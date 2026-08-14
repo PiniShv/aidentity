@@ -101,6 +101,15 @@ back regardless of what else it does.
    the entry point is ever renamed, `END_MARKER` in `install.sh` has to change
    in the same commit.
 
+8. **Regenerate `SHA256SUMS` in the same commit that changes `bin/aidentity`.**
+   `install.sh` fetches that file and refuses to install a script whose hash
+   does not match, so a stale checksum breaks every `curl` install. CI fails the
+   build when the two disagree.
+
+   ```sh
+   make checksums
+   ```
+
 ## Adding support for a new app
 
 There is no per-app list to edit — that is the design. Detection is structural,
