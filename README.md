@@ -42,7 +42,7 @@ aidentity setup
 
 `aidentity add` is the same thing in direct, scriptable form — one profile, all of it on the command line.
 
-Either route puts one file — a shell script — on your `PATH`. There is no daemon, no login item, and nothing that runs in the background.
+Every route puts one file — a shell script — on your `PATH`. There is no daemon, no login item, and nothing that runs in the background.
 
 **What each channel checks.** The Homebrew formula pins the sha256 of a tagged release tarball, committed to the tap before anyone installs it. The `curl` installer verifies the script it downloads against a `SHA256SUMS` file served from the same origin: that catches a truncated transfer, a corrupted object and a proxy swapping the body, but not a compromise of the repository itself, because the file and its checksum would move together. Homebrew is the more verifiable of the two.
 

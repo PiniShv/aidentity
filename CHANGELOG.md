@@ -7,6 +7,131 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-08-14
+
+Four commands that close gaps found in review, a recorded demo, and a live
+Homebrew tap. No change to how launchers work, so existing profiles keep
+running untouched.
+
+### Added
+
+- `aidentity rename OLD NEW` (alias `mv`) — renames a profile and moves its
+  data directory with it, so the account stays signed in. The data is moved
+  first and the launcher rebuilt second; if the rebuild fails the move is rolled
+  back, because a recoverable half-rename beats a lost session. Refuses while
+  the profile is running, since moving the directory out from under a live
+  instance would break it, and refuses a name that collides with an existing
+  launcher or data directory.
+- `aidentity set NAME` (aliases `modify`, `edit`) — changes `--badge`,
+  `--color` or `--no-badge` in place. Only the launcher bundle is rewritten and
+  the profile directory is never opened, so it is safe with the app running.
+- `aidentity prune` — finds profile data that no launcher points at, which is
+  what a launcher deleted in Finder leaves behind, and offers to remove it.
+  Lists each orphan with its disk size, asks for a typed `yes` unless `-y` is
+  given, and skips anything running or recorded outside the data root. That data
+  was previously unreachable forever.
+- `aidentity rebuild NAME` / `--all` (alias `repair`) — regenerates launchers
+  after the target app moves or is reinstalled. If the recorded path is gone it
+  looks the app up again by name, which covers a move between `/Applications`
+  and `~/Applications`. Profile data is never touched.
+- The badge character and colour are now recorded in the launcher's
+  `Info.plist`, so `set` and `rebuild` can regenerate an icon without asking you
+  to remember what you picked.
+- `AIDENTITY_APP_DIRS` — colon-separated list of directories to search for apps,
+  default `/Applications:$HOME/Applications`. `list_compatible_apps` and
+  `resolve_app` previously hardcoded `/Applications`, so the test suite scanned
+  the developer's own machine and any recording would have published their app
+  list. The case-insensitive fallback walks the same path instead of a second
+  hardcoded list.
+- `assets/demo.gif` in the README — a terminal recording made entirely inside a
+  sandbox: `HOME`, the app search path, the launcher directory and the data root
+  all point at `/tmp` fixtures, so no real app list, username, hostname or path
+  can appear. `assets/record-demo.sh` regenerates it from `assets/demo.tape`.
+- A published `SHA256SUMS`, with a CI gate so it cannot go stale, and
+  `make checksums` to regenerate it.
+- The Homebrew tap is live: `brew install pinishv/tap/aidentity`, or
+  `brew tap pinishv/tap && brew install aidentity`. Homebrew does not run the
+  walkthrough — run `aidentity setup` after installing.
+
+### Changed
+
+- The badge loop makes one `osascript` call for every icon size instead of one
+  per size. Icon generation went from roughly 690ms to 330ms: starting the Cocoa
+  runtime costs far more than the drawing does.
+- The logo and app icon were redrawn as vector art. The previous mark had a dark
+  background baked in, so it appeared as a dark rectangle on GitHub's light
+  theme and could not be used as an app icon. `assets/logo.svg`,
+  `assets/icon.svg`, `assets/aidentity.icns` and raster fallbacks.
+
+### Fixed
+
+- `add` reported success after a failed build. `build_launcher` ran inside
+  `$(…)`, so its `die()` exited only the subshell and `add` went on to print
+  "✓ Created" and exit 0 with no launcher on disk.
+- `uninstall.sh` could delete a running profile's data. Its running check used
+  `pgrep -af`, and on macOS `-a` means "include ancestors", not "print argv", so
+  the guard never fired. It now matches `bin/aidentity` exactly.
+- `rm --purge` could escape its own data root two ways: `"$DATA_ROOT//"` passed
+  the prefix test yet *is* the root, and a symlink inside the root was followed
+  out of it. The guard resolves paths now instead of comparing strings.
+- Distinct profile names could collapse onto one data directory, because
+  slugifying folds spaces, underscores and hyphens together — three launchers
+  silently shared one account. Collisions are refused with an explanation.
+- App bundle names went unescaped into the generated `Info.plist`, so a name
+  like "Barnes & Noble" produced a plist aidentity could no longer read, leaving
+  a bundle it could neither remove nor overwrite.
+- The running check matched unanchored, so a profile at `…/claude-work` matched
+  a running `…/claude-work-2` and froze an unrelated profile.
+- The data-root check looped forever on a relative path: `"${head%/*}"` reaches a
+  fixed point that never equals its input. Because `rm --purge` deletes the
+  launcher before that call, the user was left with a wedged process eating
+  memory and a half-removed profile. Paths must now be absolute and free of dot
+  segments, which also makes the walk-up provably terminate, and both the
+  launcher directory and data root are anchored at startup so a relative
+  override cannot reach it.
+- The running check treated "`pgrep` failed" the same as "nothing is running",
+  so a data-loss guard failed open. Anything but exit 0 or 1 now reports the
+  profile as running and the caller refuses to delete.
+- Backticks inside the unquoted help heredoc were command-substituted, so
+  `aidentity help` actually executed `mv` and printed its usage.
+- A `local want="$1" app="…$want…"` built the path from a stale value, because
+  the second assignment on that line cannot see the first.
+- The walkthrough ran the profile-name check in a subshell and discarded its
+  message, then printed a generic rule that often did not match why the name was
+  refused. It now reports the actual reason and re-prompts instead of ending the
+  session — the continue-on-failure branch was previously unreachable.
+- Menu choices parse as base 10 (`010` used to select the eighth app), relative
+  app paths are made absolute (a launcher built from a relative path could never
+  start), `--seed` no longer copies Claude's config into other apps, and a
+  launcher with no icon drops the key rather than declaring a missing file.
+- CI: the multi-byte-character guard used `grep -P`, which BSD grep rejects, so
+  the step passed unconditionally on macOS. It moved to a Linux job that can
+  actually fail, alongside checks for the `install.sh` end-marker contract and
+  for drift between the safety helpers duplicated across scripts.
+
+### Security
+
+- **Path traversal in `install.sh`.** `AIDENTITY_REF` was interpolated raw into
+  the `raw.githubusercontent.com` path, and curl collapses dot-segments before
+  sending the request. A ref of `../../../owner/repo/branch` therefore made the
+  installer fetch and install `bin/aidentity` from an entirely different GitHub
+  account — confirmed live against a real URL. Refs are now validated: no `..`,
+  no leading or trailing `/`, and only `[A-Za-z0-9._/-]`. Branch names
+  containing slashes still work.
+- **The installer verifies a checksum.** Its previous `verify()` was a marker
+  match, not an integrity check: a hand-written 2KB file that satisfied the size,
+  shebang, version-marker, syntax and end-marker checks installed `0755` and was
+  then offered for execution. `SHA256SUMS` is now fetched and compared before
+  anything is staged. What that buys, stated plainly: it catches truncation,
+  corruption and a proxy swapping the body, but not a compromise of the
+  repository, because the checksum is served from the same origin as the file.
+  The Homebrew formula pins a sha256 committed at release time, which remains
+  the stronger channel.
+
+### Tests
+
+225 assertions at 1.0.0, 279 now.
+
 ## [1.0.0] - 2026-08-14
 
 First release.
@@ -105,5 +230,6 @@ auto-update intact. Nothing needs re-running when the app updates.
   aidentity is for when you want the accounts signed in at the same time, in
   separate windows.
 
-[Unreleased]: https://github.com/PiniShv/aidentity/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/PiniShv/aidentity/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/PiniShv/aidentity/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/PiniShv/aidentity/releases/tag/v1.0.0

@@ -4,11 +4,15 @@ A tap is just a GitHub repo named `homebrew-<something>` with a `Formula/`
 directory in it. Homebrew clones it and reads the `.rb` files. There is no
 registry to apply to and nothing to approve.
 
-The formula in this repo (`Formula/aidentity.rb`) is the file you copy into the
-tap. It carries a placeholder checksum marked `REPLACE_AFTER_TAGGING`, because
-the checksum cannot exist until the tag does.
+The tap is live at <https://github.com/PiniShv/homebrew-tap>, so users install
+with `brew install pinishv/tap/aidentity`. The formula in this repo
+(`Formula/aidentity.rb`) is the copy of record; publishing means copying it into
+the tap with a `sha256` that matches the tag it points at.
 
 ## Checklist
+
+Steps 3 and 8 are one-time and already done. For a routine release, see
+[Releasing a new version later](#releasing-a-new-version-later) below.
 
 1. **Tag and push the release.** The tarball URL in the formula points at a tag,
    so the tag has to exist first.
@@ -32,9 +36,9 @@ the checksum cannot exist until the tag does.
 
    That prints 64 hex characters followed by `-`. Copy the hex only.
 
-3. **Create the tap repo.** It must be named `homebrew-tap` — Homebrew maps
-   `PiniShv/tap` to `github.com/PiniShv/homebrew-tap`. Public, MIT, no README
-   needed (though one is polite).
+3. **Create the tap repo.** Done once, in August 2026 — the repo exists and is
+   public. It must be named `homebrew-tap`, because Homebrew maps `PiniShv/tap`
+   to `github.com/PiniShv/homebrew-tap`.
 
    ```sh
    gh repo create PiniShv/homebrew-tap --public --description "Homebrew formulae by Pini Shvartsman"
@@ -48,9 +52,9 @@ the checksum cannot exist until the tag does.
    cp Formula/aidentity.rb homebrew-tap/Formula/aidentity.rb
    ```
 
-   Open `homebrew-tap/Formula/aidentity.rb`, put the hex from step 2 in the
-   `sha256` line, and delete the `REPLACE_AFTER_TAGGING` comment block above it.
-   If that marker is still in the file, the formula is not ready to ship.
+   Open `homebrew-tap/Formula/aidentity.rb` and put the hex from step 2 in the
+   `sha256` line. Check the `url` names the tag you just pushed: a formula whose
+   checksum and tarball disagree fails on the user's machine, not yours.
 
 5. **Test it locally before pushing.**
 
@@ -84,11 +88,12 @@ the checksum cannot exist until the tag does.
    aidentity version
    ```
 
-8. **Put the two lines in the README** so people never have to find this file:
+8. **Put the install lines in the README** so people never have to find this
+   file. Done — the README lists both spellings alongside the `curl` installer:
 
    ```sh
-   brew tap PiniShv/tap
-   brew install aidentity
+   brew install pinishv/tap/aidentity
+   brew tap pinishv/tap && brew install aidentity
    ```
 
 ## Releasing a new version later
