@@ -11,7 +11,7 @@ class Aidentity < Formula
   url "https://github.com/PiniShv/aidentity/archive/refs/tags/v1.1.0.tar.gz"
   # Get the real value with:
   #   curl -sL https://github.com/PiniShv/aidentity/archive/refs/tags/v1.1.0.tar.gz | shasum -a 256
-  sha256 "68b018f7ee928779baa67f849cb8eafcbb6a552337759752ee2e8255da286cc8"
+  sha256 "954ed4deb83d1416965febd9507992ebff9d737a5c8c28b1d42fe3ff7742f873"
   license "MIT"
   head "https://github.com/PiniShv/aidentity.git", branch: "main"
 
