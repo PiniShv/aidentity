@@ -164,11 +164,45 @@ jobs:
             exit 1
           fi
 
-      - name: No bare variable before a multi-byte character
+  guards:
+    name: Source guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # "$var…" expands as ${var…} in bash and dies under `set -u`. GNU grep is
+      # required for -P; this job is Linux precisely because the macOS runner's
+      # BSD grep silently rejected -P and the check passed unconditionally.
+      - name: Braces required before a multi-byte character
         run: |
-          # "$var…" expands as ${var…} in bash and dies under `set -u`.
-          # Braces are mandatory in that position; this catches regressions.
-          if grep -nP '\$\{?[A-Za-z_][A-Za-z0-9_]*\}?[^\x00-\x7F]' bin/aidentity install.sh uninstall.sh | grep -v '\${'; then
-            echo "Use \${var} when a non-ASCII character follows." >&2
+          if grep -oP '(?<!\{)\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]' \
+               bin/aidentity install.sh uninstall.sh test/run_tests.sh; then
+            echo "::error::Use \${var} when a non-ASCII character follows the name." >&2
             exit 1
           fi
+
+      # install.sh verifies downloads by matching this exact final line.
+      - name: bin/aidentity still ends on its entry point
+        run: |
+          marker=$(sed -n "s/^END_MARKER='\(.*\)'$/\1/p" install.sh)
+          last=$(awk 'NF {l=$0} END {sub(/[ \t\r]+$/,"",l); print l}' bin/aidentity)
+          if [ "$last" != "$marker" ]; then
+            echo "::error::bin/aidentity must end on [$marker] but ends on [$last]" >&2
+            exit 1
+          fi
+
+      # These helpers are defined in two scripts and MUST stay in step — a
+      # drifted copy of running_on_profile shipped a dead safety guard once.
+      - name: Duplicated safety helpers agree
+        run: |
+          fail=0
+          for fn in running_on_profile data_is_ours is_our_launcher; do
+            a=$(sed -n "/^$fn() {/,/^}/p" bin/aidentity | grep -v '^\s*#')
+            b=$(sed -n "/^$fn() {/,/^}/p" uninstall.sh  | grep -v '^\s*#')
+            if [ -n "$b" ] && [ "$a" != "$b" ]; then
+              echo "::error::$fn differs between bin/aidentity and uninstall.sh" >&2
+              diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") || true
+              fail=1
+            fi
+          done
+          exit $fail

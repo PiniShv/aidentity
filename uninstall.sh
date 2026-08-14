@@ -106,16 +106,31 @@ plist_get() {
 # Is this recorded data directory genuinely inside our data root? A plain prefix
 # test is not enough — "$DATA_ROOT/../../Pictures" is prefixed by $DATA_ROOT and
 # resolves nowhere near it, and rm -rf does not care about the difference.
+# Kept deliberately identical to bin/aidentity's version. A string prefix test
+# is not enough: "$DATA_ROOT//" matches "$DATA_ROOT"/?* yet IS the root, and a
+# symlink inside the root escapes it entirely. Resolve both sides instead.
 data_is_ours() {
-  local d="$1"
+  local d="$1" real root head tail
   [ -n "$d" ] || return 1
-  case "$d" in
-    ..|../*|*/../*|*/..) return 1 ;;
+
+  root=$(command cd -P "$DATA_ROOT" 2>/dev/null && pwd -P) || return 1
+  [ -n "$root" ] || return 1
+
+  head="$d"; tail=""
+  while [ -n "$head" ] && [ ! -d "$head" ]; do
+    tail="${head##*/}${tail:+/$tail}"
+    head="${head%/*}"
+    [ "$head" = "$d" ] && return 1
+  done
+  [ -n "$head" ] || return 1
+  real=$(command cd -P "$head" 2>/dev/null && pwd -P) || return 1
+  [ -n "$tail" ] && real="$real/$tail"
+
+  [ "$real" = "$root" ] && return 1
+  case "$real" in
+    "$root"/?*) return 0 ;;
+    *) return 1 ;;
   esac
-  case "$d" in
-    "$DATA_ROOT"/?*) return 0 ;;
-  esac
-  return 1
 }
 
 # Read the file before deleting it. "aidentity" is a plausible name for
@@ -146,8 +161,18 @@ in_repo_checkout() {
   [ -f "$root/install.sh" ] && [ -f "$root/uninstall.sh" ] && [ -f "$root/LICENSE" ]
 }
 
+# Kept deliberately identical to bin/aidentity's version. On macOS `pgrep -a`
+# means "include ancestors", NOT "print the command line" as on Linux, so -af
+# yields bare PIDs and the match below can never succeed. The list must also be
+# captured before matching, or pgrep matches the grep's own argv. This copy had
+# both bugs, which made the "don't delete a running profile" guard dead code.
 running_on_profile() {
-  pgrep -af "user-data-dir=" 2>/dev/null | grep -qF -- "user-data-dir=$1"
+  local list
+  [ -n "$1" ] || return 1
+  list=$(pgrep -fl "user-data-dir=" 2>/dev/null) || return 1
+  [ -n "$list" ] || return 1
+  printf '%s\n' "$list" | grep -qF -- "user-data-dir=$1 " ||
+  printf '%s\n' "$list" | grep -q -- "user-data-dir=$(printf '%s' "$1" | sed 's/[][\.*^$\/]/\\&/g')\$"
 }
 
 human_size() {

@@ -110,6 +110,14 @@ shquote() {
   printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
 }
 
+# Escape a string for use as XML character data in the generated Info.plist.
+# Profile names are validated, but APP names are whatever is on disk — and
+# "Barnes & Noble.app" or any name containing < or > produced a plist that
+# plutil rejects, leaving a bundle the tool could no longer read or remove.
+xmlescape() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g'
+}
+
 # --------------------------------------------------------- app discovery --
 
 # True if the bundle is Chromium- or Electron-based, i.e. it understands
@@ -154,9 +162,24 @@ bundle_id()   { /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$1/Conte
 bundle_name() { basename "$1" .app; }
 
 # Resolve a user-supplied app name or path to a bundle path.
+# Always returns an ABSOLUTE path. A relative one ("Claude.app", typed from
+# /Applications) was embedded verbatim in the launcher, which then resolved
+# against the Finder's working directory of / and could never start the app.
+# Only relative paths are rewritten. An absolute path is passed through as the
+# user gave it, symlinks and all — resolving those too would silently repoint a
+# launcher away from a deliberately symlinked app.
+abs_bundle() {
+  local p="${1%/}" d b
+  case "$p" in /*) printf '%s' "$p"; return 0 ;; esac
+  d=$(dirname "$p"); b=$(basename "$p")
+  d=$(command cd -P "$d" 2>/dev/null && pwd) || return 1
+  printf '%s/%s' "${d%/}" "$b"
+}
+
 resolve_app() {
   local q="$1" cand
-  if [ -d "$q" ] && [ "${q##*.}" = "app" ]; then printf '%s' "${q%/}"; return 0; fi
+  q="${q%/}"
+  if [ -d "$q" ] && [ "${q##*.}" = "app" ]; then abs_bundle "$q"; return $?; fi
   for cand in "/Applications/$q.app" "$HOME/Applications/$q.app" \
               "/Applications/$q" "$HOME/Applications/$q" \
               "/System/Applications/$q.app"; do
@@ -213,7 +236,9 @@ EOF
   if [ "$choice" -lt 1 ] || [ "$choice" -gt "${#apps[@]}" ]; then
     warn "Number out of range."; return 1
   fi
-  printf '%s' "${apps[$((choice-1))]}"
+  # 10# forces base 10. Plain $((choice-1)) reads a leading zero as octal, so
+  # "010" selected the 8th app and "08"/"09" aborted the wizard outright.
+  printf '%s' "${apps[$((10#$choice - 1))]}"
 }
 
 # ---------------------------------------------------------------- colours --
@@ -347,25 +372,54 @@ assert_ours() {
 #      grep starts both at once, and the grep's own argv contains the path we
 #      are searching for — so pgrep matches the grep and every profile looks
 #      like it is running.
+# The match is anchored on purpose. A bare substring test made ".../claude-work"
+# match a process running ".../claude-work-2", so one profile reported another
+# as running and refused to remove or rebuild it. The flag is always followed by
+# a space or the end of the argument list, so require one of those.
 running_on_profile() {
   local list
+  [ -n "$1" ] || return 1
   list=$(pgrep -fl "user-data-dir=" 2>/dev/null) || return 1
   [ -n "$list" ] || return 1
-  printf '%s\n' "$list" | grep -qF -- "user-data-dir=$1"
+  printf '%s\n' "$list" | grep -qF -- "user-data-dir=$1 " ||
+  printf '%s\n' "$list" | grep -q -- "user-data-dir=$(printf '%s' "$1" | sed 's/[][\.*^$\/]/\\&/g')\$"
 }
 
 # A recorded data directory is ours only if it sits genuinely inside the data
-# root. A plain prefix test is not enough: "$DATA_ROOT/../../elsewhere" starts
-# with the root but resolves outside it, which would aim rm -rf at any directory
-# an edited Info.plist named.
+# root. This is the last thing standing between a hand-edited Info.plist and
+# `rm -rf`, so it resolves the path rather than pattern-matching the string.
+#
+# Three ways a string test alone was shown to fail:
+#   "$DATA_ROOT/../elsewhere"  — traversal
+#   "$DATA_ROOT//"             — matches "$DATA_ROOT"/?* yet IS the root, so
+#                                rm -rf took every profile with it
+#   "$DATA_ROOT/link/x"        — link is a symlink out of the root, and rm -rf
+#                                follows it
+# Resolving both sides with `cd -P` collapses all three: a path that resolves
+# to the root itself, or to anywhere outside it, is rejected.
 data_is_ours() {
-  local d="$1"
+  local d="$1" real root
   [ -n "$d" ] || return 1
-  case "$d" in
-    *"/../"*|*"/.."|"../"*|"..") return 1 ;;
-  esac
-  case "$d" in
-    "$DATA_ROOT"/?*) return 0 ;;
+
+  root=$(command cd -P "$DATA_ROOT" 2>/dev/null && pwd -P) || return 1
+  [ -n "$root" ] || return 1
+
+  # Resolve the deepest existing ancestor, then re-attach the rest, so a
+  # not-yet-created directory is still judged by where it would land.
+  local head="$d" tail=""
+  while [ -n "$head" ] && [ ! -d "$head" ]; do
+    tail="${head##*/}${tail:+/$tail}"
+    head="${head%/*}"
+    [ "$head" = "$d" ] && return 1
+  done
+  [ -n "$head" ] || return 1
+  real=$(command cd -P "$head" 2>/dev/null && pwd -P) || return 1
+  [ -n "$tail" ] && real="$real/$tail"
+
+  # Must be strictly below the root — never the root itself.
+  [ "$real" = "$root" ] && return 1
+  case "$real" in
+    "$root"/?*) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -397,13 +451,19 @@ build_launcher() {
   local bid
   bid="com.aidentity.$(slugify "$label")"
 
+  local x_label x_profile x_src x_data
+  x_label=$(xmlescape "$label")
+  x_profile=$(xmlescape "$profile")
+  x_src=$(xmlescape "$src_app")
+  x_data=$(xmlescape "$data_dir")
+
   cat > "$dst/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleName</key><string>$label</string>
-	<key>CFBundleDisplayName</key><string>$label</string>
+	<key>CFBundleName</key><string>$x_label</string>
+	<key>CFBundleDisplayName</key><string>$x_label</string>
 	<key>CFBundleIdentifier</key><string>$bid</string>
 	<key>CFBundleExecutable</key><string>launcher</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
@@ -411,23 +471,38 @@ build_launcher() {
 	<key>CFBundleVersion</key><string>$AIDENTITY_VERSION</string>
 	<key>CFBundleIconFile</key><string>icon</string>
 	<key>LSUIElement</key><true/>
-	<key>$MARKER_KEY</key><string>$profile</string>
-	<key>AIdentityTargetApp</key><string>$src_app</string>
-	<key>AIdentityDataDir</key><string>$data_dir</string>
-	<key>AIdentityVersion</key><string>$AIDENTITY_VERSION</string>
+	<key>$MARKER_KEY</key><string>$x_profile</string>
+	<key>AIdentityTargetApp</key><string>$x_src</string>
+	<key>AIdentityDataDir</key><string>$x_data</string>
 </dict>
 </plist>
 PLIST
 
-  plutil -lint "$dst/Contents/Info.plist" >/dev/null 2>&1 \
-    || die "Generated a malformed Info.plist for '$label' — aborting."
+  # Leave nothing behind on failure. A half-written bundle whose plist cannot be
+  # parsed is invisible to is_our_launcher, which made it unremovable by rm and
+  # un-overwritable by add — the user had to delete it by hand.
+  if ! plutil -lint "$dst/Contents/Info.plist" >/dev/null 2>&1; then
+    rm -rf "$dst"
+    die "Generated a malformed Info.plist for '$label' — nothing was created."
+  fi
 
   # An empty letter means the user asked for the app's own icon, untouched.
+  local have_icon=1
   if [ -z "$letter" ]; then
-    copy_plain_icon "$src_app" "$dst/Contents/Resources/icon.icns"
-  elif ! build_icon "$src_app" "$letter" "$hex" "$dst/Contents/Resources/icon.icns"; then
-    copy_plain_icon "$src_app" "$dst/Contents/Resources/icon.icns"
+    copy_plain_icon "$src_app" "$dst/Contents/Resources/icon.icns" || have_icon=0
+  elif build_icon "$src_app" "$letter" "$hex" "$dst/Contents/Resources/icon.icns"; then
+    :
+  elif copy_plain_icon "$src_app" "$dst/Contents/Resources/icon.icns"; then
     warn "Could not badge the icon; using the app's own icon instead."
+  else
+    have_icon=0
+  fi
+
+  # Declaring an icon that is not there gives a broken-looking bundle. Drop the
+  # key instead and say so, rather than claiming an icon we failed to write.
+  if [ "$have_icon" -eq 0 ]; then
+    /usr/libexec/PlistBuddy -c "Delete :CFBundleIconFile" "$dst/Contents/Info.plist" >/dev/null 2>&1 || true
+    warn "$(bundle_name "$src_app") has no icon to copy; the launcher uses the default one."
   fi
 
   # Ad-hoc sign so the bundle is internally consistent. Not required to launch a
@@ -441,8 +516,7 @@ PLIST
   local lsreg="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
   [ -x "$lsreg" ] && "$lsreg" -f "$dst" >/dev/null 2>&1
   touch "$dst"
-
-  printf '%s' "$dst"
+  return 0
 }
 
 # -------------------------------------------------------------- commands --
@@ -633,6 +707,26 @@ cmd_add() {
   local slug;  slug="$(slugify "$label")"
   local data_dir="$DATA_ROOT/$slug"
 
+  # slugify folds spaces, underscores and hyphens together and drops non-ASCII,
+  # so "Work 2", "Work_2" and "Work-2" all produced ONE data directory. Three
+  # launchers then shared a single profile — the opposite of the tool's job.
+  # Refuse the collision rather than silently merging two accounts.
+  if [ -z "$slug" ]; then
+    die "Cannot derive a profile directory from '$label'.
+    Use a name containing at least one letter or number."
+  fi
+  local existing
+  for existing in "$APPS_DIR"/*.app; do
+    [ -d "$existing" ] || continue
+    is_our_launcher "$existing" || continue
+    [ "$(bundle_name "$existing")" = "$label" ] && continue
+    if [ "$(plist_get "$existing" "AIdentityDataDir")" = "$data_dir" ]; then
+      die "'$label' would share its profile directory with '$(bundle_name "$existing")':
+      $data_dir
+    Spaces, underscores and hyphens are treated the same. Pick a more distinct name."
+    fi
+  done
+
   [ -n "$badge" ] || badge=$(printf '%s' "$profile" | cut -c1 | tr '[:lower:]' '[:upper:]')
   badge=$(printf '%s' "$badge" | cut -c1)
   [ "$no_badge" -eq 1 ] && badge=""
@@ -653,13 +747,22 @@ cmd_add() {
     die "'$label' is running right now. Quit it, then re-run."
   fi
 
-  local dst; dst=$(build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex")
+  # Called directly, NOT via $(…). In a command substitution the builder runs in
+  # a subshell, so its `die` calls exited only that subshell and cmd_add went on
+  # to print "✓ Created" after a failed build, exiting 0.
+  local dst="$APPS_DIR/$label.app"
+  build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" || exit 1
 
   # Claude Desktop keeps its MCP server list inside the profile, so a new profile
   # starts empty. Offer to copy the existing one across; they diverge afterwards.
   if [ "$seed" -eq 1 ]; then
+    # Gate on the target app. --seed used to copy Claude's MCP config into
+    # whatever profile was being created, so `add Slack --profile W --seed`
+    # dropped claude_desktop_config.json into Slack's directory.
     local primary="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-    if [ -f "$primary" ] && [ ! -f "$data_dir/claude_desktop_config.json" ]; then
+    if [ "$(bundle_id "$src_app")" != "com.anthropic.claudefordesktop" ]; then
+      warn "--seed only applies to Claude Desktop; ignoring it for $(bundle_name "$src_app")."
+    elif [ -f "$primary" ] && [ ! -f "$data_dir/claude_desktop_config.json" ]; then
       cp "$primary" "$data_dir/claude_desktop_config.json" && ok "Copied your MCP server config into the new profile."
     else
       dim "  Nothing to seed (no existing config, or the profile already has one)."

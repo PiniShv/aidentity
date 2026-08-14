@@ -702,6 +702,10 @@ group "--seed copies an existing Claude config"
 FAKE_HOME="$SB/fake home"
 mkdir -p "$FAKE_HOME/Library/Application Support/Claude"
 printf '{"mcpServers":{"probe":{}}}\n' > "$FAKE_HOME/Library/Application Support/Claude/claude_desktop_config.json"
+# --seed is gated on the target being Claude Desktop, so the fixture has to
+# claim Claude's bundle id. Seeding any other app was a real bug.
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anthropic.claudefordesktop" \
+  "$ELECTRON_APP/Contents/Info.plist" >/dev/null 2>&1 || true
 RUN_OUT=$(HOME="$FAKE_HOME" bash "$AIDENTITY" add "$ELECTRON_APP" --profile Seeded --seed 2>&1 </dev/null)
 RUN_RC=$?
 assert_rc "add --seed exits 0" 0 "$RUN_RC" "$RUN_OUT"
@@ -806,12 +810,64 @@ group "a malformed Info.plist is caught, not shipped"
 # Profile names are validated; app bundle names are not, and both go into the
 # generated plist. An app whose name carries XML metacharacters is the reachable
 # path to a broken plist, which is what the plutil -lint backstop is for.
+# An app name carrying XML metacharacters must be ESCAPED into the plist, not
+# left to corrupt it. "Barnes & Noble.app" is the real-world case.
 XML_APP="$SRC/Ev&il<x>.app"
 make_electron_app "$XML_APP"
 ai add "$XML_APP" --profile Work
-assert_contains "an app name with XML metacharacters trips the plist check" \
-  "$RUN_OUT" "malformed Info.plist"
-rm -rf "$APPS/Ev&il<x> Work.app" "$DATA/evilx-work"
+assert_rc "an app name with XML metacharacters is handled, not rejected" 0 "$RUN_RC" "$RUN_OUT"
+assert_dir "the launcher for an XML-metacharacter app exists" "$APPS/Ev&il<x> Work.app"
+if plutil -lint "$APPS/Ev&il<x> Work.app/Contents/Info.plist" >/dev/null 2>&1; then
+  _pass "the generated plist is well formed despite & and <"
+else
+  _fail "the generated plist is well formed despite & and <" "plutil rejected it"
+fi
+assert_eq "the app name round-trips through the plist unescaped" \
+  "$(plist_key "$APPS/Ev&il<x> Work.app" CFBundleName)" "Ev&il<x> Work"
+ai rm "Ev&il<x> Work" --purge -y
+assert_rc "the XML-metacharacter launcher is removable by the tool" 0 "$RUN_RC" "$RUN_OUT"
+assert_no_dir "no XML-metacharacter debris is left behind" "$APPS/Ev&il<x> Work.app"
+
+group "regressions — bugs found in review, each must stay fixed"
+
+# A failed build must NOT report success. build_launcher used to run inside
+# $(…), so its die() exited only that subshell and add printed "✓ Created".
+REG_APPS="$SB/ro apps"
+mkdir -p "$REG_APPS"
+chmod 500 "$REG_APPS"
+RUN_OUT=$(AIDENTITY_APPS_DIR="$REG_APPS" bash "$AIDENTITY" add "$ELECTRON_APP" --profile Blocked 2>&1 </dev/null)
+RUN_RC=$?
+chmod 700 "$REG_APPS"
+assert_rc_nonzero "a build that cannot write exits non-zero" "$RUN_RC" "$RUN_OUT"
+assert_not_contains "a failed build never claims success" "$RUN_OUT" "Created"
+
+# data_is_ours must reject the root however it is spelled, and must not follow
+# a symlink out of the root.
+libcall data_is_ours "$DATA//"
+assert_rc_nonzero "purge guard rejects the data root spelled with a double slash" "$RUN_RC"
+libcall data_is_ours "$DATA"
+assert_rc_nonzero "purge guard rejects the bare data root" "$RUN_RC"
+mkdir -p "$SB/outside/keep"
+ln -sfn "$SB/outside" "$DATA/escape"
+libcall data_is_ours "$DATA/escape/keep"
+assert_rc_nonzero "purge guard does not follow a symlink out of the root" "$RUN_RC"
+rm -f "$DATA/escape"
+libcall data_is_ours "$DATA/a-real-profile"
+assert_rc "purge guard still accepts a genuine profile path" 0 "$RUN_RC"
+
+# Distinct names that slugify to one directory must be refused, not merged.
+ai add "$ELECTRON_APP" --profile "Coll A"
+assert_rc "the first of two colliding names is created" 0 "$RUN_RC" "$RUN_OUT"
+ai add "$ELECTRON_APP" --profile "Coll_A"
+assert_rc_nonzero "a name colliding on slug is refused" "$RUN_RC" "$RUN_OUT"
+assert_contains "the collision is explained" "$RUN_OUT" "share its profile directory"
+assert_no_dir "no launcher is built for the colliding name" "$APPS/Fake Coll_A.app"
+ai rm "Fake Coll A" --purge -y
+
+# The running check must be anchored, and must never match on an empty path.
+libcall running_on_profile ""
+assert_rc_nonzero "an empty data dir never reports as running" "$RUN_RC"
+
 
 group "sandbox isolation — final check"
 
