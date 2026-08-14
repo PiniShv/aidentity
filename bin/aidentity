@@ -657,9 +657,10 @@ cmd_open() {
   [ -d "$app" ] || die "No launcher named '$want'. Run 'aidentity list' to see what exists."
   assert_ours "$app"
   open "$app" || die "Could not open '$want'."
-  # Braces are required, not cosmetic: bash folds a following multi-byte
-  # character into the parameter name, so "$want…" expands as ${want…} and
-  # dies under `set -u`.
+  # Braces are required here, not cosmetic. Bash folds a following multi-byte
+  # character into the parameter name, so an unbraced name directly before the
+  # ellipsis is read as part of the name and dies under `set -u`. A CI guard
+  # enforces this, which is why the bad form is described rather than written.
   ok "Opening ${want}…"
 }
 
