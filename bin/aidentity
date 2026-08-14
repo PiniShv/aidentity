@@ -180,28 +180,59 @@ resolve_app() {
   local q="$1" cand
   q="${q%/}"
   if [ -d "$q" ] && [ "${q##*.}" = "app" ]; then abs_bundle "$q"; return $?; fi
-  for cand in "/Applications/$q.app" "$HOME/Applications/$q.app" \
-              "/Applications/$q" "$HOME/Applications/$q" \
-              "/System/Applications/$q.app"; do
-    [ -d "$cand" ] && { printf '%s' "${cand%/}"; return 0; }
-  done
-  # case-insensitive fallback
-  cand=$(ls -d /Applications/*.app "$HOME"/Applications/*.app 2>/dev/null \
-         | awk -v q="$(printf '%s' "$q" | tr '[:upper:]' '[:lower:]')" \
-             'BEGIN{IGNORECASE=1} { n=$0; sub(/.*\//,"",n); sub(/\.app$/,"",n);
-               if (tolower(n)==q) { print; exit } }')
-  [ -n "$cand" ] && { printf '%s' "$cand"; return 0; }
+  local dir
+  while IFS= read -r dir; do
+    for cand in "$dir/$q.app" "$dir/$q"; do
+      [ -d "$cand" ] && { printf '%s' "${cand%/}"; return 0; }
+    done
+  done <<EOF
+$(app_search_dirs)
+/System/Applications
+EOF
+
+  # Case-insensitive fallback over the same search path.
+  local want; want=$(printf '%s' "$q" | tr '[:upper:]' '[:lower:]')
+  while IFS= read -r dir; do
+    [ -d "$dir" ] || continue
+    for cand in "$dir"/*.app; do
+      [ -d "$cand" ] || continue
+      local n; n=$(bundle_name "$cand")
+      if [ "$(printf '%s' "$n" | tr '[:upper:]' '[:lower:]')" = "$want" ]; then
+        printf '%s' "$cand"; return 0
+      fi
+    done
+  done <<EOF
+$(app_search_dirs)
+EOF
   return 1
+}
+
+# Where to look for installed apps, colon-separated.
+#
+# Overridable so the test suite and the documentation recording run against
+# fixtures instead of whatever is really installed. Without this the suite
+# scans the developer's own /Applications — which weakens its isolation claim —
+# and any recorded demo would publish the operator's full app list.
+app_search_dirs() {
+  local raw="${AIDENTITY_APP_DIRS:-/Applications:$HOME/Applications}" d
+  local oldifs="$IFS"; IFS=':'
+  for d in $raw; do [ -n "$d" ] && printf '%s\n' "${d%/}"; done
+  IFS="$oldifs"
 }
 
 # Every Chromium/Electron app installed, one path per line.
 list_compatible_apps() {
-  local app
-  for app in /Applications/*.app "$HOME"/Applications/*.app; do
-    [ -d "$app" ] || continue
-    is_our_launcher "$app" && continue
-    is_chromium_app "$app" && printf '%s\n' "$app"
-  done
+  local dir app
+  while IFS= read -r dir; do
+    [ -d "$dir" ] || continue
+    for app in "$dir"/*.app; do
+      [ -d "$app" ] || continue
+      is_our_launcher "$app" && continue
+      is_chromium_app "$app" && printf '%s\n' "$app"
+    done
+  done <<EOF
+$(app_search_dirs)
+EOF
 }
 
 copy_plain_icon() {
