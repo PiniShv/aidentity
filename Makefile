@@ -92,3 +92,8 @@ lint: ## shellcheck every shell file, or syntax-check them if shellcheck is abse
 		done; \
 	fi
 	@printf 'Lint passed.\n'
+
+.PHONY: checksums
+checksums: ## Regenerate SHA256SUMS after changing bin/aidentity
+	@shasum -a 256 bin/aidentity | awk '{print $$1"  bin/aidentity"}' > SHA256SUMS
+	@echo "SHA256SUMS updated"

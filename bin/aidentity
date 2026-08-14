@@ -27,6 +27,12 @@ MARKER_KEY="AIdentityProfile"
 APPS_DIR="${AIDENTITY_APPS_DIR:-$HOME/Applications}"
 DATA_ROOT="${AIDENTITY_DATA_ROOT:-$HOME/Library/Application Support/aidentity/profiles}"
 
+# Both are overridable, and a relative value would be recorded verbatim in a
+# launcher's Info.plist — where it later resolves against whatever directory
+# the tool happens to run from. Anchor them once, here.
+case "$APPS_DIR"  in /*) ;; *) APPS_DIR="$PWD/${APPS_DIR#./}" ;; esac
+case "$DATA_ROOT" in /*) ;; *) DATA_ROOT="$PWD/${DATA_ROOT#./}" ;; esac
+
 # ---------------------------------------------------------------- output --
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -410,8 +416,17 @@ assert_ours() {
 running_on_profile() {
   local list
   [ -n "$1" ] || return 1
-  list=$(pgrep -fl "user-data-dir=" 2>/dev/null) || return 1
-  [ -n "$list" ] || return 1
+  # pgrep exits 1 for "no match" but >=2 for a real failure. Treating those the
+  # same made a data-loss guard fail OPEN — a broken pgrep read as "nothing is
+  # running" and the delete went ahead. Anything but 0 or 1 is reported as
+  # running, so the caller refuses to delete.
+  local rc
+  list=$(pgrep -fl "user-data-dir=" 2>/dev/null); rc=$?
+  if [ "$rc" -gt 1 ]; then
+    warn "Could not check which profiles are running (pgrep exited $rc); assuming they are."
+    return 0
+  fi
+  [ "$rc" -eq 0 ] && [ -n "$list" ] || return 1
   printf '%s\n' "$list" | grep -qF -- "user-data-dir=$1 " ||
   printf '%s\n' "$list" | grep -q -- "user-data-dir=$(printf '%s' "$1" | sed 's/[][\.*^$\/]/\\&/g')\$"
 }
@@ -429,23 +444,35 @@ running_on_profile() {
 # Resolving both sides with `cd -P` collapses all three: a path that resolves
 # to the root itself, or to anywhere outside it, is rejected.
 data_is_ours() {
-  local d="$1" real root
+  local d="$1" real root head tail
   [ -n "$d" ] || return 1
+
+  # Absolute only. A relative path also made the walk-up loop below spin
+  # forever: "${head%/*}" reaches a fixed point that never equals the input,
+  # so the guard never fired and `tail` grew without bound.
+  case "$d" in /*) ;; *) return 1 ;; esac
+
+  # No dot segments at all. The tail is re-attached lexically further down, so
+  # a ".." inside it would never be resolved and the answer would be wrong.
+  case "$d" in
+    *"/../"*|*"/.."|*"/./"*|*"/."|*"/") return 1 ;;
+  esac
 
   root=$(command cd -P "$DATA_ROOT" 2>/dev/null && pwd -P) || return 1
   [ -n "$root" ] || return 1
 
   # Resolve the deepest existing ancestor, then re-attach the rest, so a
-  # not-yet-created directory is still judged by where it would land.
-  local head="$d" tail=""
-  while [ -n "$head" ] && [ ! -d "$head" ]; do
+  # not-yet-created directory is still judged by where it would land. This
+  # terminates because the path is absolute: head shrinks one component per
+  # pass and bottoms out at "/", which always exists.
+  head="$d"; tail=""
+  while [ ! -d "$head" ]; do
     tail="${head##*/}${tail:+/$tail}"
     head="${head%/*}"
-    [ "$head" = "$d" ] && return 1
+    [ -z "$head" ] && head="/"
   done
-  [ -n "$head" ] || return 1
   real=$(command cd -P "$head" 2>/dev/null && pwd -P) || return 1
-  [ -n "$tail" ] && real="$real/$tail"
+  [ -n "$tail" ] && real="${real%/}/$tail"
 
   # Must be strictly below the root — never the root itself.
   [ "$real" = "$root" ] && return 1

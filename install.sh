@@ -37,7 +37,20 @@ set -euo pipefail
 
 REPO_URL="https://github.com/PiniShv/aidentity"
 REF="${AIDENTITY_REF:-main}"
+
+# REF is interpolated into a raw.githubusercontent.com path, and curl collapses
+# dot-segments before sending the request — so a REF containing ".." walked up
+# and back down into a DIFFERENT owner and repo, and the installer happily
+# fetched and installed whatever that repo served. Validate before use.
+case "$REF" in
+  ''|*..*|/*|*/|*[!A-Za-z0-9._/-]*)
+    printf 'Refusing to use AIDENTITY_REF=%s\n' "$REF" >&2
+    printf 'A ref may contain letters, numbers, dot, underscore, hyphen and slash,\n' >&2
+    printf 'may not contain "..", and may not start or end with "/".\n' >&2
+    exit 1 ;;
+esac
 SOURCE_URL="https://raw.githubusercontent.com/PiniShv/aidentity/${REF}/bin/aidentity"
+SUMS_URL="https://raw.githubusercontent.com/PiniShv/aidentity/${REF}/SHA256SUMS"
 INSTALL_URL="https://raw.githubusercontent.com/PiniShv/aidentity/${REF}/install.sh"
 
 BIN_NAME="aidentity"
@@ -378,6 +391,36 @@ offer_setup() {
   "$INSTALLED_PATH" setup < /dev/tty || true
 }
 
+
+# Verify the download against the checksum published at the same ref.
+#
+# Be honest about what this buys: it catches corruption, truncation, a proxy
+# swapping the body, and a partial CDN object. It does NOT defend against a
+# compromise of the repository itself, because the checksum is served from the
+# same origin as the file. Homebrew is the stronger channel — its formula pins
+# a sha256 reviewed at release time.
+verify_checksum() {
+  local want got
+  want=$(curl -fsSL --proto '=https' --proto-redir '=https' "$SUMS_URL" 2>/dev/null \
+         | awk '$2 == "bin/aidentity" { print $1; exit }') || want=""
+  if [ -z "$want" ]; then
+    warn "No published checksum found for '$REF'; continuing on the structural checks alone."
+    return 0
+  fi
+  got=$(shasum -a 256 "$TMP_FILE" 2>/dev/null | awk '{print $1}')
+  if [ -z "$got" ]; then
+    warn "Could not compute a checksum locally; continuing on the structural checks alone."
+    return 0
+  fi
+  if [ "$want" != "$got" ]; then
+    die "Checksum mismatch — refusing to install.
+    expected $want
+    got      $got
+    Nothing was written. If this repeats, download it by hand from $REPO_URL"
+  fi
+  dim "  checksum verified"
+}
+
 # ----------------------------------------------------------------- main --
 
 main() {
@@ -385,6 +428,7 @@ main() {
   info ""
   download
   verify
+  verify_checksum
   choose_install_dir
   install_binary
   report

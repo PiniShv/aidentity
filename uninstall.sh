@@ -113,18 +113,24 @@ data_is_ours() {
   local d="$1" real root head tail
   [ -n "$d" ] || return 1
 
+  # Absolute only: a relative path made the walk-up loop below spin forever.
+  case "$d" in /*) ;; *) return 1 ;; esac
+  # No dot segments — the tail is re-attached lexically and never resolved.
+  case "$d" in
+    *"/../"*|*"/.."|*"/./"*|*"/."|*"/") return 1 ;;
+  esac
+
   root=$(command cd -P "$DATA_ROOT" 2>/dev/null && pwd -P) || return 1
   [ -n "$root" ] || return 1
 
   head="$d"; tail=""
-  while [ -n "$head" ] && [ ! -d "$head" ]; do
+  while [ ! -d "$head" ]; do
     tail="${head##*/}${tail:+/$tail}"
     head="${head%/*}"
-    [ "$head" = "$d" ] && return 1
+    [ -z "$head" ] && head="/"
   done
-  [ -n "$head" ] || return 1
   real=$(command cd -P "$head" 2>/dev/null && pwd -P) || return 1
-  [ -n "$tail" ] && real="$real/$tail"
+  [ -n "$tail" ] && real="${real%/}/$tail"
 
   [ "$real" = "$root" ] && return 1
   case "$real" in
@@ -132,6 +138,7 @@ data_is_ours() {
     *) return 1 ;;
   esac
 }
+
 
 # Read the file before deleting it. "aidentity" is a plausible name for
 # something the user wrote themselves, and $(command -v) will happily hand us
@@ -169,8 +176,17 @@ in_repo_checkout() {
 running_on_profile() {
   local list
   [ -n "$1" ] || return 1
-  list=$(pgrep -fl "user-data-dir=" 2>/dev/null) || return 1
-  [ -n "$list" ] || return 1
+  # pgrep exits 1 for "no match" but >=2 for a real failure. Treating those the
+  # same made a data-loss guard fail OPEN — a broken pgrep read as "nothing is
+  # running" and the delete went ahead. Anything but 0 or 1 is reported as
+  # running, so the caller refuses to delete.
+  local rc
+  list=$(pgrep -fl "user-data-dir=" 2>/dev/null); rc=$?
+  if [ "$rc" -gt 1 ]; then
+    warn "Could not check which profiles are running (pgrep exited $rc); assuming they are."
+    return 0
+  fi
+  [ "$rc" -eq 0 ] && [ -n "$list" ] || return 1
   printf '%s\n' "$list" | grep -qF -- "user-data-dir=$1 " ||
   printf '%s\n' "$list" | grep -q -- "user-data-dir=$(printf '%s' "$1" | sed 's/[][\.*^$\/]/\\&/g')\$"
 }

@@ -206,3 +206,16 @@ jobs:
             fi
           done
           exit $fail
+
+      # bin/aidentity changed without regenerating SHA256SUMS would make every
+      # piped install fail the checksum. Catch it here instead of in the field.
+      - name: SHA256SUMS matches bin/aidentity
+        run: |
+          want=$(awk '$2 == "bin/aidentity" { print $1; exit }' SHA256SUMS)
+          got=$(shasum -a 256 bin/aidentity | awk '{print $1}')
+          if [ "$want" != "$got" ]; then
+            echo "::error::SHA256SUMS is stale. Run: make checksums" >&2
+            echo "  expected $want" >&2
+            echo "  actual   $got"  >&2
+            exit 1
+          fi

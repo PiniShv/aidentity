@@ -864,6 +864,42 @@ assert_contains "the collision is explained" "$RUN_OUT" "share its profile direc
 assert_no_dir "no launcher is built for the colliding name" "$APPS/Fake Coll_A.app"
 ai rm "Fake Coll A" --purge -y
 
+# data_is_ours must never hang. A relative path made its walk-up loop spin
+# forever while the tail string grew without bound — and in `rm --purge` the
+# launcher is deleted BEFORE that call, so the user was left wedged.
+# Run it with a hard deadline; a hang is a failure, not a stalled suite.
+bounded_libcall() { # seconds, fn, args...
+  local secs="$1"; shift
+  local rcfile="$SANDBOX/bounded.$$"
+  rm -f "$rcfile"
+  # Spawn the worker DIRECTLY so we hold its real pid. Going through libcall
+  # gave us the pid of a wrapper subshell; killing that left the inner bash
+  # spinning, so a hang in the code under test hung the suite instead of
+  # failing it.
+  bash -c '. "$1" >/dev/null 2>&1 || exit 99; shift; "$@" >/dev/null 2>&1' \
+       aidentity-lib "$LIB" "$@" &
+  local pid=$!
+  ( sleep "$secs"; kill -9 "$pid" 2>/dev/null ) &
+  local watchdog=$!
+  if wait "$pid" 2>/dev/null; then BOUNDED_RC=0; else BOUNDED_RC=$?; fi
+  kill "$watchdog" 2>/dev/null
+  wait "$watchdog" 2>/dev/null
+  # kill -9 surfaces as 137; report it as a timeout rather than a plain failure.
+  [ "$BOUNDED_RC" = "137" ] && BOUNDED_RC="TIMEOUT"
+  rm -f "$rcfile"
+  return 0
+}
+
+bounded_libcall 5 data_is_ours "reldata/some-profile"
+assert_ne "a relative data dir does not hang the purge guard" "TIMEOUT" "$BOUNDED_RC"
+assert_ne "a relative data dir is not accepted" "0" "$BOUNDED_RC"
+
+bounded_libcall 5 data_is_ours "nope/a/b/c"
+assert_ne "a deep relative path does not hang the purge guard" "TIMEOUT" "$BOUNDED_RC"
+
+libcall data_is_ours "$DATA/../$(basename "$DATA")/x"
+assert_rc_nonzero "purge guard rejects a path containing .. even if it would land inside" "$RUN_RC"
+
 # The running check must be anchored, and must never match on an empty path.
 libcall running_on_profile ""
 assert_rc_nonzero "an empty data dir never reports as running" "$RUN_RC"
