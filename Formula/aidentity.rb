@@ -9,10 +9,9 @@ class Aidentity < Formula
   desc "Run several accounts of the same Mac app at the same time"
   homepage "https://github.com/PiniShv/aidentity"
   url "https://github.com/PiniShv/aidentity/archive/refs/tags/v1.0.0.tar.gz"
-  # REPLACE_AFTER_TAGGING — this is a placeholder, not a real checksum.
   # Get the real value with:
   #   curl -sL https://github.com/PiniShv/aidentity/archive/refs/tags/v1.0.0.tar.gz | shasum -a 256
-  sha256 "0000000000000000000000000000000000000000000000000000000000000000" # REPLACE_AFTER_TAGGING
+  sha256 "a0a0ce5872ed1f2f103a5537cca564bb5596ccb32563e05a482d439e2a383d16"
   license "MIT"
   head "https://github.com/PiniShv/aidentity.git", branch: "main"
 
