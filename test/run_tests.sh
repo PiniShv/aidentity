@@ -801,7 +801,10 @@ printf 'precious\n' > "$FILE_AT_PATH"
 ai add "$ELECTRON_APP" --profile Filed
 assert_file "a plain file sitting at the launcher path is never deleted" "$FILE_AT_PATH"
 assert_eq "that file's contents are intact" "precious" "$(cat "$FILE_AT_PATH" 2>/dev/null)"
-assert_contains "add refuses to touch it" "$RUN_OUT" "not created by aidentity"
+# Caught by create_profile's -e collision guard now, before build_launcher is
+# reached at all — earlier and with a clearer message than the old -d test,
+# which let a plain file slip through to assert_ours.
+assert_contains "add refuses to touch it" "$RUN_OUT" "aidentity did not create"
 rm -f "$FILE_AT_PATH"
 rm -rf "$DATA/fake-filed"
 
@@ -903,6 +906,81 @@ assert_rc_nonzero "purge guard rejects a path containing .. even if it would lan
 # The running check must be anchored, and must never match on an empty path.
 libcall running_on_profile ""
 assert_rc_nonzero "an empty data dir never reports as running" "$RUN_RC"
+
+
+group "rename, set, prune and rebuild"
+
+ai add "$ELECTRON_APP" --profile Renameable
+assert_rc "a profile to rename is created" 0 "$RUN_RC" "$RUN_OUT"
+RN_DATA="$DATA/fake-renameable"
+assert_dir "its data directory exists" "$RN_DATA"
+printf 'signed-in\n' > "$RN_DATA/session.marker"
+
+ai rename "Fake Renameable" "Renamed"
+assert_rc "rename succeeds" 0 "$RUN_RC" "$RUN_OUT"
+assert_dir "the renamed launcher exists" "$APPS/Fake Renamed.app"
+assert_no_dir "the old launcher is gone" "$APPS/Fake Renameable.app"
+assert_file "the signed-in session moved with it" "$DATA/fake-renamed/session.marker"
+assert_no_dir "the old data directory is gone" "$RN_DATA"
+assert_eq "the launcher records the new data dir" \
+  "$DATA/fake-renamed" "$(plist_key "$APPS/Fake Renamed.app" AIdentityDataDir)"
+
+ai rename "Fake Renamed" "../evil"
+assert_rc_nonzero "rename rejects an invalid new name" "$RUN_RC" "$RUN_OUT"
+assert_dir "a rejected rename leaves the launcher alone" "$APPS/Fake Renamed.app"
+ai rename "No Such Profile" "Whatever"
+assert_rc_nonzero "rename refuses an unknown profile" "$RUN_RC" "$RUN_OUT"
+
+ai set "Fake Renamed" --color purple
+assert_rc "set changes a colour" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "the new colour is recorded" "8E4EC6" "$(plist_key "$APPS/Fake Renamed.app" AIdentityColor)"
+assert_file "set does not disturb the session" "$DATA/fake-renamed/session.marker"
+ai set "Fake Renamed" --color nosuchcolour
+assert_rc_nonzero "set rejects an unknown colour" "$RUN_RC" "$RUN_OUT"
+ai set "Fake Renamed"
+assert_rc_nonzero "set with nothing to change is refused" "$RUN_RC" "$RUN_OUT"
+ai set "Fake Renamed" --no-badge
+assert_rc "set --no-badge succeeds" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "the badge is cleared" "" "$(plist_key "$APPS/Fake Renamed.app" AIdentityBadge)"
+
+mkdir -p "$DATA/an-orphan"
+printf 'x\n' > "$DATA/an-orphan/data"
+ai prune -y
+assert_rc "prune succeeds" 0 "$RUN_RC" "$RUN_OUT"
+assert_no_dir "an orphaned profile directory is removed" "$DATA/an-orphan"
+assert_dir "a claimed profile directory survives prune" "$DATA/fake-renamed"
+assert_file "prune never touches a live session" "$DATA/fake-renamed/session.marker"
+ai prune -y
+assert_contains "a second prune reports nothing to do" "$RUN_OUT" "No orphaned profile data"
+
+ai rebuild "Fake Renamed"
+assert_rc "rebuild of one profile succeeds" 0 "$RUN_RC" "$RUN_OUT"
+assert_dir "the rebuilt launcher is still there" "$APPS/Fake Renamed.app"
+assert_file "rebuild does not touch profile data" "$DATA/fake-renamed/session.marker"
+assert_eq "rebuild preserves the recorded data dir" \
+  "$DATA/fake-renamed" "$(plist_key "$APPS/Fake Renamed.app" AIdentityDataDir)"
+ai rebuild --all
+assert_rc "rebuild --all succeeds" 0 "$RUN_RC" "$RUN_OUT"
+ai rebuild "No Such Profile"
+assert_rc_nonzero "rebuild refuses an unknown profile" "$RUN_RC" "$RUN_OUT"
+
+# None of these may act on a bundle aidentity did not create.
+DECOY4="$APPS/Decoy Four.app"
+mkdir -p "$DECOY4/Contents"
+write_min_plist "$DECOY4" "com.example.decoyfour"
+for sub in rename set rebuild; do
+  case "$sub" in
+    rename) ai rename "Decoy Four" "Hijacked" ;;
+    set)    ai set "Decoy Four" --color red ;;
+    rebuild) ai rebuild "Decoy Four" ;;
+  esac
+  assert_rc_nonzero "$sub refuses a bundle aidentity did not create" "$RUN_RC" "$RUN_OUT"
+done
+assert_dir "the decoy survives all three" "$DECOY4"
+rm -rf "$DECOY4"
+
+ai rm "Fake Renamed" --purge -y
+assert_rc "the renamed profile is removed cleanly" 0 "$RUN_RC" "$RUN_OUT"
 
 
 group "sandbox isolation — final check"
