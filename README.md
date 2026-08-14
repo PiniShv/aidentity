@@ -10,6 +10,10 @@ macOS runs one copy of an app, so you get one account — sign out of work Claud
 ![No dependencies](https://img.shields.io/badge/dependencies-none-2FB344)
 ![License MIT](https://img.shields.io/badge/license-MIT-2E7DF6)
 
+![Terminal recording: aidentity lists the compatible apps, creates three profiles, shows them with aidentity list, renames one and recolours it, then runs doctor](assets/demo.gif)
+
+<sub>Recorded in a sandbox against fixture apps — the home directory, app search path, launcher directory and data root all point at a throwaway `/tmp` tree, so nothing from a real machine appears. `assets/record-demo.sh` regenerates it from `assets/demo.tape`.</sub>
+
 ---
 
 ## 30 seconds
@@ -20,7 +24,17 @@ curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh |
 
 That is the whole thing — the installer ends by offering to run the walkthrough, so one command covers it. The walkthrough asks whether to badge the icons, shows a numbered list of the apps on your Mac that qualify, and asks what to call each account. Open the launcher it builds, sign in with the second account, and both windows stay signed in from then on. Nothing else to configure.
 
-Said no, or want to add another account later:
+Homebrew works too, in either spelling:
+
+```bash
+brew install pinishv/tap/aidentity
+```
+
+```bash
+brew tap pinishv/tap && brew install aidentity
+```
+
+Only the `curl` installer offers the walkthrough at the end. After a Homebrew install — or if you said no, or you want to add another account later — start it yourself:
 
 ```bash
 aidentity setup
@@ -28,23 +42,19 @@ aidentity setup
 
 `aidentity add` is the same thing in direct, scriptable form — one profile, all of it on the command line.
 
+Either route puts one file — a shell script — on your `PATH`. There is no daemon, no login item, and nothing that runs in the background.
+
+**What each channel checks.** The Homebrew formula pins the sha256 of a tagged release tarball, committed to the tap before anyone installs it. The `curl` installer verifies the script it downloads against a `SHA256SUMS` file served from the same origin: that catches a truncated transfer, a corrupted object and a proxy swapping the body, but not a compromise of the repository itself, because the file and its checksum would move together. Homebrew is the more verifiable of the two.
+
 <details>
-<summary>Other ways to install</summary>
-
-**Homebrew**
-
-```bash
-brew install pinishv/tap/aidentity
-```
-
-**From source**
+<summary>Install from source</summary>
 
 ```bash
 git clone https://github.com/PiniShv/aidentity.git
 cd aidentity && make install
 ```
 
-All three put one file — a shell script — on your `PATH`. There is no daemon, no login item, and nothing that runs in the background. Only the `curl` installer offers the walkthrough at the end; after the other two, run `aidentity setup` when you are ready.
+Same single script, same `PATH`. Run `aidentity setup` when you are ready.
 
 </details>
 
@@ -190,6 +200,49 @@ Launch a profile from the terminal, instead of double-clicking it in Finder.
 aidentity open "Claude Work"
 ```
 
+### `aidentity rename`
+
+Rename a profile. The data directory moves with the launcher, so the account stays signed in. Alias: `aidentity mv`.
+
+```bash
+aidentity rename "Claude Work" Client
+```
+
+The second argument is the new *account* name; the launcher keeps the app prefix, so this produces `~/Applications/Claude Client.app` and moves the profile directory to `…/profiles/claude-client`. The data is moved first and the launcher rebuilt second — if the rebuild fails, the move is rolled back and nothing changes. `rename` refuses to run while the profile is open, because moving the directory out from under a running instance would break it. It also refuses if the new name collides with an existing launcher or profile directory.
+
+### `aidentity set`
+
+Change a profile's badge or colour without touching its account. Aliases: `modify`, `edit`.
+
+```bash
+aidentity set "Claude Work" --color purple
+aidentity set "Claude Work" --badge W
+aidentity set "Claude Work" --no-badge
+```
+
+`--color`, `--badge` and `--no-badge` take the same values as on `add`; at least one of them is required. Only the launcher bundle is rewritten — the profile directory is never opened — so this is safe with the app running. Asking for a colour on a launcher that has no badge adds one back, using the first letter of the profile name.
+
+### `aidentity prune`
+
+Find profile data that no launcher points at, and offer to delete it.
+
+```bash
+aidentity prune
+```
+
+This is what gets left behind when a launcher is deleted in Finder instead of with `aidentity rm`: the directory stays, holding a signed-in session nothing can reach any more. `prune` lists each orphan with its disk size and full path, then asks you to type `yes`. `-y` / `--yes` skips that prompt. Anything currently running is skipped, and so is anything recorded outside the data root.
+
+### `aidentity rebuild`
+
+Regenerate launchers after the app they point at moved. Alias: `repair`.
+
+```bash
+aidentity rebuild "Claude Work"
+aidentity rebuild --all
+```
+
+Each launcher stores the path of the app it opens. If that path no longer exists, `rebuild` looks the app up again by name across the search path, which covers a move between `/Applications` and `~/Applications`; if it still cannot be found, that profile is reported and skipped rather than rewritten. Profile data is never touched, so every account stays signed in.
+
 ### `aidentity rm`
 
 Remove a launcher. Data is kept by default, so you can rebuild the launcher later and still be signed in.
@@ -233,10 +286,13 @@ aidentity help
 
 | Variable | Default |
 |---|---|
+| `AIDENTITY_APP_DIRS` | `/Applications:$HOME/Applications` — colon-separated list of directories searched for compatible apps |
 | `AIDENTITY_APPS_DIR` | `~/Applications` — where launchers are written |
 | `AIDENTITY_DATA_ROOT` | `~/Library/Application Support/aidentity/profiles` — where profile data lives |
 
-The test suite sets both, which is how it runs without touching a real machine's apps.
+The first two are one letter apart and mean different things: the plural `APP_DIRS` is where your *apps* are looked for, `APPS_DIR` is where aidentity *writes* its launchers.
+
+The test suite sets `AIDENTITY_APPS_DIR` and `AIDENTITY_DATA_ROOT`, which is how it runs without touching a real machine. The demo recording sets all three, so it never scans the apps actually installed.
 
 ---
 
@@ -286,7 +342,7 @@ Fixing this properly would mean copying and re-signing the app bundle. That was 
 No. Your app updates itself the way it always has, because it is still the same untouched install in `/Applications`. Only the app can update itself, and `aidentity` is not in that path.
 
 **What happens when the app updates?**
-Nothing you need to do. The launcher stores the *path* to the app, not a copy of it, so the next launch picks up the new version automatically. There is no rebuild step after an update.
+Nothing you need to do. The launcher stores the *path* to the app, not a copy of it, so the next launch picks up the new version automatically. The one case that needs a hand is the app *moving* — reinstalled into `~/Applications` instead of `/Applications`, say. Then run `aidentity rebuild --all`, which finds it again by name and rewrites the launchers.
 
 **Can I use more than two accounts?**
 Yes. There is no limit in the tool — run `add` once per account. Each gets its own directory, its own lock, its own badge. The practical ceiling is RAM: every profile is a full instance of the app.
@@ -311,6 +367,7 @@ That is between you and the vendor, and it depends on whether the two accounts a
 ```bash
 aidentity list                              # see what exists
 aidentity rm "Claude Work" --purge -y       # repeat for each profile
+aidentity prune -y                          # data from launchers deleted in Finder
 ```
 
 Then remove the tool itself:

@@ -197,8 +197,10 @@ jobs:
         run: |
           fail=0
           for fn in running_on_profile data_is_ours is_our_launcher; do
-            a=$(sed -n "/^$fn() {/,/^}/p" bin/aidentity | grep -v '^\s*#')
-            b=$(sed -n "/^$fn() {/,/^}/p" uninstall.sh  | grep -v '^\s*#')
+            # Compare CODE, not formatting: comments and blank lines differ
+            # legitimately between the two files.
+            a=$(sed -n "/^$fn() {/,/^}/p" bin/aidentity | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$')
+            b=$(sed -n "/^$fn() {/,/^}/p" uninstall.sh  | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$')
             if [ -n "$b" ] && [ "$a" != "$b" ]; then
               echo "::error::$fn differs between bin/aidentity and uninstall.sh" >&2
               diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") || true
