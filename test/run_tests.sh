@@ -73,7 +73,10 @@ mkdir -p "$APPS" "$DATA" "$SRC"
 export AIDENTITY_APPS_DIR="$APPS"
 export AIDENTITY_DATA_ROOT="$DATA"
 
-# shellcheck disable=SC2329  # invoked by the EXIT/INT/TERM trap below
+# Reached only through the EXIT/INT/TERM trap installed below, which shellcheck
+# cannot see — hence both suppressions. SC2329 is the older spelling, SC2317 the
+# newer one; keep both so the lint passes on any shellcheck version.
+# shellcheck disable=SC2329,SC2317
 cleanup() {
   if [ -n "${AIDENTITY_TEST_KEEP:-}" ]; then
     printf '%s# sandbox kept: %s%s\n' "$P_DIM" "$SANDBOX" "$P_OFF"
