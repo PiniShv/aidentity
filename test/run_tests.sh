@@ -72,6 +72,10 @@ mkdir -p "$APPS" "$DATA" "$SRC"
 
 export AIDENTITY_APPS_DIR="$APPS"
 export AIDENTITY_DATA_ROOT="$DATA"
+# Without this the suite scans the real /Applications, which makes `apps`,
+# `doctor` and the wizard menu depend on whatever the developer has installed —
+# and quietly breaks the isolation this file claims a few lines above.
+export AIDENTITY_APP_DIRS="$SRC:$APPS"
 
 # Reached only through the EXIT/INT/TERM trap installed below, which shellcheck
 # cannot see — hence both suppressions. SC2329 is the older spelling, SC2317 the

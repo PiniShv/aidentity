@@ -296,15 +296,19 @@ color_hex() {
   esac
 }
 
-COLOR_NAMES="blue green orange purple teal pink red yellow"
+# Every name color_hex accepts, so the error message and `help` cannot claim a
+# smaller set than the code actually takes. auto_color only picks from the
+# first eight — the neutrals are opt-in, never assigned automatically.
+COLOR_NAMES="blue green orange purple teal pink red yellow gray grey graphite black"
+AUTO_COLOR_NAMES="blue green orange purple teal pink red yellow"
 
 # Stable colour per profile name, so a profile always looks the same.
 auto_color() {
   local sum n i
   sum=$(printf '%s' "$1" | cksum | awk '{print $1}')
-  n=$(printf '%s' "$COLOR_NAMES" | wc -w | tr -d ' ')
+  n=$(printf '%s' "$AUTO_COLOR_NAMES" | wc -w | tr -d ' ')
   i=$(( sum % n + 1 ))
-  printf '%s' "$COLOR_NAMES" | awk -v i="$i" '{print $i}'
+  printf '%s' "$AUTO_COLOR_NAMES" | awk -v i="$i" '{print $i}'
 }
 
 # ------------------------------------------------------------------ icons --
@@ -1248,11 +1252,13 @@ ${C_BOLD}COMMANDS${C_RESET}
   add [app]            Create one profile directly.
       --profile NAME   Name for this account, e.g. Work
       --badge  X       Single character for the icon badge (default: first letter)
-      --color  NAME    blue green orange purple teal pink red yellow, or a hex value
+      --color  NAME    blue green orange purple teal pink red yellow gray graphite,
+                       or a hex value like 2E7DF6
       --no-badge       Use the app's own icon unchanged, just with your name
       --seed           Copy Claude Desktop's MCP server config into the new profile
 
   list                 Show every profile, where its data lives, and what is running
+                       Also spelled 'ls'.
   open  NAME           Launch a profile
 
   rename OLD NEW       Rename a profile, moving its data so the account stays
@@ -1267,7 +1273,7 @@ ${C_BOLD}COMMANDS${C_RESET}
       -y, --yes        Skip the confirmation prompt
   rebuild NAME         Regenerate a launcher after the app moved or updated
       --all            Rebuild every profile
-  rm    NAME           Remove a launcher (keeps its data)
+  rm    NAME           Remove a launcher (keeps its data). Also 'remove', 'delete'.
       --purge          Also delete the profile's data. Cannot be undone.
       -y, --yes        Skip the confirmation prompt
   apps                 List apps on this Mac that support extra accounts
