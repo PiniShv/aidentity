@@ -1,0 +1,174 @@
+name: CI
+
+# aidentity is one shell script, so CI is deliberately small:
+#
+#   lint  (ubuntu)  cheap syntax + shellcheck gate, catches typos in seconds
+#   test  (macOS)   the real thing — the test suite builds its own fake .app
+#                   bundles, so it needs no Chromium or Electron app installed
+#
+# The blocking shellcheck run uses the same exclusion list as `make lint`, so a
+# green local lint means a green CI lint. A second run with nothing excluded is
+# advisory: it reports style findings without failing the build.
+
+# Quoted so YAML does not read "on" as the boolean true.
+"on":
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NO_COLOR: "1"
+  # Keep in step with SHELLCHECK_EXCLUDE in the Makefile.
+  #   SC2034  colour variables kept as a complete set, even when one is unused
+  #   SC2012  ls over find in app discovery — .app names are known-safe here
+  #   SC2015  A && B || C, used deliberately where C is the error path
+  SHELLCHECK_EXCLUDE: SC2034,SC2012,SC2015
+
+jobs:
+  lint:
+    name: Syntax and lint (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Collect the shell files
+        id: files
+        run: |
+          set -eu
+          files=""
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh; do
+            [ -f "$f" ] && files="$files $f"
+          done
+          [ -n "$files" ] || { echo "No shell files found." >&2; exit 1; }
+          echo "list=${files# }" >> "$GITHUB_OUTPUT"
+          echo "Linting:$files"
+
+      - name: Syntax check (bash -n)
+        run: |
+          set -eu
+          for f in ${{ steps.files.outputs.list }}; do
+            printf '  bash -n %s\n' "$f"
+            bash -n "$f"
+          done
+
+      - name: Install shellcheck
+        run: |
+          set -eu
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq shellcheck
+          fi
+          shellcheck --version
+
+      - name: shellcheck (blocking)
+        run: shellcheck -s bash -e "$SHELLCHECK_EXCLUDE" ${{ steps.files.outputs.list }}
+
+      - name: shellcheck (advisory, nothing excluded)
+        continue-on-error: true
+        run: shellcheck -s bash ${{ steps.files.outputs.list }}
+
+      - name: The test suite is executable
+        run: test -x test/run_tests.sh
+
+      - name: The test suite skips cleanly off macOS
+        run: |
+          set -eu
+          out=$(bash test/run_tests.sh)
+          printf '%s\n' "$out"
+          case "$out" in
+            *SKIP*) ;;
+            *) echo "Expected a TAP SKIP plan on Linux." >&2; exit 1 ;;
+          esac
+
+  test:
+    name: Test (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Show the environment
+        run: |
+          sw_vers
+          printf '/bin/bash  %s\n' "$(/bin/bash --version | head -1)"
+          printf 'bash       %s\n' "$(bash --version | head -1)"
+          xcode-select -p || true
+
+      - name: Syntax check (bash -n)
+        run: |
+          set -eu
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh; do
+            [ -f "$f" ] || continue
+            printf '  bash -n %s\n' "$f"
+            bash -n "$f"
+          done
+
+      - name: Install shellcheck
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: |
+          set -eu
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            brew install shellcheck
+          fi
+          shellcheck --version
+
+      - name: shellcheck (blocking)
+        run: |
+          set -eu
+          files=""
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh; do
+            [ -f "$f" ] && files="$files $f"
+          done
+          # shellcheck disable=SC2086
+          shellcheck -s bash -e "$SHELLCHECK_EXCLUDE" $files
+
+      - name: shellcheck (advisory, nothing excluded)
+        continue-on-error: true
+        run: |
+          files=""
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh; do
+            [ -f "$f" ] && files="$files $f"
+          done
+          # shellcheck disable=SC2086
+          shellcheck -s bash $files
+
+      # The script promises to work with the bash macOS ships, which is 3.2.
+      # Running the suite under /bin/bash is what keeps that promise honest.
+      - name: Test suite — macOS system bash 3.2
+        run: /bin/bash test/run_tests.sh
+
+      - name: Test suite — default bash on PATH
+        run: bash test/run_tests.sh
+
+      # A last check that the script is usable as installed, not just testable.
+      - name: Smoke test the CLI
+        run: |
+          set -eu
+          bash bin/aidentity version
+          bash bin/aidentity help > /dev/null
+          bash bin/aidentity apps > /dev/null
+          bash bin/aidentity doctor > /dev/null
+          if bash bin/aidentity not-a-command > /dev/null 2>&1; then
+            echo "An unknown command should exit non-zero." >&2
+            exit 1
+          fi
+
+      - name: No bare variable before a multi-byte character
+        run: |
+          # "$var…" expands as ${var…} in bash and dies under `set -u`.
+          # Braces are mandatory in that position; this catches regressions.
+          if grep -nP '\$\{?[A-Za-z_][A-Za-z0-9_]*\}?[^\x00-\x7F]' bin/aidentity install.sh uninstall.sh | grep -v '\${'; then
+            echo "Use \${var} when a non-ASCII character follows." >&2
+            exit 1
+          fi

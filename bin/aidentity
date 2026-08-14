@@ -1,0 +1,837 @@
+#!/usr/bin/env bash
+#
+# aidentity — run several accounts of the same Mac app at the same time.
+#
+# Builds a small launcher app per profile. The launcher opens the app you already
+# have installed, pointed at its own data directory, so every account stays signed
+# in simultaneously. The original app is never copied, patched or re-signed.
+#
+#   aidentity add                 # interactive
+#   aidentity add Claude --profile Work
+#   aidentity list
+#   aidentity rm "Claude Work" --purge
+#
+# https://github.com/PiniShv/aidentity
+#
+# MIT licensed. Requires macOS. No dependencies beyond what ships with the OS.
+
+set -uo pipefail
+
+AIDENTITY_VERSION="1.0.0"
+
+# Every launcher we build carries this key in its Info.plist. It is the ONLY way
+# we recognise our own bundles, and nothing is ever deleted without it. That makes
+# `rm` safe even if a profile is named after an app you already have installed.
+MARKER_KEY="AIdentityProfile"
+
+APPS_DIR="${AIDENTITY_APPS_DIR:-$HOME/Applications}"
+DATA_ROOT="${AIDENTITY_DATA_ROOT:-$HOME/Library/Application Support/aidentity/profiles}"
+
+# ---------------------------------------------------------------- output --
+
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  C_RESET=$'\033[0m'; C_DIM=$'\033[2m'; C_BOLD=$'\033[1m'
+  C_RED=$'\033[31m'; C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_BLUE=$'\033[34m'
+else
+  C_RESET=''; C_DIM=''; C_BOLD=''; C_RED=''; C_GREEN=''; C_YELLOW=''; C_BLUE=''
+fi
+
+info() { printf '%s\n' "$*"; }
+ok()   { printf '%s✓%s %s\n' "$C_GREEN" "$C_RESET" "$*"; }
+warn() { printf '%s!%s %s\n' "$C_YELLOW" "$C_RESET" "$*" >&2; }
+die()  { printf '%s✗%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; exit 1; }
+dim()  { printf '%s%s%s\n' "$C_DIM" "$*" "$C_RESET"; }
+
+# Ask a question and echo the answer.
+#
+# stdin first, so the tool behaves like every other Unix command: a terminal
+# types the answer, and `printf 'yes\n' | aidentity rm …` still works.
+# /dev/tty is only a fallback for when stdin is exhausted or absent — which is
+# what happens if this ever runs with the script itself arriving on stdin.
+# The prompt goes to stderr on purpose. Callers capture the answer with $(…),
+# which swallows stdout — printing the prompt there would make it part of the
+# answer ("Type yes to confirm: yes" never equals "yes").
+ask() {
+  local prompt="$1" reply=""
+  printf '%s' "$prompt" >&2
+  if IFS= read -r reply; then
+    printf '%s' "$reply"; return 0
+  fi
+  if [ -r /dev/tty ]; then
+    printf '%s' "$prompt" >&2
+    IFS= read -r reply < /dev/tty 2>/dev/null || return 1
+    printf '%s' "$reply"; return 0
+  fi
+  return 1
+}
+
+# Yes/no with a default. $2 is "y" or "n".
+confirm() {
+  local prompt="$1" def="${2:-y}" hint reply
+  case "$def" in y) hint="[Y/n]" ;; *) hint="[y/N]" ;; esac
+  reply=$(ask "$prompt $hint ") || return 1
+  reply=$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')
+  [ -z "$reply" ] && reply="$def"
+  case "$reply" in y|yes) return 0 ;; *) return 1 ;; esac
+}
+
+have_tty() { [ -r /dev/tty ] || [ -t 0 ]; }
+
+# ---------------------------------------------------------------- guards --
+
+[ "$(uname)" = "Darwin" ] || die "aidentity is macOS only (this is $(uname))."
+
+# ------------------------------------------------------------ validation --
+
+# A profile name becomes a directory name, a bundle name and a shell string.
+# Restricting it up front is what lets everything downstream stay simple.
+validate_profile_name() {
+  local name="$1"
+  [ -n "$name" ] || die "Profile name cannot be empty."
+  case "$name" in
+    *[!A-Za-z0-9\ _-]*)
+      die "Profile name may only contain letters, numbers, spaces, hyphens and underscores.
+    Got: '$name'" ;;
+  esac
+  [ "${#name}" -le 40 ] || die "Profile name is too long (max 40 characters)."
+  case "$name" in
+    " "*|*" ") die "Profile name cannot start or end with a space." ;;
+    .*) die "Profile name cannot start with a dot." ;;
+  esac
+}
+
+slugify() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr ' _' '-' | tr -cd 'a-z0-9-'
+}
+
+# Quote an arbitrary string as a single-quoted shell literal, so it can be
+# embedded in the generated launcher without any escaping ambiguity.
+shquote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+# --------------------------------------------------------- app discovery --
+
+# True if the bundle is Chromium- or Electron-based, i.e. it understands
+# --user-data-dir. Two structural signals, both just directory probes:
+#   1. an Electron Framework                        (Claude, Slack, VS Code, Notion…)
+#   2. a *.framework with Versions/*/Helpers/*.app  (Chromium forks: ChatGPT, Edge…)
+#
+# Deliberately no binary scanning here — this runs across every installed app,
+# and grepping frameworks for the flag turned a listing into a 30-second wait.
+is_chromium_app() {
+  local app="$1" fw
+
+  [ -d "$app/Contents/Frameworks/Electron Framework.framework" ] && return 0
+
+  for fw in "$app"/Contents/Frameworks/*.framework; do
+    [ -d "$fw" ] || continue
+    if compgen -G "$fw/Versions/*/Helpers/*.app" >/dev/null 2>&1; then return 0; fi
+  done
+
+  return 1
+}
+
+# Same question, but allowed to be slow. Used only when the user names one
+# specific app, so an unusual bundle layout still gets a fair hearing.
+is_chromium_app_deep() {
+  local app="$1" fw bin
+
+  is_chromium_app "$app" && return 0
+  command -v strings >/dev/null 2>&1 || return 1
+
+  for fw in "$app"/Contents/Frameworks/*.framework; do
+    [ -d "$fw" ] || continue
+    bin="${fw%.framework}"; bin="$fw/Versions/Current/${bin##*/}"
+    [ -f "$bin" ] || continue
+    if strings -a "$bin" 2>/dev/null | grep -qx -- "--user-data-dir"; then return 0; fi
+  done
+
+  return 1
+}
+
+bundle_id()   { /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$1/Contents/Info.plist" 2>/dev/null; }
+bundle_name() { basename "$1" .app; }
+
+# Resolve a user-supplied app name or path to a bundle path.
+resolve_app() {
+  local q="$1" cand
+  if [ -d "$q" ] && [ "${q##*.}" = "app" ]; then printf '%s' "${q%/}"; return 0; fi
+  for cand in "/Applications/$q.app" "$HOME/Applications/$q.app" \
+              "/Applications/$q" "$HOME/Applications/$q" \
+              "/System/Applications/$q.app"; do
+    [ -d "$cand" ] && { printf '%s' "${cand%/}"; return 0; }
+  done
+  # case-insensitive fallback
+  cand=$(ls -d /Applications/*.app "$HOME"/Applications/*.app 2>/dev/null \
+         | awk -v q="$(printf '%s' "$q" | tr '[:upper:]' '[:lower:]')" \
+             'BEGIN{IGNORECASE=1} { n=$0; sub(/.*\//,"",n); sub(/\.app$/,"",n);
+               if (tolower(n)==q) { print; exit } }')
+  [ -n "$cand" ] && { printf '%s' "$cand"; return 0; }
+  return 1
+}
+
+# Every Chromium/Electron app installed, one path per line.
+list_compatible_apps() {
+  local app
+  for app in /Applications/*.app "$HOME"/Applications/*.app; do
+    [ -d "$app" ] || continue
+    is_our_launcher "$app" && continue
+    is_chromium_app "$app" && printf '%s\n' "$app"
+  done
+}
+
+copy_plain_icon() {
+  local src_app="$1" out="$2" icon_name
+  icon_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$src_app/Contents/Info.plist" 2>/dev/null || true)
+  [ -n "$icon_name" ] || return 1
+  [ -f "$src_app/Contents/Resources/${icon_name%.icns}.icns" ] || return 1
+  cp "$src_app/Contents/Resources/${icon_name%.icns}.icns" "$out"
+}
+
+# Show a numbered menu of compatible apps and echo the chosen bundle path.
+# The menu is drawn on stderr so that only the chosen path reaches stdout,
+# which is what the caller captures.
+pick_app() {
+  local apps=() a i=1 choice
+  while IFS= read -r a; do [ -n "$a" ] && apps+=("$a"); done <<EOF
+$(list_compatible_apps)
+EOF
+  if [ "${#apps[@]}" -eq 0 ]; then
+    warn "No compatible apps found on this Mac."
+    return 1
+  fi
+  {
+    printf '%sWhich app needs another account?%s\n\n' "$C_BOLD" "$C_RESET"
+    for a in "${apps[@]}"; do printf '  %2d) %s\n' "$i" "$(bundle_name "$a")"; i=$((i+1)); done
+    printf '\n'
+  } >&2
+  choice=$(ask 'Number: ') || return 1
+  case "$choice" in
+    ''|*[!0-9]*) warn "Please enter a number."; return 1 ;;
+  esac
+  if [ "$choice" -lt 1 ] || [ "$choice" -gt "${#apps[@]}" ]; then
+    warn "Number out of range."; return 1
+  fi
+  printf '%s' "${apps[$((choice-1))]}"
+}
+
+# ---------------------------------------------------------------- colours --
+
+color_hex() {
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+    blue)   printf '2E7DF6' ;; green)  printf '2FB344' ;; red)    printf 'E5484D' ;;
+    orange) printf 'F76B15' ;; purple) printf '8E4EC6' ;; pink)   printf 'D6409F' ;;
+    teal)   printf '12A594' ;; yellow) printf 'F5B400' ;; gray|grey) printf '6B7280' ;;
+    graphite|black) printf '1F2430' ;;
+    [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) printf '%s' "$1" ;;
+    *) return 1 ;;
+  esac
+}
+
+COLOR_NAMES="blue green orange purple teal pink red yellow"
+
+# Stable colour per profile name, so a profile always looks the same.
+auto_color() {
+  local sum n i
+  sum=$(printf '%s' "$1" | cksum | awk '{print $1}')
+  n=$(printf '%s' "$COLOR_NAMES" | wc -w | tr -d ' ')
+  i=$(( sum % n + 1 ))
+  printf '%s' "$COLOR_NAMES" | awk -v i="$i" '{print $i}'
+}
+
+# ------------------------------------------------------------------ icons --
+
+# Composite a coloured badge with a letter onto the source app's icon.
+# Uses only what ships with macOS: iconutil for icns<->png, and JXA/Cocoa to draw.
+# If anything here fails we fall back to the app's plain icon — never fatal.
+build_icon() {
+  local tmp rc
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/aidentity.XXXXXX") || return 1
+  _build_icon_in "$1" "$2" "$3" "$4" "$tmp"
+  rc=$?
+  rm -rf "$tmp"
+  return $rc
+}
+
+_build_icon_in() {
+  local src_app="$1" letter="$2" hex="$3" out_icns="$4" tmp="$5"
+  local icon_name src_icns
+
+  icon_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$src_app/Contents/Info.plist" 2>/dev/null) || return 1
+  [ -n "$icon_name" ] || return 1
+  src_icns="$src_app/Contents/Resources/${icon_name%.icns}.icns"
+  [ -f "$src_icns" ] || return 1
+
+  iconutil -c iconset "$src_icns" -o "$tmp/base.iconset" >/dev/null 2>&1 || return 1
+
+  cat > "$tmp/badge.jxa" <<'JXA'
+ObjC.import('Cocoa');
+function run(argv) {
+  var inPath = argv[0], outPath = argv[1], letter = argv[2], hex = argv[3];
+  var src = $.NSImage.alloc.initWithContentsOfFile(inPath);
+  if (!src || src.isNil()) return 1;
+  var W = src.size.width, H = src.size.height;
+  if (W < 1) return 1;
+  var out = $.NSImage.alloc.initWithSize({width: W, height: H});
+  out.lockFocus;
+  src.drawInRect($.NSMakeRect(0, 0, W, H));
+
+  var d = W * 0.44, x = W - d - W * 0.03, y = W * 0.03;
+  var r = parseInt(hex.substr(0,2),16)/255,
+      g = parseInt(hex.substr(2,2),16)/255,
+      b = parseInt(hex.substr(4,2),16)/255;
+
+  // A light ring keeps the badge readable over any icon.
+  $.NSColor.colorWithCalibratedRedGreenBlueAlpha(1,1,1,0.96).set;
+  $.NSBezierPath.bezierPathWithOvalInRect(
+    $.NSMakeRect(x - W*0.022, y - W*0.022, d + W*0.044, d + W*0.044)).fill;
+  $.NSColor.colorWithCalibratedRedGreenBlueAlpha(r,g,b,1).set;
+  $.NSBezierPath.bezierPathWithOvalInRect($.NSMakeRect(x, y, d, d)).fill;
+
+  var attrs = $.NSMutableDictionary.dictionary;
+  attrs.setObjectForKey($.NSFont.boldSystemFontOfSize(d * 0.60), "NSFont");
+  attrs.setObjectForKey($.NSColor.whiteColor, "NSColor");
+  var s = $.NSString.alloc.initWithUTF8String(letter);
+  var ts = s.sizeWithAttributes(attrs);
+  s.drawAtPointWithAttributes({x: x + (d - ts.width)/2, y: y + (d - ts.height)/2}, attrs);
+
+  out.unlockFocus;
+  var rep = $.NSBitmapImageRep.imageRepWithData(out.TIFFRepresentation);
+  rep.representationUsingTypeProperties(4, $.NSDictionary.dictionary)
+     .writeToFileAtomically(outPath, true);
+  return 0;
+}
+JXA
+
+  # Badge only the sizes where a letter is legible; leave 16/32 as-is.
+  local f base
+  for f in "$tmp/base.iconset"/*.png; do
+    [ -f "$f" ] || continue
+    base=$(basename "$f")
+    case "$base" in
+      icon_16x16.png|icon_16x16@2x.png|icon_32x32.png) continue ;;
+    esac
+    osascript -l JavaScript "$tmp/badge.jxa" "$f" "$f" "$letter" "$hex" >/dev/null 2>&1 || true
+  done
+
+  iconutil -c icns "$tmp/base.iconset" -o "$out_icns" >/dev/null 2>&1 || return 1
+  [ -f "$out_icns" ]
+}
+
+# -------------------------------------------------------------- launcher --
+
+is_our_launcher() {
+  [ -d "$1" ] || return 1
+  /usr/libexec/PlistBuddy -c "Print :$MARKER_KEY" "$1/Contents/Info.plist" >/dev/null 2>&1
+}
+
+plist_get() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
+
+# Refuse to touch a bundle unless it is demonstrably one of ours.
+assert_ours() {
+  local app="$1"
+  case "$app" in
+    */*.app) ;;
+    *) die "Refusing to operate on '$app' — not an .app bundle." ;;
+  esac
+  is_our_launcher "$app" || die "Refusing to touch '$app' — it was not created by aidentity."
+}
+
+# Two traps here, both of which produced a wrong answer in testing:
+#
+#   1. On macOS `pgrep -a` means "include ancestors", not "print the command
+#      line" as it does on Linux. With -a you get bare PIDs and the match below
+#      can never succeed. `pgrep -fl` is the macOS spelling that prints argv.
+#   2. The list must be captured BEFORE matching. Piping pgrep straight into
+#      grep starts both at once, and the grep's own argv contains the path we
+#      are searching for — so pgrep matches the grep and every profile looks
+#      like it is running.
+running_on_profile() {
+  local list
+  list=$(pgrep -fl "user-data-dir=" 2>/dev/null) || return 1
+  [ -n "$list" ] || return 1
+  printf '%s\n' "$list" | grep -qF -- "user-data-dir=$1"
+}
+
+# A recorded data directory is ours only if it sits genuinely inside the data
+# root. A plain prefix test is not enough: "$DATA_ROOT/../../elsewhere" starts
+# with the root but resolves outside it, which would aim rm -rf at any directory
+# an edited Info.plist named.
+data_is_ours() {
+  local d="$1"
+  [ -n "$d" ] || return 1
+  case "$d" in
+    *"/../"*|*"/.."|"../"*|"..") return 1 ;;
+  esac
+  case "$d" in
+    "$DATA_ROOT"/?*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+build_launcher() {
+  local src_app="$1" profile="$2" data_dir="$3" label="$4" letter="$5" hex="$6"
+  local dst="$APPS_DIR/$label.app"
+
+  mkdir -p "$APPS_DIR" "$data_dir" || die "Could not create $APPS_DIR"
+
+  # Only ever replace a bundle that is ours.
+  if [ -e "$dst" ]; then
+    assert_ours "$dst"
+    rm -rf "$dst" || die "Could not replace $dst"
+  fi
+
+  mkdir -p "$dst/Contents/MacOS" "$dst/Contents/Resources" || die "Could not create $dst"
+
+  # The launcher is a plain shell script in a plain bundle. No AppleScript, so
+  # there is no nested-quoting layer to get wrong.
+  {
+    printf '#!/bin/sh\n'
+    printf '# Generated by aidentity %s. Safe to delete.\n' "$AIDENTITY_VERSION"
+    printf 'exec /usr/bin/open -na %s --args --user-data-dir=%s\n' \
+      "$(shquote "$src_app")" "$(shquote "$data_dir")"
+  } > "$dst/Contents/MacOS/launcher"
+  chmod +x "$dst/Contents/MacOS/launcher"
+
+  local bid
+  bid="com.aidentity.$(slugify "$label")"
+
+  cat > "$dst/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key><string>$label</string>
+	<key>CFBundleDisplayName</key><string>$label</string>
+	<key>CFBundleIdentifier</key><string>$bid</string>
+	<key>CFBundleExecutable</key><string>launcher</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>$AIDENTITY_VERSION</string>
+	<key>CFBundleVersion</key><string>$AIDENTITY_VERSION</string>
+	<key>CFBundleIconFile</key><string>icon</string>
+	<key>LSUIElement</key><true/>
+	<key>$MARKER_KEY</key><string>$profile</string>
+	<key>AIdentityTargetApp</key><string>$src_app</string>
+	<key>AIdentityDataDir</key><string>$data_dir</string>
+	<key>AIdentityVersion</key><string>$AIDENTITY_VERSION</string>
+</dict>
+</plist>
+PLIST
+
+  plutil -lint "$dst/Contents/Info.plist" >/dev/null 2>&1 \
+    || die "Generated a malformed Info.plist for '$label' — aborting."
+
+  # An empty letter means the user asked for the app's own icon, untouched.
+  if [ -z "$letter" ]; then
+    copy_plain_icon "$src_app" "$dst/Contents/Resources/icon.icns"
+  elif ! build_icon "$src_app" "$letter" "$hex" "$dst/Contents/Resources/icon.icns"; then
+    copy_plain_icon "$src_app" "$dst/Contents/Resources/icon.icns"
+    warn "Could not badge the icon; using the app's own icon instead."
+  fi
+
+  # Ad-hoc sign so the bundle is internally consistent. Not required to launch a
+  # locally-built app, so a missing toolchain is a note, not an error.
+  if command -v codesign >/dev/null 2>&1 && xcode-select -p >/dev/null 2>&1; then
+    codesign --force --sign - "$dst" >/dev/null 2>&1 \
+      || warn "Could not sign $label.app. It will still launch."
+  fi
+
+  # Nudge Launch Services so the icon and name appear immediately.
+  local lsreg="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  [ -x "$lsreg" ] && "$lsreg" -f "$dst" >/dev/null 2>&1
+  touch "$dst"
+
+  printf '%s' "$dst"
+}
+
+# -------------------------------------------------------------- commands --
+
+cmd_apps() {
+  local app n=0
+  info "${C_BOLD}Apps on this Mac that aidentity can give extra accounts:${C_RESET}"
+  info ""
+  while IFS= read -r app; do
+    [ -n "$app" ] || continue
+    n=$((n+1))
+    printf '  %-28s %s\n' "$(bundle_name "$app")" "$(dim "$(bundle_id "$app")")"
+  done <<EOF
+$(list_compatible_apps)
+EOF
+  info ""
+  if [ "$n" -eq 0 ]; then
+    warn "No compatible apps found."
+    dim "  aidentity works with Chromium- and Electron-based apps."
+  else
+    dim "  $n app(s). Add one with:  aidentity add \"<name>\" --profile Work"
+  fi
+}
+
+cmd_list() {
+  local app n=0 profile target data
+  for app in "$APPS_DIR"/*.app; do
+    [ -d "$app" ] || continue
+    is_our_launcher "$app" || continue
+    n=$((n+1))
+    profile=$(plist_get "$app" "$MARKER_KEY")
+    target=$(plist_get "$app" "AIdentityTargetApp")
+    data=$(plist_get "$app" "AIdentityDataDir")
+    local status="signed out / new"
+    [ -d "$data/Default" ] && status="in use"
+    running_on_profile "$data" && status="${C_GREEN}running${C_RESET}"
+    printf '%s%s%s\n' "$C_BOLD" "$(bundle_name "$app")" "$C_RESET"
+    printf '   app      %s\n' "$(bundle_name "$target")"
+    printf '   profile  %s\n' "$profile"
+    printf '   status   %b\n' "$status"
+    printf '   data     %s\n' "$(dim "$data")"
+    info ""
+  done
+  if [ "$n" -eq 0 ]; then
+    info "No profiles yet."
+    dim "  Create one with:  aidentity add"
+  fi
+}
+
+cmd_open() {
+  local want="${1:-}"
+  [ -n "$want" ] || die "Usage: aidentity open \"<profile>\""
+  local app="$APPS_DIR/$want.app"
+  [ -d "$app" ] || die "No launcher named '$want'. Run 'aidentity list' to see what exists."
+  assert_ours "$app"
+  open "$app" || die "Could not open '$want'."
+  # Braces are required, not cosmetic: bash folds a following multi-byte
+  # character into the parameter name, so "$want…" expands as ${want…} and
+  # dies under `set -u`.
+  ok "Opening ${want}…"
+}
+
+cmd_rm() {
+  local want="" purge=0 yes=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --purge) purge=1; shift ;;
+      -y|--yes) yes=1; shift ;;
+      -*) die "Unknown option for rm: $1" ;;
+      *) want="$1"; shift ;;
+    esac
+  done
+  [ -n "$want" ] || die "Usage: aidentity rm \"<profile>\" [--purge]"
+
+  local app="$APPS_DIR/$want.app"
+  [ -d "$app" ] || die "No launcher named '$want'. Run 'aidentity list' to see what exists."
+  assert_ours "$app"
+
+  local data; data=$(plist_get "$app" "AIdentityDataDir")
+
+  if running_on_profile "$data"; then
+    die "'$want' is running right now. Quit it first, then re-run."
+  fi
+
+  if [ "$yes" -eq 0 ]; then
+    if [ "$purge" -eq 1 ]; then
+      printf 'Remove launcher "%s" AND permanently delete its data?\n  %s\n' "$want" "$data"
+    else
+      printf 'Remove launcher "%s"? Its data is kept.\n' "$want"
+    fi
+    local reply; reply=$(ask 'Type yes to confirm: ')
+    [ "$reply" = "yes" ] || die "Cancelled."
+  fi
+
+  rm -rf "$app"
+  ok "Removed launcher '$want'."
+
+  if [ "$purge" -eq 1 ]; then
+    # Only delete inside our own data root — never an arbitrary recorded path.
+    if data_is_ours "$data"; then
+      rm -rf "$data"; ok "Deleted profile data."
+    else
+      warn "Profile data is outside the aidentity data directory; left in place:"
+      dim "  $data"
+    fi
+  else
+    dim "  Profile data kept at: $data"
+    dim "  Delete it later with: aidentity rm \"$want\" --purge"
+  fi
+}
+
+cmd_doctor() {
+  local problems=0
+  info "${C_BOLD}aidentity doctor${C_RESET}"
+  info ""
+  printf '  macOS               %s\n' "$(sw_vers -productVersion 2>/dev/null || echo unknown)"
+  printf '  aidentity           %s\n' "$AIDENTITY_VERSION"
+  printf '  bash                %s\n' "${BASH_VERSION:-unknown}"
+
+  if [ -d "$APPS_DIR" ] && [ -w "$APPS_DIR" ]; then
+    printf '  launcher dir        %s\n' "$(printf '%sok%s %s' "$C_GREEN" "$C_RESET" "$APPS_DIR")"
+  elif [ ! -d "$APPS_DIR" ]; then
+    printf '  launcher dir        %s\n' "$(dim "will be created: $APPS_DIR")"
+  else
+    printf '  launcher dir        %sNOT WRITABLE%s %s\n' "$C_RED" "$C_RESET" "$APPS_DIR"; problems=$((problems+1))
+  fi
+
+  if xcode-select -p >/dev/null 2>&1; then
+    printf '  codesign            %savailable%s (launchers will be signed)\n' "$C_GREEN" "$C_RESET"
+  else
+    printf '  codesign            %sabsent%s — launchers work, just unsigned\n' "$C_YELLOW" "$C_RESET"
+    dim "                      install with: xcode-select --install"
+  fi
+
+  local n; n=$(list_compatible_apps | wc -l | tr -d ' ')
+  printf '  compatible apps     %s found\n' "$n"
+  [ "$n" -eq 0 ] && { warn "No Chromium/Electron apps detected."; problems=$((problems+1)); }
+
+  local p; p=$(for a in "$APPS_DIR"/*.app; do is_our_launcher "$a" && echo x; done 2>/dev/null | wc -l | tr -d ' ')
+  printf '  profiles            %s\n' "$p"
+
+  info ""
+  if [ "$problems" -eq 0 ]; then ok "No problems found."; else warn "$problems problem(s) found."; fi
+  return 0
+}
+
+cmd_add() {
+  local app_arg="" profile="" badge="" color="" seed=0 no_badge=0
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --profile|-p) profile="${2:-}"; shift 2 || die "--profile needs a value" ;;
+      --badge|-b)   badge="${2:-}";   shift 2 || die "--badge needs a value" ;;
+      --color|--colour|-c) color="${2:-}"; shift 2 || die "--color needs a value" ;;
+      --no-badge)   no_badge=1; shift ;;
+      --seed)       seed=1; shift ;;
+      --)           shift; break ;;
+      -*)           die "Unknown option for add: $1" ;;
+      *)            [ -z "$app_arg" ] && app_arg="$1" || die "Unexpected argument: $1"; shift ;;
+    esac
+  done
+
+  # ---- interactive wizard when arguments are missing ----
+  if [ -z "$app_arg" ]; then
+    have_tty || die "No app given. Usage: aidentity add \"<app>\" --profile \"<name>\""
+    app_arg=$(pick_app) || exit 1
+    info ""
+  fi
+
+  local src_app
+  src_app=$(resolve_app "$app_arg") \
+    || die "Could not find an app called '$app_arg'. Run 'aidentity apps' to see what is available."
+
+  is_our_launcher "$src_app" && die "'$app_arg' is an aidentity launcher, not an app. Pick the real app."
+
+  is_chromium_app_deep "$src_app" \
+    || die "$(bundle_name "$src_app") is not a Chromium- or Electron-based app, so it has no
+    separate-profile switch. aidentity cannot give it extra accounts yet.
+    See: https://github.com/PiniShv/aidentity#which-apps-work"
+
+  if [ -z "$profile" ]; then
+    have_tty || die "No profile name given. Use --profile \"<name>\"."
+    profile=$(ask 'Name this account (e.g. Work, Personal, Client): ') || exit 1
+  fi
+  validate_profile_name "$profile"
+
+  local label; label="$(bundle_name "$src_app") $profile"
+  local slug;  slug="$(slugify "$label")"
+  local data_dir="$DATA_ROOT/$slug"
+
+  [ -n "$badge" ] || badge=$(printf '%s' "$profile" | cut -c1 | tr '[:lower:]' '[:upper:]')
+  badge=$(printf '%s' "$badge" | cut -c1)
+  [ "$no_badge" -eq 1 ] && badge=""
+
+  local hex
+  if [ -n "$color" ]; then
+    hex=$(color_hex "$color") || die "Unknown colour '$color'. Try one of: $COLOR_NAMES, or a hex value like 2E7DF6."
+  else
+    hex=$(color_hex "$(auto_color "$label")")
+  fi
+
+  if [ -d "$APPS_DIR/$label.app" ] && ! is_our_launcher "$APPS_DIR/$label.app"; then
+    die "There is already an app at $APPS_DIR/$label.app that aidentity did not create.
+    Refusing to overwrite it. Pick a different profile name."
+  fi
+
+  if running_on_profile "$data_dir"; then
+    die "'$label' is running right now. Quit it, then re-run."
+  fi
+
+  local dst; dst=$(build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex")
+
+  # Claude Desktop keeps its MCP server list inside the profile, so a new profile
+  # starts empty. Offer to copy the existing one across; they diverge afterwards.
+  if [ "$seed" -eq 1 ]; then
+    local primary="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+    if [ -f "$primary" ] && [ ! -f "$data_dir/claude_desktop_config.json" ]; then
+      cp "$primary" "$data_dir/claude_desktop_config.json" && ok "Copied your MCP server config into the new profile."
+    else
+      dim "  Nothing to seed (no existing config, or the profile already has one)."
+    fi
+  fi
+
+  info ""
+  ok "Created ${C_BOLD}$label${C_RESET}"
+  printf '   launcher  %s\n' "$dst"
+  printf '   profile   %s\n' "$(dim "$data_dir")"
+  info ""
+  info "${C_BOLD}Next:${C_RESET}"
+  printf '  1. Open it:      aidentity open "%s"\n' "$label"
+  printf '  2. Sign in with the other account in the window that appears.\n'
+  printf '  3. Keep it handy: drag %s from Finder onto your Dock.\n' "$(basename "$dst")"
+  info ""
+  dim "  Nothing to re-run when the app updates — the launcher holds no copy of it."
+}
+
+# The guided walkthrough. This is what a first-time user sees, and what the
+# installer offers to run at the end of a `curl | bash`.
+cmd_setup() {
+  have_tty || die "aidentity setup needs a terminal. Use 'aidentity add' with flags instead."
+
+  info ""
+  info "${C_BOLD}Welcome to aidentity.${C_RESET}"
+  info ""
+  info "macOS runs one copy of an app, so one account at a time. This sets up extra"
+  info "copies of an app you already have, each signed into a different account, all"
+  info "running together."
+  info ""
+  dim  "Your existing app and its current account are not touched."
+  info ""
+
+  local badge_style="badge"
+  if ! confirm "Add a small coloured badge to each icon so you can tell them apart?" y; then
+    badge_style="plain"
+    dim "  Using the app's own icon with your chosen name."
+  fi
+  info ""
+
+  local made=0 src_app profile
+  while :; do
+    src_app=$(pick_app) || break
+    info ""
+
+    while :; do
+      profile=$(ask 'Name this account (e.g. Work, Personal, Client): ') || break 2
+      if [ -z "$profile" ]; then
+        warn "A name is required."; continue
+      fi
+      # Re-validate in a subshell so a bad name re-prompts instead of exiting.
+      if ( validate_profile_name "$profile" ) 2>/dev/null; then break; fi
+      warn "Letters, numbers, spaces, hyphens and underscores only (max 40)."
+    done
+
+    local label="$(bundle_name "$src_app") $profile"
+    if [ -e "$APPS_DIR/$label.app" ] && ! is_our_launcher "$APPS_DIR/$label.app"; then
+      warn "Something else already sits at $APPS_DIR/$label.app — pick another name."
+      continue
+    fi
+
+    local args=("$src_app" --profile "$profile")
+    [ "$badge_style" = "plain" ] && args+=(--no-badge)
+
+    # Claude keeps its MCP server list per profile; offer to copy it across.
+    case "$(bundle_name "$src_app")" in
+      Claude)
+        if [ -f "$HOME/Library/Application Support/Claude/claude_desktop_config.json" ]; then
+          confirm "Copy your existing MCP server config into this profile?" y && args+=(--seed)
+        fi ;;
+    esac
+
+    info ""
+    if cmd_add "${args[@]}"; then
+      made=$((made+1))
+    else
+      warn "That one did not work. Continuing."
+    fi
+
+    info ""
+    confirm "Set up another account?" y || break
+    info ""
+  done
+
+  info ""
+  if [ "$made" -eq 0 ]; then
+    info "Nothing set up. Run ${C_BOLD}aidentity setup${C_RESET} again whenever you like."
+    return 0
+  fi
+
+  ok "Done — $made profile(s) created."
+  info ""
+  info "${C_BOLD}To use them:${C_RESET}"
+  info "  1. Open Finder → Go → Home → Applications."
+  info "  2. Drag each new icon onto your Dock."
+  info "  3. Click one, sign in with that account, and leave it signed in."
+  info ""
+  dim  "  See them any time with:  aidentity list"
+
+  if confirm "Open the Applications folder now?" y; then
+    open "$APPS_DIR" 2>/dev/null || true
+  fi
+}
+
+cmd_version() { printf 'aidentity %s\n' "$AIDENTITY_VERSION"; }
+
+cmd_help() {
+  cat <<EOF
+${C_BOLD}aidentity${C_RESET} — run several accounts of the same Mac app at the same time.
+
+${C_BOLD}USAGE${C_RESET}
+  aidentity <command> [options]
+
+${C_BOLD}COMMANDS${C_RESET}
+  setup                Guided walkthrough. Start here — it asks which app, what to
+                       call each account, and sets them all up in one pass.
+
+  add [app]            Create one profile directly.
+      --profile NAME   Name for this account, e.g. Work
+      --badge  X       Single character for the icon badge (default: first letter)
+      --color  NAME    blue green orange purple teal pink red yellow, or a hex value
+      --no-badge       Use the app's own icon unchanged, just with your name
+      --seed           Copy Claude Desktop's MCP server config into the new profile
+
+  list                 Show every profile, where its data lives, and what is running
+  open  NAME           Launch a profile
+  rm    NAME           Remove a launcher (keeps its data)
+      --purge          Also delete the profile's data. Cannot be undone.
+      -y, --yes        Skip the confirmation prompt
+  apps                 List apps on this Mac that support extra accounts
+  doctor               Check the setup and report anything wrong
+  version              Print the version
+
+${C_BOLD}EXAMPLES${C_RESET}
+  aidentity setup
+  aidentity add Claude --profile Work --color blue --seed
+  aidentity add ChatGPT --profile Personal
+  aidentity list
+  aidentity rm "Claude Work" --purge
+
+${C_BOLD}HOW IT WORKS${C_RESET}
+  Chromium and Electron apps keep their single-instance lock inside their data
+  directory. Point a second instance at a different directory and the two never
+  see each other's lock, so both run at once — each signed into its own account.
+
+  aidentity builds a small launcher app that does exactly that. Your real app is
+  never copied, patched or re-signed, so its signature, keychain access and
+  auto-update all keep working.
+
+${C_BOLD}MORE${C_RESET}
+  https://github.com/PiniShv/aidentity
+EOF
+}
+
+# -------------------------------------------------------------- dispatch --
+
+main() {
+  local cmd="${1:-help}"
+  [ $# -gt 0 ] && shift
+  case "$cmd" in
+    setup|init|wizard) cmd_setup "$@" ;;
+    add)             cmd_add "$@" ;;
+    list|ls)         cmd_list "$@" ;;
+    open)            cmd_open "$@" ;;
+    rm|remove|delete) cmd_rm "$@" ;;
+    apps)            cmd_apps "$@" ;;
+    doctor)          cmd_doctor "$@" ;;
+    version|--version|-v) cmd_version ;;
+    help|--help|-h)  cmd_help ;;
+    *) printf '%sUnknown command: %s%s\n\n' "$C_RED" "$cmd" "$C_RESET" >&2; cmd_help >&2; exit 1 ;;
+  esac
+}
+
+main "$@"
