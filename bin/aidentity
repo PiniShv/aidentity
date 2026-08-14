@@ -716,7 +716,7 @@ cmd_setup() {
       warn "Letters, numbers, spaces, hyphens and underscores only (max 40)."
     done
 
-    local label="$(bundle_name "$src_app") $profile"
+    local label; label="$(bundle_name "$src_app") $profile"
     if [ -e "$APPS_DIR/$label.app" ] && ! is_our_launcher "$APPS_DIR/$label.app"; then
       warn "Something else already sits at $APPS_DIR/$label.app — pick another name."
       continue
