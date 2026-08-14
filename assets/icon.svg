@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024"
+     role="img" aria-label="aidentity app icon">
+  <title>aidentity</title>
+
+  <!-- macOS icon geometry: the art sits on an 824pt rounded square centred in a
+       1024pt canvas, leaving Apple's 100pt breathing room on every side so the
+       Dock's own shadow and hover scaling have somewhere to go. -->
+  <defs>
+    <linearGradient id="ic-bg" x1="100" y1="100" x2="924" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#1B2333"/>
+      <stop offset="0.55" stop-color="#131A27"/>
+      <stop offset="1"   stop-color="#0B111B"/>
+    </linearGradient>
+
+    <linearGradient id="ic-strand" x1="512" y1="836" x2="512" y2="236" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#1D4ED8"/>
+      <stop offset="0.45" stop-color="#2E7DF6"/>
+      <stop offset="1"   stop-color="#38BDF8"/>
+    </linearGradient>
+
+    <linearGradient id="ic-node" x1="460" y1="430" x2="564" y2="534" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#67E8F9"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+
+    <!-- A real bloom is right here: the icon always sits on its own dark plate. -->
+    <filter id="ic-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <linearGradient id="ic-sheen" x1="512" y1="100" x2="512" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="url(#ic-bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="url(#ic-sheen)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" ry="184.5"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1"/>
+
+  <g filter="url(#ic-glow)" transform="translate(512 512) scale(1.28) translate(-256 -256)">
+    <g fill="none" stroke="url(#ic-strand)" stroke-width="15"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M166 64 V 278 C 166 350 196 372 232 398 V 468"/>
+      <path d="M198 64 V 278 C 198 340 226 358 256 382 V 468"/>
+      <path d="M314 64 V 278 C 314 340 286 358 256 382 V 468"/>
+      <path d="M346 64 V 278 C 346 350 316 372 280 398 V 468"/>
+    </g>
+    <g stroke="url(#ic-node)" stroke-width="6" stroke-linecap="round" fill="none">
+      <path d="M256 268 L 285 285 L 285 319 L 256 336 L 227 319 L 227 285 Z"/>
+      <path d="M256 268 L 256 302 M 285 285 L 256 302 M 285 319 L 256 302
+               M 256 336 L 256 302 M 227 319 L 256 302 M 227 285 L 256 302"/>
+    </g>
+    <g fill="url(#ic-node)">
+      <circle cx="256" cy="268" r="9"/>
+      <circle cx="285" cy="285" r="9"/>
+      <circle cx="285" cy="319" r="9"/>
+      <circle cx="256" cy="336" r="9"/>
+      <circle cx="227" cy="319" r="9"/>
+      <circle cx="227" cy="285" r="9"/>
+      <circle cx="256" cy="302" r="11" fill="#A5F3FC"/>
+    </g>
+  </g>
+</svg>

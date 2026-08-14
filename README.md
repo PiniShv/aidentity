@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="" width="128" height="128">
+</p>
+
 # aidentity
 
 macOS runs one copy of an app, so you get one account — sign out of work Claude to check personal Claude, then sign back in. `aidentity` builds a small launcher per account so you can run them side by side, each signed in, at the same time.
