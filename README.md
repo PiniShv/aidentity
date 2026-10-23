@@ -8,7 +8,7 @@
 
 **Run your work, personal and client accounts side by side. Each one stays signed in.**
 
-Built for AI desktop apps like Claude and ChatGPT. Checked by hand with Claude Desktop. Other Mac apps built on Chromium, the engine inside Google Chrome, should work too: ChatGPT, Slack, VS Code, Cursor, Notion and more. [See the list](#which-apps-work).
+Built for AI desktop apps like Claude and ChatGPT. Also tested with Slack, VS Code, Cursor, Notion and other apps built on Chromium, the engine inside Google Chrome. [See the list](#which-apps-work).
 
 ![macOS only](https://img.shields.io/badge/macOS-only-111?logo=apple&logoColor=white)
 ![Latest version](https://img.shields.io/github/v/tag/PiniShv/aidentity?label=version&sort=semver)
@@ -95,13 +95,13 @@ Apps built on **Chromium** (the engine inside Google Chrome) or **Electron** (a 
 | Status | Apps |
 |---|---|
 | **Verified**: two accounts signed in at once, checked by hand | Claude Desktop |
-| **Detected**: built the right way, not checked by hand yet | ChatGPT, Slack, Visual Studio Code, Cursor, Notion, Notion Calendar, Postman, Microsoft Teams (classic), Antigravity, Kiro, Podman Desktop |
+| **Tested**: starts as its own copy with its own data; two sign-ins not checked yet | ChatGPT, Slack, Visual Studio Code, Cursor, Kiro, Antigravity, Notion, Notion Calendar, Obsidian, Podman Desktop, Postman |
 | **Browsers**: detected, but their built-in profiles usually do the job better | Chrome, Edge, Brave, Arc, Vivaldi, Comet |
-| **Does not work**: native Mac apps | ChatGPT Classic, and any app written in Swift or AppKit |
+| **Does not work** | ChatGPT Classic and other native Mac apps (Swift or AppKit). Microsoft Teams (classic) and MiniMax Design, which ignore the separate folder. |
 
-Native apps have no Chromium inside, so they have no `--user-data-dir` option to use. `aidentity add` checks this first and refuses. The newer ChatGPT app is Chromium inside, so `aidentity` detects it. Support for native apps is not planned for version 1. [Full list and notes](docs/guide.md#which-apps-work)
+Native apps have no Chromium inside, so they have no `--user-data-dir` option to use. `aidentity add` checks this first and refuses. A few Electron apps ignore that option, and `add` cannot tell, so they are listed above. For VS Code, Cursor and Kiro, keep profile names short. Support for native apps is not planned for version 1. [Full list and notes](docs/guide.md#which-apps-work)
 
-Tried another app? [Tell us how it went](https://github.com/PiniShv/aidentity/issues). That is how an app moves from Detected to Verified.
+Tried another app? [Tell us how it went](https://github.com/PiniShv/aidentity/issues). That is how an app moves to Verified.
 
 ## Frequently asked
 
