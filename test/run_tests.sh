@@ -77,7 +77,11 @@ SB="$SANDBOX/work space"
 APPS="$SB/Applications"
 DATA="$SB/profile data"
 SRC="$SB/src"
-mkdir -p "$APPS" "$DATA" "$SRC"
+# VS Code and its forks keep a socket in the profile folder, and aidentity
+# refuses a folder whose socket path would pass 103 bytes. "$DATA" is too deep
+# for that, so their profiles live in this shorter root.
+VSC_DATA="$SANDBOX/v"
+mkdir -p "$APPS" "$DATA" "$SRC" "$VSC_DATA"
 
 export AIDENTITY_APPS_DIR="$APPS"
 export AIDENTITY_DATA_ROOT="$DATA"
@@ -1800,12 +1804,132 @@ make_electron_app "$VSC_APP"
 mkdir -p "$VSC_APP/Contents/Resources/app"
 printf '{"darwinBundleIdentifier":"com.example.codish","dataFolderName":".codish"}\n' \
   > "$VSC_APP/Contents/Resources/app/product.json"
-ai add "$VSC_APP" --profile Iso --own-extensions
+AIDENTITY_DATA_ROOT="$VSC_DATA" ai add "$VSC_APP" --profile Iso --own-extensions
 assert_rc "a VS Code-style app accepts --own-extensions" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "its launcher gets its own extensions folder" \
-  "$(cat "$APPS/Codish Iso.app/Contents/MacOS/launcher")" "--extensions-dir='$DATA/codish-iso/extensions'"
-ai rm "Codish Iso" --purge -y
+  "$(cat "$APPS/Codish Iso.app/Contents/MacOS/launcher")" "--extensions-dir='$VSC_DATA/codish-iso/extensions'"
+AIDENTITY_DATA_ROOT="$VSC_DATA" ai rm "Codish Iso" --purge -y
 rm -rf "$VSC_APP"
+
+
+group "VS Code-style apps: the socket path limit"
+
+# VS Code and its forks quit at start when the path of the socket they keep in
+# the profile folder, "<first four characters of the version>-main.sock", is
+# longer than 103 bytes.
+SOCK_APP="$SRC/Codish.app"
+make_electron_app "$SOCK_APP"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.codish" "$SOCK_APP/Contents/Info.plist"
+mkdir -p "$SOCK_APP/Contents/Resources/app"
+sock_version() { # version, or nothing for a product.json without one
+  printf '{"darwinBundleIdentifier":"com.example.codish","dataFolderName":".codish"%s}\n' \
+    "${1:+,\"version\":\"$1\"}" > "$SOCK_APP/Contents/Resources/app/product.json"
+}
+
+sock_version 1.142.0
+libcall socket_path_bytes "$SOCK_APP" "/p"
+assert_eq "the socket is named after the version's first four characters" "17" "$RUN_OUT"
+sock_version 1.0
+libcall socket_path_bytes "$SOCK_APP" "/p"
+assert_eq "a shorter version gives a shorter name" "16" "$RUN_OUT"
+sock_version ""
+libcall socket_path_bytes "$SOCK_APP" "/p"
+assert_eq "with no version, the longest name is assumed" "17" "$RUN_OUT"
+sock_version 1.142.0
+
+ai add "$SOCK_APP" --main
+assert_rc "a main launcher has no profile folder, so nothing to check" 0 "$RUN_RC" "$RUN_OUT"
+ai rm "Codish Main" -y
+ai add "$ELECTRON_APP" --profile "$(repeat_char 40 a)"
+assert_rc "an app that is not VS Code-style is not checked" 0 "$RUN_RC" "$RUN_OUT"
+ai rm "Fake $(repeat_char 40 a)" --purge -y
+
+# The socket path is: root / "codish-" name / "1.14-main.sock", so the longest
+# name that fits follows from the root's length in bytes (LC_ALL=C here).
+FIT=$((103 - ${#VSC_DATA} - 23))
+if [ "$FIT" -lt 2 ] || [ "$FIT" -gt 39 ]; then
+  _skip "socket path limit for add, rename, restore and doctor" "the sandbox path is ${#SANDBOX} bytes"
+else
+  NAME_FIT=$(repeat_char "$FIT" a)
+  NAME_OVER=$(repeat_char $((FIT + 1)) a)
+
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai add "$SOCK_APP" --profile "$NAME_OVER"
+  assert_rc_nonzero "add refuses a profile whose socket path would be 104 bytes" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and says how long it would be" "$RUN_OUT" "this one would be 104"
+  assert_contains "and the limit" "$RUN_OUT" "103 bytes"
+  assert_contains "and the longest name that fits" "$RUN_OUT" "Use a profile name of at most $FIT characters, or set AIDENTITY_DATA_ROOT"
+  assert_no_dir "it builds no launcher" "$APPS/Codish $NAME_OVER.app"
+  assert_no_dir "and makes no profile folder" "$VSC_DATA/codish-$NAME_OVER"
+
+  # é is one character and two bytes. Counted as characters, this path would
+  # be 103 and pass.
+  U_ROOT="$SANDBOX/é"
+  LC_ALL=en_US.UTF-8 AIDENTITY_DATA_ROOT="$U_ROOT" ai add "$SOCK_APP" --profile "$NAME_FIT"
+  assert_rc_nonzero "bytes are counted, not characters" "$RUN_RC" "$RUN_OUT"
+  assert_contains "so a UTF-8 path is 104 bytes" "$RUN_OUT" "this one would be 104"
+  assert_no_dir "and nothing is created" "$U_ROOT"
+
+  # A data folder so deep that a one-character name would be 106 bytes: no
+  # name fits, and the folder must be 3 bytes shorter.
+  DEEP_ROOT="$VSC_DATA/$(repeat_char $((82 - ${#VSC_DATA} - 1)) d)"
+  AIDENTITY_DATA_ROOT="$DEEP_ROOT" ai add "$SOCK_APP" --profile A
+  assert_rc_nonzero "a data folder too deep for any name is refused" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and says no name fits" "$RUN_OUT" "Even a one-character name is too long in this data folder"
+  assert_contains "and how much shorter the folder must be" "$RUN_OUT" \
+    "AIDENTITY_DATA_ROOT to a folder whose path is at least 3 bytes shorter"
+  assert_no_dir "and nothing is created" "$DEEP_ROOT"
+
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai add "$SOCK_APP" --profile A
+  assert_rc "a short name is fine" 0 "$RUN_RC" "$RUN_OUT"
+  printf 'session\n' > "$VSC_DATA/codish-a/Cookies"
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai rename "Codish A" "$NAME_OVER"
+  assert_rc_nonzero "rename refuses a name whose socket path would be too long" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and asks for a shorter one" "$RUN_OUT" "of at most $FIT characters"
+  assert_dir "the launcher is untouched" "$APPS/Codish A.app"
+  assert_file "and the profile is not moved" "$VSC_DATA/codish-a/Cookies"
+  assert_no_dir "to the new name" "$VSC_DATA/codish-$NAME_OVER"
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai rename "Codish A" "$NAME_FIT"
+  assert_rc "rename takes a name of exactly 103 bytes" 0 "$RUN_RC" "$RUN_OUT"
+  assert_file "and moves the profile" "$VSC_DATA/codish-$NAME_FIT/Cookies"
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai doctor
+  assert_not_contains "doctor finds nothing wrong at exactly 103 bytes" "$RUN_OUT" "cannot open it"
+
+  # A launcher deleted in Finder, and a folder one byte too deep to restore.
+  FIT_DATA="$VSC_DATA/codish-$NAME_FIT"
+  LONG_DATA="$VSC_DATA/codish-${NAME_FIT}x"
+  rm -rf "$APPS/Codish $NAME_FIT.app"
+  mv "$FIT_DATA" "$LONG_DATA"
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai restore --all
+  assert_rc_nonzero "restore refuses a folder whose socket path is too long" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and says to rename the folder" "$RUN_OUT" "Rename this folder to a name of at most $((FIT + 7)) characters"
+  assert_no_dir "it builds no launcher" "$APPS/Codish $NAME_FIT.app"
+  assert_file "and leaves the profile alone" "$LONG_DATA/Cookies"
+  mv "$LONG_DATA" "$FIT_DATA"
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai restore --all
+  assert_rc "with a shorter folder name it restores" 0 "$RUN_RC" "$RUN_OUT"
+  assert_dir "the launcher is back" "$APPS/Codish $NAME_FIT.app"
+
+  # A profile made before this check, one byte too deep.
+  mv "$FIT_DATA" "$LONG_DATA"
+  /usr/libexec/PlistBuddy -c "Set :AIdentityDataDir $LONG_DATA" "$APPS/Codish $NAME_FIT.app/Contents/Info.plist"
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai doctor
+  assert_rc "doctor reports, it does not fail" 0 "$RUN_RC" "$RUN_OUT"
+  assert_contains "doctor reports a profile whose socket path is too long" "$RUN_OUT" \
+    "Codish cannot open it: the socket path in its profile folder would be 104 bytes, and macOS allows 103"
+  assert_contains "with the rename that fixes it" "$RUN_OUT" \
+    "rename it to a name of at most $FIT characters: aidentity rename \"Codish $NAME_FIT\""
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai doctor --fix
+  assert_contains "--fix leaves the new name to the user" "$RUN_OUT" "Codish cannot open it"
+  assert_eq "and the profile folder stays where it is" "$LONG_DATA" \
+    "$(plist_key "$APPS/Codish $NAME_FIT.app" AIdentityDataDir)"
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai add "$SOCK_APP" --profile "$NAME_FIT"
+  assert_rc_nonzero "re-adding it is refused too" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and points to a rename" "$RUN_OUT" "Rename it to a name of at most $FIT characters:"
+  assert_contains "with the command" "$RUN_OUT" "aidentity rename \"Codish $NAME_FIT\""
+  AIDENTITY_DATA_ROOT="$VSC_DATA" ai rm "Codish $NAME_FIT" --purge -y
+  assert_no_dir "rm --purge still removes it" "$LONG_DATA"
+fi
+rm -rf "$SOCK_APP"
 
 
 group "list --json"
@@ -1832,7 +1956,7 @@ make_electron_app "$EXT_APP"
 mkdir -p "$EXT_APP/Contents/Resources/app"
 printf '{"darwinBundleIdentifier":"com.example.codey","dataFolderName":".codey"}\n' \
   > "$EXT_APP/Contents/Resources/app/product.json"
-ai add "$EXT_APP" --profile Ext --own-extensions
+AIDENTITY_DATA_ROOT="$VSC_DATA" ai add "$EXT_APP" --profile Ext --own-extensions
 
 ai_stdout list --json
 J=$RUN_OUT
@@ -1899,7 +2023,8 @@ assert_contains "and names it" "$RUN_OUT" "--jsn"
 ai list extra
 assert_rc_nonzero "list refuses an extra argument" "$RUN_RC" "$RUN_OUT"
 
-for l in "$ODD" "Fake Busy" "Gone Lost" "Codey Ext"; do ai rm "$l" --purge -y; done
+for l in "$ODD" "Fake Busy" "Gone Lost"; do ai rm "$l" --purge -y; done
+AIDENTITY_DATA_ROOT="$VSC_DATA" ai rm "Codey Ext" --purge -y
 ai rm "Fake Main" -y
 rm -rf "$ODD_APP" "$EXT_APP"
 assert_eq "every launcher this group made is gone" "$JSON_LAUNCHERS_BEFORE" "$(count_launchers)"
