@@ -11,8 +11,12 @@ name: CI
 # advisory: it reports style findings without failing the build.
 
 # Quoted so YAML does not read "on" as the boolean true.
+# Pushes to main and release tags, plus pull requests. A bare `push:` ran every
+# PR branch twice, once per trigger.
 "on":
   push:
+    branches: [main]
+    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -37,14 +41,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Collect the shell files
         id: files
         run: |
           set -eu
           files=""
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh; do
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh assets/record-demo.sh; do
             [ -f "$f" ] && files="$files $f"
           done
           [ -n "$files" ] || { echo "No shell files found." >&2; exit 1; }
@@ -94,7 +98,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Show the environment
         run: |
@@ -106,7 +110,7 @@ jobs:
       - name: Syntax check (bash -n)
         run: |
           set -eu
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh; do
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh assets/record-demo.sh; do
             [ -f "$f" ] || continue
             printf '  bash -n %s\n' "$f"
             bash -n "$f"
@@ -127,7 +131,7 @@ jobs:
         run: |
           set -eu
           files=""
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh; do
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh assets/record-demo.sh; do
             [ -f "$f" ] && files="$files $f"
           done
           # shellcheck disable=SC2086
@@ -137,7 +141,7 @@ jobs:
         continue-on-error: true
         run: |
           files=""
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh; do
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh assets/record-demo.sh; do
             [ -f "$f" ] && files="$files $f"
           done
           # shellcheck disable=SC2086
@@ -169,57 +173,12 @@ jobs:
   guards:
     name: Source guards
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      # "$var…" expands as ${var…} in bash and dies under `set -u`. GNU grep is
-      # required for -P; this job is Linux precisely because the macOS runner's
-      # BSD grep silently rejected -P and the check passed unconditionally.
-      - name: Braces required before a multi-byte character
-        run: |
-          if grep -oP '(?<!\{)\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]' \
-               bin/aidentity install.sh uninstall.sh test/run_tests.sh; then
-            echo "::error::Use \${var} when a non-ASCII character follows the name." >&2
-            exit 1
-          fi
-
-      # install.sh verifies downloads by matching this exact final line.
-      - name: bin/aidentity still ends on its entry point
-        run: |
-          marker=$(sed -n "s/^END_MARKER='\(.*\)'$/\1/p" install.sh)
-          last=$(awk 'NF {l=$0} END {sub(/[ \t\r]+$/,"",l); print l}' bin/aidentity)
-          if [ "$last" != "$marker" ]; then
-            echo "::error::bin/aidentity must end on [$marker] but ends on [$last]" >&2
-            exit 1
-          fi
-
-      # These helpers are defined in two scripts and MUST stay in step — a
-      # drifted copy of running_on_profile shipped a dead safety guard once.
-      - name: Duplicated safety helpers agree
-        run: |
-          fail=0
-          for fn in running_on_profile data_is_ours is_our_launcher; do
-            # Compare CODE, not formatting: comments and blank lines differ
-            # legitimately between the two files.
-            a=$(sed -n "/^$fn() {/,/^}/p" bin/aidentity | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$')
-            b=$(sed -n "/^$fn() {/,/^}/p" uninstall.sh  | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$')
-            if [ -n "$b" ] && [ "$a" != "$b" ]; then
-              echo "::error::$fn differs between bin/aidentity and uninstall.sh" >&2
-              diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") || true
-              fail=1
-            fi
-          done
-          exit $fail
-
-      # bin/aidentity changed without regenerating SHA256SUMS would make every
-      # piped install fail the checksum. Catch it here instead of in the field.
-      - name: SHA256SUMS matches bin/aidentity
-        run: |
-          want=$(awk '$2 == "bin/aidentity" { print $1; exit }' SHA256SUMS)
-          got=$(shasum -a 256 bin/aidentity | awk '{print $1}')
-          if [ "$want" != "$got" ]; then
-            echo "::error::SHA256SUMS is stale. Run: make checksums" >&2
-            echo "  expected $want" >&2
-            echo "  actual   $got"  >&2
-            exit 1
-          fi
+      # The same script `make check` runs locally: braces before multi-byte
+      # characters, install.sh's end marker, the safety helpers copied into
+      # uninstall.sh, SHA256SUMS, and the installer's default ref.
+      - name: Source guards
+        run: bash scripts/guards.sh

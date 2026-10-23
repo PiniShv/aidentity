@@ -12,7 +12,7 @@ macOS runs one copy of an app, so you get one account — sign out of work Claud
 
 ![Terminal recording: aidentity lists the compatible apps, creates three profiles, shows them with aidentity list, renames one and recolours it, then runs doctor](assets/demo.gif)
 
-<sub>Recorded in a sandbox against fixture apps — the home directory, app search path, launcher directory and data root all point at a throwaway `/tmp` tree, so nothing from a real machine appears. `assets/record-demo.sh` regenerates it from `assets/demo.tape`.</sub>
+<sub>Recorded in a sandbox against fixture apps — the home directory, app search path, launcher directory and data root all point at a throwaway temporary folder, so no app list, username or real path appears; `doctor` does show the macOS and bash versions. `assets/record-demo.sh` regenerates it from `assets/demo.tape`.</sub>
 
 ---
 
