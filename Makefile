@@ -72,7 +72,7 @@ test: ## Run the test suite (test/run_tests.sh)
 		printf 'No test suite at %s\n' "$(TESTS)" >&2; \
 		exit 1; \
 	fi
-	@bash "$(TESTS)"
+	@/bin/bash "$(TESTS)"
 
 lint: ## shellcheck every shell file, or syntax-check them if shellcheck is absent
 	@if command -v shellcheck >/dev/null 2>&1; then \

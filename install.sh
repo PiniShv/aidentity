@@ -285,6 +285,12 @@ install_binary() {
     dim "  Created $INSTALL_DIR"
   fi
 
+  # A real directory here (a checkout at ~/bin/aidentity, say) would swallow the
+  # file: mv moves INTO a directory instead of replacing it.
+  if [ -d "$dest" ] && [ ! -L "$dest" ]; then
+    die "$dest is a directory, not a file. Move it aside, then run this again.
+    Nothing was installed."
+  fi
   if [ -e "$dest" ]; then
     previous=$(read_version "$dest")
   fi
@@ -302,10 +308,14 @@ install_binary() {
     || die "Could not write to $INSTALL_DIR"
   cat "$TMP_FILE" > "$STAGED_FILE" || die "Could not write to $INSTALL_DIR"
   chmod 755 "$STAGED_FILE" || die "Could not set permissions on $STAGED_FILE"
-  # mv replaces the name; if $dest is itself a symlink it is replaced, not
-  # followed, so an existing symlink cannot redirect the install either.
-  mv -f "$STAGED_FILE" "$dest" || die "Could not install to $dest"
+  # -h: if $dest is a symlink, replace the link itself. Plain `mv -f` follows a
+  # symlink to a directory and drops the file inside it, so the install
+  # "succeeded" while nothing usable reached PATH. /bin/mv by full path: -h is
+  # BSD-only, and GNU coreutils first on PATH (common with Homebrew) rejects it.
+  /bin/mv -fh "$STAGED_FILE" "$dest" || die "Could not install to $dest"
   STAGED_FILE=""
+  [ -f "$dest" ] && [ ! -L "$dest" ] || die "Installing to $dest did not leave a file there.
+    Check what is at that path, then run this again."
 
   INSTALLED_PATH="$dest"
   INSTALLED_VERSION=$(read_version "$dest")
@@ -374,14 +384,25 @@ report() {
 # stdin is the installer script itself when this arrives via `curl … | bash`, so
 # both the question and the walkthrough have to be wired to the terminal
 # explicitly. With no terminal (CI, a provisioning script) we simply skip it.
+#
+# The terminal test opens /dev/tty rather than reading its mode bits: those say
+# "readable" on every Mac, terminal or not, so a CI or MDM install that had
+# just succeeded died on the redirection below and exited 1.
 offer_setup() {
-  [ -r /dev/tty ] || return 0
+  ( : < /dev/tty ) 2>/dev/null || return 0
   [ -x "$INSTALLED_PATH" ] || return 0
+  # Under the sudo line printed above, setup would build launchers and profile
+  # directories owned by root, in root's home. Leave it to the user.
+  if [ "$(id -u)" -eq 0 ]; then
+    info ""
+    dim "  Run 'aidentity setup' as yourself (not with sudo) to set up an account."
+    return 0
+  fi
 
   local reply=""
   info ""
-  printf 'Set up your first extra account now? [Y/n] ' > /dev/tty
-  IFS= read -r reply < /dev/tty 2>/dev/null || return 0
+  printf 'Set up your first extra account now? [Y/n] ' 2>/dev/null > /dev/tty || return 0
+  IFS= read -r reply 2>/dev/null < /dev/tty || return 0
   case "$(printf '%s' "$reply" | tr '[:upper:]' '[:lower:]')" in
     ''|y|yes) ;;
     *) info ""; dim "  No problem — run 'aidentity setup' whenever you like."; return 0 ;;
@@ -401,7 +422,8 @@ offer_setup() {
 # a sha256 reviewed at release time.
 verify_checksum() {
   local want got
-  want=$(curl -fsSL --proto '=https' --proto-redir '=https' "$SUMS_URL" 2>/dev/null \
+  want=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
+              --connect-timeout 10 --max-time 30 --retry 2 "$SUMS_URL" 2>/dev/null \
          | awk '$2 == "bin/aidentity" { print $1; exit }') || want=""
   if [ -z "$want" ]; then
     warn "No published checksum found for '$REF'; continuing on the structural checks alone."

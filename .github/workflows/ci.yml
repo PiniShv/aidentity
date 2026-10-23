@@ -148,8 +148,10 @@ jobs:
       - name: Test suite — macOS system bash 3.2
         run: /bin/bash test/run_tests.sh
 
+      # The suite runs the script under /bin/bash unless told otherwise; this
+      # step points it at the bash first on PATH, so both shells are covered.
       - name: Test suite — default bash on PATH
-        run: bash test/run_tests.sh
+        run: AIDENTITY_TEST_BASH="$(command -v bash)" bash test/run_tests.sh
 
       # A last check that the script is usable as installed, not just testable.
       - name: Smoke test the CLI

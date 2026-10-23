@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
+# SC2016: single-quoted scripts are handed to "$BASH_BIN" -c and to generated
+# stubs, which expand them later, on purpose. shellcheck only recognises that
+# when the interpreter is spelled literally as `bash -c`.
+# shellcheck disable=SC2016
 #
 # aidentity test suite — self-contained, no frameworks, no dependencies.
 #
@@ -163,10 +167,32 @@ assert_exec()    { if [ -x "$2" ];   then _pass "$1"; else _fail "$1" "not execu
 
 # ---------------------------------------------------------------- runners --
 
-# Run the CLI. Combines stdout and stderr; stdin is closed so nothing can hang
-# on a prompt. Results land in RUN_OUT / RUN_RC.
+# The interpreter under test. The script promises the bash 3.2 that macOS ships
+# as /bin/bash; running it with whatever `bash` comes first on PATH (often a
+# Homebrew 5.x) would hide a 3.2-only bug. AIDENTITY_TEST_BASH tries another.
+BASH_BIN="${AIDENTITY_TEST_BASH:-/bin/bash}"
+
+# Run a command with no controlling terminal. Closing stdin is not enough: the
+# script's ask() falls back to /dev/tty when stdin runs dry, so in a real
+# terminal the "no terminal" tests sat waiting for a key that never came —
+# silently, because the prompt went into the captured output. CI has no
+# terminal, which is why it never showed there. macOS has no setsid(1); its
+# perl does the same, after a fork in case we lead a process group.
+detached() {
+  if [ -x /usr/bin/perl ]; then
+    /usr/bin/perl -MPOSIX -e '
+      my $pid = fork; die "fork: $!\n" unless defined $pid;
+      if ($pid) { waitpid($pid, 0); exit($? & 127 ? 128 + ($? & 127) : $? >> 8) }
+      POSIX::setsid(); exec @ARGV or exit 127' -- "$@"
+  else
+    "$@"
+  fi
+}
+
+# Run the CLI. Combines stdout and stderr; stdin is closed and there is no
+# terminal, so nothing can hang on a prompt. Results land in RUN_OUT / RUN_RC.
 ai() {
-  RUN_OUT=$(bash "$AIDENTITY" "$@" 2>&1 </dev/null)
+  RUN_OUT=$(detached "$BASH_BIN" "$AIDENTITY" "$@" 2>&1 </dev/null)
   RUN_RC=$?
   return 0
 }
@@ -174,8 +200,26 @@ ai() {
 # Same, but feed a line on stdin (for the rm confirmation prompt).
 ai_in() {
   local input="$1"; shift
-  RUN_OUT=$(printf '%s\n' "$input" | bash "$AIDENTITY" "$@" 2>&1)
+  RUN_OUT=$(printf '%s\n' "$input" | detached "$BASH_BIN" "$AIDENTITY" "$@" 2>&1)
   RUN_RC=$?
+  return 0
+}
+
+# Run the CLI on a pseudo-terminal, typing $1 (printf %b escapes) as a user
+# would. script(1) gives the child a real terminal, so the walkthrough's
+# terminal checks pass and its questions read the typed lines. The pauses keep
+# script from signalling end-of-input before the child starts reading. `open`
+# is stubbed so a walkthrough can never open a real Finder window.
+ai_tty() {
+  local input="$1"; shift
+  # HOME is sandboxed too: the walkthrough asks extra questions when it finds a
+  # real Claude config in the developer's home, which shifted every answer.
+  RUN_OUT=$( { { sleep 0.3; printf '%b' "$input"; sleep 1; } \
+      | HOME="$SANDBOX/tty-home" PATH="$STUB_BIN:$PATH" \
+        script -q /dev/null "$BASH_BIN" "$AIDENTITY" "$@"
+      echo "__rc=${PIPESTATUS[1]}"; } 2>&1 | tr -d '\r')
+  RUN_RC=${RUN_OUT##*__rc=}
+  RUN_OUT=${RUN_OUT%__rc=*}
   return 0
 }
 
@@ -183,10 +227,16 @@ ai_in() {
 # line stripped so sourcing does not execute a command.
 LIB="$SANDBOX/aidentity-lib.sh"
 libcall() {
-  RUN_OUT=$(bash -c '. "$1" >/dev/null 2>&1 || exit 99; shift; "$@"' aidentity-lib "$LIB" "$@" 2>&1)
+  RUN_OUT=$(detached "$BASH_BIN" -c '. "$1" >/dev/null 2>&1 || exit 99; shift; "$@"' aidentity-lib "$LIB" "$@" 2>&1)
   RUN_RC=$?
   return 0
 }
+
+# Commands that must never reach the real system during a test.
+STUB_BIN="$SANDBOX/stub-bin"
+mkdir -p "$STUB_BIN"
+printf '#!/bin/sh\nprintf "stub open: %%s\\n" "$*"\n' > "$STUB_BIN/open"
+chmod +x "$STUB_BIN/open"
 
 plist_key() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
 
@@ -375,7 +425,7 @@ else
   RO_APPS="$SB/read only apps"
   mkdir -p "$RO_APPS"
   chmod 500 "$RO_APPS"
-  RUN_OUT=$(AIDENTITY_APPS_DIR="$RO_APPS" bash "$AIDENTITY" doctor 2>&1 </dev/null)
+  RUN_OUT=$(AIDENTITY_APPS_DIR="$RO_APPS" detached "$BASH_BIN" "$AIDENTITY" doctor 2>&1 </dev/null)
   chmod 700 "$RO_APPS"
   assert_contains "doctor flags a launcher directory it cannot write to" "$RUN_OUT" "NOT WRITABLE"
 fi
@@ -465,8 +515,8 @@ assert_eq "shquote escapes an embedded single quote" "'it'\\''s'" "$RUN_OUT"
 # The property that matters: whatever goes in comes back out of a shell verbatim.
 shquote_roundtrip() { # description input
   local quoted back
-  quoted=$(bash -c '. "$1" >/dev/null 2>&1; shquote "$2"' aidentity-lib "$LIB" "$2")
-  back=$(bash -c "printf '%s' $quoted")
+  quoted=$("$BASH_BIN" -c '. "$1" >/dev/null 2>&1; shquote "$2"' aidentity-lib "$LIB" "$2")
+  back=$("$BASH_BIN" -c "printf '%s' $quoted")
   assert_eq "shquote round-trips $1" "$2" "$back"
 }
 shquote_roundtrip "a path with spaces"       "/Users/x/Application Support/y"
@@ -710,7 +760,7 @@ printf '{"mcpServers":{"probe":{}}}\n' > "$FAKE_HOME/Library/Application Support
 # claim Claude's bundle id. Seeding any other app was a real bug.
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.anthropic.claudefordesktop" \
   "$ELECTRON_APP/Contents/Info.plist" >/dev/null 2>&1 || true
-RUN_OUT=$(HOME="$FAKE_HOME" bash "$AIDENTITY" add "$ELECTRON_APP" --profile Seeded --seed 2>&1 </dev/null)
+RUN_OUT=$(HOME="$FAKE_HOME" detached "$BASH_BIN" "$AIDENTITY" add "$ELECTRON_APP" --profile Seeded --seed 2>&1 </dev/null)
 RUN_RC=$?
 assert_rc "add --seed exits 0" 0 "$RUN_RC" "$RUN_OUT"
 assert_file "add --seed copies the MCP config into the new profile" \
@@ -842,7 +892,7 @@ group "regressions — bugs found in review, each must stay fixed"
 REG_APPS="$SB/ro apps"
 mkdir -p "$REG_APPS"
 chmod 500 "$REG_APPS"
-RUN_OUT=$(AIDENTITY_APPS_DIR="$REG_APPS" bash "$AIDENTITY" add "$ELECTRON_APP" --profile Blocked 2>&1 </dev/null)
+RUN_OUT=$(AIDENTITY_APPS_DIR="$REG_APPS" detached "$BASH_BIN" "$AIDENTITY" add "$ELECTRON_APP" --profile Blocked 2>&1 </dev/null)
 RUN_RC=$?
 chmod 700 "$REG_APPS"
 assert_rc_nonzero "a build that cannot write exits non-zero" "$RUN_RC" "$RUN_OUT"
@@ -883,7 +933,7 @@ bounded_libcall() { # seconds, fn, args...
   # gave us the pid of a wrapper subshell; killing that left the inner bash
   # spinning, so a hang in the code under test hung the suite instead of
   # failing it.
-  bash -c '. "$1" >/dev/null 2>&1 || exit 99; shift; "$@" >/dev/null 2>&1' \
+  "$BASH_BIN" -c '. "$1" >/dev/null 2>&1 || exit 99; shift; "$@" >/dev/null 2>&1' \
        aidentity-lib "$LIB" "$@" &
   local pid=$!
   ( sleep "$secs"; kill -9 "$pid" 2>/dev/null ) &
@@ -985,6 +1035,416 @@ rm -rf "$DECOY4"
 
 ai rm "Fake Renamed" --purge -y
 assert_rc "the renamed profile is removed cleanly" 0 "$RUN_RC" "$RUN_OUT"
+
+
+group "running check — a real-sized process list"
+
+# A stub pgrep with the profile's main process FIRST, then about 120 KB of
+# Electron helper lines for another profile, a size real apps reach. The old
+# check piped this into grep -q under pipefail; grep's early exit killed the
+# writer with SIGPIPE and the profile read as NOT running.
+PGREP_STUB="$SANDBOX/stub-pgrep"
+mkdir -p "$PGREP_STUB"
+BUSY_DATA="$DATA/fake-busy"
+{
+  printf '#!/bin/sh\n'
+  printf "printf '%%s\\\\n' '101 /Apps/Fake.app/Contents/MacOS/Fake --user-data-dir=%s'\n" "$BUSY_DATA"
+  printf 'i=0\nwhile [ "$i" -lt 80 ]; do\n'
+  printf "  printf '%%s\\\\n' \"\$((200 + i)) /Apps/Fake.app/Contents/Frameworks/Fake Helper.app/Contents/MacOS/Fake Helper --type=renderer --user-data-dir=%s/other %s\"\n" \
+    "$DATA" "$(repeat_char 1400 x)"
+  printf '  i=$((i + 1))\ndone\n'
+} > "$PGREP_STUB/pgrep"
+chmod +x "$PGREP_STUB/pgrep"
+STUB_SIZE=$(PATH="$PGREP_STUB:$PATH" pgrep -fl x | wc -c | tr -d ' ')
+if [ "$STUB_SIZE" -gt 65536 ]; then _pass "the stub list is bigger than a pipe buffer ($STUB_SIZE bytes)"
+else _fail "the stub list is bigger than a pipe buffer" "only $STUB_SIZE bytes"; fi
+
+probe_running() { # data dir -> RUNNING / STOPPED
+  PATH="$PGREP_STUB:$PATH" "$BASH_BIN" -c \
+    '. "$1" >/dev/null 2>&1; running_on_profile "$2" && echo RUNNING || echo STOPPED' x "$LIB" "$1"
+}
+assert_eq "a profile listed first in a 120 KB process list reads as running" "RUNNING" "$(probe_running "$BUSY_DATA")"
+assert_eq "a prefix of a running profile does not match" "STOPPED" "$(probe_running "$DATA/fake-bus")"
+assert_eq "a longer name than a running profile does not match" "STOPPED" "$(probe_running "$BUSY_DATA-2")"
+# The same folder under another spelling is the same running profile: a
+# symlinked root, a doubled slash, a trailing slash.
+mkdir -p "$BUSY_DATA"
+ln -sfn "$DATA" "$SB/data-alias"
+assert_eq "a running profile reached through a symlinked root reads as running" "RUNNING" \
+  "$(probe_running "$SB/data-alias/fake-busy")"
+assert_eq "a doubled slash does not hide a running profile" "RUNNING" "$(probe_running "$DATA//fake-busy")"
+mkdir -p "$DATA/fake-other"
+assert_eq "a different folder through the same symlink does not match" "STOPPED" \
+  "$(probe_running "$SB/data-alias/fake-other")"
+rm -f "$SB/data-alias"
+rmdir "$BUSY_DATA" "$DATA/fake-other" 2>/dev/null
+
+ai add "$ELECTRON_APP" --profile Busy
+printf 'session\n' > "$BUSY_DATA/Cookies"
+PATH="$PGREP_STUB:$PATH" ai rm "Fake Busy" --purge -y
+assert_rc_nonzero "rm --purge refuses a profile that is running" "$RUN_RC" "$RUN_OUT"
+assert_file "the running profile's session survives" "$BUSY_DATA/Cookies"
+PATH="$PGREP_STUB:$PATH" ai prune -y
+assert_file "prune leaves a running, claimed profile alone" "$BUSY_DATA/Cookies"
+ai rm "Fake Busy" --purge -y
+assert_no_dir "once it stops, --purge deletes it" "$BUSY_DATA"
+
+
+group "add asks for the account name"
+
+ai add "$ELECTRON_APP"
+assert_contains "with no terminal, add says how to give the name" "$RUN_OUT" "--profile"
+ai_tty 'Typed\n' add "$ELECTRON_APP"
+assert_rc "on a terminal, add asks for a missing name" 0 "$RUN_RC" "$RUN_OUT"
+assert_dir "the typed name is used" "$APPS/Fake Typed.app"
+ai_tty 'bad/name\nRetyped\n' add "$ELECTRON_APP"
+assert_contains "a refused name says why" "$RUN_OUT" "may only contain"
+assert_dir "a refused name is asked for again" "$APPS/Fake Retyped.app"
+ai rm "Fake Typed" --purge -y
+ai rm "Fake Retyped" --purge -y
+
+
+group "setup survives a typo, and offers a main launcher"
+
+libcall list_compatible_apps
+FAKE_IDX=$(printf '%s\n' "$RUN_OUT" | grep -n -x -F "$ELECTRON_APP" | cut -d: -f1)
+assert_nonempty "the fake Electron app is in the walkthrough menu" "$FAKE_IDX"
+
+ai_tty "y\nabc\n0\n${FAKE_IDX}\nWizard\nn\nn\nn\n" setup
+assert_rc "setup finishes after typos at the menu" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "a typo is answered with a hint" "$RUN_OUT" "Please enter a number"
+assert_dir "the account after the typos is created" "$APPS/Fake Wizard.app"
+assert_contains "setup reports one profile" "$RUN_OUT" "1 profile(s) created"
+assert_no_dir "declining the main launcher builds none" "$APPS/Fake Main.app"
+
+ai_tty "y\n${FAKE_IDX}\nWizard Two\ny\nn\nn\n" setup
+assert_dir "accepting the offer builds a main launcher" "$APPS/Fake Main.app"
+assert_eq "it is marked as a main launcher" "true" "$(plist_key "$APPS/Fake Main.app" AIdentityMain)"
+assert_not_contains "setup never opened a real Finder window" "$RUN_OUT" "Opening"
+for p in "Fake Wizard" "Fake Wizard Two"; do ai rm "$p" --purge -y; done
+ai rm "Fake Main" -y
+
+
+group "--main opens the original account"
+
+ai add "$ELECTRON_APP" --main
+assert_rc "add --main succeeds" 0 "$RUN_RC" "$RUN_OUT"
+MAIN_APP="$APPS/Fake Main.app"
+assert_dir "it is named <App> Main" "$MAIN_APP"
+assert_eq "it is marked as a main launcher" "true" "$(plist_key "$MAIN_APP" AIdentityMain)"
+assert_eq "it records no data directory" "" "$(plist_key "$MAIN_APP" AIdentityDataDir)"
+MAIN_SRC=$(cat "$MAIN_APP/Contents/MacOS/launcher")
+assert_not_contains "it passes no --user-data-dir" "$MAIN_SRC" "user-data-dir"
+assert_contains "it still starts a new instance (-na) of the real app" "$MAIN_SRC" "-na '$ELECTRON_APP'"
+assert_no_dir "no profile directory is created for it" "$DATA/fake-main"
+
+ai add "$ELECTRON_APP" --main --profile Second
+assert_rc_nonzero "a second main launcher for the same app is refused" "$RUN_RC" "$RUN_OUT"
+ai add "$ELECTRON_APP" --profile Main
+assert_rc_nonzero "a profile cannot take over the main launcher's name" "$RUN_RC" "$RUN_OUT"
+assert_eq "the main launcher is unchanged" "true" "$(plist_key "$MAIN_APP" AIdentityMain)"
+
+ai add "$ELECTRON_APP" --profile Regular
+ai add "$ELECTRON_APP" --main --profile Regular
+assert_rc_nonzero "a separate profile is never turned into a main launcher" "$RUN_RC" "$RUN_OUT"
+assert_eq "the profile keeps its own data directory" \
+  "$DATA/fake-regular" "$(plist_key "$APPS/Fake Regular.app" AIdentityDataDir)"
+ai rm "Fake Regular" --purge -y
+
+ai list
+assert_contains "list says it opens the original account" "$RUN_OUT" "your original account"
+
+ai rename "Fake Main" Original
+assert_rc "a main launcher can be renamed" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "it is still a main launcher" "true" "$(plist_key "$APPS/Fake Original.app" AIdentityMain)"
+assert_no_dir "renaming creates no profile directory" "$DATA/fake-original"
+ai set "Fake Original" --color red
+assert_rc "set works on a main launcher" 0 "$RUN_RC" "$RUN_OUT"
+ai rebuild "Fake Original"
+assert_rc "rebuild works on a main launcher" 0 "$RUN_RC" "$RUN_OUT"
+assert_not_contains "rebuild keeps it on the original account" \
+  "$(cat "$APPS/Fake Original.app/Contents/MacOS/launcher")" "user-data-dir"
+ai rm "Fake Original" --purge -y
+assert_rc "rm --purge on a main launcher removes only the launcher" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "and says --purge did nothing" "$RUN_OUT" "does nothing"
+assert_no_dir "the main launcher is gone" "$APPS/Fake Original.app"
+
+
+group "a failed build never loses a launcher"
+
+ai add "$ELECTRON_APP" --profile Safe
+printf 'session\n' > "$DATA/fake-safe/Cookies"
+SAFE_COLOR=$(plist_key "$APPS/Fake Safe.app" AIdentityColor)
+chmod 500 "$APPS"
+ai set "Fake Safe" --color red
+SET_RC=$RUN_RC; SET_OUT=$RUN_OUT
+ai rename "Fake Safe" Moved
+REN_RC=$RUN_RC; REN_OUT=$RUN_OUT
+chmod 755 "$APPS"
+assert_rc_nonzero "set fails when the launcher cannot be rebuilt" "$SET_RC" "$SET_OUT"
+assert_rc_nonzero "rename fails when the launcher cannot be rebuilt" "$REN_RC" "$REN_OUT"
+assert_dir "the launcher survives both failures" "$APPS/Fake Safe.app"
+assert_eq "its colour is unchanged" "$SAFE_COLOR" "$(plist_key "$APPS/Fake Safe.app" AIdentityColor)"
+assert_contains "rename says nothing changed" "$REN_OUT" "Nothing was changed"
+assert_file "the session was moved back by rename's roll-back" "$DATA/fake-safe/Cookies"
+assert_no_dir "no half-renamed data directory is left" "$DATA/fake-moved"
+assert_eq "no staging directory is left behind" "0" \
+  "$(find "$APPS" -maxdepth 1 -name '.aidentity-build.*' | wc -l | tr -d ' ')"
+ai rm "Fake Safe" --purge -y
+
+
+group "status, permissions and option values"
+
+ai add "$ELECTRON_APP" --profile Used
+mkdir -p "$DATA/fake-used/Local Storage"
+printf 'x\n' > "$DATA/fake-used/Cookies"
+ai list
+USED_STATUS=$(printf '%s\n' "$RUN_OUT" | awk '/^Fake Used$/ { f = 1; next } f && /status/ { print; exit }')
+assert_contains "an Electron-shaped profile (no Default/) reads as in use" "$USED_STATUS" "in use"
+assert_eq "profile directories are owner-only" "700" "$(stat -f '%Lp' "$DATA/fake-used")"
+ai rm "Fake Used" --purge -y
+
+ai add "$ELECTRON_APP" --profile --seed
+assert_rc_nonzero "an option cannot be swallowed as a profile name" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says what is missing" "$RUN_OUT" "needs a value"
+assert_no_dir "no launcher named after the option" "$APPS/Fake --seed.app"
+
+ai add "$ELECTRON_APP" --profile Accent --badge "é"
+assert_rc "a non-ASCII badge works under LC_ALL=C" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "the whole character is recorded" "é" "$(plist_key "$APPS/Fake Accent.app" AIdentityBadge)"
+ai rm "Fake Accent" --purge -y
+
+ai add "$ELECTRON_APP" --profile One
+ai add "$ELECTRON_APP" --profile Two
+ai rm "Fake One" "Fake Two" -y
+assert_rc_nonzero "rm refuses two names instead of removing only the last" "$RUN_RC" "$RUN_OUT"
+assert_dir "the first is untouched" "$APPS/Fake One.app"
+assert_dir "the second is untouched" "$APPS/Fake Two.app"
+ai rm "Fake One" --purge -y
+ai rm "Fake Two" --purge -y
+
+
+group "rm hints, locked launchers and prune"
+
+ai add "$ELECTRON_APP" --profile Hint
+printf 'session\n' > "$DATA/fake-hint/Cookies"
+ai rm "Fake Hint" -y
+assert_contains "rm prints an add line that reattaches the data" "$RUN_OUT" 'aidentity add "Fake" --profile "Hint"'
+assert_contains "rm points at prune for deleting it" "$RUN_OUT" "aidentity prune"
+assert_not_contains "rm no longer suggests a command that cannot work" "$RUN_OUT" 'rm "Fake Hint" --purge'
+ai add Fake --profile Hint
+assert_rc "following the hint brings the launcher back" 0 "$RUN_RC" "$RUN_OUT"
+assert_file "and the session with it" "$DATA/fake-hint/Cookies"
+
+chflags uchg "$APPS/Fake Hint.app"
+ai rm "Fake Hint" --purge -y
+LOCK_RC=$RUN_RC; LOCK_OUT=$RUN_OUT
+chflags nouchg "$APPS/Fake Hint.app"
+assert_rc_nonzero "rm fails on a locked launcher" "$LOCK_RC" "$LOCK_OUT"
+assert_not_contains "and does not claim it removed it" "$LOCK_OUT" "Removed launcher"
+assert_file "and does not delete the data" "$DATA/fake-hint/Cookies"
+
+# A launcher filed into a folder still claims its data.
+mkdir -p "$APPS/Accounts"
+mv "$APPS/Fake Hint.app" "$APPS/Accounts/"
+ai prune -y
+assert_file "prune keeps the data of a launcher moved into a folder" "$DATA/fake-hint/Cookies"
+mv "$APPS/Accounts/Fake Hint.app" "$APPS/"
+rmdir "$APPS/Accounts"
+
+# The same root spelled through a symlink is the same directory.
+ln -s "$DATA" "$SB/data-link"
+AIDENTITY_DATA_ROOT="$SB/data-link" ai add "$ELECTRON_APP" --profile Linked
+assert_eq "the launcher records the symlinked spelling" \
+  "$SB/data-link/fake-linked" "$(plist_key "$APPS/Fake Linked.app" AIdentityDataDir)"
+printf 'session\n' > "$DATA/fake-linked/Cookies"
+ai prune -y
+assert_file "prune matches directories, not spellings" "$DATA/fake-linked/Cookies"
+AIDENTITY_DATA_ROOT="$SB/data-link" ai rm "Fake Linked" --purge -y
+rm -f "$SB/data-link"
+ai rm "Fake Hint" --purge -y
+
+
+group "rename and rebuild edge cases"
+
+ai add "$ELECTRON_APP" --profile lower
+printf 'session\n' > "$DATA/fake-lower/Cookies"
+ai rename "Fake lower" Lower
+assert_rc "a rename that only changes capitals works" 0 "$RUN_RC" "$RUN_OUT"
+ON_DISK=""
+for a in "$APPS"/*.app; do
+  case "$(basename "$a")" in [Ff][Aa][Kk][Ee]\ [Ll][Oo][Ww][Ee][Rr].app) ON_DISK=$(basename "$a") ;; esac
+done
+assert_eq "the launcher has the new capitals on disk" "Fake Lower.app" "$ON_DISK"
+assert_file "the data stays where it was" "$DATA/fake-lower/Cookies"
+ai rm "Fake Lower" --purge -y
+
+ai add "$ELECTRON_APP" --profile Alpha
+ai rename "Fake Alpha" Beta
+assert_eq "a default badge letter follows the new name" "B" "$(plist_key "$APPS/Fake Beta.app" AIdentityBadge)"
+ai rm "Fake Beta" --purge -y
+ai add "$ELECTRON_APP" --profile Gamma --badge Z
+ai rename "Fake Gamma" Delta
+assert_eq "a badge chosen by hand is kept" "Z" "$(plist_key "$APPS/Fake Delta.app" AIdentityBadge)"
+ai rm "Fake Delta" --purge -y
+
+# A launcher as aidentity 1.0.0 wrote it: no badge or colour keys at all.
+ai add "$ELECTRON_APP" --profile Legacy
+/usr/libexec/PlistBuddy -c "Delete :AIdentityBadge" -c "Delete :AIdentityColor" \
+  "$APPS/Fake Legacy.app/Contents/Info.plist" >/dev/null 2>&1
+ai rebuild "Fake Legacy"
+assert_rc "a 1.0.0 launcher rebuilds" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "it gets its default badge back instead of losing it" "L" \
+  "$(plist_key "$APPS/Fake Legacy.app" AIdentityBadge)"
+assert_contains "and the user is told why" "$RUN_OUT" "1.0.0"
+ai rm "Fake Legacy" --purge -y
+
+GONE_APP="$SRC/Gone.app"
+make_electron_app "$GONE_APP"
+ai add "$GONE_APP" --profile G
+rm -rf "$GONE_APP"
+ai rebuild "Gone G"
+assert_rc_nonzero "rebuild exits non-zero when the app cannot be found" "$RUN_RC" "$RUN_OUT"
+assert_not_contains "and prints no success tick" "$RUN_OUT" "Rebuilt 0"
+ai rm "Gone G" --purge -y
+
+
+group "launcher discovery and input edge cases"
+
+# A launcher filed into a folder of a SYMLINKED launcher directory. find without
+# -H does not follow the symlinked start, so prune saw no launcher and deleted
+# the profile behind it.
+mkdir -p "$APPS/Filed"
+ln -s "$APPS" "$SB/apps-link"
+ai add "$ELECTRON_APP" --profile Linkapps
+printf 'session\n' > "$DATA/fake-linkapps/Cookies"
+mv "$APPS/Fake Linkapps.app" "$APPS/Filed/"
+AIDENTITY_APPS_DIR="$SB/apps-link" ai prune -y
+assert_file "prune follows a symlinked launcher directory into its folders" "$DATA/fake-linkapps/Cookies"
+mv "$APPS/Filed/Fake Linkapps.app" "$APPS/"
+rm -f "$SB/apps-link"
+
+# uninstall.sh must find the same launchers, or it calls their data orphaned
+# and deletes it while the launcher stays. Only scan_launchers runs here; the
+# removal functions are never called by the suite.
+UNINST_LIB="$SANDBOX/uninstall-lib.sh"
+grep -v '^main "\$@"$' "$REPO_DIR/uninstall.sh" > "$UNINST_LIB"
+mv "$APPS/Fake Linkapps.app" "$APPS/Filed/"
+mkdir -p "$DATA/left-behind"
+# `set --` first: a sourced file sees the caller's arguments, and uninstall.sh
+# reads $1 as an option.
+SCAN=$(HOME="$SANDBOX/tty-home" "$BASH_BIN" -c 'lib=$1; set --; . "$lib" >/dev/null 2>&1; scan_launchers
+  for a in ${LAUNCHERS[@]+"${LAUNCHERS[@]}"}; do printf "L %s\n" "$a"; done
+  for o in ${ORPHANS[@]+"${ORPHANS[@]}"}; do printf "O %s\n" "$o"; done' x "$UNINST_LIB" 2>&1)
+assert_contains "uninstall lists a launcher kept in a folder" "$SCAN" "L $APPS/Filed/Fake Linkapps.app"
+assert_not_contains "and does not call its data orphaned" "$SCAN" "O $DATA/fake-linkapps"
+assert_contains "real orphaned data is still listed" "$SCAN" "O $DATA/left-behind"
+# A launcher that is itself a symlink in the launcher folder, pointing outside.
+mkdir -p "$SB/apps-elsewhere"
+mv "$APPS/Filed/Fake Linkapps.app" "$SB/apps-elsewhere/"
+ln -s "$SB/apps-elsewhere/Fake Linkapps.app" "$APPS/Fake Linkapps.app"
+SCAN=$(HOME="$SANDBOX/tty-home" "$BASH_BIN" -c 'lib=$1; set --; . "$lib" >/dev/null 2>&1; scan_launchers
+  for a in ${LAUNCHERS[@]+"${LAUNCHERS[@]}"}; do printf "L %s\n" "$a"; done
+  for o in ${ORPHANS[@]+"${ORPHANS[@]}"}; do printf "O %s\n" "$o"; done' x "$UNINST_LIB" 2>&1)
+assert_contains "uninstall lists a launcher that is a symlink" "$SCAN" "L $APPS/Fake Linkapps.app"
+assert_not_contains "and does not call its data orphaned" "$SCAN" "O $DATA/fake-linkapps"
+rm -f "$APPS/Fake Linkapps.app"
+mv "$SB/apps-elsewhere/Fake Linkapps.app" "$APPS/Filed/"
+rmdir "$SB/apps-elsewhere"
+mv "$APPS/Filed/Fake Linkapps.app" "$APPS/"
+rmdir "$APPS/Filed" "$DATA/left-behind"
+ai rm "Fake Linkapps" --purge -y
+
+ai add "$ELECTRON_APP" --profile Latin --badge "$(printf '\351')"
+assert_rc "a badge that is not text still builds" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "and says it used the default" "$RUN_OUT" "not a character"
+assert_eq "the default badge is used" "L" "$(plist_key "$APPS/Fake Latin.app" AIdentityBadge)"
+ai rm "Fake Latin" --purge -y
+
+libcall list_compatible_apps
+IDX=$(printf '%s\n' "$RUN_OUT" | grep -n -x -F "$ELECTRON_APP" | cut -d: -f1)
+ai_tty "18446744073709551617\n${IDX}\nDigits\n" add
+assert_contains "a 20-digit menu answer is refused, not wrapped around" "$RUN_OUT" "Please enter a number"
+assert_dir "the next valid answer is used" "$APPS/Fake Digits.app"
+ai rm "Fake Digits" --purge -y
+
+ai_tty "y\n${IDX}\nDecl One\nn\ny\n${IDX}\nDecl Two\nn\nn\n" setup
+assert_rc "setup with two accounts for one app finishes" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "a declined Main launcher is offered only once" "1" \
+  "$(printf '%s\n' "$RUN_OUT" | grep -c "Add a 'Fake Main' launcher")"
+assert_dir "both accounts were created" "$APPS/Fake Decl Two.app"
+ai rm "Fake Decl One" --purge -y
+ai rm "Fake Decl Two" --purge -y
+
+
+group "interrupts, aliases and symlinks"
+
+# An interrupt while rename builds the new launcher. The data has already
+# moved; the old launcher still points at the old path. The handler must move
+# the data back. A stub codesign slows the build so the signal lands inside it.
+SLOW_STUB="$SANDBOX/stub-slow"
+mkdir -p "$SLOW_STUB"
+printf '#!/bin/sh\nsleep 4\nexit 0\n' > "$SLOW_STUB/codesign"
+# Signing runs only when xcode-select answers, so answer it here too: the
+# pause must not depend on the developer's toolchain.
+printf '#!/bin/sh\necho /Library/Developer/CommandLineTools\n' > "$SLOW_STUB/xcode-select"
+chmod +x "$SLOW_STUB/codesign" "$SLOW_STUB/xcode-select"
+ai add "$ELECTRON_APP" --profile Intr
+printf 'session\n' > "$DATA/fake-intr/Cookies"
+PATH="$SLOW_STUB:$PATH" "$BASH_BIN" "$AIDENTITY" rename "Fake Intr" Gone </dev/null >"$SANDBOX/intr.out" 2>&1 &
+INTR_PID=$!
+sleep 1.5
+kill -TERM "$INTR_PID" 2>/dev/null
+wait "$INTR_PID" 2>/dev/null
+assert_file "an interrupted rename puts the session back" "$DATA/fake-intr/Cookies"
+assert_no_dir "and leaves no moved copy" "$DATA/fake-gone"
+assert_dir "the old launcher is still there" "$APPS/Fake Intr.app"
+assert_eq "and still points at the session" "$DATA/fake-intr" "$(plist_key "$APPS/Fake Intr.app" AIdentityDataDir)"
+assert_no_dir "no half-built launcher is left" "$APPS/Fake Gone.app"
+assert_eq "no staging folder is left" "0" "$(find "$APPS" -maxdepth 1 -name '.aidentity-*' | wc -l | tr -d ' ')"
+ai rm "Fake Intr" --purge -y
+
+# Stopped between the two moves of a swap: the old launcher is set aside in the
+# stage, the new one not yet in place. Cleanup must put the old one back.
+mkdir -p "$SANDBOX/swapstage/.previous/Contents"
+printf 'old\n' > "$SANDBOX/swapstage/.previous/Contents/marker"
+RUN_OUT=$("$BASH_BIN" -c '. "$1" >/dev/null 2>&1
+  BUILD_STAGE="$2"; SWAP_PREV="$2/.previous"; SWAP_DST="$3"; _cleanup_stage' x "$LIB" \
+  "$SANDBOX/swapstage" "$APPS/Swap Target.app" 2>&1)
+assert_file "cleanup puts a set-aside launcher back" "$APPS/Swap Target.app/Contents/marker"
+assert_no_dir "and then removes the stage" "$SANDBOX/swapstage"
+rm -rf "$APPS/Swap Target.app"
+
+# A symlink to a launcher must not be mistaken for it.
+ai add "$ELECTRON_APP" --profile Aliased
+ln -s "$APPS/Fake Aliased.app" "$APPS/A Alias.app"
+ai set "Fake Aliased" --color red
+assert_eq "set acts on the launcher, not on a symlink to it" "E5484D" \
+  "$(plist_key "$APPS/Fake Aliased.app" AIdentityColor)"
+if [ -L "$APPS/A Alias.app" ]; then _pass "the symlink is left as it was"; else _fail "the symlink is left as it was" "it was replaced"; fi
+rm -f "$APPS/A Alias.app"
+ai rm "Fake Aliased" --purge -y
+
+# A launcher renamed to "previous" in Finder: its replacement must not end up
+# with the old bundle nested inside it.
+ai add "$ELECTRON_APP" --profile Prev
+mv "$APPS/Fake Prev.app" "$APPS/previous.app"
+ai set previous --color teal
+assert_rc "a launcher called previous can be rebuilt" 0 "$RUN_RC" "$RUN_OUT"
+assert_no_dir "with nothing nested inside it" "$APPS/previous.app/previous.app"
+rm -rf "$APPS/previous.app" "$DATA/fake-prev"
+
+# A recorded profile path that is a symlink: its target is claimed, not orphaned.
+mkdir -p "$DATA/moved-here"
+printf 'session\n' > "$DATA/moved-here/Cookies"
+ai add "$ELECTRON_APP" --profile Linked2
+rm -rf "$DATA/fake-linked2"
+ln -s "$DATA/moved-here" "$DATA/fake-linked2"
+ai prune -y
+assert_file "prune keeps the folder a profile's symlink points at" "$DATA/moved-here/Cookies"
+ai rm "Fake Linked2" -y
+rm -f "$DATA/fake-linked2"
+rm -rf "$DATA/moved-here"
 
 
 group "sandbox isolation — final check"
