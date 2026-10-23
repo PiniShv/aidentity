@@ -99,9 +99,10 @@ Steps 3 and 8 are one-time and already done. For a routine release, see
 ## Releasing a new version later
 
 1. Tag `vX.Y.Z` and push it.
-2. Bump `AIDENTITY_VERSION` in `bin/aidentity` **before** tagging — the formula's
-   `test do` block asserts that `aidentity version` prints the formula's version,
-   so a mismatch fails `brew test`.
+2. Bump `AIDENTITY_VERSION` in `bin/aidentity` **before** tagging, and check by
+   hand that `aidentity version` prints the tag's version. The formula's
+   `test do` block only checks the format (so `--HEAD` builds pass), so it no
+   longer catches a mismatch.
 3. In the tap: update `url` to the new tag, recompute `sha256` (step 2 above),
    commit, push. Nothing else changes.
 

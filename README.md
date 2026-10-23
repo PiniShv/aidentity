@@ -44,7 +44,7 @@ aidentity setup
 
 Every route puts one file — a shell script — on your `PATH`. There is no daemon, no login item, and nothing that runs in the background.
 
-**What each channel checks.** The Homebrew formula pins the sha256 of a tagged release tarball, committed to the tap before anyone installs it. The `curl` installer verifies the script it downloads against a `SHA256SUMS` file served from the same origin: that catches a truncated transfer, a corrupted object and a proxy swapping the body, but not a compromise of the repository itself, because the file and its checksum would move together. Homebrew is the more verifiable of the two.
+**What each channel checks.** The Homebrew formula pins the sha256 of a tagged release tarball, committed to the tap before anyone installs it. The `curl` installer verifies the script it downloads against a `SHA256SUMS` file served from the same origin: that catches a truncated transfer, a corrupted or stale cached object, and a mix of two versions, but not deliberate tampering — whoever can change the file on that origin, or intercept the connection, can change its checksum too. Homebrew is the more verifiable of the two.
 
 <details>
 <summary>Install from source</summary>
@@ -139,7 +139,7 @@ The guided walkthrough, and the recommended place to start. Aliases: `aidentity 
 aidentity setup
 ```
 
-It asks whether to badge the icons (yes by default), lists the compatible apps on this Mac by number, asks what to call the account, offers to copy your Claude MCP config when the app is Claude Desktop, then loops so you can set up several accounts in one pass. At the end it offers to open `~/Applications` so you can drag the new icons to your Dock.
+It asks whether to badge the icons (yes by default), lists the compatible apps on this Mac by number, asks what to call the account, offers to copy your Claude MCP config when the app is Claude Desktop, offers a `Main` launcher for your original account (see [below](#opening-your-original-account-while-a-profile-runs)), then loops so you can set up several accounts in one pass. At the end it offers to open `~/Applications` so you can drag the new icons to your Dock.
 
 It needs a terminal — in a script or a CI job, use `add` with flags instead.
 
@@ -159,11 +159,12 @@ aidentity add Claude --profile Work --color blue --seed
 
 | Option | What it does |
 |---|---|
-| `--profile NAME` | The account name, e.g. `Work`. Letters, numbers, spaces, hyphens, underscores; 40 characters max. |
+| `--profile NAME` | The account name, e.g. `Work`. Letters, numbers, spaces, hyphens, underscores; 40 characters max. It cannot start with a space, a dot or a hyphen. |
 | `--badge X` | One character for the icon badge. Defaults to the first letter of the profile name. |
 | `--color NAME` | `blue` `green` `orange` `purple` `teal` `pink` `red` `yellow` `gray` `graphite`, or a hex value like `2E7DF6`. Defaults to a colour derived from the name, so a given profile always looks the same. |
 | `--no-badge` | Skip the badge entirely. The launcher gets the app's own icon, byte for byte unchanged, under the profile's name. The walkthrough asks this as a question and defaults to badges on. |
 | `--seed` | Claude Desktop only: copy your existing `claude_desktop_config.json` (your MCP servers) into the new profile. They diverge from that point on. |
+| `--main` | Build a launcher for your **original** account instead of a new one, named `<App> Main` unless you pass `--profile`. Pin it to your Dock in place of the app — see [Opening your original account](#opening-your-original-account-while-a-profile-runs). |
 
 The launcher is named `<App> <Profile>` — `aidentity add Claude --profile Work` produces `~/Applications/Claude Work.app`. That full string is the name you use with `open` and `rm`.
 
@@ -190,7 +191,7 @@ Claude Work
    data     ~/Library/Application Support/aidentity/profiles/claude-work
 ```
 
-Status is `running`, `in use` (has data, not currently open), or `signed out / new`.
+Status is `running`, `in use` (the app has written data there, not currently open), or `signed out / new`. "In use" means the profile has been opened, not that a sign-in is still valid. A `--main` launcher shows `running` or `not running`, for your original account. A launcher whose app has moved shows `app missing` with the `rebuild` command that fixes it; if the app was uninstalled, reinstall it first.
 
 ### `aidentity open`
 
@@ -230,7 +231,9 @@ Find profile data that no launcher points at, and offer to delete it.
 aidentity prune
 ```
 
-This is what gets left behind when a launcher is deleted in Finder instead of with `aidentity rm`: the directory stays, holding a signed-in session nothing can reach any more. `prune` lists each orphan with its disk size and full path, then asks you to type `yes`. `-y` / `--yes` skips that prompt. Anything currently running is skipped, and so is anything recorded outside the data root.
+This is what gets left behind when a launcher is deleted in Finder, or removed with `aidentity rm` without `--purge`: the directory stays, holding a signed-in session. `prune` lists each orphan with its disk size and full path, then asks you to type `yes`. `-y` / `--yes` skips that prompt. Anything currently running is skipped, and so is anything recorded outside the data root.
+
+Before calling anything an orphan, `prune` looks for launchers in the launcher directory and the folders inside it, in the app search path, and through Spotlight, and it compares directories by identity rather than by how their path is spelled. If you keep a launcher somewhere else entirely, its data shows up in the list — read it before you type `yes`.
 
 ### `aidentity rebuild`
 
@@ -241,11 +244,11 @@ aidentity rebuild "Claude Work"
 aidentity rebuild --all
 ```
 
-Each launcher stores the path of the app it opens. If that path no longer exists, `rebuild` looks the app up again by name across the search path, which covers a move between `/Applications` and `~/Applications`; if it still cannot be found, that profile is reported and skipped rather than rewritten. Profile data is never touched, so every account stays signed in.
+Each launcher stores the path of the app it opens. If that path no longer exists, `rebuild` looks the app up again by name across the search path, which covers a move between `/Applications` and `~/Applications`; if it still cannot be found, that profile is reported and skipped rather than rewritten, and `rebuild` exits non-zero. Profile data is never touched, so every account stays signed in. A launcher built by aidentity 1.0.0 gets its default badge and colour back; a colour you picked by hand back then can be set again with `aidentity set`.
 
 ### `aidentity rm`
 
-Remove a launcher. Data is kept by default, so you can rebuild the launcher later and still be signed in.
+Remove a launcher. Data is kept by default, so you can bring the launcher back later and still be signed in — `rm` prints the exact `aidentity add` line that reattaches it, and `aidentity prune` deletes the data when you are sure.
 
 ```bash
 aidentity rm "Claude Work"
@@ -257,7 +260,7 @@ Remove the launcher *and* delete the account's local data — cookies, session, 
 aidentity rm "Claude Work" --purge
 ```
 
-Add `-y` / `--yes` to skip the confirmation prompt (for scripts). `rm` refuses to run while that profile is open — quit it first.
+Add `-y` / `--yes` to skip the confirmation prompt (for scripts). `rm` refuses to run while that profile is open — quit it first. On a `--main` launcher, `--purge` does nothing: that launcher opens the app's own account, and aidentity never deletes the app's own data.
 
 ### `aidentity apps`
 
@@ -296,6 +299,24 @@ The test suite sets `AIDENTITY_APPS_DIR` and `AIDENTITY_DATA_ROOT`, which is how
 
 ---
 
+## Opening your original account while a profile runs
+
+macOS keeps one record per app, not per window. Every profile is the same `Claude.app` started a second time, so while any profile is running, macOS considers Claude to be running. Click `Claude.app` in the Dock, in Finder or in Spotlight, and macOS does what it always does for a running app: it switches to it. You land in whichever profile is open, and your original account does not start.
+
+The fix is a launcher for the original account:
+
+```bash
+aidentity add Claude --main
+```
+
+That builds `~/Applications/Claude Main.app`. It starts Claude with no profile directory, so it opens the account Claude.app always opened, with Claude's own data. It always starts, even while other profiles run. If your original account is already open, Claude hands the launch to that window and brings it forward, as most Electron apps do. Pin it to your Dock in place of `Claude.app`. `aidentity setup` offers to build it for you.
+
+From a terminal, `open -na /Applications/Claude.app` does the same thing.
+
+A main launcher never touches the app's data: `rm --purge` does not delete it, and `rename` only renames the launcher.
+
+---
+
 ## The rough edge: Dock tiles show the original app
 
 This is the one real cost, and it is worth knowing before you install.
@@ -315,9 +336,9 @@ Fixing this properly would mean copying and re-signing the app bundle. That was 
 
 ## Is this safe?
 
-**Your existing account and data are not touched.** `aidentity` never reads, moves or modifies your current profile. New profiles start empty in their own directory. Your original app keeps launching exactly as before, into exactly the account it was already in.
+**Your existing account and data are not touched.** `aidentity` never reads, moves or modifies your current profile. New profiles start empty in their own directory. Your original app keeps its account and its data. One thing does change: while a profile is running, clicking the app itself switches to that profile instead of opening your original account. A `--main` launcher fixes that — see [Opening your original account](#opening-your-original-account-while-a-profile-runs).
 
-**The app is never copied, patched or re-signed.** The launcher is a five-line shell script in a hand-written `.app` bundle that calls `open -na` on the app already installed. Because the real bundle is untouched, its Apple signature stays valid, its keychain access groups keep working (SSO, passkeys) and its auto-updater keeps updating it.
+**The app is never copied, patched or re-signed.** The launcher is a three-line shell script in a hand-written `.app` bundle that calls `open -na` on the app already installed. Because the real bundle is untouched, its Apple signature stays valid, its keychain access groups keep working (SSO, passkeys) and its auto-updater keeps updating it.
 
 **Every launcher is marked, and nothing unmarked is ever touched.** Each bundle `aidentity` builds carries a custom `Info.plist` key, `AIdentityProfile`. Any command that modifies or deletes a bundle checks for that key first and refuses without it. That is what makes a profile named after a real app harmless: if `~/Applications/Claude Work.app` existed and `aidentity` did not create it, `add` refuses to overwrite it and `rm` refuses to delete it.
 
@@ -332,7 +353,7 @@ Fixing this properly would mean copying and re-signing the app bundle. That was 
 
 **No special permissions.** No `sudo` for anything except optionally installing the script into `/usr/local/bin`. No Accessibility or Full Disk Access prompts, no TCC grants, no background process, no network access — `aidentity` never phones home, because there is nothing to phone home to. It is a single readable shell script; [read it](bin/aidentity) before you run it.
 
-**To uninstall completely**, see the last question below.
+**To uninstall completely**, see "How do I remove everything?" below.
 
 ---
 
@@ -360,25 +381,37 @@ Because that name and icon live inside the app bundle, which is deliberately lef
 That is between you and the vendor, and it depends on whether the two accounts are separate accounts (usually yes, each pays its own way) or one account used twice. `aidentity` does not change what you are entitled to; it changes how many windows you can have open.
 
 **Something went wrong. Where do I start?**
-`aidentity doctor`. It reports the writability of the launcher directory, whether `codesign` is present, and how many compatible apps it can see. If a launcher opens the app on your *original* account, the app is probably native rather than Chromium — check `aidentity apps` for whether it is listed at all.
+`aidentity doctor`. It reports the writability of the launcher directory, whether `codesign` is present, and how many compatible apps it can see. If a launcher other than a `--main` one opens the app on your *original* account, the app is probably native rather than Chromium — check `aidentity apps` for whether it is listed at all.
 
 **How do I remove everything?**
+
+The uninstaller does all of it in one go. It removes the command, then lists every launcher it can find — in `~/Applications` and the folders inside it, in `/Applications`, and through Spotlight — and every profile directory, including data no launcher points at any more. It deletes them only after you type `delete`. Download it, then run it in a terminal:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/PiniShv/aidentity/main/uninstall.sh
+```
+
+```bash
+bash uninstall.sh
+```
+
+It leaves a Homebrew install alone (remove that with `brew uninstall aidentity`), and it refuses to delete the data of a profile that is running.
+
+By hand, it is:
 
 ```bash
 aidentity list                              # see what exists
 aidentity rm "Claude Work" --purge -y       # repeat for each profile
-aidentity prune -y                          # data from launchers deleted in Finder
+aidentity prune -y                          # data no launcher points at
+brew uninstall aidentity                    # if installed via Homebrew
+rm -f "$(command -v aidentity)"             # if installed via curl or make
+rm -rf ~/Library/Application\ Support/aidentity   # the now-empty data folder
 ```
 
-Then remove the tool itself:
+The curl installer puts the command in `/usr/local/bin`, or in `~/.local/bin` when that is not writable, so `command -v` is the safe way to find it. That is everything. Nothing else was installed, and your real apps are exactly as they were.
 
-```bash
-brew uninstall aidentity          # if installed via Homebrew
-rm -f /usr/local/bin/aidentity    # if installed via curl or make
-rm -rf ~/Library/Application\ Support/aidentity
-```
-
-That is everything. Nothing else was installed, and your real apps are exactly as they were.
+**Clicking Claude.app opens one of my profiles, not my original account.**
+macOS sees every profile as Claude itself, so it switches to whichever one is running. Use `aidentity add Claude --main` — see [Opening your original account](#opening-your-original-account-while-a-profile-runs).
 
 ---
 

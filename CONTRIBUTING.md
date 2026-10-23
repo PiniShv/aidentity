@@ -1,8 +1,8 @@
 # Contributing to aidentity
 
 The whole tool is one shell script: `bin/aidentity`. Read it before changing it —
-it is about 650 lines and commented, and most questions are answered faster by
-reading it than by asking.
+it is commented throughout, and most questions are answered faster by reading it
+than by asking.
 
 ## Running the tests
 
@@ -10,7 +10,9 @@ reading it than by asking.
 make test
 ```
 
-225 assertions, run against the real script — not a mock of it. The suite points `AIDENTITY_APPS_DIR` and `AIDENTITY_DATA_ROOT` at throwaway
+Every assertion runs against the real script — not a mock of it. `make test` runs
+it under `/bin/bash`, the 3.2 that ships with macOS, and detaches it from your
+terminal, so a prompt can never sit waiting for you. The suite points `AIDENTITY_APPS_DIR` and `AIDENTITY_DATA_ROOT` at throwaway
 directories, so it builds and deletes launchers without touching `~/Applications`
 or your real profile data. If a test ever writes outside those two variables,
 that is a bug in the test, and a serious one — say so in the PR.
@@ -57,22 +59,29 @@ These are not style preferences. A change that weakens any of them will be sent
 back regardless of what else it does.
 
 1. **Never touch a bundle that lacks the marker key.** Every launcher aidentity
-   builds carries `AIdentityProfile` in its `Info.plist`. `assert_ours()` is the
-   only gate between this tool and someone's real applications. Any new code
-   path that deletes, overwrites or rewrites an `.app` must call it first. Do
-   not add a "force" flag that skips it.
+   builds carries `AIdentityProfile` in its `Info.plist`. `is_our_launcher()` is
+   the only gate between this tool and someone's real applications. Any new code
+   path that deletes, overwrites or rewrites an `.app` must check it first:
+   through `assert_ours()` where failing means exit, or inline (as
+   `build_launcher` does) where the caller has a recovery path. Do not add a
+   "force" flag that skips it.
 
-2. **Never delete outside the data root.** `rm --purge` deletes only paths under
-   `$DATA_ROOT`, checked with a `case` match against the live value of the
-   variable. The path recorded in a bundle's plist is untrusted input — a bundle
-   can be edited by hand. Keep the check on the destination, not on the source
-   of the string.
+2. **Never delete outside the data root, or while a profile runs.** `rm --purge`,
+   `prune` and `uninstall.sh` delete only paths that `data_is_ours()` accepts:
+   absolute, no dot segments, resolved with `cd -P`, strictly below the root.
+   The path recorded in a bundle's plist is untrusted input — a bundle can be
+   edited by hand. Keep the check on the destination, not on the source of the
+   string. Every delete is also gated on `running_on_profile()`, which must
+   fail closed: if it cannot tell, it says "running". Never pipe its process
+   list into `grep -q` — under `pipefail` an early exit reads as "no match".
+   Both helpers are copied into `uninstall.sh`, and CI fails if the copies
+   differ.
 
 3. **Never widen profile-name validation without an escaping review.** A profile
    name becomes a directory name, a bundle name, a slug and a string embedded in
    the generated launcher script. The current rule — letters, numbers, spaces,
    hyphens, underscores; 40 chars; no leading or trailing space; no leading dot
-   — is what lets the rest of the code stay simple. If you want to allow another
+   or hyphen — is what lets the rest of the code stay simple. If you want to allow another
    character, the PR must show what happens to it in all four of those places,
    and must keep `shquote()` in the path that writes the launcher. Adding a
    character is a security change, not a UX change.

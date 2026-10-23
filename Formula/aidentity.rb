@@ -28,13 +28,14 @@ class Aidentity < Formula
       Launchers are written to ~/Applications and profile data to
         ~/Library/Application Support/aidentity/profiles
 
-      Start with:
-        aidentity doctor
-        aidentity add
+      Start with the guided walkthrough:
+        aidentity setup
     EOS
   end
 
   test do
-    assert_match "aidentity #{version}", shell_output("#{bin}/aidentity version")
+    # A pattern, not "aidentity #{version}": a --HEAD build's version is
+    # HEAD-<sha>, while the script prints its own release number.
+    assert_match(/^aidentity \d+\.\d+\.\d+$/, shell_output("#{bin}/aidentity version"))
   end
 end

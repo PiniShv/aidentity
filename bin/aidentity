@@ -60,12 +60,15 @@ dim()  { printf '%s%s%s\n' "$C_DIM" "$*" "$C_RESET"; }
 ask() {
   local prompt="$1" reply=""
   printf '%s' "$prompt" >&2
-  if IFS= read -r reply; then
+  # `|| [ -n "$reply" ]`: read fails at end of input even after filling the
+  # variable, so `printf yes | aidentity rm …` (no newline) read as "Cancelled".
+  if IFS= read -r reply || [ -n "$reply" ]; then
     printf '%s' "$reply"; return 0
   fi
-  if [ -r /dev/tty ]; then
-    printf '%s' "$prompt" >&2
-    IFS= read -r reply < /dev/tty 2>/dev/null || return 1
+  # Only when stdin is NOT the terminal. Ctrl-D at a terminal prompt means "no
+  # answer"; reading /dev/tty then would just ask the same terminal again.
+  if [ ! -t 0 ] && tty_opens; then
+    IFS= read -r reply 2>/dev/null < /dev/tty || [ -n "$reply" ] || return 1
     printf '%s' "$reply"; return 0
   fi
   return 1
@@ -81,7 +84,30 @@ confirm() {
   case "$reply" in y|yes) return 0 ;; *) return 1 ;; esac
 }
 
-have_tty() { [ -r /dev/tty ] || [ -t 0 ]; }
+# Whether /dev/tty can actually be opened. Its mode is crw-rw-rw- on every Mac,
+# so `[ -r /dev/tty ]` was true with no controlling terminal at all (cron,
+# launchd, CI) and the "needs a terminal" guards built on it never fired.
+tty_opens() { ( : < /dev/tty ) 2>/dev/null; }
+have_tty() { [ -t 0 ] || tty_opens; }
+
+# Fail unless an option got a real value. `shift 2 || die` only caught a value
+# missing at the very end: `--profile --seed` created a profile literally named
+# "--seed" and silently dropped the flag.
+need_value() {
+  case "${2:-}" in
+    ''|-*) die "$1 needs a value." ;;
+  esac
+}
+
+# The first character of a badge, whatever the caller's locale. Under LC_ALL=C,
+# `cut -c1` cut "é" to half a character, the Info.plist became invalid UTF-8,
+# and the build was refused.
+first_char() { printf '%s' "$1" | LC_ALL=en_US.UTF-8 cut -c1 2>/dev/null; }
+
+lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+
+# A profile's default badge: its first letter, upper-cased. Names are ASCII.
+first_upper() { printf '%s' "$1" | cut -c1 | tr '[:lower:]' '[:upper:]'; }
 
 # ---------------------------------------------------------------- guards --
 
@@ -107,6 +133,7 @@ validate_profile_name() {
   case "$name" in
     " "*|*" ") warn "Profile name cannot start or end with a space."; return 1 ;;
     .*) warn "Profile name cannot start with a dot."; return 1 ;;
+    -*) warn "Profile name cannot start with a hyphen — it would read as an option."; return 1 ;;
   esac
   return 0
 }
@@ -139,13 +166,17 @@ xmlescape() {
 # Deliberately no binary scanning here — this runs across every installed app,
 # and grepping frameworks for the flag turned a listing into a 30-second wait.
 is_chromium_app() {
-  local app="$1" fw
+  local app="$1" fw helper
 
   [ -d "$app/Contents/Frameworks/Electron Framework.framework" ] && return 0
 
+  # A plain glob, not `compgen -G "$fw/…"`: compgen reads the whole argument as
+  # a pattern, so an app at a path containing [ ] * or ? was never detected.
   for fw in "$app"/Contents/Frameworks/*.framework; do
     [ -d "$fw" ] || continue
-    if compgen -G "$fw/Versions/*/Helpers/*.app" >/dev/null 2>&1; then return 0; fi
+    for helper in "$fw"/Versions/*/Helpers/*.app; do
+      [ -d "$helper" ] && return 0
+    done
   done
 
   return 1
@@ -163,7 +194,10 @@ is_chromium_app_deep() {
     [ -d "$fw" ] || continue
     bin="${fw%.framework}"; bin="$fw/Versions/Current/${bin##*/}"
     [ -f "$bin" ] || continue
-    if strings -a "$bin" 2>/dev/null | grep -qx -- "--user-data-dir"; then return 0; fi
+    # No -q: grep -q stops at the first match, strings dies of SIGPIPE, and
+    # pipefail turns that into "no match" — so this check could never succeed
+    # on a binary big enough to matter.
+    if strings -a "$bin" 2>/dev/null | grep -x -- "--user-data-dir" >/dev/null; then return 0; fi
   done
 
   return 1
@@ -246,12 +280,19 @@ $(app_search_dirs)
 EOF
 }
 
-copy_plain_icon() {
-  local src_app="$1" out="$2" icon_name
-  icon_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$src_app/Contents/Info.plist" 2>/dev/null || true)
+# Path of an app's .icns icon, if it declares one.
+app_icns() {
+  local icon_name
+  icon_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$1/Contents/Info.plist" 2>/dev/null) || return 1
   [ -n "$icon_name" ] || return 1
-  [ -f "$src_app/Contents/Resources/${icon_name%.icns}.icns" ] || return 1
-  cp "$src_app/Contents/Resources/${icon_name%.icns}.icns" "$out"
+  [ -f "$1/Contents/Resources/${icon_name%.icns}.icns" ] || return 1
+  printf '%s' "$1/Contents/Resources/${icon_name%.icns}.icns"
+}
+
+copy_plain_icon() {
+  local src
+  src=$(app_icns "$1") || return 1
+  cp "$src" "$2"
 }
 
 # Show a numbered menu of compatible apps and echo the chosen bundle path.
@@ -271,13 +312,23 @@ EOF
     for a in "${apps[@]}"; do printf '  %2d) %s\n' "$i" "$(bundle_name "$a")"; i=$((i+1)); done
     printf '\n'
   } >&2
-  choice=$(ask 'Number: ') || return 1
-  case "$choice" in
-    ''|*[!0-9]*) warn "Please enter a number."; return 1 ;;
-  esac
-  if [ "$choice" -lt 1 ] || [ "$choice" -gt "${#apps[@]}" ]; then
-    warn "Number out of range."; return 1
-  fi
+  # Ask again on a typo. Returning on bad input ended the whole `setup`
+  # walkthrough, because its loop cannot tell a typo from the end of input.
+  # Only end of input (or q) gives up.
+  while :; do
+    choice=$(ask 'Number: ') || return 1
+    choice=$(printf '%s' "$choice" | tr -d '[:space:]')
+    case "$choice" in
+      q|Q|quit) return 1 ;;
+      # Five digits or more is never a menu number, and a long enough string
+      # wraps bash's 64-bit arithmetic back into range.
+      ''|*[!0-9]*|?????*) warn "Please enter a number from 1 to ${#apps[@]} (or q to stop)."; continue ;;
+    esac
+    if [ "$((10#$choice))" -lt 1 ] || [ "$((10#$choice))" -gt "${#apps[@]}" ]; then
+      warn "Please enter a number from 1 to ${#apps[@]} (or q to stop)."; continue
+    fi
+    break
+  done
   # 10# forces base 10. Plain $((choice-1)) reads a leading zero as octal, so
   # "010" selected the 8th app and "08"/"09" aborted the wizard outright.
   printf '%s' "${apps[$((10#$choice - 1))]}"
@@ -296,9 +347,10 @@ color_hex() {
   esac
 }
 
-# Every name color_hex accepts, so the error message and `help` cannot claim a
-# smaller set than the code actually takes. auto_color only picks from the
-# first eight — the neutrals are opt-in, never assigned automatically.
+# Every name color_hex accepts, used in the "unknown colour" error so it cannot
+# claim a smaller set than the code takes. (help and the README list the main
+# spellings and leave out the aliases grey and black.) auto_color only picks from
+# the first eight — the neutrals are opt-in, never assigned automatically.
 COLOR_NAMES="blue green orange purple teal pink red yellow gray grey graphite black"
 AUTO_COLOR_NAMES="blue green orange purple teal pink red yellow"
 
@@ -327,12 +379,9 @@ build_icon() {
 
 _build_icon_in() {
   local src_app="$1" letter="$2" hex="$3" out_icns="$4" tmp="$5"
-  local icon_name src_icns
+  local src_icns
 
-  icon_name=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" "$src_app/Contents/Info.plist" 2>/dev/null) || return 1
-  [ -n "$icon_name" ] || return 1
-  src_icns="$src_app/Contents/Resources/${icon_name%.icns}.icns"
-  [ -f "$src_icns" ] || return 1
+  src_icns=$(app_icns "$src_app") || return 1
 
   iconutil -c iconset "$src_icns" -o "$tmp/base.iconset" >/dev/null 2>&1 || return 1
 
@@ -415,6 +464,44 @@ is_our_launcher() {
 
 plist_get() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
 
+# A launcher made with `add --main` opens the app's own, original account. It
+# records no data directory, and nothing ever deletes or moves the app's data.
+is_main_launcher() { [ "$(plist_get "$1" AIdentityMain)" = "true" ]; }
+
+# The badge and colour a launcher was built with. 1.0.0 recorded neither key,
+# and an empty badge means "no badge" — so reading a missing key as empty
+# stripped the badge from every 1.0.0 launcher on its first rebuild or rename.
+# For those, rebuild 1.0.0's defaults: the profile's first letter, unless the
+# icon is the app's own byte for byte, which is what 1.0.0's --no-badge wrote.
+is_legacy_launcher() {
+  ! /usr/libexec/PlistBuddy -c "Print :AIdentityBadge" "$1/Contents/Info.plist" >/dev/null 2>&1
+}
+
+launcher_badge() { # launcher, target app, profile
+  local src
+  if ! is_legacy_launcher "$1"; then plist_get "$1" AIdentityBadge; return 0; fi
+  if src=$(app_icns "$2") && cmp -s "$src" "$1/Contents/Resources/icon.icns"; then
+    return 0
+  fi
+  first_upper "$3"
+}
+
+launcher_color() { # launcher, label
+  local hex
+  hex=$(plist_get "$1" AIdentityColor)
+  [ -n "$hex" ] || hex=$(color_hex "$(auto_color "$2")")
+  printf '%s' "$hex"
+}
+
+# A directory's identity, so two spellings of one directory compare equal: a
+# symlinked root, "//", a trailing slash, /var against /private/var.
+# /usr/bin/stat by full path: a GNU stat earlier on PATH reads -f as "file
+# system" and prints one value for every directory, which made every
+# directory look claimed. -L: the directory a symlink points at, not the link
+# itself — or a profile whose recorded path is a symlink read as unclaimed,
+# and prune deleted what it pointed to.
+dir_id() { [ -d "$1" ] && /usr/bin/stat -L -f '%d:%i' "$1" 2>/dev/null; }
+
 # Refuse to touch a bundle unless it is demonstrably one of ours.
 assert_ours() {
   local app="$1"
@@ -428,8 +515,9 @@ assert_ours() {
 # Two traps here, both of which produced a wrong answer in testing:
 #
 #   1. On macOS `pgrep -a` means "include ancestors", not "print the command
-#      line" as it does on Linux. With -a you get bare PIDs and the match below
-#      can never succeed. `pgrep -fl` is the macOS spelling that prints argv.
+#      line" as it does on Linux: -l is what prints argv. -a alone gives bare
+#      PIDs and the match below can never succeed; -afl prints argv AND keeps
+#      the caller's own ancestors in the list.
 #   2. The list must be captured BEFORE matching. Piping pgrep straight into
 #      grep starts both at once, and the grep's own argv contains the path we
 #      are searching for — so pgrep matches the grep and every profile looks
@@ -438,22 +526,67 @@ assert_ours() {
 # match a process running ".../claude-work-2", so one profile reported another
 # as running and refused to remove or rebuild it. The flag is always followed by
 # a space or the end of the argument list, so require one of those.
+#
+# The match runs in the shell, never as `printf … | grep -q`. grep -q exits at
+# the first match; real Electron helpers make this list 100 KB, so printf then
+# died of SIGPIPE and pipefail turned the pipeline into "no match". A running
+# profile read as stopped exactly when its line came early — fail OPEN, on a
+# guard whose whole job is to stop a delete. Quoting "$1" inside the pattern
+# keeps [ * ? in a path literal.
 running_on_profile() {
-  local list
+  local list rc nl=$'\n'
   [ -n "$1" ] || return 1
   # pgrep exits 1 for "no match" but >=2 for a real failure. Treating those the
   # same made a data-loss guard fail OPEN — a broken pgrep read as "nothing is
   # running" and the delete went ahead. Anything but 0 or 1 is reported as
   # running, so the caller refuses to delete.
-  local rc
-  list=$(pgrep -fl "user-data-dir=" 2>/dev/null); rc=$?
+  # -a: on macOS pgrep leaves out the caller's own ancestors unless asked.
+  list=$(pgrep -afl "user-data-dir=" 2>/dev/null); rc=$?
   if [ "$rc" -gt 1 ]; then
     warn "Could not check which profiles are running (pgrep exited $rc); assuming they are."
     return 0
   fi
   [ "$rc" -eq 0 ] && [ -n "$list" ] || return 1
-  printf '%s\n' "$list" | grep -qF -- "user-data-dir=$1 " ||
-  printf '%s\n' "$list" | grep -q -- "user-data-dir=$(printf '%s' "$1" | sed 's/[][\.*^$\/]/\\&/g')\$"
+  case "$list$nl" in
+    *"user-data-dir=$1 "*|*"user-data-dir=$1$nl"*) return 0 ;;
+  esac
+  # The same directory under another spelling — a symlinked root, "//", a
+  # trailing slash — is the same profile. Compare each path a process names
+  # (up to the next " --" or the end of its line) by directory identity.
+  local want line rest path seen="|"
+  want=$(/usr/bin/stat -L -f '%d:%i' "$1" 2>/dev/null) || return 1
+  while IFS= read -r line; do
+    rest=$line
+    while :; do
+      case "$rest" in *user-data-dir=*) rest=${rest#*user-data-dir=} ;; *) break ;; esac
+      path=${rest%% --*}
+      case "$seen" in *"|$path|"*) continue ;; esac
+      seen="$seen$path|"
+      [ "$(/usr/bin/stat -L -f '%d:%i' "$path" 2>/dev/null)" = "$want" ] && return 0
+    done
+  done <<EOF
+$list
+EOF
+  return 1
+}
+
+# Whether the app is running on its own account, with no --user-data-dir: the
+# instance a --main launcher opens. Matched in the shell for the same reason as
+# above — a pipe into grep -q fails open on a long process list.
+main_running() {
+  local exe list line
+  exe=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$1/Contents/Info.plist" 2>/dev/null) || return 1
+  exe="$1/Contents/MacOS/$exe"
+  list=$(ps -axww -o command= 2>/dev/null) || return 1
+  while IFS= read -r line; do
+    case "$line" in
+      *--user-data-dir=*) ;;
+      "$exe"|"$exe "*) return 0 ;;
+    esac
+  done <<EOF
+$list
+EOF
+  return 1
 }
 
 # A recorded data directory is ours only if it sits genuinely inside the data
@@ -507,28 +640,163 @@ data_is_ours() {
   esac
 }
 
-build_launcher() {
-  local src_app="$1" profile="$2" data_dir="$3" label="$4" letter="$5" hex="$6"
-  local dst="$APPS_DIR/$label.app"
+# A launcher is built in a hidden staging directory beside its final place and
+# moved in only once it is complete, so a failed `set`, `rebuild` or `rename`
+# leaves the working launcher exactly as it was. The old code deleted the
+# launcher first and then died half way, which left the profile with no
+# launcher — and its signed-in data looking orphaned to `prune`. If we are
+# interrupted mid-build, the staging directory is removed on the way out.
+BUILD_STAGE=""
+# While a launcher is being swapped, the old one sits in the staging directory
+# under SWAP_PREV. If anything stops us there — an interrupt, a failed second
+# move — it goes back to SWAP_DST before the stage is removed. Deleting the
+# stage blindly deleted the only copy of the launcher.
+SWAP_DST=""
+SWAP_PREV=""
+# Set by rename between moving a profile's data and finishing its launcher, as
+# "new path|old path": an interrupt in that window moves the data back, so the
+# old launcher still finds it.
+RENAME_UNDO=""
 
-  mkdir -p "$APPS_DIR" "$data_dir" || die "Could not create $APPS_DIR"
+# Returns non-zero when something in the staging directory could not be
+# removed (a locked file), so a caller can say so instead of claiming success.
+_cleanup_stage() {
+  local rc=0
+  if [ -n "$SWAP_PREV" ] && [ -e "$SWAP_PREV" ] && [ ! -e "$SWAP_DST" ]; then
+    if ! mv "$SWAP_PREV" "$SWAP_DST" 2>/dev/null; then
+      warn "Interrupted while replacing a launcher. The old one is still at:
+    $SWAP_PREV
+    Move it back to: $SWAP_DST"
+      SWAP_PREV=""; SWAP_DST=""; BUILD_STAGE=""
+      return 1
+    fi
+  fi
+  SWAP_PREV=""; SWAP_DST=""
+  if [ -n "$BUILD_STAGE" ]; then
+    rm -rf "$BUILD_STAGE" 2>/dev/null
+    [ -e "$BUILD_STAGE" ] && rc=1
+    BUILD_STAGE=""
+  fi
+  return "$rc"
+}
+
+_undo_rename() {
+  local from to
+  [ -n "$RENAME_UNDO" ] || return 0
+  from=${RENAME_UNDO%%|*}; to=${RENAME_UNDO#*|}
+  RENAME_UNDO=""
+  if [ -d "$from" ] && [ ! -e "$to" ] && mv "$from" "$to" 2>/dev/null; then
+    warn "Interrupted: the profile was moved back to $to; nothing was renamed."
+  else
+    warn "Interrupted during rename. The profile data is at: $from"
+  fi
+}
+
+_on_exit() { _cleanup_stage; _undo_rename; return 0; }
+trap '_on_exit' EXIT
+trap '_on_exit; exit 130' INT
+trap '_on_exit; exit 143' TERM
+trap '_on_exit; exit 129' HUP
+
+# Build or replace a launcher. On failure it warns and returns non-zero; it
+# never exits. Every caller has a recovery path — rename moves the data back,
+# setup carries on with the next account, rebuild --all counts the failure —
+# and the die() calls that used to live here skipped every one of them.
+# kind is "main" for a launcher that opens the app's own account (no data dir).
+build_launcher() {
+  local src_app="$1" profile="$2" data_dir="$3" label="$4" letter="$5" hex="$6" kind="${7:-}"
+  local dst="$APPS_DIR/$label.app" rc
 
   # Only ever replace a bundle that is ours.
-  if [ -e "$dst" ]; then
-    assert_ours "$dst"
-    rm -rf "$dst" || die "Could not replace $dst"
+  if [ -e "$dst" ] && ! is_our_launcher "$dst"; then
+    warn "Refusing to replace '$dst' — it was not created by aidentity."
+    return 1
+  fi
+  # Without a data directory a launcher opens the app's own account. That must
+  # only ever happen on purpose, never because a plist lost its key.
+  if [ "$kind" != "main" ] && [ -z "$data_dir" ]; then
+    warn "No profile directory recorded for '$label'. Refusing to build a launcher
+    that would open the app's original account instead."
+    return 1
   fi
 
-  mkdir -p "$dst/Contents/MacOS" "$dst/Contents/Resources" || die "Could not create $dst"
+  mkdir -p "$APPS_DIR" 2>/dev/null || { warn "Could not create $APPS_DIR"; return 1; }
+  if [ "$kind" != "main" ]; then
+    # Owner-only, like the directories the apps create for themselves. Only
+    # directories made here are affected; an existing root keeps its mode.
+    ( umask 077 && mkdir -p "$data_dir" ) 2>/dev/null \
+      || { warn "Could not create $data_dir"; return 1; }
+  fi
+
+  BUILD_STAGE=$(mktemp -d "$APPS_DIR/.aidentity-build.XXXXXX" 2>/dev/null) \
+    || { BUILD_STAGE=""; warn "Could not write to $APPS_DIR"; return 1; }
+
+  _assemble_launcher "$BUILD_STAGE/$label.app" "$src_app" "$profile" "$data_dir" \
+      "$label" "$letter" "$hex" "$kind" \
+    && _swap_in "$BUILD_STAGE/$label.app" "$dst" "$BUILD_STAGE"
+  rc=$?
+  _cleanup_stage
+  [ "$rc" -eq 0 ] || return 1
+
+  # Nudge Launch Services so the icon and name appear immediately.
+  local lsreg="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  [ -x "$lsreg" ] && "$lsreg" -f "$dst" >/dev/null 2>&1
+  touch "$dst"
+  return 0
+}
+
+# Move a finished bundle into place. The old one is set aside, not deleted, and
+# put back if the new one cannot be moved in. Both moves are renames inside one
+# directory, so nothing is copied and nothing is half-written.
+_swap_in() { # new bundle, destination, staging dir
+  if [ -e "$2" ]; then
+    # Set aside under a name no launcher can have (no .app), so a launcher
+    # that happens to be called "previous" cannot be moved inside its own
+    # replacement.
+    SWAP_DST="$2"; SWAP_PREV="$3/.previous"
+    mv "$2" "$SWAP_PREV" 2>/dev/null \
+      || { SWAP_DST=""; SWAP_PREV=""; warn "Could not replace $2 (is it locked?). Nothing was changed."; return 1; }
+    if ! mv "$1" "$2" 2>/dev/null; then
+      if mv "$SWAP_PREV" "$2" 2>/dev/null; then
+        SWAP_DST=""; SWAP_PREV=""
+        warn "Could not move the new launcher into place. The old one is unchanged."
+      else
+        warn "Could not move the new launcher into place, nor put the old one back. It is at:
+    $SWAP_PREV
+    Move it back to: $2"
+        # Keep the stage: it holds the only copy of the launcher.
+        SWAP_DST=""; SWAP_PREV=""; BUILD_STAGE=""
+      fi
+      return 1
+    fi
+    SWAP_DST=""; SWAP_PREV=""
+  else
+    mv "$1" "$2" 2>/dev/null || { warn "Could not create $2"; return 1; }
+  fi
+  return 0
+}
+
+_assemble_launcher() { # out, src_app, profile, data_dir, label, letter, hex, kind
+  local dst="$1" src_app="$2" profile="$3" data_dir="$4" label="$5" letter="$6" hex="$7" kind="$8"
+
+  mkdir -p "$dst/Contents/MacOS" "$dst/Contents/Resources" 2>/dev/null \
+    || { warn "Could not create $dst"; return 1; }
 
   # The launcher is a plain shell script in a plain bundle. No AppleScript, so
-  # there is no nested-quoting layer to get wrong.
+  # there is no nested-quoting layer to get wrong. -n starts a new instance even
+  # when the app is already running. For a main launcher that is the whole
+  # point: Launch Services sees every profile as the same app, so opening the
+  # app itself only switches to whichever profile is already running.
   {
     printf '#!/bin/sh\n'
     printf '# Generated by aidentity %s. Safe to delete.\n' "$AIDENTITY_VERSION"
-    printf 'exec /usr/bin/open -na %s --args --user-data-dir=%s\n' \
-      "$(shquote "$src_app")" "$(shquote "$data_dir")"
-  } > "$dst/Contents/MacOS/launcher"
+    if [ "$kind" = "main" ]; then
+      printf 'exec /usr/bin/open -na %s\n' "$(shquote "$src_app")"
+    else
+      printf 'exec /usr/bin/open -na %s --args --user-data-dir=%s\n' \
+        "$(shquote "$src_app")" "$(shquote "$data_dir")"
+    fi
+  } > "$dst/Contents/MacOS/launcher" || { warn "Could not write the launcher script."; return 1; }
   chmod +x "$dst/Contents/MacOS/launcher"
 
   local bid
@@ -542,6 +810,8 @@ build_launcher() {
   # Recorded so `set` and `rebuild` can regenerate the icon without asking the
   # user to remember what they picked. An empty badge means "no badge".
   local x_badge; x_badge=$(xmlescape "$letter")
+  local x_main=""
+  [ "$kind" = "main" ] && x_main="<key>AIdentityMain</key><true/>"
 
   cat > "$dst/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -562,16 +832,17 @@ build_launcher() {
 	<key>AIdentityDataDir</key><string>$x_data</string>
 	<key>AIdentityBadge</key><string>$x_badge</string>
 	<key>AIdentityColor</key><string>$hex</string>
+	$x_main
 </dict>
 </plist>
 PLIST
 
-  # Leave nothing behind on failure. A half-written bundle whose plist cannot be
-  # parsed is invisible to is_our_launcher, which made it unremovable by rm and
-  # un-overwritable by add — the user had to delete it by hand.
+  # Never ship this. A bundle whose plist cannot be parsed is invisible to
+  # is_our_launcher, which made it unremovable by rm and un-overwritable by add.
+  # The staging directory is discarded, so nothing on disk changes.
   if ! plutil -lint "$dst/Contents/Info.plist" >/dev/null 2>&1; then
-    rm -rf "$dst"
-    die "Generated a malformed Info.plist for '$label' — nothing was created."
+    warn "Generated a malformed Info.plist for '$label' — nothing was changed."
+    return 1
   fi
 
   # An empty letter means the user asked for the app's own icon, untouched.
@@ -599,11 +870,6 @@ PLIST
     codesign --force --sign - "$dst" >/dev/null 2>&1 \
       || warn "Could not sign $label.app. It will still launch."
   fi
-
-  # Nudge Launch Services so the icon and name appear immediately.
-  local lsreg="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-  [ -x "$lsreg" ] && "$lsreg" -f "$dst" >/dev/null 2>&1
-  touch "$dst"
   return 0
 }
 
@@ -629,23 +895,46 @@ EOF
   fi
 }
 
+# Whether a profile directory has been used. Chromium browsers keep their
+# profile in Default/, but Electron apps (Claude, Slack, VS Code, Notion) write
+# straight into the root — so testing only for Default/ showed every signed-in
+# Electron profile as "signed out / new".
+profile_has_data() {
+  local f
+  for f in Default "Local State" Preferences Cookies "Local Storage"; do
+    [ -e "$1/$f" ] && return 0
+  done
+  return 1
+}
+
 cmd_list() {
-  local app n=0 profile target data
+  local app n=0 profile target data label status
   for app in "$APPS_DIR"/*.app; do
     [ -d "$app" ] || continue
     is_our_launcher "$app" || continue
     n=$((n+1))
+    label=$(bundle_name "$app")
     profile=$(plist_get "$app" "$MARKER_KEY")
     target=$(plist_get "$app" "AIdentityTargetApp")
     data=$(plist_get "$app" "AIdentityDataDir")
-    local status="signed out / new"
-    [ -d "$data/Default" ] && status="in use"
-    running_on_profile "$data" && status="${C_GREEN}running${C_RESET}"
-    printf '%s%s%s\n' "$C_BOLD" "$(bundle_name "$app")" "$C_RESET"
+    if is_main_launcher "$app"; then
+      status="not running"
+      main_running "$target" && status="${C_GREEN}running${C_RESET}"
+    else
+      status="signed out / new"
+      profile_has_data "$data" && status="in use"
+      running_on_profile "$data" && status="${C_GREEN}running${C_RESET}"
+    fi
+    [ -d "$target" ] || status="${C_YELLOW}app missing${C_RESET} — run: aidentity rebuild \"$label\""
+    printf '%s%s%s\n' "$C_BOLD" "$label" "$C_RESET"
     printf '   app      %s\n' "$(bundle_name "$target")"
     printf '   profile  %s\n' "$profile"
-    printf '   status   %b\n' "$status"
-    printf '   data     %s\n' "$(dim "$data")"
+    printf '   status   %s\n' "$status"
+    if is_main_launcher "$app"; then
+      printf '   data     %s\n' "$(dim "the app's own — your original account, never touched")"
+    else
+      printf '   data     %s\n' "$(dim "$data")"
+    fi
     info ""
   done
   if [ "$n" -eq 0 ]; then
@@ -657,6 +946,7 @@ cmd_list() {
 cmd_open() {
   local want="${1:-}"
   [ -n "$want" ] || die "Usage: aidentity open \"<profile>\""
+  [ $# -le 1 ] || die "Unexpected argument: $2  (quote a name that has spaces)"
   local app="$APPS_DIR/$want.app"
   [ -d "$app" ] || die "No launcher named '$want'. Run 'aidentity list' to see what exists."
   assert_ours "$app"
@@ -675,7 +965,9 @@ cmd_rm() {
       --purge) purge=1; shift ;;
       -y|--yes) yes=1; shift ;;
       -*) die "Unknown option for rm: $1" ;;
-      *) want="$1"; shift ;;
+      # One name only. Taking the last of several made `rm A B --purge -y`
+      # delete B and silently ignore A.
+      *) [ -z "$want" ] && want="$1" || die "Unexpected argument: $1  (one profile at a time; quote a name that has spaces)"; shift ;;
     esac
   done
   [ -n "$want" ] || die "Usage: aidentity rm \"<profile>\" [--purge]"
@@ -684,15 +976,28 @@ cmd_rm() {
   [ -d "$app" ] || die "No launcher named '$want'. Run 'aidentity list' to see what exists."
   assert_ours "$app"
 
-  local data; data=$(plist_get "$app" "AIdentityDataDir")
+  # Read everything needed afterwards now — the launcher is about to go.
+  local data target profile main=0
+  data=$(plist_get "$app" "AIdentityDataDir")
+  target=$(plist_get "$app" "AIdentityTargetApp")
+  profile=$(plist_get "$app" "$MARKER_KEY")
+  is_main_launcher "$app" && main=1
 
-  if running_on_profile "$data"; then
+  if [ "$main" -eq 1 ] && [ "$purge" -eq 1 ]; then
+    warn "'$want' opens $(bundle_name "$target")'s own account. aidentity never deletes that
+    data, so --purge does nothing here; only the launcher is removed."
+    purge=0
+  fi
+
+  if [ "$main" -eq 0 ] && running_on_profile "$data"; then
     die "'$want' is running right now. Quit it first, then re-run."
   fi
 
   if [ "$yes" -eq 0 ]; then
     if [ "$purge" -eq 1 ]; then
       printf 'Remove launcher "%s" AND permanently delete its data?\n  %s\n' "$want" "$data"
+    elif [ "$main" -eq 1 ]; then
+      printf 'Remove launcher "%s"? Your original account is not affected.\n' "$want"
     else
       printf 'Remove launcher "%s"? Its data is kept.\n' "$want"
     fi
@@ -700,21 +1005,71 @@ cmd_rm() {
     [ "$reply" = "yes" ] || die "Cancelled."
   fi
 
-  rm -rf "$app"
+  # Move it aside first, delete it second. A locked bundle (or one owned by
+  # someone else) survived rm -rf with its Info.plist gone — no longer
+  # recognisable as ours, so its data then looked orphaned — and this still
+  # printed "Removed" and went on to delete the data. A locked bundle cannot be
+  # moved, so now it is refused whole, with nothing touched.
+  BUILD_STAGE=$(mktemp -d "$APPS_DIR/.aidentity-rm.XXXXXX" 2>/dev/null) \
+    || { BUILD_STAGE=""; die "Could not write to $APPS_DIR. Nothing was changed."; }
+  if ! mv "$app" "$BUILD_STAGE/" 2>/dev/null; then
+    _cleanup_stage
+    die "Could not remove $app — it may be locked (Finder → Get Info) or
+    owned by another user. Nothing was changed."
+  fi
+  local trash="$BUILD_STAGE"
+  _cleanup_stage || warn "Part of the old launcher could not be deleted (a locked file?).
+    It is out of the way, in: $trash"
   ok "Removed launcher '$want'."
+  [ "$main" -eq 1 ] && return 0
 
   if [ "$purge" -eq 1 ]; then
     # Only delete inside our own data root — never an arbitrary recorded path.
-    if data_is_ours "$data"; then
-      rm -rf "$data"; ok "Deleted profile data."
-    else
+    if ! data_is_ours "$data"; then
       warn "Profile data is outside the aidentity data directory; left in place:"
       dim "  $data"
+      return 0
     fi
+    # Launchers from 1.0.0 could share one directory. Deleting it would sign
+    # the other launcher out too.
+    local others; others=$(launchers_sharing "$data")
+    if [ -n "$others" ]; then
+      warn "Profile data kept — another launcher uses the same directory: $others"
+      dim "  $data"
+      return 0
+    fi
+    # Checked again: the confirmation above can sit for minutes, and the app
+    # may have been opened in the meantime.
+    if running_on_profile "$data"; then
+      die "The profile was opened while waiting for confirmation. The launcher is
+    gone, but its data was kept: $data"
+    fi
+    rm -rf "$data" 2>/dev/null
+    if [ -e "$data" ]; then warn "Could not delete all of $data"; return 1; fi
+    ok "Deleted profile data."
   else
+    # `aidentity rm NAME --purge` cannot work any more — that launcher is gone,
+    # which is what this used to suggest. These two do.
+    local app_ref; app_ref=$(bundle_name "$target")
+    [ "$(resolve_app "$app_ref" 2>/dev/null)" = "$target" ] || app_ref="$target"
     dim "  Profile data kept at: $data"
-    dim "  Delete it later with: aidentity rm \"$want\" --purge"
+    dim "  To use this account again:  aidentity add \"$app_ref\" --profile \"$profile\""
+    dim "  To delete the data:         aidentity prune"
   fi
+}
+
+# Other launchers in the launcher directory that point at the same data
+# directory as $1, however it is spelled. Prints their names, comma-separated.
+launchers_sharing() {
+  local id app d names=""
+  id=$(dir_id "$1") || return 0
+  for app in "$APPS_DIR"/*.app; do
+    [ -d "$app" ] || continue
+    is_our_launcher "$app" || continue
+    d=$(plist_get "$app" "AIdentityDataDir")
+    [ "$(dir_id "$d")" = "$id" ] && names="${names:+$names, }$(bundle_name "$app")"
+  done
+  printf '%s' "$names"
 }
 
 cmd_doctor() {
@@ -753,15 +1108,16 @@ cmd_doctor() {
 }
 
 cmd_add() {
-  local app_arg="" profile="" badge="" color="" seed=0 no_badge=0
+  local app_arg="" profile="" badge="" color="" seed=0 no_badge=0 main=0
 
   while [ $# -gt 0 ]; do
     case "$1" in
-      --profile|-p) profile="${2:-}"; shift 2 || die "--profile needs a value" ;;
-      --badge|-b)   badge="${2:-}";   shift 2 || die "--badge needs a value" ;;
-      --color|--colour|-c) color="${2:-}"; shift 2 || die "--color needs a value" ;;
+      --profile|-p) need_value "$1" "${2:-}"; profile="$2"; shift 2 ;;
+      --badge|-b)   need_value "$1" "${2:-}"; badge="$2";   shift 2 ;;
+      --color|--colour|-c) need_value "$1" "${2:-}"; color="$2"; shift 2 ;;
       --no-badge)   no_badge=1; shift ;;
       --seed)       seed=1; shift ;;
+      --main)       main=1; shift ;;
       --)           shift; break ;;
       -*)           die "Unknown option for add: $1" ;;
       *)            [ -z "$app_arg" ] && app_arg="$1" || die "Unexpected argument: $1"; shift ;;
@@ -775,16 +1131,30 @@ cmd_add() {
     info ""
   fi
 
-  create_profile "$app_arg" "$profile" "$badge" "$color" "$seed" "$no_badge" || exit 1
+  if [ "$main" -eq 1 ]; then
+    [ -n "$profile" ] || profile="Main"
+  elif [ -z "$profile" ]; then
+    # Ask for the account name. 1.0.0 did; a refactor in 1.1.0 lost the prompt,
+    # so `aidentity add` picked an app and then failed on the empty name. The
+    # app is vetted first, so nobody names an account for an app that is then
+    # refused.
+    local src_app; src_app=$(resolve_target_app "$app_arg") || exit 1
+    have_tty || die "No profile name given. Use --profile \"<name>\"."
+    while :; do
+      profile=$(ask 'Name this account (e.g. Work, Personal, Client): ') || exit 1
+      validate_profile_name "$profile" && break
+    done
+    app_arg="$src_app"
+  fi
+
+  create_profile "$app_arg" "$profile" "$badge" "$color" "$seed" "$no_badge" "$main" || exit 1
 }
 
-# Create one profile end to end. Returns non-zero on any failure instead of
-# exiting, so the wizard can report it and carry on with the next account.
-# cmd_add is the CLI wrapper; cmd_setup calls this directly.
-create_profile() {
-  local app_arg="$1" profile="$2" badge="$3" color="$4" seed="$5" no_badge="${6:-0}"
-
-  local src_app
+# Resolve and vet the app a launcher would open. Prints its bundle path, or
+# warns and returns non-zero if it is missing, is one of our own launchers, or
+# has no separate-profile switch.
+resolve_target_app() {
+  local app_arg="$1" src_app
   src_app=$(resolve_app "$app_arg") || {
     warn "Could not find an app called '$app_arg'. Run 'aidentity apps' to see what is available."
     return 1; }
@@ -800,36 +1170,98 @@ create_profile() {
     See: https://github.com/PiniShv/aidentity#which-apps-work"
     return 1
   fi
+  printf '%s' "$src_app"
+}
+
+# The --main launcher already built for an app, if there is one.
+main_launcher_for() {
+  local app
+  for app in "$APPS_DIR"/*.app; do
+    [ -d "$app" ] || continue
+    is_our_launcher "$app" || continue
+    is_main_launcher "$app" || continue
+    [ "$(plist_get "$app" "AIdentityTargetApp")" = "$1" ] && { printf '%s' "$app"; return 0; }
+  done
+  return 1
+}
+
+# Create one profile end to end. Returns non-zero on any failure instead of
+# exiting, so the wizard can report it and carry on with the next account.
+# cmd_add is the CLI wrapper; cmd_setup calls this directly.
+# main=1 builds a launcher for the app's own, original account instead.
+create_profile() {
+  local app_arg="$1" profile="$2" badge="$3" color="$4" seed="$5" no_badge="${6:-0}" main="${7:-0}"
+
+  local src_app
+  src_app=$(resolve_target_app "$app_arg") || return 1
 
   validate_profile_name "$profile" || return 1
 
   local label; label="$(bundle_name "$src_app") $profile"
   local slug;  slug="$(slugify "$label")"
-  local data_dir="$DATA_ROOT/$slug"
+  local data_dir="" kind=""
+  local dst="$APPS_DIR/$label.app"
 
-  # slugify folds spaces, underscores and hyphens together and drops non-ASCII,
-  # so "Work 2", "Work_2" and "Work-2" all produced ONE data directory. Three
-  # launchers then shared a single profile — the opposite of the tool's job.
-  if [ -z "$slug" ]; then
-    warn "Cannot derive a profile directory from '$label'.
-    Use a name containing at least one letter or number."
-    return 1
-  fi
-  local existing
-  for existing in "$APPS_DIR"/*.app; do
-    [ -d "$existing" ] || continue
-    is_our_launcher "$existing" || continue
-    [ "$(bundle_name "$existing")" = "$label" ] && continue
-    if [ "$(plist_get "$existing" "AIdentityDataDir")" = "$data_dir" ]; then
-      warn "'$label' would share its profile directory with '$(bundle_name "$existing")':
-      $data_dir
-    Spaces, underscores and hyphens are treated the same. Pick a more distinct name."
+  if [ "$main" -eq 1 ]; then
+    kind="main"
+    # One is enough. Two launchers for the same original account would only
+    # be two names for one thing.
+    local other; other=$(main_launcher_for "$src_app")
+    if [ -n "$other" ] && [ "$other" != "$dst" ]; then
+      warn "'$(bundle_name "$other")' already opens your original $(bundle_name "$src_app") account."
       return 1
     fi
-  done
+  else
+    data_dir="$DATA_ROOT/$slug"
+    # slugify folds spaces, underscores and hyphens together and drops
+    # non-ASCII, so "Work 2", "Work_2" and "Work-2" all produced ONE data
+    # directory. Three launchers then shared a single profile — the opposite
+    # of the tool's job.
+    if [ -z "$slug" ]; then
+      warn "Cannot derive a profile directory from '$label'.
+    Use a name containing at least one letter or number."
+      return 1
+    fi
+    local existing
+    for existing in "$APPS_DIR"/*.app; do
+      [ -d "$existing" ] || continue
+      is_our_launcher "$existing" || continue
+      [ "$(bundle_name "$existing")" = "$label" ] && continue
+      if [ "$(plist_get "$existing" "AIdentityDataDir")" = "$data_dir" ]; then
+        warn "'$label' would share its profile directory with '$(bundle_name "$existing")':
+      $data_dir
+    Spaces, underscores, hyphens and capitals are treated the same. Pick a more distinct name."
+        return 1
+      fi
+    done
+  fi
 
-  [ -n "$badge" ] || badge=$(printf '%s' "$profile" | cut -c1 | tr '[:lower:]' '[:upper:]')
-  badge=$(printf '%s' "$badge" | cut -c1)
+  # Never turn a separate profile into a main launcher or back by re-adding
+  # under the same name. The profile's data would be left with nothing pointing
+  # at it — and that is exactly what `prune` deletes.
+  if [ -e "$dst" ] && is_our_launcher "$dst"; then
+    local was=""
+    is_main_launcher "$dst" && was="main"
+    if [ "$was" != "$kind" ]; then
+      if [ "$was" = "main" ]; then
+        warn "'$label' already opens your original account. Pick another profile name."
+      else
+        warn "'$label' is already a separate profile. Pick another name for the original account:
+      aidentity add \"$(bundle_name "$src_app")\" --main --profile Original"
+      fi
+      return 1
+    fi
+  fi
+
+  [ -n "$badge" ] || badge=$(first_upper "$profile")
+  local wanted="$badge"
+  badge=$(first_char "$badge")
+  # Bytes that are not text (a Latin-1 é, say) cut to nothing, which would
+  # quietly mean "no badge". Say so and use the default instead.
+  if [ -z "$badge" ]; then
+    badge=$(first_upper "$profile")
+    warn "'$wanted' is not a character that can be drawn; using the badge $badge."
+  fi
   [ "$no_badge" -eq 1 ] && badge=""
 
   local hex
@@ -847,31 +1279,53 @@ create_profile() {
     return 1
   fi
 
-  if running_on_profile "$data_dir"; then
+  if [ -n "$data_dir" ] && running_on_profile "$data_dir"; then
     warn "'$label' is running right now. Quit it, then re-run."
     return 1
   fi
 
   # Called directly, NOT via $(…). In a command substitution the builder runs in
-  # a subshell, so its `die` calls exited only that subshell and the caller went
-  # on to print "✓ Created" after a failed build.
-  local dst="$APPS_DIR/$label.app"
-  build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" || return 1
+  # a subshell, so a failure there could not stop the caller printing
+  # "✓ Created" after a failed build.
+  local had_data=0
+  [ -n "$data_dir" ] && [ -d "$data_dir" ] && had_data=1
+  if ! build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" "$kind"; then
+    # Leave no empty directory behind for `prune` to report later.
+    [ "$had_data" -eq 0 ] && [ -n "$data_dir" ] && rmdir "$data_dir" 2>/dev/null
+    return 1
+  fi
 
   if [ "$seed" -eq 1 ]; then
     local primary="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
     if [ "$(bundle_id "$src_app")" != "com.anthropic.claudefordesktop" ]; then
       warn "--seed only applies to Claude Desktop; ignoring it for $(bundle_name "$src_app")."
+    elif [ "$main" -eq 1 ]; then
+      dim "  Nothing to seed — the original account already has your config."
     elif [ -f "$primary" ] && [ ! -f "$data_dir/claude_desktop_config.json" ]; then
-      cp "$primary" "$data_dir/claude_desktop_config.json" && ok "Copied your MCP server config into the new profile."
+      # Owner-only: MCP server entries often carry API keys in their env.
+      cp "$primary" "$data_dir/claude_desktop_config.json" \
+        && chmod 600 "$data_dir/claude_desktop_config.json" \
+        && ok "Copied your MCP server config into the new profile."
     else
       dim "  Nothing to seed (no existing config, or the profile already has one)."
     fi
   fi
 
+  local app_name; app_name=$(bundle_name "$src_app")
   info ""
   ok "Created ${C_BOLD}$label${C_RESET}"
   printf '   launcher  %s\n' "$dst"
+  if [ "$main" -eq 1 ]; then
+    printf '   opens     %s\n' "$(dim "your original $app_name account, with $app_name's own data")"
+    info ""
+    info "${C_BOLD}Next:${C_RESET}"
+    printf '  Drag %s onto your Dock in place of %s.app.\n' "$(basename "$dst")" "$app_name"
+    info ""
+    dim "  While any profile is running, macOS treats it as $app_name itself, so"
+    dim "  clicking $app_name.app only switches to that profile. This launcher always"
+    dim "  opens your original account."
+    return 0
+  fi
   printf '   profile   %s\n' "$(dim "$data_dir")"
   info ""
   info "${C_BOLD}Next:${C_RESET}"
@@ -905,7 +1359,7 @@ cmd_setup() {
   fi
   info ""
 
-  local made=0 src_app profile
+  local made=0 src_app profile main_declined="|"
   while :; do
     src_app=$(pick_app) || break
     info ""
@@ -932,6 +1386,7 @@ cmd_setup() {
     # answer ended the whole walkthrough.
     if create_profile "$src_app" "$profile" "" "" "$seed" "$nb"; then
       made=$((made+1))
+      offer_main_launcher "$src_app" "$nb"
     else
       info ""
       warn "That one did not work — nothing was created for it. Carrying on."
@@ -962,9 +1417,36 @@ cmd_setup() {
   fi
 }
 
+# Offered in the walkthrough after an app's first new profile, until the app
+# has a main launcher or the person says no. While any profile runs, macOS
+# treats it as the app itself, so clicking the app switches to that profile
+# instead of opening the original account. A --main launcher always opens the
+# original. A "no" is remembered for the rest of the walkthrough in
+# cmd_setup's main_declined (bash locals are visible to the functions a
+# function calls).
+offer_main_launcher() {
+  local src_app="$1" nb="$2" name
+  name=$(bundle_name "$src_app")
+  main_launcher_for "$src_app" >/dev/null && return 0
+  [ -e "$APPS_DIR/$name Main.app" ] && return 0
+  case "${main_declined:-}" in *"|$src_app|"*) return 0 ;; esac
+  info ""
+  dim "  While a profile is running, clicking $name.app only switches to that profile."
+  if confirm "Add a '$name Main' launcher that always opens your original account?" y; then
+    info ""
+    create_profile "$src_app" "Main" "" "" 0 "$nb" 1 \
+      || warn "Skipped. Add it later with: aidentity add \"$name\" --main"
+  else
+    main_declined="${main_declined:-|}$src_app|"
+  fi
+  return 0
+}
+
 # Resolve a profile label to the launcher bundle that carries it, or explain.
+# The path comes back spelled as it is on disk: the disk ignores case, and
+# `set "claude work"` used to rebuild the launcher under the typed spelling.
 launcher_for() {
-  local want="$1"
+  local want="$1" a
   local app="$APPS_DIR/$want.app"
   [ -n "$want" ] || { warn "Which profile? Run 'aidentity list' to see them."; return 1; }
   if [ ! -d "$app" ]; then
@@ -975,18 +1457,61 @@ launcher_for() {
     warn "'$want' was not created by aidentity — refusing to touch it."
     return 1
   fi
+  # The real bundle, by name, ignoring case. Not by -ef: a symlink pointing
+  # at the launcher matched too, and an alias sorting first was renamed or
+  # rebuilt instead of the launcher itself.
+  local want_lc; want_lc=$(lower "$want.app")
+  for a in "$APPS_DIR"/*.app; do
+    [ -L "$a" ] && continue
+    [ "$(lower "$(basename "$a")")" = "$want_lc" ] && { app="$a"; break; }
+  done
   printf '%s' "$app"
 }
 
-# Every data directory a launcher currently points at, one per line.
-claimed_data_dirs() {
-  local app d
-  for app in "$APPS_DIR"/*.app; do
-    [ -d "$app" ] || continue
-    is_our_launcher "$app" || continue
-    d=$(plist_get "$app" "AIdentityDataDir")
-    [ -n "$d" ] && printf '%s\n' "$d"
+# Every aidentity launcher that can be found, one path per line: the launcher
+# directory and folders inside it, the app search path, and whatever Spotlight
+# knows. `prune` deletes data that no launcher claims, so a launcher it cannot
+# see is a signed-in session it would delete. Looking only in the launcher
+# directory deleted the data of any launcher moved somewhere else.
+#
+# find runs with -H so a symlinked launcher directory is followed, as the old
+# "$APPS_DIR"/*.app glob was; without it a symlinked ~/Applications looked
+# empty and prune deleted every profile behind it. Our own hidden .aidentity-*
+# staging folders, and the Trash, hold launchers on their way out: they claim
+# nothing, or a launcher deleted in Finder would keep its data from prune.
+all_launchers() {
+  local dir app
+  {
+    for app in "$APPS_DIR"/*.app; do [ -d "$app" ] && printf '%s\n' "$app"; done
+    find -H "$APPS_DIR" -maxdepth 3 -type d -name '.aidentity-*' -prune \
+      -o -type d -name '*.app' -print -prune 2>/dev/null
+    while IFS= read -r dir; do
+      [ -d "$dir" ] && find -H "$dir" -maxdepth 2 -type d -name '.aidentity-*' -prune \
+        -o -type d -name '*.app' -print -prune 2>/dev/null
+    done <<EOF
+$(app_search_dirs)
+EOF
+    if command -v mdfind >/dev/null 2>&1; then
+      mdfind "kMDItemCFBundleIdentifier == 'com.aidentity.*'" 2>/dev/null
+    fi
+  } | awk 'NF && !seen[$0]++' | while IFS= read -r dir; do
+    case "$dir" in */.aidentity-*|*/.Trash/*|*/.Trashes/*) continue ;; esac
+    is_our_launcher "$dir" && printf '%s\n' "$dir"
   done
+}
+
+# The identity of every data directory a launcher points at, space-separated.
+claimed_dir_ids() {
+  local app d id ids=" "
+  while IFS= read -r app; do
+    [ -n "$app" ] || continue
+    d=$(plist_get "$app" "AIdentityDataDir")
+    [ -n "$d" ] || continue
+    id=$(dir_id "$d") && ids="$ids$id "
+  done <<EOF
+$(all_launchers)
+EOF
+  printf '%s' "$ids"
 }
 
 human_bytes() {
@@ -1007,67 +1532,111 @@ cmd_rename() {
 
   local app; app=$(launcher_for "$from") || exit 1
   validate_profile_name "$to" || exit 1
+  from=$(bundle_name "$app")
 
-  local src_app old_data badge hex
+  local src_app old_data profile badge hex kind=""
   src_app=$(plist_get "$app" "AIdentityTargetApp")
   old_data=$(plist_get "$app" "AIdentityDataDir")
-  badge=$(plist_get "$app" "AIdentityBadge")
-  hex=$(plist_get "$app" "AIdentityColor")
-  [ -n "$hex" ] || hex=$(color_hex "$(auto_color "$from")")
+  profile=$(plist_get "$app" "$MARKER_KEY")
+  is_main_launcher "$app" && kind="main"
+  badge=$(launcher_badge "$app" "$src_app" "$profile")
+  hex=$(launcher_color "$app" "$from")
 
   [ -d "$src_app" ] || die "'$from' points at an app that is no longer there:
     $src_app
     Run 'aidentity rebuild' after reinstalling it, or remove the profile."
 
+  # A badge that was only the old name's first letter follows the new name;
+  # "Client" kept the "W" of "Work". A badge chosen by hand stays.
+  if [ -n "$badge" ] && [ "$badge" = "$(first_upper "$profile")" ]; then
+    badge=$(first_upper "$to")
+  fi
+
   local new_label; new_label="$(bundle_name "$src_app") $to"
   local new_slug;  new_slug="$(slugify "$new_label")"
-  local new_data="$DATA_ROOT/$new_slug"
+  local new_app="$APPS_DIR/$new_label.app"
 
   [ "$new_label" = "$from" ] && die "'$from' already has that name."
-  [ -n "$new_slug" ] || die "Cannot derive a profile directory from '$new_label'."
 
-  if [ -e "$APPS_DIR/$new_label.app" ]; then
-    die "There is already something at $APPS_DIR/$new_label.app. Pick another name."
+  # On a disk that ignores case, "Work" -> "work" names this very bundle. That
+  # is a rename of this launcher, not a collision with another one.
+  if [ -e "$new_app" ] && ! [ "$new_app" -ef "$app" ]; then
+    die "There is already something at $new_app. Pick another name."
   fi
-  if [ -e "$new_data" ]; then
-    die "A profile directory already exists at:
+
+  local new_data="" moved=0
+  if [ "$kind" != "main" ]; then
+    [ -n "$new_slug" ] || die "Cannot derive a profile directory from '$new_label'."
+    new_data="$DATA_ROOT/$new_slug"
+
+    # Renaming while the app is open would move the directory out from under a
+    # live Chromium instance.
+    if running_on_profile "$old_data"; then
+      die "'$from' is running right now. Quit it, then rename."
+    fi
+
+    # Names that differ only in case, or in spaces against hyphens, keep the
+    # same directory. Nothing needs to move, and the old -e test refused them.
+    if [ "$new_data" = "$old_data" ] || { [ -n "$(dir_id "$old_data")" ] &&
+         [ "$(dir_id "$old_data")" = "$(dir_id "$new_data")" ]; }; then
+      new_data="$old_data"
+    else
+      if [ -e "$new_data" ]; then
+        die "A profile directory already exists at:
       $new_data
     Pick a name that does not collide with an existing profile."
-  fi
-
-  # Renaming while the app is open would move the directory out from under a
-  # live Chromium instance.
-  if running_on_profile "$old_data"; then
-    die "'$from' is running right now. Quit it, then rename."
-  fi
-
-  # Move the data FIRST. If the rebuild then fails the session still exists and
-  # the old launcher is still on disk pointing at the old path, which is a
-  # recoverable state; losing the data would not be.
-  if [ -d "$old_data" ]; then
-    data_is_ours "$old_data" || die "'$from' records a profile directory outside the aidentity
+      fi
+      # Move the data FIRST. If the rebuild then fails, it is moved back and
+      # the old launcher, untouched, still points at it.
+      if [ -d "$old_data" ]; then
+        data_is_ours "$old_data" || die "'$from' records a profile directory outside the aidentity
     data root, so renaming it is not safe:
       $old_data"
-    mv "$old_data" "$new_data" || die "Could not move the profile directory to $new_data"
+        mv "$old_data" "$new_data" || die "Could not move the profile directory to $new_data"
+        moved=1
+        RENAME_UNDO="$new_data|$old_data"
+      fi
+    fi
   fi
 
-  if ! build_launcher "$src_app" "$to" "$new_data" "$new_label" "$badge" "$hex"; then
-    [ -d "$new_data" ] && mv "$new_data" "$old_data" 2>/dev/null
+  if ! build_launcher "$src_app" "$to" "$new_data" "$new_label" "$badge" "$hex" "$kind"; then
+    RENAME_UNDO=""
+    if [ "$moved" -eq 1 ] && ! mv "$new_data" "$old_data" 2>/dev/null; then
+      die "Could not build the renamed launcher, and could not move the profile back.
+    The signed-in data is at: $new_data
+    Move it back to $old_data by hand; '$from' still points there."
+    fi
     die "Could not build the renamed launcher. Nothing was changed."
   fi
 
-  rm -rf "$app"
+  # The new launcher is in place and points at the moved data: an interrupt
+  # from here on must not move it back.
+  RENAME_UNDO=""
+
+  # After a case-only rename the old path IS the new launcher. Deleting it
+  # would delete the launcher just built.
+  if ! [ "$app" -ef "$new_app" ]; then
+    rm -rf "$app" 2>/dev/null
+    [ -e "$app" ] && warn "Could not remove the old launcher; delete it by hand: $app"
+  fi
   ok "Renamed ${C_BOLD}$from${C_RESET} to ${C_BOLD}$new_label${C_RESET}"
-  printf '   profile   %s\n' "$(dim "$new_data")"
-  dim "  The account stays signed in — only the name and directory moved."
+  if [ "$kind" = "main" ]; then
+    dim "  It still opens your original account."
+  elif [ "$moved" -eq 1 ]; then
+    printf '   profile   %s\n' "$(dim "$new_data")"
+    dim "  The account stays signed in — only the name and directory moved."
+  else
+    printf '   profile   %s\n' "$(dim "$new_data")"
+    dim "  The account stays signed in — only the name changed."
+  fi
 }
 
 cmd_set() {
   local want="" badge="" color="" no_badge=0 changed=0
   while [ $# -gt 0 ]; do
     case "$1" in
-      --badge|-b) badge="${2:-}"; shift 2 || die "--badge needs a value" ;;
-      --color|--colour|-c) color="${2:-}"; shift 2 || die "--color needs a value" ;;
+      --badge|-b) need_value "$1" "${2:-}"; badge="$2"; shift 2 ;;
+      --color|--colour|-c) need_value "$1" "${2:-}"; color="$2"; shift 2 ;;
       --no-badge) no_badge=1; shift ;;
       -*) die "Unknown option for set: $1" ;;
       *) [ -z "$want" ] && want="$1" || die "Unexpected argument: $1"; shift ;;
@@ -1078,14 +1647,15 @@ cmd_set() {
     || die "Nothing to change. Pass --color, --badge or --no-badge."
 
   local app; app=$(launcher_for "$want") || exit 1
+  want=$(bundle_name "$app")
 
-  local src_app profile data_dir cur_badge cur_hex
+  local src_app profile data_dir cur_badge cur_hex kind=""
   src_app=$(plist_get "$app" "AIdentityTargetApp")
   profile=$(plist_get "$app" "$MARKER_KEY")
   data_dir=$(plist_get "$app" "AIdentityDataDir")
-  cur_badge=$(plist_get "$app" "AIdentityBadge")
-  cur_hex=$(plist_get "$app" "AIdentityColor")
-  [ -n "$cur_hex" ] || cur_hex=$(color_hex "$(auto_color "$want")")
+  is_main_launcher "$app" && kind="main"
+  cur_badge=$(launcher_badge "$app" "$src_app" "$profile")
+  cur_hex=$(launcher_color "$app" "$want")
 
   [ -d "$src_app" ] || die "'$want' points at an app that is no longer there:
     $src_app"
@@ -1094,7 +1664,8 @@ cmd_set() {
   if [ "$no_badge" -eq 1 ]; then
     new_badge=""; changed=1
   elif [ -n "$badge" ]; then
-    new_badge=$(printf '%s' "$badge" | cut -c1); changed=1
+    new_badge=$(first_char "$badge"); changed=1
+    [ -n "$new_badge" ] || die "'$badge' is not a character that can be drawn as a badge."
   fi
   if [ -n "$color" ]; then
     new_hex=$(color_hex "$color") \
@@ -1102,7 +1673,7 @@ cmd_set() {
     changed=1
     # Asking for a colour with no badge showing is almost certainly a mistake.
     [ -z "$new_badge" ] && [ "$no_badge" -eq 0 ] && {
-      new_badge=$(printf '%s' "$profile" | cut -c1 | tr '[:lower:]' '[:upper:]')
+      new_badge=$(first_upper "$profile")
       dim "  No badge was set, so --color added one: $new_badge"
     }
   fi
@@ -1110,7 +1681,7 @@ cmd_set() {
 
   # Only the launcher bundle is rewritten; the profile directory is untouched,
   # so the account stays signed in even if the app is open right now.
-  build_launcher "$src_app" "$profile" "$data_dir" "$want" "$new_badge" "$new_hex" || exit 1
+  build_launcher "$src_app" "$profile" "$data_dir" "$want" "$new_badge" "$new_hex" "$kind" || exit 1
   ok "Updated ${C_BOLD}$want${C_RESET}"
   dim "  The signed-in account is untouched — only the icon changed."
 }
@@ -1127,11 +1698,15 @@ cmd_prune() {
 
   [ -d "$DATA_ROOT" ] || { info "No profile data directory yet — nothing to prune."; return 0; }
 
-  local claimed; claimed=$(claimed_data_dirs)
-  local orphans=() d n=0
+  # Compared by directory identity, not by spelling. A string match made a live
+  # profile look orphaned whenever its launcher recorded the root differently —
+  # a symlinked root, a trailing slash, /tmp against /private/tmp.
+  local claimed; claimed=$(claimed_dir_ids)
+  local orphans=() d id n=0
   for d in "$DATA_ROOT"/*; do
     [ -d "$d" ] || continue
-    printf '%s\n' "$claimed" | grep -qxF -- "$d" && continue
+    id=$(dir_id "$d") || continue
+    case "$claimed" in *" $id "*) continue ;; esac
     orphans+=("$d"); n=$((n+1))
   done
 
@@ -1147,8 +1722,10 @@ cmd_prune() {
     dim "             $d"
   done
   info ""
-  dim "  These are left behind when a launcher is deleted in Finder instead of"
-  dim "  with 'aidentity rm'. The signed-in session inside them is unreachable."
+  dim "  This is what is left when a launcher is deleted in Finder, or removed with"
+  dim "  'aidentity rm' without --purge. Launchers were looked for in $APPS_DIR"
+  dim "  (and folders inside it), in the app folders and through Spotlight. If you"
+  dim "  keep a launcher anywhere else, its account is listed here: do not delete it."
   info ""
 
   if [ "$yes" -eq 0 ]; then
@@ -1198,14 +1775,13 @@ cmd_rebuild() {
 
   local done_n=0 failed=0
   for app in "${targets[@]}"; do
-    local label src_app profile data_dir badge hex
+    local label src_app profile data_dir badge hex kind=""
     label=$(bundle_name "$app")
     src_app=$(plist_get "$app" "AIdentityTargetApp")
     profile=$(plist_get "$app" "$MARKER_KEY")
     data_dir=$(plist_get "$app" "AIdentityDataDir")
-    badge=$(plist_get "$app" "AIdentityBadge")
-    hex=$(plist_get "$app" "AIdentityColor")
-    [ -n "$hex" ] || hex=$(color_hex "$(auto_color "$label")")
+    is_main_launcher "$app" && kind="main"
+    hex=$(launcher_color "$app" "$label")
 
     if [ ! -d "$src_app" ]; then
       # The app moved or was uninstalled. Try to find it again by name before
@@ -1221,7 +1797,15 @@ cmd_rebuild() {
       fi
     fi
 
-    if build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex"; then
+    # Only now, with the app found: a 1.0.0 launcher's badge is worked out by
+    # comparing its icon with the app's, which fails against a path that moved.
+    badge=$(launcher_badge "$app" "$src_app" "$profile")
+    if is_legacy_launcher "$app"; then
+      info "  $label: built by aidentity 1.0.0 — badge and colour restored to its defaults."
+      dim  "    A colour or letter you picked yourself back then: aidentity set \"$label\" --color …"
+    fi
+
+    if build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" "$kind"; then
       done_n=$((done_n+1))
     else
       warn "$label: rebuild failed."
@@ -1230,9 +1814,14 @@ cmd_rebuild() {
   done
 
   info ""
-  ok "Rebuilt $done_n launcher(s)."
-  [ "$failed" -gt 0 ] && warn "$failed could not be rebuilt."
+  [ "$done_n" -gt 0 ] && ok "Rebuilt $done_n launcher(s)."
   dim "  Profile data was not touched — every account stays signed in."
+  # A failure is a failure: this printed a green tick and exited 0 even when
+  # nothing could be rebuilt, so a script never noticed.
+  if [ "$failed" -gt 0 ]; then
+    warn "$failed launcher(s) could not be rebuilt."
+    return 1
+  fi
   return 0
 }
 
@@ -1256,6 +1845,9 @@ ${C_BOLD}COMMANDS${C_RESET}
                        or a hex value like 2E7DF6
       --no-badge       Use the app's own icon unchanged, just with your name
       --seed           Copy Claude Desktop's MCP server config into the new profile
+      --main           A launcher for your ORIGINAL account instead (name: Main).
+                       While a profile runs, macOS treats it as the app itself,
+                       so the app's own icon only switches to that profile.
 
   list                 Show every profile, where its data lives, and what is running
                        Also spelled 'ls'.
@@ -1268,8 +1860,8 @@ ${C_BOLD}COMMANDS${C_RESET}
       --badge  X       New badge character
       --no-badge       Use the app's own icon, unchanged
   prune                Find profile data with no launcher pointing at it —
-                       what gets left behind when a launcher is deleted in
-                       Finder — and offer to remove it
+                       left when a launcher is deleted in Finder, or removed
+                       with rm without --purge — and offer to remove it
       -y, --yes        Skip the confirmation prompt
   rebuild NAME         Regenerate a launcher after the app moved or updated
       --all            Rebuild every profile
@@ -1284,6 +1876,7 @@ ${C_BOLD}EXAMPLES${C_RESET}
   aidentity setup
   aidentity add Claude --profile Work --color blue --seed
   aidentity add ChatGPT --profile Personal
+  aidentity add Claude --main
   aidentity list
   aidentity rename "Claude Work" Client
   aidentity set "Claude Work" --color purple
