@@ -43,8 +43,14 @@ Read this before deciding whether a finding is a bug.
   FileVault if you have it on — nothing more. A second profile is a second live
   session on your disk. Treat it accordingly.
 - **A launcher runs an app you already trust.** aidentity adds a
-  `--user-data-dir` argument to an app that is already installed. It does not
-  inject code into it.
+  `--user-data-dir` argument to an app that is already installed, plus any
+  per-profile settings you chose from a short allowlist. It does not inject
+  code into it. Before opening the app, the launcher removes variables such as
+  `NODE_OPTIONS` from the environment it was started with, and the first time
+  a new profile opens while the app already runs, it may show one dialog.
+- **Each profile folder holds a small restore record** (`.aidentity-profile.plist`)
+  that `aidentity restore` reads. Its contents are checked as if typed on the
+  command line.
 
 ## In scope
 
@@ -55,7 +61,10 @@ Read this before deciding whether a finding is a bug.
   window in bundle creation.
 - **The generated launcher**: anything that makes it execute a binary other
   than the app recorded in its `Info.plist`, or point at a data directory other
-  than the one recorded; an escaping failure in the embedded paths.
+  than the one recorded; an escaping failure in the embedded paths or settings;
+  a switch or variable outside the allowlist reaching the app.
+- **The restore record**: anything in it that `restore` acts on without the
+  checks a command-line value gets.
 - **The deletion logic** (`rm`, `--purge`, and the overwrite path in `add`):
   anything that removes or overwrites a bundle without the `AIdentityProfile`
   marker key, or deletes a path outside `$AIDENTITY_DATA_ROOT`. Symlink and

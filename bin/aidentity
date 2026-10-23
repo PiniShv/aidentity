@@ -589,6 +589,27 @@ EOF
   return 1
 }
 
+# The app's main executable, from its Info.plist.
+app_exe() {
+  local exe
+  exe=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$1/Contents/Info.plist" 2>/dev/null) || return 1
+  [ -n "$exe" ] || return 1
+  printf '%s' "$1/Contents/MacOS/$exe"
+}
+
+# Whether any copy of the app is running, on any account.
+app_running() {
+  local exe list line
+  exe=$(app_exe "$1") || return 1
+  list=$(ps -axww -o command= 2>/dev/null) || return 1
+  while IFS= read -r line; do
+    case "$line" in "$exe"|"$exe "*) return 0 ;; esac
+  done <<EOF
+$list
+EOF
+  return 1
+}
+
 # Whether the app is running on its own account, with no --user-data-dir: the
 # instance a --main launcher opens. Matched in the shell for the same reason as
 # above — a pipe into grep -q fails open on a long process list.
@@ -724,6 +745,7 @@ trap '_on_exit; exit 129' HUP
 # kind is "main" for a launcher that opens the app's own account (no data dir).
 build_launcher() {
   local src_app="$1" profile="$2" data_dir="$3" label="$4" letter="$5" hex="$6" kind="${7:-}"
+  local extras="${8:-}"
   local dst="$APPS_DIR/$label.app" rc
 
   # Only ever replace a bundle that is ours.
@@ -739,6 +761,10 @@ build_launcher() {
     return 1
   fi
 
+  # Every launch setting is checked here, wherever it came from: the command
+  # line, a launcher's own Info.plist, or a restore record someone could edit.
+  validate_extras "$extras" "$src_app" "$kind" || return 1
+
   mkdir -p "$APPS_DIR" 2>/dev/null || { warn "Could not create $APPS_DIR"; return 1; }
   if [ "$kind" != "main" ]; then
     # Owner-only, like the directories the apps create for themselves. Only
@@ -751,14 +777,14 @@ build_launcher() {
     || { BUILD_STAGE=""; warn "Could not write to $APPS_DIR"; return 1; }
 
   _assemble_launcher "$BUILD_STAGE/$label.app" "$src_app" "$profile" "$data_dir" \
-      "$label" "$letter" "$hex" "$kind" \
+      "$label" "$letter" "$hex" "$kind" "$extras" \
     && _swap_in "$BUILD_STAGE/$label.app" "$dst" "$BUILD_STAGE"
   rc=$?
   _cleanup_stage
   [ "$rc" -eq 0 ] || return 1
 
   if [ "$kind" != "main" ]; then
-    write_restore_record "$data_dir" "$profile" "$src_app" "$letter" "$hex" \
+    write_restore_record "$data_dir" "$profile" "$src_app" "$letter" "$hex" "$extras" \
       || warn "Could not write the restore record in $data_dir. The launcher works; 'aidentity restore' will not know this profile."
   fi
 
@@ -778,8 +804,8 @@ build_launcher() {
 # and moved into place, owner-only like the rest of the directory.
 RESTORE_RECORD=".aidentity-profile.plist"
 
-write_restore_record() { # data_dir, profile, target app, badge, colour
-  local dir="$1" tmp bid
+write_restore_record() { # data_dir, profile, target app, badge, colour, [extras]
+  local dir="$1" tmp bid extras="${6:-}"
   [ -d "$dir" ] || return 1
   bid=$(bundle_id "$3")
   tmp=$(mktemp "$dir/.aidentity-record.XXXXXX" 2>/dev/null) || return 1
@@ -793,6 +819,7 @@ write_restore_record() { # data_dir, profile, target app, badge, colour
 	<key>AIdentityTargetBundleID</key><string>$(xmlescape "$bid")</string>
 	<key>AIdentityBadge</key><string>$(xmlescape "$4")</string>
 	<key>AIdentityColor</key><string>$(xmlescape "$5")</string>
+	$(extras_plist_xml "$extras")
 	<key>AIdentityVersion</key><string>$AIDENTITY_VERSION</string>
 </dict>
 </plist>
@@ -805,6 +832,222 @@ PLIST
 }
 
 record_get() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/$RESTORE_RECORD" 2>/dev/null; }
+
+# ------------------------------------------------- per-profile launch settings
+#
+# Extra switches and environment variables a launcher hands its app, and
+# whether a VS Code-family app gets its own extensions folder. They travel as
+# one text value, a line per setting: "arg<TAB>--lang=de", "env<TAB>NAME=value",
+# "ext<TAB>1". validate_extras refuses a tab or line break inside a value, so
+# the format cannot be confused.
+TAB=$'\t'
+
+extras_lines() { # kind (arg, env or ext), extras -> that kind's values
+  local line
+  while IFS= read -r line; do
+    case "$line" in "$1$TAB"*) printf '%s\n' "${line#*"$TAB"}" ;; esac
+  done <<EOF
+$2
+EOF
+}
+
+plist_array_get() { # plist file, key -> one value per line
+  local i=0 v
+  while v=$(/usr/libexec/PlistBuddy -c "Print :$2:$i" "$1" 2>/dev/null); do
+    printf '%s\n' "$v"; i=$((i+1))
+  done
+}
+
+# The settings a launcher's Info.plist (or a restore record) was built with.
+extras_of() { # plist file
+  local v
+  while IFS= read -r v; do [ -n "$v" ] && printf 'arg%s%s\n' "$TAB" "$v"; done <<EOF
+$(plist_array_get "$1" AIdentityArgs)
+EOF
+  while IFS= read -r v; do [ -n "$v" ] && printf 'env%s%s\n' "$TAB" "$v"; done <<EOF
+$(plist_array_get "$1" AIdentityEnv)
+EOF
+  [ "$(/usr/libexec/PlistBuddy -c 'Print :AIdentityOwnExtensions' "$1" 2>/dev/null)" = "true" ] \
+    && printf 'ext%s1\n' "$TAB"
+  return 0
+}
+
+extras_plist_xml() { # extras -> the <key>…</key> entries that record them
+  local v
+  printf '<key>AIdentityArgs</key><array>'
+  while IFS= read -r v; do [ -n "$v" ] && printf '<string>%s</string>' "$(xmlescape "$v")"; done <<EOF
+$(extras_lines arg "$1")
+EOF
+  printf '</array><key>AIdentityEnv</key><array>'
+  while IFS= read -r v; do [ -n "$v" ] && printf '<string>%s</string>' "$(xmlescape "$v")"; done <<EOF
+$(extras_lines env "$1")
+EOF
+  printf '</array>'
+  [ -n "$(extras_lines ext "$1")" ] && printf '<key>AIdentityOwnExtensions</key><true/>'
+  return 0
+}
+
+# Launch settings are an allowlist. Many Chromium and Electron switches and
+# variables can hand the app to another program or switch off its protections,
+# and a launcher is one click for anyone at this Mac. Only settings with a
+# plain job pass, and each value must have the exact shape that job needs.
+ALLOWED_SWITCHES="--proxy-server --proxy-bypass-list --no-proxy-server --lang --locale --force-device-scale-factor --disable-gpu --disable-lcd-text"
+ALLOWED_ENV="HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY http_proxy https_proxy all_proxy no_proxy LANG LC_ALL LC_CTYPE LC_MESSAGES TZ"
+
+# A language tag: 2-3 lower-case letters, optionally "-" and 2-8 letters or
+# digits (de, pt-BR, zh-Hant).
+is_lang_tag() {
+  local base="${1%%-*}" rest=""
+  case "$1" in *-*) rest="${1#*-}" ;; esac
+  case "$base" in [a-z][a-z]|[a-z][a-z][a-z]) ;; *) return 1 ;; esac
+  case "$1" in *-) return 1 ;; esac
+  [ -z "$rest" ] && return 0
+  case "$rest" in *[!A-Za-z0-9]*) return 1 ;; esac
+  [ "${#rest}" -ge 2 ] && [ "${#rest}" -le 8 ]
+}
+
+# A proxy server or bypass list: the characters those lists use, nothing else.
+is_proxy_value() {
+  [ -n "$1" ] && [ "${#1}" -le 512 ] || return 1
+  case "$1" in *[!A-Za-z0-9:/._\;=*,\<\>@+-]*) return 1 ;; esac
+  return 0
+}
+
+validate_switch() {
+  local s="$1" name val=""
+  case "$s" in *[[:cntrl:]]*) warn "A switch cannot contain a tab, a line break or another control character."; return 1 ;; esac
+  case "$s" in
+    --[a-z]*) ;;
+    *) warn "'$s' is not a switch. A switch looks like --lang=de or --disable-gpu."; return 1 ;;
+  esac
+  name=${s#--}
+  case "$name" in *=*) val=${name#*=}; name=${name%%=*} ;; esac
+  case "$name" in
+    proxy-server|proxy-bypass-list)
+      is_proxy_value "$val" || { warn "--$name needs a proxy value, e.g. --$name=socks5://127.0.0.1:1080"; return 1; } ;;
+    no-proxy-server|disable-gpu|disable-lcd-text)
+      case "$s" in *=*) warn "--$name takes no value."; return 1 ;; esac ;;
+    lang|locale)
+      is_lang_tag "$val" || { warn "--$name needs a language code, e.g. --$name=de or --$name=pt-BR."; return 1; } ;;
+    force-device-scale-factor)
+      if ! printf '%s' "$val" | grep -Eq '^[0-9]{1,2}(\.[0-9]{1,3})?$' \
+         || ! awk -v v="$val" 'BEGIN { exit !(v >= 0.5 && v <= 4) }'; then
+        warn "--force-device-scale-factor needs a number from 0.5 to 4."; return 1
+      fi ;;
+    *)
+      warn "--$name is not one aidentity passes on. Allowed: $ALLOWED_SWITCHES."
+      return 1 ;;
+  esac
+  return 0
+}
+
+validate_env() {
+  local kv="$1" name val
+  case "$kv" in *[[:cntrl:]]*) warn "An environment value cannot contain a tab, a line break or another control character."; return 1 ;; esac
+  case "$kv" in
+    *=*) ;;
+    *) warn "'$kv' must look like NAME=value."; return 1 ;;
+  esac
+  name=${kv%%=*}; val=${kv#*=}
+  case "$name" in
+    ''|[0-9]*|*[!A-Za-z0-9_]*) warn "'$name' is not a variable name."; return 1 ;;
+  esac
+  case " $ALLOWED_ENV " in
+    *" $name "*) ;;
+    *) warn "$name is not one aidentity passes on. Allowed: $ALLOWED_ENV."; return 1 ;;
+  esac
+  case "$name" in
+    *_PROXY|*_proxy)
+      is_proxy_value "$val" || { warn "$name needs a proxy value, e.g. $name=http://proxy.example:8080"; return 1; } ;;
+    LANG|LC_*)
+      case "$val" in ''|*[!A-Za-z0-9_.@-]*) warn "$name needs a locale, e.g. $name=de_DE.UTF-8"; return 1 ;; esac ;;
+    TZ)
+      case "$val" in ''|*..*|*[!A-Za-z0-9_+:/-]*) warn "TZ needs a time zone, e.g. TZ=Europe/Berlin"; return 1 ;; esac ;;
+  esac
+  return 0
+}
+
+# VS Code and its forks keep extensions outside --user-data-dir, so profiles
+# share them unless each gets its own --extensions-dir. A fork is recognised by
+# its product.json naming the same bundle identifier as the app itself.
+is_vscode_family() {
+  local pj="$1/Contents/Resources/app/product.json" bid pbid
+  [ -f "$pj" ] || return 1
+  bid=$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$1/Contents/Info.plist" 2>/dev/null) || return 1
+  pbid=$(/usr/bin/plutil -extract darwinBundleIdentifier raw -o - "$pj" 2>/dev/null) || return 1
+  [ -n "$bid" ] && [ "$bid" = "$pbid" ] && \
+    /usr/bin/plutil -extract dataFolderName raw -o - "$pj" >/dev/null 2>&1
+}
+
+validate_extras() { # extras, target app, kind
+  local v
+  while IFS= read -r v; do [ -z "$v" ] || validate_switch "$v" || return 1; done <<EOF
+$(extras_lines arg "$1")
+EOF
+  while IFS= read -r v; do [ -z "$v" ] || validate_env "$v" || return 1; done <<EOF
+$(extras_lines env "$1")
+EOF
+  if [ -n "$(extras_lines ext "$1")" ]; then
+    if [ "${3:-}" = "main" ]; then
+      warn "--own-extensions applies to profiles, not to the original account."; return 1
+    fi
+    if ! is_vscode_family "$2"; then
+      warn "--own-extensions only applies to VS Code and its forks (Cursor, Kiro)."; return 1
+    fi
+  fi
+  return 0
+}
+
+# Stored settings that are no longer allowed — from an older version, a
+# hand-edited file, or an app that stopped being a VS Code fork — are dropped
+# with a note, so rebuild, restore and doctor --fix can still finish. New
+# settings from the command line are checked strictly instead.
+filter_extras() { # extras, target app, kind -> the allowed lines
+  local line
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    if validate_extras "$line" "$2" "$3" 2>/dev/null; then
+      printf '%s\n' "$line"
+    else
+      warn "Dropped a stored launch setting that is not allowed: ${line#*"$TAB"}"
+    fi
+  done <<EOF
+$1
+EOF
+}
+
+# Merge new settings into old ones, the newest winning: a switch replaces one
+# with the same name (--lang=fr replaces --lang=de; the app would only use the
+# last anyway), a variable replaces one with the same NAME, --proxy-server and
+# --no-proxy-server replace each other, and "ext" follows the last word.
+extras_merge() { # old extras, new extras (lines; "noext" clears ext)
+  local line out="" name
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    case "$line" in
+      "env$TAB"*)
+        name=${line#*"$TAB"}; name=${name%%=*}
+        out=$(printf '%s\n' "$out" | /usr/bin/grep -v "^env$TAB$name=" || true) ;;
+      "arg$TAB"*)
+        name=${line#*"$TAB"}; name=${name%%=*}
+        case "$name" in
+          --proxy-server|--no-proxy-server)
+            out=$(printf '%s\n' "$out" | /usr/bin/grep -v -e "^arg$TAB--proxy-server=" -e "^arg$TAB--no-proxy-server\$" || true) ;;
+          *)
+            out=$(printf '%s\n' "$out" | /usr/bin/grep -v -e "^arg$TAB$name=" -e "^arg$TAB$name\$" || true) ;;
+        esac ;;
+      "ext$TAB"*|"noext")
+        out=$(printf '%s\n' "$out" | /usr/bin/grep -v "^ext$TAB" || true)
+        [ "$line" = "noext" ] && continue ;;
+    esac
+    out="${out:+$out
+}$line"
+  done <<EOF
+$1
+$2
+EOF
+  printf '%s' "$out" | /usr/bin/grep -v '^$' || true
+}
 
 # Move a finished bundle into place. The old one is set aside, not deleted, and
 # put back if the new one cannot be moved in. Both moves are renames inside one
@@ -837,25 +1080,81 @@ _swap_in() { # new bundle, destination, staging dir
   return 0
 }
 
-_assemble_launcher() { # out, src_app, profile, data_dir, label, letter, hex, kind
+_assemble_launcher() { # out, src_app, profile, data_dir, label, letter, hex, kind, extras
   local dst="$1" src_app="$2" profile="$3" data_dir="$4" label="$5" letter="$6" hex="$7" kind="$8"
+  local extras="${9:-}" env_q="" args_q="" v exe_re=""
+  # A pattern for any running copy of the app: its main executable, at the
+  # start of the command line. Regex characters in the path are escaped.
+  v=$(app_exe "$src_app") && exe_re="^$(printf '%s' "$v" | sed 's/[][\.*^$+?(){}|]/\\&/g')( |\$)"
+  while IFS= read -r v; do [ -n "$v" ] && env_q="$env_q --env $(shquote "$v")"; done <<EOF
+$(extras_lines env "$extras")
+EOF
+  while IFS= read -r v; do [ -n "$v" ] && args_q="$args_q $(shquote "$v")"; done <<EOF
+$(extras_lines arg "$extras")
+EOF
+  if [ -n "$(extras_lines ext "$extras")" ]; then
+    args_q="$args_q --extensions-dir=$(shquote "$data_dir/extensions")"
+  fi
 
   mkdir -p "$dst/Contents/MacOS" "$dst/Contents/Resources" 2>/dev/null \
     || { warn "Could not create $dst"; return 1; }
 
-  # The launcher is a plain shell script in a plain bundle. No AppleScript, so
-  # there is no nested-quoting layer to get wrong. -n starts a new instance even
+  # The launcher is a plain shell script in a plain bundle. Every value it
+  # carries is written with shquote, and the one AppleScript (the sign-in
+  # guard) takes its words as arguments, never pasted into its source. -n
+  # starts a new instance even
   # when the app is already running. For a main launcher that is the whole
   # point: Launch Services sees every profile as the same app, so opening the
   # app itself only switches to whichever profile is already running.
   {
     printf '#!/bin/sh\n'
     printf '# Generated by aidentity %s. Safe to delete.\n' "$AIDENTITY_VERSION"
+    # `open` hands its own environment to the app, so a profile opened from a
+    # terminal inherited NODE_OPTIONS, ELECTRON_* or VSCODE_* (which overrides
+    # --extensions-dir). Drop those before opening. Names are read in the C
+    # locale: under UTF-8, sed stops at the first value that is not valid text.
+    cat <<'SCRUB'
+set --
+for name in $(/usr/bin/env | LC_ALL=C /usr/bin/sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p'); do
+  case "$name" in DYLD_*|LD_*|ELECTRON_*|NODE_*|VSCODE_*|CHROME_*|CHROMIUM_*|SSLKEYLOGFILE) set -- "$@" -u "$name" ;; esac
+done
+SCRUB
+    if [ "$kind" != "main" ] && [ -n "$exe_re" ]; then
+      # The sign-in guard. With several copies of one app running, macOS hands
+      # an opened link to the copy that started first, and a browser sign-in
+      # comes back as such a link. On a new profile's first open, while another
+      # copy runs, say so once and offer to cancel. It only warns: if the
+      # dialog cannot be shown, the profile opens anyway.
+      printf 'data=%s\n' "$(shquote "$data_dir")"
+      printf 'running=%s\n' "$(shquote "$exe_re")"
+      printf 'label=%s\n' "$(shquote "$label")"
+      printf 'name=%s\n' "$(shquote "$(bundle_name "$src_app")")"
+      cat <<'GUARD'
+if [ ! -e "$data/Local State" ] && [ ! -e "$data/Preferences" ] && [ ! -e "$data/Cookies" ] \
+   && [ ! -d "$data/Default" ] && /usr/bin/pgrep -qf -U "$(/usr/bin/id -u)" "$running"; then
+  answer=$(/usr/bin/osascript - "$label" "$name" 2>/dev/null <<'OSA'
+on run argv
+	set l to item 1 of argv
+	set a to item 2 of argv
+	try
+		display dialog "Opening " & l & " for the first time." & return & return & "Another " & a & " is already open. If " & a & " signs you in through your browser, macOS returns the sign-in to the " & a & " that started first, not to this one." & return & return & "To be safe, quit the other " & a & " windows, sign in here, then open them again." buttons {"Cancel", "Open Anyway"} default button "Open Anyway" with title "aidentity" with icon caution
+	on error number -128
+		return "cancel"
+	end try
+	return "open"
+end run
+OSA
+)
+  [ "$answer" = "cancel" ] && exit 0
+fi
+GUARD
+    fi
     if [ "$kind" = "main" ]; then
-      printf 'exec /usr/bin/open -na %s\n' "$(shquote "$src_app")"
+      printf 'exec /usr/bin/env "$@" /usr/bin/open -na %s%s%s\n' \
+        "$(shquote "$src_app")" "$env_q" "${args_q:+ --args$args_q}"
     else
-      printf 'exec /usr/bin/open -na %s --args --user-data-dir=%s\n' \
-        "$(shquote "$src_app")" "$(shquote "$data_dir")"
+      printf 'exec /usr/bin/env "$@" /usr/bin/open -na %s%s --args --user-data-dir=%s%s\n' \
+        "$(shquote "$src_app")" "$env_q" "$(shquote "$data_dir")" "$args_q"
     fi
   } > "$dst/Contents/MacOS/launcher" || { warn "Could not write the launcher script."; return 1; }
   chmod +x "$dst/Contents/MacOS/launcher"
@@ -893,6 +1192,7 @@ _assemble_launcher() { # out, src_app, profile, data_dir, label, letter, hex, ki
 	<key>AIdentityDataDir</key><string>$x_data</string>
 	<key>AIdentityBadge</key><string>$x_badge</string>
 	<key>AIdentityColor</key><string>$hex</string>
+	$(extras_plist_xml "$extras")
 	$x_main
 </dict>
 </plist>
@@ -930,6 +1230,12 @@ PLIST
   if command -v codesign >/dev/null 2>&1 && xcode-select -p >/dev/null 2>&1; then
     codesign --force --sign - "$dst" >/dev/null 2>&1 \
       || warn "Could not sign $label.app. It will still launch."
+  fi
+  # A proxy setting can carry a password: a launcher with settings is readable
+  # by its owner only.
+  if [ -n "$extras" ]; then
+    chmod 600 "$dst/Contents/Info.plist" && chmod 700 "$dst/Contents/MacOS/launcher" \
+      || { warn "Could not make $label.app owner-only."; return 1; }
   fi
   return 0
 }
@@ -996,6 +1302,14 @@ cmd_list() {
     else
       printf '   data     %s\n' "$(dim "$data")"
     fi
+    local ex sw envs
+    ex=$(extras_of "$app/Contents/Info.plist")
+    sw=$(extras_lines arg "$ex" | tr '\n' ' ')
+    # Names only: a value may be a token or a password.
+    envs=$(extras_lines env "$ex" | sed 's/=.*//' | tr '\n' ' ')
+    [ -n "$sw" ] && printf '   flags    %s\n' "${sw% }"
+    [ -n "$envs" ] && printf '   env      %s\n' "$(dim "${envs% } (values hidden)")"
+    [ -n "$(extras_lines ext "$ex")" ] && printf '   ext      %s\n' "$(dim "its own extensions folder, inside the profile folder")"
     info ""
   done
   if [ "$n" -eq 0 ]; then
@@ -1071,7 +1385,8 @@ cmd_rm() {
   if [ "$main" -eq 0 ] && [ "$purge" -eq 0 ] && [ -d "$data" ] && data_is_ours "$data" \
      && [ ! -f "$data/$RESTORE_RECORD" ]; then
     write_restore_record "$data" "$profile" "$target" \
-      "$(launcher_badge "$app" "$target" "$profile")" "$(launcher_color "$app" "$want")" || true
+      "$(launcher_badge "$app" "$target" "$profile")" "$(launcher_color "$app" "$want")" \
+      "$(extras_of "$app/Contents/Info.plist")" || true
   fi
 
   # Move it aside first, delete it second. A locked bundle (or one owned by
@@ -1323,7 +1638,7 @@ EOF
 }
 
 cmd_add() {
-  local app_arg="" profile="" badge="" color="" seed=0 no_badge=0 main=0
+  local app_arg="" profile="" badge="" color="" seed=0 no_badge=0 main=0 extras=""
 
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -1333,6 +1648,16 @@ cmd_add() {
       --no-badge)   no_badge=1; shift ;;
       --seed)       seed=1; shift ;;
       --main)       main=1; shift ;;
+      --arg)        [ -n "${2:-}" ] || die "--arg needs a switch, e.g.  --arg --lang=de"
+                    validate_switch "$2" || exit 1
+                    extras="${extras:+$extras
+}arg$TAB$2"; shift 2 ;;
+      --env)        [ -n "${2:-}" ] || die "--env needs NAME=value"
+                    validate_env "$2" || exit 1
+                    extras="${extras:+$extras
+}env$TAB$2"; shift 2 ;;
+      --own-extensions) extras="${extras:+$extras
+}ext${TAB}1"; shift ;;
       --)           shift; break ;;
       -*)           die "Unknown option for add: $1" ;;
       *)            [ -z "$app_arg" ] && app_arg="$1" || die "Unexpected argument: $1"; shift ;;
@@ -1362,7 +1687,7 @@ cmd_add() {
     app_arg="$src_app"
   fi
 
-  create_profile "$app_arg" "$profile" "$badge" "$color" "$seed" "$no_badge" "$main" || exit 1
+  create_profile "$app_arg" "$profile" "$badge" "$color" "$seed" "$no_badge" "$main" "$extras" || exit 1
 }
 
 # Resolve and vet the app a launcher would open. Prints its bundle path, or
@@ -1406,6 +1731,7 @@ main_launcher_for() {
 # main=1 builds a launcher for the app's own, original account instead.
 create_profile() {
   local app_arg="$1" profile="$2" badge="$3" color="$4" seed="$5" no_badge="${6:-0}" main="${7:-0}"
+  local extras="${8:-}"
 
   local src_app
   src_app=$(resolve_target_app "$app_arg") || return 1
@@ -1517,6 +1843,14 @@ create_profile() {
     hex=$(color_hex "$(auto_color "$label")")
   fi
 
+  # Launch settings an existing profile has are kept, new ones win, and a
+  # setting given twice counts once.
+  if [ "$existing_launcher" -eq 1 ]; then
+    extras=$(extras_merge "$(filter_extras "$(extras_of "$dst/Contents/Info.plist")" "$src_app" "$kind")" "$extras")
+  else
+    extras=$(extras_merge "" "$extras")
+  fi
+
   if [ -e "$APPS_DIR/$label.app" ] && ! is_our_launcher "$APPS_DIR/$label.app"; then
     warn "There is already something at $APPS_DIR/$label.app that aidentity did not create.
     Refusing to overwrite it. Pick a different profile name."
@@ -1533,7 +1867,7 @@ create_profile() {
   # "✓ Created" after a failed build.
   local had_data=0
   [ -n "$data_dir" ] && [ -d "$data_dir" ] && had_data=1
-  if ! build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" "$kind"; then
+  if ! build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" "$kind" "$extras"; then
     # Leave no empty directory behind for `prune` to report later.
     [ "$had_data" -eq 0 ] && [ -n "$data_dir" ] && rmdir "$data_dir" 2>/dev/null
     return 1
@@ -1581,6 +1915,10 @@ create_profile() {
   info "${C_BOLD}Next:${C_RESET}"
   printf '  1. Open it:      aidentity open "%s"\n' "$label"
   printf '  2. Sign in with the other account in the window that appears.\n'
+  if app_running "$src_app"; then
+    printf '     %s is open already: quit it for this first sign-in. A browser\n' "$app_name"
+    printf '     sign-in goes back to the %s that started first, not to this one.\n' "$app_name"
+  fi
   printf '  3. Keep it handy: drag %s from Finder onto your Dock.\n' "$(basename "$dst")"
   info ""
   dim "  Nothing to re-run when the app updates — the launcher holds no copy of it."
@@ -1849,7 +2187,8 @@ cmd_rename() {
     fi
   fi
 
-  if ! build_launcher "$src_app" "$to" "$new_data" "$new_label" "$badge" "$hex" "$kind"; then
+  if ! build_launcher "$src_app" "$to" "$new_data" "$new_label" "$badge" "$hex" "$kind" \
+       "$(filter_extras "$(extras_of "$app/Contents/Info.plist")" "$src_app" "$kind")"; then
     RENAME_UNDO=""
     if [ "$moved" -eq 1 ] && ! mv "$new_data" "$old_data" 2>/dev/null; then
       die "Could not build the renamed launcher, and could not move the profile back.
@@ -1882,19 +2221,37 @@ cmd_rename() {
 }
 
 cmd_set() {
-  local want="" badge="" color="" no_badge=0 changed=0
+  local want="" badge="" color="" no_badge=0 changed=0 add_extras="" clear_args=0 clear_env=0
   while [ $# -gt 0 ]; do
     case "$1" in
       --badge|-b) need_value "$1" "${2:-}"; badge="$2"; shift 2 ;;
       --color|--colour|-c) need_value "$1" "${2:-}"; color="$2"; shift 2 ;;
       --no-badge) no_badge=1; shift ;;
+      --arg) [ -n "${2:-}" ] || die "--arg needs a switch, e.g.  --arg --lang=de"
+             validate_switch "$2" || exit 1
+             add_extras="${add_extras:+$add_extras
+}arg$TAB$2"; shift 2 ;;
+      --env) [ -n "${2:-}" ] || die "--env needs NAME=value"
+             validate_env "$2" || exit 1
+             add_extras="${add_extras:+$add_extras
+}env$TAB$2"; shift 2 ;;
+      --clear-args) clear_args=1; shift ;;
+      --clear-env)  clear_env=1; shift ;;
+      --own-extensions)    add_extras="${add_extras:+$add_extras
+}ext${TAB}1"; shift ;;
+      --shared-extensions) add_extras="${add_extras:+$add_extras
+}noext"; shift ;;
       -*) die "Unknown option for set: $1" ;;
       *) [ -z "$want" ] && want="$1" || die "Unexpected argument: $1"; shift ;;
     esac
   done
-  [ -n "$want" ] || die "Usage: aidentity set \"<profile>\" [--color NAME] [--badge X] [--no-badge]"
-  [ -n "$badge" ] || [ -n "$color" ] || [ "$no_badge" -eq 1 ] \
-    || die "Nothing to change. Pass --color, --badge or --no-badge."
+  [ -n "$want" ] || die "Usage: aidentity set \"<profile>\" [--color NAME] [--badge X] [--no-badge]
+    [--arg SWITCH] [--env NAME=value] [--clear-args] [--clear-env]
+    [--own-extensions | --shared-extensions]"
+  [ -n "$badge" ] || [ -n "$color" ] || [ "$no_badge" -eq 1 ] || [ -n "$add_extras" ] \
+    || [ "$clear_args" -eq 1 ] || [ "$clear_env" -eq 1 ] \
+    || die "Nothing to change. Pass --color, --badge, --no-badge, --arg, --env,
+    --clear-args, --clear-env, --own-extensions or --shared-extensions."
 
   local app; app=$(launcher_for "$want") || exit 1
   want=$(bundle_name "$app")
@@ -1927,13 +2284,23 @@ cmd_set() {
       dim "  No badge was set, so --color added one: $new_badge"
     }
   fi
+  local extras settings_changed=0
+  extras=$(filter_extras "$(extras_of "$app/Contents/Info.plist")" "$src_app" "$kind")
+  if [ "$clear_args" -eq 1 ]; then extras=$(printf '%s\n' "$extras" | /usr/bin/grep -v "^arg$TAB" || true); changed=1; settings_changed=1; fi
+  if [ "$clear_env" -eq 1 ];  then extras=$(printf '%s\n' "$extras" | /usr/bin/grep -v "^env$TAB" || true); changed=1; settings_changed=1; fi
+  if [ -n "$add_extras" ]; then extras=$(extras_merge "$extras" "$add_extras"); changed=1; settings_changed=1; fi
   [ "$changed" -eq 1 ] || die "Nothing to change."
 
   # Only the launcher bundle is rewritten; the profile directory is untouched,
   # so the account stays signed in even if the app is open right now.
-  build_launcher "$src_app" "$profile" "$data_dir" "$want" "$new_badge" "$new_hex" "$kind" || exit 1
+  build_launcher "$src_app" "$profile" "$data_dir" "$want" "$new_badge" "$new_hex" "$kind" "$extras" || exit 1
   ok "Updated ${C_BOLD}$want${C_RESET}"
-  dim "  The signed-in account is untouched — only the icon changed."
+  if [ "$settings_changed" -eq 1 ]; then
+    dim "  The signed-in account is untouched. New launch settings apply the next time"
+    dim "  this profile opens; quit it first if it is open now."
+  else
+    dim "  The signed-in account is untouched — only the icon changed."
+  fi
 }
 
 # Profile directories in the data root that no launcher points at, one per
@@ -2023,7 +2390,9 @@ EOF
   hex=$(color_hex "$(record_get "$dir" AIdentityColor)" 2>/dev/null) \
     || hex=$(color_hex "$(auto_color "$label")")
 
-  build_launcher "$src" "$profile" "$dir" "$label" "$badge" "$hex" || return 1
+  # The record's launch settings go through build_launcher's checks like any.
+  build_launcher "$src" "$profile" "$dir" "$label" "$badge" "$hex" "" \
+    "$(filter_extras "$(extras_of "$dir/$RESTORE_RECORD")" "$src" "")" || return 1
   ok "Restored ${C_BOLD}$label${C_RESET} — it opens the same profile folder as before."
 }
 
@@ -2180,7 +2549,8 @@ rebuild_one() {
     dim  "    A colour or letter you picked yourself back then: aidentity set \"$label\" --color …"
   fi
 
-  if ! build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" "$kind"; then
+  if ! build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" "$kind" \
+       "$(filter_extras "$(extras_of "$app/Contents/Info.plist")" "$src_app" "$kind")"; then
     warn "$label: rebuild failed."
     return 1
   fi
@@ -2251,6 +2621,11 @@ ${C_BOLD}COMMANDS${C_RESET}
       --main           A launcher for your ORIGINAL account instead (name: Main).
                        While a profile runs, macOS treats it as the app itself,
                        so the app's own icon only switches to that profile.
+      --arg SWITCH     Pass a switch every launch: --proxy-server=…, --lang=de,
+                       --force-device-scale-factor=…, --disable-gpu (repeatable)
+      --env NAME=VAL   Set a proxy variable, LANG, LC_ALL, LC_CTYPE, LC_MESSAGES
+                       or TZ (repeatable)
+      --own-extensions VS Code, Cursor, Kiro: a separate extensions folder
 
   list                 Show every profile, where its data lives, and what is running
                        Also spelled 'ls'.
@@ -2262,6 +2637,8 @@ ${C_BOLD}COMMANDS${C_RESET}
       --color  NAME    New colour
       --badge  X       New badge character
       --no-badge       Use the app's own icon, unchanged
+      --arg, --env, --own-extensions   As on add; --clear-args, --clear-env
+                       and --shared-extensions undo them
   prune                Find profile data with no launcher pointing at it —
                        left when a launcher is deleted in Finder, or removed
                        with rm without --purge — and offer to remove it

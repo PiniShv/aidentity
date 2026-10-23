@@ -1634,6 +1634,149 @@ assert_no_dir "and makes no new one under the other root" "$SB/other-root/fake-h
 ai rm "Fake Hue" --purge -y
 
 
+group "launch settings: an allowlist, kept across rename, rebuild and restore"
+
+ai add "$ELECTRON_APP" --profile Flags --arg --lang=de --arg "--proxy-server=socks5://127.0.0.1:1080" \
+  --env "HTTPS_PROXY=http://proxy.example:8080"
+assert_rc "add accepts allowed switches and variables" 0 "$RUN_RC" "$RUN_OUT"
+FL_LAUNCHER="$APPS/Fake Flags.app/Contents/MacOS/launcher"
+FL_SRC=$(cat "$FL_LAUNCHER")
+assert_contains "the switch reaches the app" "$FL_SRC" "'--lang=de'"
+assert_contains "the variable reaches the app" "$FL_SRC" "--env 'HTTPS_PROXY=http://proxy.example:8080'"
+if sh -n "$FL_LAUNCHER" 2>/dev/null; then _pass "the launcher is valid sh"; else _fail "the launcher is valid sh" "sh -n failed"; fi
+ai list
+assert_contains "list shows the switches" "$RUN_OUT" "--lang=de"
+assert_contains "list names the variables" "$RUN_OUT" "HTTPS_PROXY (values hidden)"
+assert_not_contains "but never shows their values" "$RUN_OUT" "proxy.example"
+
+for bad in --remote-debugging-port=9222 -remote-debugging-port=9222 --inspect --no-sandbox \
+           --disable-web-security --js-flags=--x --lang=../x --force-device-scale-factor=9; do
+  ai add "$ELECTRON_APP" --profile Denied --arg "$bad"
+  assert_rc_nonzero "the switch [$bad] is refused" "$RUN_RC" "$RUN_OUT"
+done
+for bad in NODE_OPTIONS=--require=/x ELECTRON_RUN_AS_NODE=1 DYLD_INSERT_LIBRARIES=/x FOO=bar HOME=/tmp; do
+  ai add "$ELECTRON_APP" --profile Denied --env "$bad"
+  assert_rc_nonzero "the variable [$bad] is refused" "$RUN_RC" "$RUN_OUT"
+done
+assert_no_dir "no launcher is built for a refused setting" "$APPS/Fake Denied.app"
+
+ai set "Fake Flags" --env "HTTPS_PROXY=http://other.example:3128"
+assert_eq "set replaces a variable of the same name" "HTTPS_PROXY=http://other.example:3128" \
+  "$(/usr/libexec/PlistBuddy -c 'Print :AIdentityEnv:0' "$APPS/Fake Flags.app/Contents/Info.plist" 2>/dev/null)"
+ai rename "Fake Flags" Flagged
+assert_contains "rename keeps the switches" "$(cat "$APPS/Fake Flagged.app/Contents/MacOS/launcher")" "'--lang=de'"
+ai rebuild "Fake Flagged"
+assert_contains "rebuild keeps the switches" "$(cat "$APPS/Fake Flagged.app/Contents/MacOS/launcher")" "'--lang=de'"
+rm -rf "$APPS/Fake Flagged.app"
+ai restore "Fake Flagged"
+assert_contains "restore keeps the switches" "$(cat "$APPS/Fake Flagged.app/Contents/MacOS/launcher")" "'--lang=de'"
+ai set "Fake Flagged" --clear-args --clear-env
+assert_not_contains "set --clear-args removes the switches" "$(cat "$APPS/Fake Flagged.app/Contents/MacOS/launcher")" "--lang"
+assert_not_contains "set --clear-env removes the variables" "$(cat "$APPS/Fake Flagged.app/Contents/MacOS/launcher")" "HTTPS_PROXY"
+
+# A restore record is a file anyone with the folder can edit: its settings go
+# through the same allowlist.
+rm -rf "$APPS/Fake Flagged.app"
+/usr/libexec/PlistBuddy -c "Add :AIdentityArgs:0 string --remote-debugging-port=9222" \
+  "$DATA/fake-flagged/.aidentity-profile.plist" >/dev/null 2>&1
+ai restore "Fake Flagged"
+assert_rc "a record carrying a refused switch is still restored" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the refused switch is dropped, with a note" "$RUN_OUT" "Dropped a stored launch setting"
+assert_not_contains "and never reaches the launcher" \
+  "$(cat "$APPS/Fake Flagged.app/Contents/MacOS/launcher")" "remote-debugging"
+ai rm "Fake Flagged" --purge -y
+
+# Changed values replace old ones by switch name; the newest wins.
+ai add "$ELECTRON_APP" --profile Merge --arg --lang=de --arg --lang=de
+ai set "Fake Merge" --arg --lang=fr
+M_SRC=$(cat "$APPS/Fake Merge.app/Contents/MacOS/launcher")
+assert_contains "a new value replaces the old one" "$M_SRC" "'--lang=fr'"
+assert_not_contains "the old value is gone" "$M_SRC" "--lang=de"
+ai set "Fake Merge" --arg --lang=de
+assert_not_contains "setting an earlier value again applies it" \
+  "$(cat "$APPS/Fake Merge.app/Contents/MacOS/launcher")" "--lang=fr"
+assert_contains "and says when it applies" "$RUN_OUT" "next time"
+ai set "Fake Merge" --arg "--proxy-server=socks5://127.0.0.1:1080"
+ai set "Fake Merge" --arg --no-proxy-server
+assert_not_contains "--no-proxy-server replaces --proxy-server" \
+  "$(cat "$APPS/Fake Merge.app/Contents/MacOS/launcher")" "--proxy-server="
+assert_eq "a launcher with settings is owner-only" "600" \
+  "$(stat -f '%Lp' "$APPS/Fake Merge.app/Contents/Info.plist")"
+# A stored setting that is no longer allowed is dropped on rebuild, not fatal.
+/usr/libexec/PlistBuddy -c "Add :AIdentityArgs:0 string --inspect" \
+  "$APPS/Fake Merge.app/Contents/Info.plist" >/dev/null 2>&1
+ai rebuild "Fake Merge"
+assert_rc "rebuild drops a stored setting that is not allowed" 0 "$RUN_RC" "$RUN_OUT"
+assert_not_contains "and the launcher never carries it" \
+  "$(cat "$APPS/Fake Merge.app/Contents/MacOS/launcher")" "--inspect"
+ai rm "Fake Merge" --purge -y
+
+for bad in '--locale=ab-CDE$(id)' --force-device-scale-factor=1.0e308 --force-device-scale-factor=4.5 \
+           '--proxy-server=http://a --inspect' --lang=d; do
+  ai add "$ELECTRON_APP" --profile Shape --arg "$bad"
+  assert_rc_nonzero "the value in [$bad] is refused" "$RUN_RC" "$RUN_OUT"
+done
+for bad in 'TZ=/etc/../x' 'LANG=../x' 'LANG TZ=x' 'HTTPS_PROXY=http://a b'; do
+  ai add "$ELECTRON_APP" --profile Shape --env "$bad"
+  assert_rc_nonzero "the variable [$bad] is refused" "$RUN_RC" "$RUN_OUT"
+done
+ai add "$ELECTRON_APP" --profile Shape --arg --lang=pt-BR --arg --force-device-scale-factor=1.25 \
+  --env TZ=Europe/Berlin --env LANG=de_DE.UTF-8
+assert_rc "well-formed values are accepted" 0 "$RUN_RC" "$RUN_OUT"
+ai rm "Fake Shape" --purge -y
+
+ai add "$ELECTRON_APP" --profile Ext --own-extensions
+assert_rc_nonzero "--own-extensions is refused for an app that is not VS Code" "$RUN_RC" "$RUN_OUT"
+VSC_APP="$SRC/Codish.app"
+make_electron_app "$VSC_APP"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.codish" "$VSC_APP/Contents/Info.plist"
+mkdir -p "$VSC_APP/Contents/Resources/app"
+printf '{"darwinBundleIdentifier":"com.example.codish","dataFolderName":".codish"}\n' \
+  > "$VSC_APP/Contents/Resources/app/product.json"
+ai add "$VSC_APP" --profile Iso --own-extensions
+assert_rc "a VS Code-style app accepts --own-extensions" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "its launcher gets its own extensions folder" \
+  "$(cat "$APPS/Codish Iso.app/Contents/MacOS/launcher")" "--extensions-dir='$DATA/codish-iso/extensions'"
+ai rm "Codish Iso" --purge -y
+rm -rf "$VSC_APP"
+
+
+group "the generated launcher: sign-in guard and a clean environment"
+
+# The launcher is run here with pgrep, osascript and open swapped for stubs,
+# so nothing real is launched and no dialog is shown.
+GUARD_STUB="$SANDBOX/stub-guard"
+mkdir -p "$GUARD_STUB"
+printf '#!/bin/sh\nexit "${STUB_PGREP:-0}"\n' > "$GUARD_STUB/pgrep"
+printf '#!/bin/sh\necho "${STUB_ANSWER:-open}"\n' > "$GUARD_STUB/osascript"
+printf '#!/bin/sh\n{ echo "ARGS $*"; env; } > "%s/opened"\n' "$SANDBOX" > "$GUARD_STUB/open"
+chmod +x "$GUARD_STUB/pgrep" "$GUARD_STUB/osascript" "$GUARD_STUB/open"
+ai add "$ELECTRON_APP" --profile Guard
+G_DATA="$DATA/fake-guard"
+sed -e "s|/usr/bin/pgrep|$GUARD_STUB/pgrep|; s|/usr/bin/osascript|$GUARD_STUB/osascript|; s|/usr/bin/open|$GUARD_STUB/open|" \
+  "$APPS/Fake Guard.app/Contents/MacOS/launcher" > "$SANDBOX/guard-launcher.sh"
+run_guard() { rm -f "$SANDBOX/opened"; env "$@" /bin/sh "$SANDBOX/guard-launcher.sh"; }
+
+run_guard STUB_ANSWER=cancel
+assert_no_file "Cancel in the first-open dialog opens nothing" "$SANDBOX/opened"
+run_guard STUB_ANSWER=open
+assert_file "Open Anyway opens the profile" "$SANDBOX/opened"
+run_guard STUB_PGREP=1 STUB_ANSWER=cancel
+assert_file "with no other copy running there is no dialog" "$SANDBOX/opened"
+printf '{}' > "$G_DATA/Local State"
+run_guard STUB_ANSWER=cancel
+assert_file "a profile that was opened before has no dialog" "$SANDBOX/opened"
+run_guard "AA_BYTES=$(printf 'caf\351')" LC_ALL=en_US.UTF-8 \
+  NODE_OPTIONS=--require=/x VSCODE_PID=1 ELECTRON_RUN_AS_NODE=1 LANG=de_DE.UTF-8
+OPENED=$(cat "$SANDBOX/opened")
+assert_not_contains "NODE_OPTIONS never reaches the app, even beside a value that is not UTF-8" "$OPENED" "NODE_OPTIONS="
+assert_not_contains "VSCODE_* from the caller never reaches the app" "$OPENED" "VSCODE_PID="
+assert_not_contains "ELECTRON_* from the caller never reaches the app" "$OPENED" "ELECTRON_RUN_AS_NODE="
+assert_contains "ordinary variables still do" "$OPENED" "LANG=de_DE.UTF-8"
+assert_contains "and the profile directory is passed" "$OPENED" "--user-data-dir=$G_DATA"
+ai rm "Fake Guard" --purge -y
+
+
 group "install.sh end to end, against a stub curl"
 
 # A stub curl that serves this checkout instead of GitHub. It knows the two
