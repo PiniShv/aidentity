@@ -402,13 +402,13 @@ Changing the tile would mean copying the app and signing it again. That does not
 
 ## Commands
 
-Type `aidentity` and a command. Put a name that has a space in quotes, like `"Claude Work"`. Type `aidentity` on its own to see the built-in help. The output is plain text for people. There is no JSON output. Colour is off when the output is not a terminal, or when `NO_COLOR` is set.
+Type `aidentity` and a command. Put a name that has a space in quotes, like `"Claude Work"`. Type `aidentity` on its own to see the built-in help. The output is plain text for people. For scripts, [`list --json`](#for-scripts-list---json) prints the list as JSON. It is new after version 1.2.0. Colour is off when the output is not a terminal, or when `NO_COLOR` is set.
 
 | Command | Also spelled | What it does |
 |---|---|---|
 | [`setup`](#aidentity-setup) | `init`, `wizard` | Guided walkthrough. Start here. |
 | [`add [app]`](#aidentity-add) | | Create one profile directly. |
-| [`list`](#aidentity-list) | `ls` | Show every profile and whether it is running. |
+| [`list`](#aidentity-list) | `ls` | Show every profile and whether it is running. `--json` prints it for scripts. |
 | [`open NAME`](#aidentity-open) | | Open a profile from Terminal. |
 | [`rename OLD NEW`](#aidentity-rename) | `mv` | Rename a profile. It stays signed in. |
 | [`set NAME`](#aidentity-set) | `modify`, `edit` | Change a profile's look or launch settings. |
@@ -498,6 +498,45 @@ The status is one of these:
 - `app missing`: the app has moved or is gone. The line shows the `rebuild` command that fixes it. If the app was uninstalled, reinstall it first.
 
 `list` shows launch switches in full, and the *names* of variables, never their values.
+
+#### For scripts: `list --json`
+
+The plain list is for people, and its wording may change. A script, or another app that shows your profiles, should use `--json`. It prints the same profiles as one JSON array, with one object per launcher.
+
+```bash
+aidentity list --json
+```
+
+```json
+[
+  {"name":"Claude Work","app":"Claude","app_path":"/Applications/Claude.app","profile":"Work","data_dir":"/Users/you/Library/Application Support/aidentity/profiles/claude-work","main":false,"status":"running","badge":"W","color":"2E7DF6","built_by":"1.2.0","args":["--lang=de"],"env":["HTTPS_PROXY"],"own_extensions":false}
+]
+```
+
+Every object has every key, in this order:
+
+| Key | Value |
+|---|---|
+| `name` | The launcher's name. This is the name that `open`, `rename`, `set`, `rebuild` and `rm` take. |
+| `app` | The app's name. |
+| `app_path` | Where the app is. |
+| `profile` | The profile name. |
+| `data_dir` | The profile's data folder. `null` for a Main launcher. |
+| `main` | `true` for a Main launcher, otherwise `false`. |
+| `status` | One of the words above: `running`, `in use`, `signed out / new`, `app missing` or `not running`. |
+| `badge` | The badge character. `null` when the launcher uses the app's own icon. |
+| `color` | The badge colour: six hex digits, without `#`. |
+| `built_by` | The `aidentity` version that built the launcher. |
+| `args` | The launch switches, in full. |
+| `env` | The *names* of the variables, never their values. |
+| `own_extensions` | `true` when the profile has its own extensions folder. |
+
+`app`, `app_path` and `built_by` are `null` if the launcher does not record them.
+
+- Only JSON goes to standard output. Warnings go to standard error, and there is no colour, even in a terminal.
+- With no profiles, it prints `[]`. It exits with 0.
+- `list` refuses an option it does not know, so a mistyped `--json` fails instead of printing the plain list.
+- `--json` is new after version 1.2.0. Version 1.2.0 ignores it and prints the plain list. Run `aidentity version` to see which one you have.
 
 ### `aidentity open`
 
