@@ -27,7 +27,9 @@
 #
 # Environment overrides:
 #   AIDENTITY_INSTALL_DIR   install here instead of the default search
-#   AIDENTITY_REF           branch, tag or commit to install from (default: main)
+#   AIDENTITY_REF           branch, tag or commit to install from. The default is
+#                           the REF= line below: the latest release once one is
+#                           tagged (`make release` sets it), main before that.
 #
 # Uninstall:  https://raw.githubusercontent.com/PiniShv/aidentity/main/uninstall.sh
 #

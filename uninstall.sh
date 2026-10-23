@@ -33,7 +33,12 @@
 #
 # Environment overrides (match the ones aidentity uses):
 #   AIDENTITY_INSTALL_DIR   where the command was installed
+#   AIDENTITY_BIN_DIRS      colon-separated folders to look in for the command,
+#                           INSTEAD of the default folders and your PATH (the
+#                           test suite uses it so it can never find a real copy)
 #   AIDENTITY_APPS_DIR      where launchers live (default: ~/Applications)
+#   AIDENTITY_APP_DIRS      colon-separated app folders also searched for
+#                           launchers (default: /Applications:~/Applications)
 #   AIDENTITY_DATA_ROOT     where profile data lives
 #
 # MIT licensed. https://github.com/PiniShv/aidentity — contact@pinishv.com
@@ -222,6 +227,17 @@ tty_opens() { ( : < /dev/tty ) 2>/dev/null; }
 # A directory's identity, so two spellings of one directory compare equal.
 dir_id() { [ -d "$1" ] && /usr/bin/stat -L -f '%d:%i' "$1" 2>/dev/null; }
 
+# Splits a colon-separated folder list into DIRS. Globbing is off while it
+# splits, so a folder name with * or ? in it stays one literal entry instead of
+# turning into whatever it happens to match.
+split_dirs() {
+  local IFS=':'
+  set -f
+  # shellcheck disable=SC2206 # splitting on ':' is the point; globbing is off
+  DIRS=($1)
+  set +f
+}
+
 human_size() {
   [ -d "$1" ] || { printf 'empty'; return 0; }
   du -sh "$1" 2>/dev/null | awk '{print $1}' || printf '?'
@@ -231,30 +247,48 @@ human_size() {
 
 remove_binary() {
   local candidates="" dir found removed=0 blocked=0 p
+  local DIRS=()
+
+  # AIDENTITY_INSTALL_DIR is one folder, taken as it is, never split.
+  DIRS=("${AIDENTITY_INSTALL_DIR:-}" /usr/local/bin "$HOME/.local/bin" "$HOME/bin" /opt/homebrew/bin)
+  local use_path=1
+  # AIDENTITY_BIN_DIRS replaces the whole search, the PATH lookup included.
+  # Without it, running this script in a sandbox could still find a real copy
+  # in /usr/local/bin and delete it.
+  if [ -n "${AIDENTITY_BIN_DIRS:-}" ]; then
+    split_dirs "$AIDENTITY_BIN_DIRS"
+    use_path=0
+  fi
 
   # Everywhere it could plausibly be, plus wherever the shell currently finds it.
-  for dir in "${AIDENTITY_INSTALL_DIR:-}" /usr/local/bin "$HOME/.local/bin" "$HOME/bin" /opt/homebrew/bin; do
+  for dir in ${DIRS[@]+"${DIRS[@]}"}; do
     [ -n "$dir" ] || continue
     [ -f "${dir%/}/$BIN_NAME" ] || continue
     candidates="$candidates
 ${dir%/}/$BIN_NAME"
   done
 
-  found=$(command -v "$BIN_NAME" 2>/dev/null) || found=""
-  # Only an absolute path is a file we can reason about. A bare name or a
-  # relative hit means PATH holds something like '.', and rm would be aimed at
-  # the current directory.
-  case "$found" in
-    /*) candidates="$candidates
+  if [ "$use_path" -eq 1 ]; then
+    found=$(command -v "$BIN_NAME" 2>/dev/null) || found=""
+    # Only an absolute path is a file we can reason about. A bare name or a
+    # relative hit means PATH holds something like '.', and rm would be aimed
+    # at the current directory.
+    case "$found" in
+      /*) candidates="$candidates
 $found" ;;
-  esac
+    esac
+  fi
 
   # Deduplicate, keeping order.
   candidates=$(printf '%s\n' "$candidates" | awk 'NF && !seen[$0]++')
 
   if [ -z "$candidates" ]; then
     info "The aidentity command is not installed anywhere obvious."
-    dim "  Looked in: /usr/local/bin, ~/.local/bin, ~/bin, /opt/homebrew/bin, and your PATH."
+    if [ "$use_path" -eq 1 ]; then
+      dim "  Looked in: /usr/local/bin, ~/.local/bin, ~/bin, /opt/homebrew/bin, and your PATH."
+    else
+      dim "  Looked in: $AIDENTITY_BIN_DIRS"
+    fi
     info ""
     return 0
   fi
@@ -318,14 +352,16 @@ LAUNCHERS=(); LABELS=(); PROFILES=(); DATA_DIRS=(); ORPHANS=()
 LEFT_BEHIND=0
 
 # Every aidentity launcher worth removing, one path per line: the launcher
-# directory and folders inside it (followed with -H when it is a symlink),
-# /Applications, and what Spotlight knows under your home folder or
-# /Applications. Looking only at the top of the launcher directory listed a
-# filed-away launcher's data as "no launcher points at" and deleted it while
-# the launcher stayed. Our own hidden .aidentity-* folders and the Trash are
-# skipped. Every hit is still checked for the marker key before it is listed.
+# directory and folders inside it (followed with -H when it is a symlink), the
+# app folders (AIDENTITY_APP_DIRS, as aidentity itself searches them), and what
+# Spotlight knows inside those places or your home folder. Looking only at the
+# top of the launcher directory listed a filed-away launcher's data as "no
+# launcher points at" and deleted it while the launcher stayed. Our own hidden
+# .aidentity-* folders and the Trash are skipped. Every hit is still checked
+# for the marker key before it is listed.
 discover_launchers() {
-  local app
+  local app dir DIRS=()
+  split_dirs "${AIDENTITY_APP_DIRS:-/Applications:$HOME/Applications}"
   {
     # The top level by glob as well: find's -type d skips a launcher that is
     # itself a symlink, and its data would then look orphaned.
@@ -334,13 +370,24 @@ discover_launchers() {
     done
     find -H "$APPS_DIR" -maxdepth 3 -type d -name '.aidentity-*' -prune \
       -o -type d -name '*.app' -print -prune 2>/dev/null || true
-    find -H /Applications -maxdepth 2 -type d -name '*.app' -print -prune 2>/dev/null || true
+    for dir in ${DIRS[@]+"${DIRS[@]}"}; do
+      [ -n "$dir" ] && [ -d "$dir" ] || continue
+      find -H "$dir" -maxdepth 2 -type d -name '.aidentity-*' -prune \
+        -o -type d -name '*.app' -print -prune 2>/dev/null || true
+    done
     if command -v mdfind >/dev/null 2>&1; then
       mdfind "kMDItemCFBundleIdentifier == 'com.aidentity.*'" 2>/dev/null || true
     fi
   } | awk 'NF && !seen[$0]++' | while IFS= read -r app; do
     case "$app" in */.aidentity-*|*/.Trash/*|*/.Trashes/*) continue ;; esac
-    case "$app" in "$APPS_DIR"/*|"$HOME"/*|/Applications/*) ;; *) continue ;; esac
+    inside=0
+    case "$app" in "$APPS_DIR"/*|"$HOME"/*) inside=1 ;; esac
+    for dir in ${DIRS[@]+"${DIRS[@]}"}; do
+      # "/" as an app folder would make every Spotlight hit "inside" it.
+      [ -n "${dir%/}" ] || continue
+      case "$app" in "${dir%/}"/*) inside=1 ;; esac
+    done
+    [ "$inside" -eq 1 ] || continue
     is_our_launcher "$app" && printf '%s\n' "$app"
   done
   return 0

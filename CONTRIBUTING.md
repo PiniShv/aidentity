@@ -18,6 +18,10 @@ or your real profile data. If a test ever writes outside those two variables,
 that is a bug in the test, and a serious one — say so in the PR.
 
 Run the suite before you open a PR and again after review changes. It is fast.
+`make check` runs the lint, the suite and the source guards in
+`scripts/guards.sh` — the checks CI blocks on. CI also repeats the suite under a
+second bash and smoke-tests the CLI. Without shellcheck installed, `make lint`
+only checks syntax and says so.
 
 You can drive the script the same way by hand:
 

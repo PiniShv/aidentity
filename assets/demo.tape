@@ -3,9 +3,10 @@
 # Regenerate with:  bash assets/record-demo.sh
 #
 # Privacy: HOME, the app search path, the launcher directory and the profile
-# data root all point at a throwaway /tmp directory seeded with fixture apps.
-# The real machine is never scanned, so no installed-app list, no username, no
-# hostname and no real path can appear. The prompt is a bare "$".
+# data root all point at a throwaway temporary directory seeded with fixture
+# apps. The real machine is never scanned, so no installed-app list, username,
+# hostname or real path can appear. `aidentity doctor` does print the macOS and
+# bash versions. The prompt is a bare "$".
 
 Output aidentity-demo.gif
 

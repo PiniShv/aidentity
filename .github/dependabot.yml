@@ -1,0 +1,10 @@
+# Keep the pinned GitHub Actions current. CI pins each action to a commit SHA,
+# so updates arrive as reviewable pull requests instead of silently.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: ci

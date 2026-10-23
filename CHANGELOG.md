@@ -25,6 +25,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   folders no launcher points at. `doctor --fix` rebuilds stale launchers and
   makes profile folders owner-only.
 
+### Changed (for maintainers and contributors)
+
+- `make check` runs everything CI runs: lint, the test suite and the source
+  guards, which moved from inline CI shell into `scripts/guards.sh`. The
+  multi-byte guard now uses perl, so it also runs on macOS.
+- `make release VERSION=x.y.z` prepares a release: version, the installer's
+  default ref, the changelog heading and `SHA256SUMS`. `make formula` points
+  the formula at the pushed tag. `docs/homebrew-tap.md` lists the whole order
+  and test commands current Homebrew accepts.
+- The installer and uninstaller have end-to-end tests: install.sh against a
+  stub `curl`, uninstall.sh with every search path in the sandbox.
+  `AIDENTITY_BIN_DIRS` tells uninstall.sh exactly where to look for the
+  command, and its launcher search follows `AIDENTITY_APP_DIRS`.
+- CI pins `actions/checkout` to a commit (v7.0.1, which also drops the Node 20
+  deprecation warning), Dependabot keeps it current, pushes run only for
+  `main` and tags, and every job has a timeout. `make lint` fails on a missing
+  file and also covers `scripts/guards.sh` and `assets/record-demo.sh`.
+- `assets/record-demo.sh` records in a fresh temporary folder under
+  `/bin/bash`, and says which machine facts can appear (macOS and bash
+  versions, in `doctor`).
+
 ### Fixed
 
 - `add` with no `--profile` asks for the account name again. 1.1.0 lost the
