@@ -8,7 +8,7 @@ This is the full user guide for `aidentity`, a command-line tool that runs sever
 
 macOS runs an app only once, so you get one account at a time. To check your personal Claude, you sign out of your work Claude. `aidentity` gives each extra account a small launcher and its own data folder. Together they make a *profile*. Your work, personal and client accounts then open side by side.
 
-- **Verified with** Claude Desktop. It should also work with ChatGPT, Slack, VS Code and other apps built on Chromium (the engine inside Google Chrome) or Electron. See [Which apps work](#which-apps-work).
+- **Verified with** Claude Desktop. Also tested with ChatGPT, Slack, VS Code, Cursor, Notion and other apps built on Chromium (the engine inside Google Chrome) or Electron. See [Which apps work](#which-apps-work).
 - **Your real app is not changed.** It is never copied, patched or re-signed. See [Is this safe?](#is-this-safe)
 - **One shell script** (a text file of Terminal commands). Once installed, it makes no network calls, never uses `sudo` (admin rights) and runs nothing in the background.
 - **Set up once in Terminal.** After that, you open each account by clicking its icon, like any other app.
@@ -156,29 +156,38 @@ An app can take extra accounts if it is built on **Chromium** or **Electron**. C
 | App | Works | Notes |
 |---|---|---|
 | Claude Desktop | Verified | `com.anthropic.claudefordesktop`. Use `--seed` to copy your MCP server config into the new profile. |
-| ChatGPT | Detected | `com.openai.codex`. It looks native, but it is Chromium inside. |
-| Slack | Detected | Slack's own workspace switcher covers most cases. Profiles are for separate *accounts*. |
-| Visual Studio Code | Detected | Separate profiles get separate settings. Extensions are shared unless you use [`--own-extensions`](#per-profile-settings). |
-| Cursor | Detected | A fork of VS Code, so the same applies. |
-| Notion | Detected | |
-| Notion Calendar | Detected | |
-| Postman | Detected | |
-| Microsoft Teams (classic) | Detected | The classic Electron build only. |
+| ChatGPT | Tested | `com.openai.codex`. It looks native, but it is Chromium inside. |
+| Slack | Tested | Slack's own workspace switcher covers most cases. Profiles are for separate *accounts*. |
+| Visual Studio Code | Tested | Separate profiles get separate settings. Extensions are shared unless you use [`--own-extensions`](#per-profile-settings). Keep the profile name short: see below. |
+| Cursor | Tested | A fork of VS Code, so the same applies. |
+| Kiro | Tested | A fork of VS Code, so the same applies. |
+| Antigravity | Tested | |
+| Notion | Tested | |
+| Notion Calendar | Tested | |
+| Obsidian | Tested | |
+| Podman Desktop | Tested | |
+| Postman | Tested | |
 | Google Chrome | Detected | Chrome has built-in profiles. Use those first. |
 | Microsoft Edge | Detected | Built-in profiles are the better tool here too. |
 | Brave / Arc / Vivaldi / Comet | Detected | Browsers. Built-in profiles usually do the job better. |
-| Antigravity | Detected | |
-| Kiro | Detected | |
-| Podman Desktop | Detected | |
+| Microsoft Teams (classic) | **No** | It does not keep its data in the profile folder, so profiles would share one account. |
+| MiniMax Design | **No** | It does not keep its data in the profile folder, so profiles would share one account. |
 | ChatGPT Classic | **No** | `com.openai.chat`. A native Swift app. See below. |
 
-**Verified** means it was checked by hand, with two accounts signed in at once. **Detected** means the app has the Chromium or Electron structure that `aidentity` looks for, so the mechanism applies. Nobody has signed in to it twice by hand yet. If one of them misbehaves, [open an issue](https://github.com/PiniShv/aidentity/issues) and the table gets fixed.
+- **Verified** means two accounts were signed in at once, checked by hand.
+- **Tested** means a second copy started next to the first and kept its data in its own folder. Signing in to two accounts has not been checked by hand yet.
+- **Detected** means the app has the Chromium or Electron structure that `aidentity` looks for, but it has not been tested.
+- **No** means it cannot work: the app is native, or it ignores the separate folder.
+
+`aidentity apps` lists every app with the right structure, including the few that ignore the separate folder. If an app misbehaves, [open an issue](https://github.com/PiniShv/aidentity/issues) and the table gets fixed.
+
+**VS Code, Cursor and Kiro: keep the profile name short.** These apps put a small connection file inside the profile folder, and macOS limits how long its path can be. With a long profile name, the app quits right after it starts. A name of one or two short words is safe.
 
 There is no list of apps in the code. `aidentity` looks at how each app is built: it looks for `Electron Framework.framework`, or for a framework with Chromium helper apps inside. `apps` and `setup` look in `/Applications` and `~/Applications`. For an app somewhere else, give `add` the path to the `.app`.
 
 ### Genuinely native apps do not work
 
-Apps written in Swift or AppKit have no `--user-data-dir` option, because they have no Chromium inside to accept it. Without that option, `aidentity` has nothing to work with. **ChatGPT Classic** (`com.openai.chat`) is the example you are most likely to meet. The newer ChatGPT desktop app is Chromium inside, so `aidentity` detects it. The Classic one is native and cannot work.
+Apps written in Swift or AppKit have no `--user-data-dir` option, because they have no Chromium inside to accept it. Without that option, `aidentity` has nothing to work with. **ChatGPT Classic** (`com.openai.chat`) is the example you are most likely to meet. The newer ChatGPT desktop app is Chromium inside, so `aidentity` can run it as a separate copy. The Classic one is native and cannot work.
 
 `aidentity add` checks this first, refuses and explains why. It does not build a launcher that would quietly open a second window on the same account. Support for native apps is not planned for version 1.
 
@@ -849,7 +858,7 @@ Do these steps in order, one block at a time. Quit every profile first.
 
 Issues and pull requests are welcome at <https://github.com/PiniShv/aidentity>.
 
-The most useful help is a report on one specific app: which app, which version, and whether two accounts stayed signed in at once. That is how rows in the table move from "Detected" to "Verified". For a bug, paste the output of `aidentity doctor`, with private details removed.
+The most useful help is a report on one specific app: which app, which version, and whether two accounts stayed signed in at once. That is how rows in the table move to "Verified". For a bug, paste the output of `aidentity doctor`, with private details removed.
 
 If you change code, read [CONTRIBUTING.md](../CONTRIBUTING.md) first. In short:
 
