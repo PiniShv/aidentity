@@ -20,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (deleted in Finder, or removed with `rm` without `--purge`), still signed in.
   Each profile folder now keeps a small restore record for this. `rm` and
   `prune` point to it.
+- Per-profile launch settings: `add` and `set` take `--arg SWITCH` and
+  `--env NAME=value`, from an allowlist (proxy, language, display scale, GPU
+  switches; proxy, locale and time-zone variables). Anything else is refused,
+  because many switches can hand the app to another program or switch off
+  its protections. Settings survive rename, rebuild and restore and are
+  checked again each time; a stored one that is not allowed is dropped. A
+  launcher with settings is owner-only, and `list` shows variable names,
+  never values.
+- `--own-extensions` gives a VS Code, Cursor or Kiro profile its own
+  extensions folder.
+- A sign-in guard: the first time a new profile opens while another copy of
+  the app runs, its launcher warns once. macOS hands an opened link — such as
+  a browser sign-in — to the copy that started first, so the sign-in could
+  land in another profile.
 - `doctor` checks every profile: an older build, a moved or missing app, a
   folder other users can read, a missing restore record, a shared folder, and
   folders no launcher points at. `doctor --fix` rebuilds stale launchers and
@@ -61,6 +75,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   again; `q` stops.
 - `rebuild` and `rename` stripped the badge (and a chosen colour) from
   launchers built by 1.0.0. They now restore 1.0.0's defaults.
+- Launchers drop `NODE_OPTIONS`, `ELECTRON_*`, `VSCODE_*`, `DYLD_*` and similar
+  variables before opening the app. `open` passes its environment on, so a
+  profile opened from a terminal inherited them.
 - `prune` deleted the data of launchers that were moved out of the launcher
   folder, and of launchers that recorded the data root with a different
   spelling (a symlink, a trailing slash). It now looks for launchers more widely

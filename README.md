@@ -165,6 +165,9 @@ aidentity add Claude --profile Work --color blue --seed
 | `--no-badge` | Skip the badge entirely. The launcher gets the app's own icon, byte for byte unchanged, under the profile's name. The walkthrough asks this as a question and defaults to badges on. |
 | `--seed` | Claude Desktop only: copy your existing `claude_desktop_config.json` (your MCP servers) into the new profile. They diverge from that point on. |
 | `--main` | Build a launcher for your **original** account instead of a new one, named `<App> Main` unless you pass `--profile`. Pin it to your Dock in place of the app — see [Opening your original account](#opening-your-original-account-while-a-profile-runs). |
+| `--arg SWITCH` | Pass a switch to the app every time this profile opens. Repeatable. See [Per-profile settings](#per-profile-settings). |
+| `--env NAME=value` | Set an environment variable for this profile. Repeatable. |
+| `--own-extensions` | VS Code, Cursor and Kiro only: give this profile its own extensions folder instead of sharing yours. |
 
 The launcher is named `<App> <Profile>` — `aidentity add Claude --profile Work` produces `~/Applications/Claude Work.app`. That full string is the name you use with `open` and `rm`.
 
@@ -221,7 +224,7 @@ aidentity set "Claude Work" --badge W
 aidentity set "Claude Work" --no-badge
 ```
 
-`--color`, `--badge` and `--no-badge` take the same values as on `add`; at least one of them is required. Only the launcher bundle and the small restore record beside the profile are rewritten — the app's own data is never opened — so this is safe with the app running. Asking for a colour on a launcher that has no badge adds one back, using the first letter of the profile name.
+`--color`, `--badge`, `--no-badge`, `--arg`, `--env` and `--own-extensions` take the same values as on `add`; `--clear-args`, `--clear-env` and `--shared-extensions` undo them. At least one of them is required. A new `--env` value replaces one with the same name. Only the launcher bundle and the small restore record beside the profile are rewritten — the app's own data is never opened — so this is safe with the app running. Asking for a colour on a launcher that has no badge adds one back, using the first letter of the profile name.
 
 ### `aidentity prune`
 
@@ -337,6 +340,34 @@ A main launcher never touches the app's data: `rm --purge` does not delete it, a
 
 ---
 
+## Per-profile settings
+
+A profile can carry a few launch settings of its own — a proxy for a client's network, a language, a display scale:
+
+```bash
+aidentity add Claude --profile Client --arg --proxy-server=socks5://127.0.0.1:1080
+aidentity set "Claude Client" --arg --lang=de --env HTTPS_PROXY=http://proxy.example:8080
+aidentity add "Visual Studio Code" --profile Client --own-extensions
+```
+
+Only an allowlist gets through: a launcher is one click for anyone at this Mac, and many switches and variables can hand the app to another program or switch off its protections. Allowed switches: `--proxy-server`, `--proxy-bypass-list`, `--no-proxy-server`, `--lang`, `--locale`, `--force-device-scale-factor`, `--disable-gpu`, `--disable-lcd-text`. Allowed variables: the proxy ones (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`, also lower-case), `LANG`, `LC_ALL`, `LC_CTYPE`, `LC_MESSAGES`, `TZ`. Each value must have the exact shape its job needs, and the same check runs again on `rebuild`, `rename` and `restore`: a stored setting that is not allowed is dropped with a note, never passed on. Do not put passwords in launch settings; a launcher that carries settings is readable by you only, but it is still a plain file.
+
+The settings are stored in the launcher, and in the restore record inside the profile folder. `aidentity list` shows the switches and the names of the variables, never their values.
+
+VS Code and its forks keep extensions outside the profile folder, so by default every profile shares yours. `--own-extensions` gives the profile its own `extensions` folder inside its profile folder. aidentity recognises VS Code, Cursor and Kiro by their `product.json`.
+
+Every launcher also removes variables like `NODE_OPTIONS`, `ELECTRON_*` and `VSCODE_*` before it opens the app. `open` passes its own environment on, so a profile opened from a terminal used to inherit them.
+
+---
+
+## Signing in to a new profile
+
+When several copies of one app run, macOS hands an opened link to the copy that started **first**. A browser sign-in comes back as such a link, so signing in to a new profile while another copy runs can land the sign-in in the other profile.
+
+So the first time a new profile opens while another copy of the app runs, its launcher says so once and offers **Cancel** or **Open Anyway**. The safe order is to quit the other windows of that app, sign in to the new profile, then open the others again. After that first sign-in, each profile stays signed in on its own. `add` and `setup` print the same advice when the app is already open.
+
+---
+
 ## The rough edge: Dock tiles show the original app
 
 This is the one real cost, and it is worth knowing before you install.
@@ -352,13 +383,17 @@ Telling them apart in practice:
 
 Fixing this properly would mean copying and re-signing the app bundle. That was tried: an ad-hoc signature cannot claim the vendor's team ID, so the copy breaks keychain access and often will not launch at all. Keeping your app untouched is worth an ambiguous Dock label.
 
+**Clicking a profile that is already open.** Its launcher starts the app again with the same profile folder; the app sees its own copy already running, hands the click to it, and that copy comes forward — reopening its window if you had closed it. Bringing the running copy forward directly would skip that step, but a copy whose window was closed would come forward with no window at all, so the launcher keeps the handoff.
+
+Renaming a running copy from outside the app does not work either: macOS ignores the change. Only the app itself could rename its entry, and that would mean modifying it.
+
 ---
 
 ## Is this safe?
 
-**Your existing account and data are not touched.** `aidentity` never reads, moves or modifies your current profile. New profiles start empty in their own directory. Your original app keeps its account and its data. One thing does change: while a profile is running, clicking the app itself switches to that profile instead of opening your original account. A `--main` launcher fixes that — see [Opening your original account](#opening-your-original-account-while-a-profile-runs).
+**Your existing account and data are not touched.** `aidentity` never reads, moves or modifies your current profile. New profiles start in their own directory, empty except for a small restore record. Your original app keeps its account and its data. One thing does change: while a profile is running, clicking the app itself switches to that profile instead of opening your original account. A `--main` launcher fixes that — see [Opening your original account](#opening-your-original-account-while-a-profile-runs).
 
-**The app is never copied, patched or re-signed.** The launcher is a three-line shell script in a hand-written `.app` bundle that calls `open -na` on the app already installed. Because the real bundle is untouched, its Apple signature stays valid, its keychain access groups keep working (SSO, passkeys) and its auto-updater keeps updating it.
+**The app is never copied, patched or re-signed.** The launcher is a short shell script in a hand-written `.app` bundle that calls `open -na` on the app already installed. Because the real bundle is untouched, its Apple signature stays valid, its keychain access groups keep working (SSO, passkeys) and its auto-updater keeps updating it.
 
 **Every launcher is marked, and nothing unmarked is ever touched.** Each bundle `aidentity` builds carries a custom `Info.plist` key, `AIdentityProfile`. Any command that modifies or deletes a bundle checks for that key first and refuses without it. That is what makes a profile named after a real app harmless: if `~/Applications/Claude Work.app` existed and `aidentity` did not create it, `add` refuses to overwrite it and `rm` refuses to delete it.
 
