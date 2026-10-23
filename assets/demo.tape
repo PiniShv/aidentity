@@ -4,9 +4,9 @@
 #
 # Privacy: HOME, the app search path, the launcher directory and the profile
 # data root all point at a throwaway temporary directory seeded with fixture
-# apps. The real machine is never scanned, so no installed-app list, username,
-# hostname or real path can appear. `aidentity doctor` does print the macOS and
-# bash versions. The prompt is a bare "$".
+# apps. The real machine is never scanned, and no command that prints machine
+# details (such as `doctor`) is recorded, so no app list, username, hostname,
+# path or version can appear. The prompt is a bare "$".
 
 Output aidentity-demo.gif
 
@@ -26,7 +26,7 @@ Enter
 Sleep 1s
 Show
 
-Type "# One Mac, one Claude — until now."
+Type "# One Mac, one Claude: until now."
 Enter
 Sleep 1500ms
 
@@ -46,7 +46,15 @@ Type "aidentity add ChatGPT --profile Work --color teal"
 Enter
 Sleep 3s
 
-Type "# Three accounts, three launchers, three separate sessions."
+Type "# And one for your original account, so Claude.app is never in the way."
+Enter
+Sleep 1500ms
+
+Type "aidentity add Claude --main"
+Enter
+Sleep 3s
+
+Type "# Three extra accounts and your original one, each in its own window."
 Enter
 Sleep 1500ms
 
@@ -54,7 +62,7 @@ Type "aidentity list"
 Enter
 Sleep 4s
 
-Type "# Rename one — the account stays signed in."
+Type "# Rename one: the account stays signed in."
 Enter
 Sleep 1500ms
 
@@ -70,7 +78,15 @@ Type "aidentity set 'Claude Client' --color purple"
 Enter
 Sleep 2500ms
 
-Type "aidentity doctor"
+Type "# Deleted a launcher by mistake? Its account is still there."
+Enter
+Sleep 1500ms
+
+Type "aidentity rm 'Claude Client' -y"
+Enter
+Sleep 2500ms
+
+Type "aidentity restore 'Claude Client'"
 Enter
 Sleep 3500ms
 

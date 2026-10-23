@@ -4,10 +4,10 @@
 #
 # HOME, the app search path, the launcher directory and the data root are all
 # redirected into a fresh temporary directory seeded with fixture .app bundles.
-# The real /Applications is never read, so the recording cannot show an app
-# list, a username, a hostname or a real path. Two facts about the machine do
-# appear, because `aidentity doctor` prints them: the macOS version and the
-# bash version. The script runs under /bin/bash, the 3.2 every Mac has.
+# The real /Applications is never read, and the tape records no command that
+# prints machine details (such as `doctor`), so the recording cannot show an
+# app list, a username, a hostname, a real path or a version. The script runs
+# under /bin/bash, the 3.2 every Mac has.
 #
 # Requires: vhs (brew install vhs), rsvg-convert (brew install librsvg), ffmpeg.
 set -euo pipefail
@@ -19,8 +19,10 @@ for tool in vhs rsvg-convert ffmpeg iconutil; do
 done
 
 # A fresh directory each run, removed on exit. A fixed /tmp path that is
-# rm -rf'd first would delete whatever someone else had put there.
-D=$(mktemp -d "${TMPDIR:-/tmp}/aidentity-demo.XXXXXX")
+# rm -rf'd first would delete whatever someone else had put there. It sits in
+# /tmp, not $TMPDIR: the recording prints these paths, and $TMPDIR is a
+# per-user folder whose name is specific to this machine.
+D=$(mktemp -d /tmp/aidentity-demo.XXXXXX)
 trap 'rm -rf "$D"' EXIT
 
 mkdir -p "$D/Apps" "$D/Applications" "$D/data" "$D/f.iconset"
