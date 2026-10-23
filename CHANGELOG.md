@@ -16,6 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   original account. `setup` offers one per app. `rm --purge` and `rename` never
   touch the app's own data.
 - `list` shows `app missing` with the fix when a launcher's app has moved.
+- `aidentity restore` rebuilds the launcher of a profile whose launcher is gone
+  (deleted in Finder, or removed with `rm` without `--purge`), still signed in.
+  Each profile folder now keeps a small restore record for this. `rm` and
+  `prune` point to it.
+- `doctor` checks every profile: an older build, a moved or missing app, a
+  folder other users can read, a missing restore record, a shared folder, and
+  folders no launcher points at. `doctor --fix` rebuilds stale launchers and
+  makes profile folders owner-only.
 
 ### Fixed
 
@@ -46,6 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renaming only the capitals of a name (`work` → `Work`) is allowed. A default
   badge letter now follows the new name.
 - `rebuild` exits non-zero when a launcher could not be rebuilt.
+- Adding a profile that already exists keeps its badge and colour, and says
+  "Updated" instead of "Created".
+- A relative `AIDENTITY_DATA_ROOT` such as `../profiles` was recorded with its
+  `..`, so purge, rename and prune refused the profiles it made. Both
+  directories are now cleaned up on paper when the tool starts.
 - `setup`, `add` and the installer test whether a terminal can really be opened.
   `/dev/tty` reads as accessible on every Mac, so "needs a terminal" never fired
   — and `make test` hung silently in a real terminal, waiting for a key.

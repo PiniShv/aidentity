@@ -27,11 +27,30 @@ MARKER_KEY="AIdentityProfile"
 APPS_DIR="${AIDENTITY_APPS_DIR:-$HOME/Applications}"
 DATA_ROOT="${AIDENTITY_DATA_ROOT:-$HOME/Library/Application Support/aidentity/profiles}"
 
-# Both are overridable, and a relative value would be recorded verbatim in a
-# launcher's Info.plist — where it later resolves against whatever directory
-# the tool happens to run from. Anchor them once, here.
-case "$APPS_DIR"  in /*) ;; *) APPS_DIR="$PWD/${APPS_DIR#./}" ;; esac
-case "$DATA_ROOT" in /*) ;; *) DATA_ROOT="$PWD/${DATA_ROOT#./}" ;; esac
+# Make a path absolute and drop ".", "..", "//" and a trailing "/", on paper
+# only — nothing on disk is read. Both directories below are overridable, and a
+# relative value was recorded verbatim in a launcher's Info.plist, where it
+# later resolved against whatever directory the tool ran from. Anchoring alone
+# was not enough: "../profiles" became ".../sub/../profiles", which the purge
+# guard rightly refuses (no dot segments), so purge, rename and prune refused
+# every profile made with it.
+normpath() {
+  local p="$1" out="" seg oldifs="$IFS"
+  case "$p" in /*) ;; *) p="$PWD/$p" ;; esac
+  IFS='/'; set -f
+  for seg in $p; do
+    case "$seg" in
+      ''|.) ;;
+      ..) out="${out%/*}" ;;
+      *) out="$out/$seg" ;;
+    esac
+  done
+  set +f; IFS="$oldifs"
+  printf '%s' "${out:-/}"
+}
+
+APPS_DIR=$(normpath "$APPS_DIR")
+DATA_ROOT=$(normpath "$DATA_ROOT")
 
 # ---------------------------------------------------------------- output --
 
@@ -738,12 +757,54 @@ build_launcher() {
   _cleanup_stage
   [ "$rc" -eq 0 ] || return 1
 
+  if [ "$kind" != "main" ]; then
+    write_restore_record "$data_dir" "$profile" "$src_app" "$letter" "$hex" \
+      || warn "Could not write the restore record in $data_dir. The launcher works; 'aidentity restore' will not know this profile."
+  fi
+
   # Nudge Launch Services so the icon and name appear immediately.
   local lsreg="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
   [ -x "$lsreg" ] && "$lsreg" -f "$dst" >/dev/null 2>&1
   touch "$dst"
   return 0
 }
+
+# A small record inside each profile directory of what its launcher was:
+# profile name, target app, badge, colour. The directory outlives the launcher —
+# a launcher deleted in Finder, or removed with `rm` without --purge — and with
+# this record `aidentity restore` can rebuild the launcher instead of `prune`
+# only offering to delete a signed-in session. Chromium and Electron ignore a
+# file they do not know in their data directory. Written to a temporary name
+# and moved into place, owner-only like the rest of the directory.
+RESTORE_RECORD=".aidentity-profile.plist"
+
+write_restore_record() { # data_dir, profile, target app, badge, colour
+  local dir="$1" tmp bid
+  [ -d "$dir" ] || return 1
+  bid=$(bundle_id "$3")
+  tmp=$(mktemp "$dir/.aidentity-record.XXXXXX" 2>/dev/null) || return 1
+  cat > "$tmp" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>$MARKER_KEY</key><string>$(xmlescape "$2")</string>
+	<key>AIdentityTargetApp</key><string>$(xmlescape "$3")</string>
+	<key>AIdentityTargetBundleID</key><string>$(xmlescape "$bid")</string>
+	<key>AIdentityBadge</key><string>$(xmlescape "$4")</string>
+	<key>AIdentityColor</key><string>$(xmlescape "$5")</string>
+	<key>AIdentityVersion</key><string>$AIDENTITY_VERSION</string>
+</dict>
+</plist>
+PLIST
+  if plutil -lint "$tmp" >/dev/null 2>&1 && chmod 600 "$tmp" && mv -f "$tmp" "$dir/$RESTORE_RECORD"; then
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+record_get() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/$RESTORE_RECORD" 2>/dev/null; }
 
 # Move a finished bundle into place. The old one is set aside, not deleted, and
 # put back if the new one cannot be moved in. Both moves are renames inside one
@@ -1005,6 +1066,14 @@ cmd_rm() {
     [ "$reply" = "yes" ] || die "Cancelled."
   fi
 
+  # Launchers built before restore records existed get one now, while the
+  # launcher still says what it was — so the hint below always works.
+  if [ "$main" -eq 0 ] && [ "$purge" -eq 0 ] && [ -d "$data" ] && data_is_ours "$data" \
+     && [ ! -f "$data/$RESTORE_RECORD" ]; then
+    write_restore_record "$data" "$profile" "$target" \
+      "$(launcher_badge "$app" "$target" "$profile")" "$(launcher_color "$app" "$want")" || true
+  fi
+
   # Move it aside first, delete it second. A locked bundle (or one owned by
   # someone else) survived rm -rf with its Info.plist gone — no longer
   # recognisable as ours, so its data then looked orphaned — and this still
@@ -1050,21 +1119,26 @@ cmd_rm() {
   else
     # `aidentity rm NAME --purge` cannot work any more — that launcher is gone,
     # which is what this used to suggest. These two do.
-    local app_ref; app_ref=$(bundle_name "$target")
-    [ "$(resolve_app "$app_ref" 2>/dev/null)" = "$target" ] || app_ref="$target"
     dim "  Profile data kept at: $data"
-    dim "  To use this account again:  aidentity add \"$app_ref\" --profile \"$profile\""
+    if [ -f "$data/$RESTORE_RECORD" ]; then
+      dim "  To use this account again:  aidentity restore \"$want\""
+    else
+      local app_ref; app_ref=$(bundle_name "$target")
+      [ "$(resolve_app "$app_ref" 2>/dev/null)" = "$target" ] || app_ref="$target"
+      dim "  To use this account again:  aidentity add \"$app_ref\" --profile \"$profile\""
+    fi
     dim "  To delete the data:         aidentity prune"
   fi
 }
 
 # Other launchers in the launcher directory that point at the same data
 # directory as $1, however it is spelled. Prints their names, comma-separated.
-launchers_sharing() {
+launchers_sharing() { # data dir, [a launcher to leave out]
   local id app d names=""
   id=$(dir_id "$1") || return 0
   for app in "$APPS_DIR"/*.app; do
     [ -d "$app" ] || continue
+    [ -n "${2:-}" ] && [ "$app" -ef "$2" ] && continue
     is_our_launcher "$app" || continue
     d=$(plist_get "$app" "AIdentityDataDir")
     [ "$(dir_id "$d")" = "$id" ] && names="${names:+$names, }$(bundle_name "$app")"
@@ -1072,8 +1146,98 @@ launchers_sharing() {
   printf '%s' "$names"
 }
 
+# Find a moved app again by its name, accepting only a real Chromium or
+# Electron .app that is not one of our launchers. resolve_app alone also
+# returns plain folders — and given an empty name, an app folder itself — so a
+# launcher with a damaged plist was "fixed" into opening /Applications.
+refind_app() {
+  local name found
+  [ -n "$1" ] || return 1
+  name=$(bundle_name "$1")
+  [ -n "$name" ] || return 1
+  found=$(resolve_app "$name" 2>/dev/null) || return 1
+  case "$found" in *.app) ;; *) return 1 ;; esac
+  is_our_launcher "$found" && return 1
+  is_chromium_app_deep "$found" || return 1
+  printf '%s' "$found"
+}
+
+# What is wrong with one launcher: one finding per line, "fix<TAB>message" for
+# what `doctor --fix` repairs and "warn<TAB>message" for what needs a person.
+launcher_findings() {
+  local app="$1" label src data ver perms others tab
+  tab=$(printf '\t')
+  label=$(bundle_name "$app")
+  src=$(plist_get "$app" AIdentityTargetApp)
+  data=$(plist_get "$app" AIdentityDataDir)
+  ver=$(plist_get "$app" CFBundleShortVersionString)
+  if [ -z "$src" ]; then
+    printf 'warn%sit records no app — remove it and add the profile again\n' "$tab"
+  elif [ ! -d "$src" ]; then
+    if [ -n "$(refind_app "$src")" ]; then
+      printf 'fix%sits app moved; a rebuild finds it again\n' "$tab"
+    else
+      printf 'warn%sits app is gone: %s — reinstall it, then: aidentity rebuild "%s"\n' "$tab" "$src" "$label"
+    fi
+  elif ! is_chromium_app "$src"; then
+    printf 'warn%s%s no longer looks like a Chromium or Electron app\n' "$tab" "$(bundle_name "$src")"
+  fi
+  if is_legacy_launcher "$app"; then
+    printf 'fix%sbuilt by aidentity 1.0.0\n' "$tab"
+  elif [ "$ver" != "$AIDENTITY_VERSION" ]; then
+    printf 'fix%sbuilt by aidentity %s; a rebuild picks up %s\n' "$tab" "${ver:-(unknown)}" "$AIDENTITY_VERSION"
+  fi
+  [ -x "$app/Contents/MacOS/launcher" ] || printf 'fix%sits launcher script is missing\n' "$tab"
+  is_main_launcher "$app" && return 0
+  if [ -z "$data" ]; then
+    printf 'warn%sit records no profile folder\n' "$tab"; return 0
+  fi
+  if ! data_is_ours "$data"; then
+    printf 'warn%sits profile folder is outside the aidentity data folder: %s\n' "$tab" "$data"; return 0
+  fi
+  if [ ! -d "$data" ]; then
+    printf 'warn%sits profile folder is gone, so it opens signed out\n' "$tab"; return 0
+  fi
+  [ -f "$data/$RESTORE_RECORD" ] || printf 'fix%sno restore record yet (made by an older aidentity)\n' "$tab"
+  perms=$(/usr/bin/stat -f '%Lp' "$data" 2>/dev/null)
+  [ "$perms" = "700" ] || printf 'fix%sother users can read its profile folder (mode %s)\n' "$tab" "$perms"
+  others=$(launchers_sharing "$data" "$app")
+  [ -z "$others" ] || printf 'warn%sshares its profile folder with: %s\n' "$tab" "$others"
+  return 0
+}
+
+# Repair what launcher_findings marks "fix": a rebuild for anything about the
+# launcher itself, chmod 700 for the profile folder's mode. Profile data inside
+# the folder is never read or changed.
+fix_launcher() {
+  local app="$1" findings data rebuild=0 rc=0
+  findings=$(launcher_findings "$app")
+  case "$findings" in
+    *"fix"$'\t'"its app moved"*|*"fix"$'\t'"built by"*|*"fix"$'\t'"its launcher script"*|*"fix"$'\t'"no restore record"*) rebuild=1 ;;
+  esac
+  data=$(plist_get "$app" AIdentityDataDir)
+  case "$findings" in
+    *"fix"$'\t'"other users can read"*)
+      if data_is_ours "$data" && [ -d "$data" ]; then chmod 700 "$data" || rc=1; fi ;;
+  esac
+  # A launcher whose folder lies outside the data root needs a person: a
+  # rebuild would recreate that folder wherever the plist says.
+  if [ -n "$data" ] && ! data_is_ours "$data"; then rebuild=0; fi
+  # Its notes (an app that moved, a 1.0.0 badge reset) are worth seeing.
+  if [ "$rebuild" -eq 1 ]; then rebuild_one "$app" | sed 's/^/    /' || rc=1; fi
+  return "$rc"
+}
+
 cmd_doctor() {
-  local problems=0
+  local problems=0 fixable=0 fix=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --fix) fix=1; shift ;;
+      -*) die "Unknown option for doctor: $1" ;;
+      *) die "Unexpected argument: $1" ;;
+    esac
+  done
+
   info "${C_BOLD}aidentity doctor${C_RESET}"
   info ""
   printf '  macOS               %s\n' "$(sw_vers -productVersion 2>/dev/null || echo unknown)"
@@ -1099,11 +1263,62 @@ cmd_doctor() {
   printf '  compatible apps     %s found\n' "$n"
   [ "$n" -eq 0 ] && { warn "No Chromium/Electron apps detected."; problems=$((problems+1)); }
 
-  local p; p=$(for a in "$APPS_DIR"/*.app; do is_our_launcher "$a" && echo x; done 2>/dev/null | wc -l | tr -d ' ')
-  printf '  profiles            %s\n' "$p"
+  local launchers=() app
+  for app in "$APPS_DIR"/*.app; do
+    [ -d "$app" ] || continue
+    is_our_launcher "$app" && launchers+=("$app")
+  done
+  printf '  profiles            %s\n' "${#launchers[@]}"
+
+  # One row per launcher. `--fix` repairs first, then the rows show what is left.
+  if [ "${#launchers[@]}" -gt 0 ]; then
+    info ""
+    info "${C_BOLD}Profiles${C_RESET}"
+    local findings kind msg failed=0
+    for app in "${launchers[@]}"; do
+      findings=$(launcher_findings "$app")
+      if [ "$fix" -eq 1 ] && [ -n "$findings" ] && printf '%s\n' "$findings" | grep -q '^fix'; then
+        if fix_launcher "$app"; then
+          printf '  %s✓%s %s %s\n' "$C_GREEN" "$C_RESET" "$(bundle_name "$app")" "$(dim "— fixed")"
+        else
+          failed=$((failed+1))
+        fi
+        findings=$(launcher_findings "$app")
+      fi
+      if [ -z "$findings" ]; then
+        [ "$fix" -eq 1 ] || printf '  %s✓%s %s\n' "$C_GREEN" "$C_RESET" "$(bundle_name "$app")"
+        continue
+      fi
+      while IFS="$(printf '\t')" read -r kind msg; do
+        [ -n "$kind" ] || continue
+        problems=$((problems+1))
+        [ "$kind" = "fix" ] && fixable=$((fixable+1))
+        printf '  %s!%s %s — %s\n' "$C_YELLOW" "$C_RESET" "$(bundle_name "$app")" "$msg"
+      done <<EOF
+$findings
+EOF
+    done
+  fi
+
+  local orphans; orphans=$(orphan_dirs | grep -c . || true)
+  if [ "${orphans:-0}" -gt 0 ]; then
+    info ""
+    printf '  %s!%s %s profile folder(s) have no launcher — see: aidentity restore, aidentity prune\n' \
+      "$C_YELLOW" "$C_RESET" "$orphans"
+    problems=$((problems+1))
+  fi
 
   info ""
-  if [ "$problems" -eq 0 ]; then ok "No problems found."; else warn "$problems problem(s) found."; fi
+  if [ "$problems" -eq 0 ]; then
+    ok "No problems found."
+  elif [ "$fixable" -gt 0 ]; then
+    warn "$problems problem(s) found. $fixable can be fixed with: aidentity doctor --fix"
+  else
+    warn "$problems problem(s) found."
+  fi
+  # doctor reports; it does not fail. Only a --fix that could not fix
+  # something exits non-zero.
+  [ "$fix" -eq 1 ] && [ "${failed:-0}" -gt 0 ] && return 1
   return 0
 }
 
@@ -1227,7 +1442,10 @@ create_profile() {
       [ -d "$existing" ] || continue
       is_our_launcher "$existing" || continue
       [ "$(bundle_name "$existing")" = "$label" ] && continue
-      if [ "$(plist_get "$existing" "AIdentityDataDir")" = "$data_dir" ]; then
+      local theirs; theirs=$(plist_get "$existing" "AIdentityDataDir")
+      # Same text, or the same directory spelled another way.
+      if [ "$theirs" = "$data_dir" ] || { [ -n "$(dir_id "$theirs")" ] &&
+           [ "$(dir_id "$theirs")" = "$(dir_id "$data_dir")" ]; }; then
         warn "'$label' would share its profile directory with '$(bundle_name "$existing")':
       $data_dir
     Spaces, underscores, hyphens and capitals are treated the same. Pick a more distinct name."
@@ -1253,22 +1471,48 @@ create_profile() {
     fi
   fi
 
-  [ -n "$badge" ] || badge=$(first_upper "$profile")
-  local wanted="$badge"
-  badge=$(first_char "$badge")
-  # Bytes that are not text (a Latin-1 é, say) cut to nothing, which would
-  # quietly mean "no badge". Say so and use the default instead.
-  if [ -z "$badge" ]; then
-    badge=$(first_upper "$profile")
-    warn "'$wanted' is not a character that can be drawn; using the badge $badge."
+  # Adding a profile that already exists rebuilds its launcher. It keeps the
+  # badge and colour it has unless new ones are given; re-adding used to reset
+  # a hand-picked colour to the default and call the result "Created".
+  local existing_launcher=0
+  [ -e "$dst" ] && is_our_launcher "$dst" && existing_launcher=1
+
+  # An existing profile keeps the folder it records. Recomputing it from the
+  # data root repointed the launcher at a new, empty folder whenever
+  # AIDENTITY_DATA_ROOT differed from the shell it was made in — signed out,
+  # with the real session left for prune.
+  if [ "$existing_launcher" -eq 1 ] && [ "$kind" != "main" ]; then
+    local recorded; recorded=$(plist_get "$dst" AIdentityDataDir)
+    if [ -n "$recorded" ] && [ "$recorded" != "$data_dir" ]; then
+      dim "  Keeping its profile folder: $recorded"
+      data_dir="$recorded"
+    fi
   fi
-  [ "$no_badge" -eq 1 ] && badge=""
+
+  if [ "$no_badge" -eq 1 ]; then
+    badge=""
+  elif [ -n "$badge" ]; then
+    local wanted="$badge"
+    badge=$(first_char "$badge")
+    # Bytes that are not text (a Latin-1 é, say) cut to nothing, which would
+    # quietly mean "no badge". Say so and use the default instead.
+    if [ -z "$badge" ]; then
+      badge=$(first_upper "$profile")
+      warn "'$wanted' is not a character that can be drawn; using the badge $badge."
+    fi
+  elif [ "$existing_launcher" -eq 1 ]; then
+    badge=$(launcher_badge "$dst" "$src_app" "$profile")
+  else
+    badge=$(first_upper "$profile")
+  fi
 
   local hex
   if [ -n "$color" ]; then
     hex=$(color_hex "$color") || {
       warn "Unknown colour '$color'. Try one of: $COLOR_NAMES, or a hex value like 2E7DF6."
       return 1; }
+  elif [ "$existing_launcher" -eq 1 ]; then
+    hex=$(launcher_color "$dst" "$label")
   else
     hex=$(color_hex "$(auto_color "$label")")
   fi
@@ -1313,7 +1557,13 @@ create_profile() {
 
   local app_name; app_name=$(bundle_name "$src_app")
   info ""
-  ok "Created ${C_BOLD}$label${C_RESET}"
+  if [ "$existing_launcher" -eq 1 ] && [ "$main" -eq 1 ]; then
+    ok "Updated ${C_BOLD}$label${C_RESET} — it already existed"
+  elif [ "$existing_launcher" -eq 1 ]; then
+    ok "Updated ${C_BOLD}$label${C_RESET} — it already existed; its profile data was not touched"
+  else
+    ok "Created ${C_BOLD}$label${C_RESET}"
+  fi
   printf '   launcher  %s\n' "$dst"
   if [ "$main" -eq 1 ]; then
     printf '   opens     %s\n' "$(dim "your original $app_name account, with $app_name's own data")"
@@ -1686,6 +1936,148 @@ cmd_set() {
   dim "  The signed-in account is untouched — only the icon changed."
 }
 
+# Profile directories in the data root that no launcher points at, one per
+# line. Compared by directory identity, not by spelling: a string match made a
+# live profile look orphaned whenever its launcher recorded the root
+# differently — a symlinked root, a trailing slash, /tmp against /private/tmp.
+orphan_dirs() {
+  local claimed d id
+  [ -d "$DATA_ROOT" ] || return 0
+  claimed=$(claimed_dir_ids)
+  for d in "$DATA_ROOT"/*; do
+    [ -d "$d" ] || continue
+    id=$(dir_id "$d") || continue
+    case "$claimed" in *" $id "*) continue ;; esac
+    printf '%s\n' "$d"
+  done
+}
+
+# The launcher name a profile directory's restore record would rebuild, e.g.
+# "Claude Work". Fails when the directory has no readable record.
+restore_label() {
+  local profile src
+  [ -f "$1/$RESTORE_RECORD" ] || return 1
+  profile=$(record_get "$1" "$MARKER_KEY") || return 1
+  src=$(record_get "$1" AIdentityTargetApp) || return 1
+  [ -n "$profile" ] && [ -n "$src" ] || return 1
+  # Printed to the terminal by restore and prune: a record carrying escape
+  # sequences could rewrite what the prune prompt shows. Invalid records are
+  # simply not offered.
+  validate_profile_name "$profile" 2>/dev/null || return 1
+  case "$src" in *[[:cntrl:]]*) return 1 ;; esac
+  printf '%s %s' "$(bundle_name "$src")" "$profile"
+}
+
+# Rebuild the launcher for one orphaned profile directory from its restore
+# record. Everything read from the record is checked as if typed on the
+# command line: the profile name is validated, the app must be a real
+# Chromium/Electron app and not one of our launchers, and the directory must
+# sit inside the data root.
+restore_one() {
+  local dir="$1" profile src bid found label badge hex
+  if ! data_is_ours "$dir"; then
+    warn "Skipping $dir — it is outside the aidentity data folder."
+    return 1
+  fi
+  profile=$(record_get "$dir" "$MARKER_KEY") || { warn "Cannot read the restore record in $dir"; return 1; }
+  validate_profile_name "$profile" || return 1
+  src=$(record_get "$dir" AIdentityTargetApp)
+  bid=$(record_get "$dir" AIdentityTargetBundleID)
+  case "$bid" in *[!A-Za-z0-9.-]*) bid="" ;; esac
+
+  if [ ! -d "$src" ]; then
+    # The app moved: look it up by name, then by bundle identifier — but only
+    # inside the app folders. A Spotlight hit on a mounted installer or an
+    # unpacked download would otherwise be handed this signed-in profile.
+    found=$(refind_app "$src" || true)
+    if [ -z "$found" ] && [ -n "$bid" ] && command -v mdfind >/dev/null 2>&1; then
+      local hit dir
+      while IFS= read -r hit; do
+        [ -n "$hit" ] || continue
+        while IFS= read -r dir; do
+          case "$hit" in "${dir%/}"/*) found="$hit"; break ;; esac
+        done <<EOF
+$(app_search_dirs)
+EOF
+        [ -n "$found" ] && break
+      done <<EOF
+$(mdfind "kMDItemCFBundleIdentifier == '$bid'" 2>/dev/null)
+EOF
+    fi
+    if [ -z "$found" ]; then
+      warn "$(bundle_name "$src") is not installed any more. Reinstall it, then run this again."
+      return 1
+    fi
+    info "  The app moved; using $found"
+    src="$found"
+  fi
+  src=$(resolve_target_app "$src") || return 1
+
+  label="$(bundle_name "$src") $profile"
+  if [ -e "$APPS_DIR/$label.app" ]; then
+    warn "There is already something at $APPS_DIR/$label.app — remove or rename it first."
+    return 1
+  fi
+
+  badge=$(first_char "$(record_get "$dir" AIdentityBadge)")
+  hex=$(color_hex "$(record_get "$dir" AIdentityColor)" 2>/dev/null) \
+    || hex=$(color_hex "$(auto_color "$label")")
+
+  build_launcher "$src" "$profile" "$dir" "$label" "$badge" "$hex" || return 1
+  ok "Restored ${C_BOLD}$label${C_RESET} — it opens the same profile folder as before."
+}
+
+cmd_restore() {
+  local want="" all=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --all|-a) all=1; shift ;;
+      -*) die "Unknown option for restore: $1" ;;
+      *) [ -z "$want" ] && want="$1" || die "Unexpected argument: $1"; shift ;;
+    esac
+  done
+  [ -n "$want" ] && [ "$all" -eq 1 ] && die "Give a name or --all, not both."
+
+  local dirs=() labels=() d label
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    label=$(restore_label "$d") || continue
+    dirs+=("$d"); labels+=("$label")
+  done <<EOF
+$(orphan_dirs)
+EOF
+
+  if [ "${#dirs[@]}" -eq 0 ]; then
+    info "Nothing to restore — every profile with a restore record has a launcher."
+    [ -z "$want" ] && [ "$all" -eq 0 ] && return 0
+    return 1
+  fi
+
+  local i=0
+  if [ -z "$want" ] && [ "$all" -eq 0 ]; then
+    info "${C_BOLD}Profiles whose launcher is gone, and can be rebuilt:${C_RESET}"
+    info ""
+    while [ "$i" -lt "${#dirs[@]}" ]; do
+      printf '  %-28s %s\n' "${labels[$i]}" "$(dim "${dirs[$i]}")"
+      i=$((i+1))
+    done
+    info ""
+    dim "  One:  aidentity restore \"${labels[0]}\"      All:  aidentity restore --all"
+    return 0
+  fi
+
+  local matched=0 failed=0
+  while [ "$i" -lt "${#dirs[@]}" ]; do
+    if [ "$all" -eq 1 ] || [ "$(lower "${labels[$i]}")" = "$(lower "$want")" ]; then
+      matched=$((matched+1))
+      restore_one "${dirs[$i]}" || failed=$((failed+1))
+    fi
+    i=$((i+1))
+  done
+  [ "$matched" -gt 0 ] || die "No restorable profile named '$want'. Run 'aidentity restore' to see them."
+  [ "$failed" -eq 0 ]
+}
+
 cmd_prune() {
   local yes=0
   while [ $# -gt 0 ]; do
@@ -1698,17 +2090,13 @@ cmd_prune() {
 
   [ -d "$DATA_ROOT" ] || { info "No profile data directory yet — nothing to prune."; return 0; }
 
-  # Compared by directory identity, not by spelling. A string match made a live
-  # profile look orphaned whenever its launcher recorded the root differently —
-  # a symlinked root, a trailing slash, /tmp against /private/tmp.
-  local claimed; claimed=$(claimed_dir_ids)
-  local orphans=() d id n=0
-  for d in "$DATA_ROOT"/*; do
-    [ -d "$d" ] || continue
-    id=$(dir_id "$d") || continue
-    case "$claimed" in *" $id "*) continue ;; esac
+  local orphans=() d n=0 label
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
     orphans+=("$d"); n=$((n+1))
-  done
+  done <<EOF
+$(orphan_dirs)
+EOF
 
   if [ "$n" -eq 0 ]; then
     ok "No orphaned profile data — every directory belongs to a launcher."
@@ -1717,11 +2105,20 @@ cmd_prune() {
 
   info "${C_BOLD}Profile data with no launcher pointing at it:${C_RESET}"
   info ""
+  local restorable=0
   for d in "${orphans[@]}"; do
     printf '  %-10s %s\n' "$(human_bytes "$d")" "$(basename "$d")"
     dim "             $d"
+    if label=$(restore_label "$d"); then
+      dim "             can be restored: aidentity restore \"$label\""
+      restorable=$((restorable+1))
+    fi
   done
   info ""
+  if [ "$restorable" -gt 0 ]; then
+    info "To keep an account, restore it first — then it is no longer listed here."
+    info ""
+  fi
   dim "  This is what is left when a launcher is deleted in Finder, or removed with"
   dim "  'aidentity rm' without --purge. Launchers were looked for in $APPS_DIR"
   dim "  (and folders inside it), in the app folders and through Spotlight. If you"
@@ -1747,6 +2144,47 @@ cmd_prune() {
     if rm -rf "$d"; then removed=$((removed+1)); else warn "Could not remove $d"; fi
   done
   ok "Removed $removed orphaned profile(s)."
+}
+
+# Rebuild one launcher from what its Info.plist records. Profile data is never
+# touched. Returns non-zero, after saying why, if it could not be rebuilt.
+# Shared by `rebuild` and `doctor --fix`.
+rebuild_one() {
+  local app="$1" label src_app profile data_dir badge hex kind="" found
+  label=$(bundle_name "$app")
+  src_app=$(plist_get "$app" "AIdentityTargetApp")
+  profile=$(plist_get "$app" "$MARKER_KEY")
+  data_dir=$(plist_get "$app" "AIdentityDataDir")
+  is_main_launcher "$app" && kind="main"
+  hex=$(launcher_color "$app" "$label")
+
+  if [ ! -d "$src_app" ]; then
+    # The app moved or was uninstalled. Try to find it again by name before
+    # giving up, which covers the common /Applications -> ~/Applications move.
+    found=$(refind_app "$src_app" || true)
+    if [ -n "$found" ]; then
+      info "  $label: target moved, now $found"
+      src_app="$found"
+    else
+      warn "$label: target app is missing and could not be found again:"
+      dim  "    $src_app"
+      return 1
+    fi
+  fi
+
+  # Only now, with the app found: a 1.0.0 launcher's badge is worked out by
+  # comparing its icon with the app's, which fails against a path that moved.
+  badge=$(launcher_badge "$app" "$src_app" "$profile")
+  if is_legacy_launcher "$app"; then
+    info "  $label: built by aidentity 1.0.0 — badge and colour restored to its defaults."
+    dim  "    A colour or letter you picked yourself back then: aidentity set \"$label\" --color …"
+  fi
+
+  if ! build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" "$kind"; then
+    warn "$label: rebuild failed."
+    return 1
+  fi
+  return 0
 }
 
 cmd_rebuild() {
@@ -1775,42 +2213,7 @@ cmd_rebuild() {
 
   local done_n=0 failed=0
   for app in "${targets[@]}"; do
-    local label src_app profile data_dir badge hex kind=""
-    label=$(bundle_name "$app")
-    src_app=$(plist_get "$app" "AIdentityTargetApp")
-    profile=$(plist_get "$app" "$MARKER_KEY")
-    data_dir=$(plist_get "$app" "AIdentityDataDir")
-    is_main_launcher "$app" && kind="main"
-    hex=$(launcher_color "$app" "$label")
-
-    if [ ! -d "$src_app" ]; then
-      # The app moved or was uninstalled. Try to find it again by name before
-      # giving up, which covers the common /Applications -> ~/Applications move.
-      local found; found=$(resolve_app "$(bundle_name "$src_app")" 2>/dev/null || true)
-      if [ -n "$found" ] && [ -d "$found" ]; then
-        info "  $label: target moved, now $found"
-        src_app="$found"
-      else
-        warn "$label: target app is missing and could not be found again:"
-        dim  "    $src_app"
-        failed=$((failed+1)); continue
-      fi
-    fi
-
-    # Only now, with the app found: a 1.0.0 launcher's badge is worked out by
-    # comparing its icon with the app's, which fails against a path that moved.
-    badge=$(launcher_badge "$app" "$src_app" "$profile")
-    if is_legacy_launcher "$app"; then
-      info "  $label: built by aidentity 1.0.0 — badge and colour restored to its defaults."
-      dim  "    A colour or letter you picked yourself back then: aidentity set \"$label\" --color …"
-    fi
-
-    if build_launcher "$src_app" "$profile" "$data_dir" "$label" "$badge" "$hex" "$kind"; then
-      done_n=$((done_n+1))
-    else
-      warn "$label: rebuild failed."
-      failed=$((failed+1))
-    fi
+    if rebuild_one "$app"; then done_n=$((done_n+1)); else failed=$((failed+1)); fi
   done
 
   info ""
@@ -1863,13 +2266,19 @@ ${C_BOLD}COMMANDS${C_RESET}
                        left when a launcher is deleted in Finder, or removed
                        with rm without --purge — and offer to remove it
       -y, --yes        Skip the confirmation prompt
+  restore [NAME]       Rebuild the launcher of a profile whose launcher was
+                       deleted, from the record kept in its data folder. With
+                       no name, list the profiles that can be restored.
+      --all            Restore every one of them
   rebuild NAME         Regenerate a launcher after the app moved or updated
       --all            Rebuild every profile
   rm    NAME           Remove a launcher (keeps its data). Also 'remove', 'delete'.
       --purge          Also delete the profile's data. Cannot be undone.
       -y, --yes        Skip the confirmation prompt
   apps                 List apps on this Mac that support extra accounts
-  doctor               Check the setup and report anything wrong
+  doctor               Check the setup and every profile, and report anything wrong
+      --fix            Repair what can be repaired: rebuild stale launchers,
+                       make profile folders owner-only
   version              Print the version
 
 ${C_BOLD}EXAMPLES${C_RESET}
@@ -1881,6 +2290,8 @@ ${C_BOLD}EXAMPLES${C_RESET}
   aidentity rename "Claude Work" Client
   aidentity set "Claude Work" --color purple
   aidentity rebuild --all
+  aidentity doctor --fix
+  aidentity restore "Claude Work"
   aidentity prune
   aidentity rm "Claude Work" --purge
 
@@ -1909,6 +2320,7 @@ main() {
     rename|mv)       cmd_rename "$@" ;;
     set|modify|edit) cmd_set "$@" ;;
     prune)           cmd_prune "$@" ;;
+    restore)         cmd_restore "$@" ;;
     rebuild|repair)  cmd_rebuild "$@" ;;
     list|ls)         cmd_list "$@" ;;
     open)            cmd_open "$@" ;;
