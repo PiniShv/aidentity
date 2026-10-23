@@ -24,6 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `list` now refuses an option or argument it does not know. It used to
   ignore them, so a mistyped `--json` printed the plain list and exited 0.
 
+### Fixed
+
+- VS Code and its forks (Cursor, Kiro and others) quit at start, with no
+  window, when the profile folder path was long. They keep a socket in that
+  folder, and macOS allows a socket path of 103 bytes. The default data folder,
+  a long app name and a long profile name went past it: a Visual Studio Code
+  profile named `Acme Consulting` already did. `add`, `rename` and `restore`
+  now refuse such a profile before they create or move anything, and say how
+  many characters to cut. `doctor` reports existing profiles that are too long;
+  the fix is a shorter name with `rename`.
+
 ## [1.2.0] - 2026-10-23
 
 ### Added
