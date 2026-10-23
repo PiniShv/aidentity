@@ -8,7 +8,7 @@
 
 **Run your work, personal and client accounts side by side. Each one stays signed in.**
 
-Built for AI desktop apps like Claude and ChatGPT, and checked by hand on both. Other Mac apps built on Chromium, the engine inside Google Chrome, should work too: Slack, VS Code, Cursor, Notion and more. [See the list](#which-apps-work).
+Built for AI desktop apps like Claude and ChatGPT. Checked by hand with Claude Desktop. Other Mac apps built on Chromium, the engine inside Google Chrome, should work too: ChatGPT, Slack, VS Code, Cursor, Notion and more. [See the list](#which-apps-work).
 
 ![macOS only](https://img.shields.io/badge/macOS-only-111?logo=apple&logoColor=white)
 ![Latest version](https://img.shields.io/github/v/tag/PiniShv/aidentity?label=version&sort=semver)
@@ -94,12 +94,12 @@ Apps built on **Chromium** (the engine inside Google Chrome) or **Electron** (a 
 
 | Status | Apps |
 |---|---|
-| **Verified**: two accounts signed in at once, checked by hand | Claude Desktop, ChatGPT |
-| **Detected**: built the right way, not checked by hand yet | Slack, Visual Studio Code, Cursor, Notion, Notion Calendar, Postman, Microsoft Teams (classic), Antigravity, Kiro, Podman Desktop |
+| **Verified**: two accounts signed in at once, checked by hand | Claude Desktop |
+| **Detected**: built the right way, not checked by hand yet | ChatGPT, Slack, Visual Studio Code, Cursor, Notion, Notion Calendar, Postman, Microsoft Teams (classic), Antigravity, Kiro, Podman Desktop |
 | **Browsers**: detected, but their built-in profiles usually do the job better | Chrome, Edge, Brave, Arc, Vivaldi, Comet |
 | **Does not work**: native Mac apps | ChatGPT Classic, and any app written in Swift or AppKit |
 
-Native apps have no Chromium inside, so they have no `--user-data-dir` option to use. `aidentity add` checks this first and refuses. The newer ChatGPT app is Chromium inside and works. Support for native apps is not planned for version 1. [Full list and notes](docs/guide.md#which-apps-work)
+Native apps have no Chromium inside, so they have no `--user-data-dir` option to use. `aidentity add` checks this first and refuses. The newer ChatGPT app is Chromium inside, so `aidentity` detects it. Support for native apps is not planned for version 1. [Full list and notes](docs/guide.md#which-apps-work)
 
 Tried another app? [Tell us how it went](https://github.com/PiniShv/aidentity/issues). That is how an app moves from Detected to Verified.
 
