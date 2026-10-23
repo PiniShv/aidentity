@@ -8,7 +8,7 @@ This is the full user guide for `aidentity`, a command-line tool that runs sever
 
 macOS runs an app only once, so you get one account at a time. To check your personal Claude, you sign out of your work Claude. `aidentity` gives each extra account a small launcher and its own data folder. Together they make a *profile*. Your work, personal and client accounts then open side by side.
 
-- **Verified with** Claude Desktop and ChatGPT. It should also work with Slack, VS Code and other apps built on Chromium (the engine inside Google Chrome) or Electron. See [Which apps work](#which-apps-work).
+- **Verified with** Claude Desktop. It should also work with ChatGPT, Slack, VS Code and other apps built on Chromium (the engine inside Google Chrome) or Electron. See [Which apps work](#which-apps-work).
 - **Your real app is not changed.** It is never copied, patched or re-signed. See [Is this safe?](#is-this-safe)
 - **One shell script** (a text file of Terminal commands). Once installed, it makes no network calls, never uses `sudo` (admin rights) and runs nothing in the background.
 - **Set up once in Terminal.** After that, you open each account by clicking its icon, like any other app.
@@ -156,7 +156,7 @@ An app can take extra accounts if it is built on **Chromium** or **Electron**. C
 | App | Works | Notes |
 |---|---|---|
 | Claude Desktop | Verified | `com.anthropic.claudefordesktop`. Use `--seed` to copy your MCP server config into the new profile. |
-| ChatGPT | Verified | `com.openai.codex`. It looks native, but it is Chromium inside. |
+| ChatGPT | Detected | `com.openai.codex`. It looks native, but it is Chromium inside. |
 | Slack | Detected | Slack's own workspace switcher covers most cases. Profiles are for separate *accounts*. |
 | Visual Studio Code | Detected | Separate profiles get separate settings. Extensions are shared unless you use [`--own-extensions`](#per-profile-settings). |
 | Cursor | Detected | A fork of VS Code, so the same applies. |
@@ -178,7 +178,7 @@ There is no list of apps in the code. `aidentity` looks at how each app is built
 
 ### Genuinely native apps do not work
 
-Apps written in Swift or AppKit have no `--user-data-dir` option, because they have no Chromium inside to accept it. Without that option, `aidentity` has nothing to work with. **ChatGPT Classic** (`com.openai.chat`) is the example you are most likely to meet. The newer ChatGPT desktop app is Chromium and works. The Classic one is native and does not.
+Apps written in Swift or AppKit have no `--user-data-dir` option, because they have no Chromium inside to accept it. Without that option, `aidentity` has nothing to work with. **ChatGPT Classic** (`com.openai.chat`) is the example you are most likely to meet. The newer ChatGPT desktop app is Chromium inside, so `aidentity` detects it. The Classic one is native and cannot work.
 
 `aidentity add` checks this first, refuses and explains why. It does not build a launcher that would quietly open a second window on the same account. Support for native apps is not planned for version 1.
 
