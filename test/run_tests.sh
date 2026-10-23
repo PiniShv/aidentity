@@ -1359,6 +1359,21 @@ mv "$APPS/Filed/Fake Linkapps.app" "$APPS/"
 rmdir "$APPS/Filed" "$DATA/left-behind"
 ai rm "Fake Linkapps" --purge -y
 
+# Folder lists are split on ':' only. A * or ? in a folder name used to be
+# expanded against the current directory.
+mkdir -p "$SB/glob-cwd/match-a" "$SB/bin-real"
+SPLIT=$(cd "$SB/glob-cwd" && "$BASH_BIN" -c 'lib=$1; list=$2; set --; . "$lib" >/dev/null 2>&1
+  split_dirs "$list"; printf "[%s]\n" "${DIRS[@]}"
+  case $- in *f*) echo "globbing left off" ;; esac' x "$UNINST_LIB" "/one:match-*::/two words" 2>&1)
+assert_eq "split_dirs keeps * literal and spaces inside a folder" \
+  "$(printf '[/one]\n[match-*]\n[]\n[/two words]')" "$SPLIT"
+cp "$REPO_DIR/bin/aidentity" "$SB/bin-real/aidentity"
+RUN_OUT=$(AIDENTITY_BIN_DIRS="$SB/bin-*" "$BASH_BIN" -c 'lib=$1; set --; . "$lib" >/dev/null 2>&1
+  remove_binary' x "$UNINST_LIB" 2>&1 </dev/null)
+assert_contains "a * in AIDENTITY_BIN_DIRS is not expanded to other folders" "$RUN_OUT" "not installed anywhere obvious"
+assert_file "and the copy it would have matched stays" "$SB/bin-real/aidentity"
+rm -rf "$SB/glob-cwd" "$SB/bin-real"
+
 ai add "$ELECTRON_APP" --profile Latin --badge "$(printf '\351')"
 assert_rc "a badge that is not text still builds" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "and says it used the default" "$RUN_OUT" "not a character"
@@ -1617,6 +1632,176 @@ assert_eq "re-adding keeps the profile's own folder" "$DATA/fake-hue" \
   "$(plist_key "$APPS/Fake Hue.app" AIdentityDataDir)"
 assert_no_dir "and makes no new one under the other root" "$SB/other-root/fake-hue"
 ai rm "Fake Hue" --purge -y
+
+
+group "install.sh end to end, against a stub curl"
+
+# A stub curl that serves this checkout instead of GitHub. It knows the two
+# files install.sh fetches; STUB_SUMS picks which checksum file it serves.
+CURL_STUB="$SANDBOX/stub-curl"
+mkdir -p "$CURL_STUB"
+cat > "$CURL_STUB/curl" <<STUB
+#!/bin/sh
+out="" url=""
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -o) out="\$2"; shift 2 ;;
+    --proto|--proto-redir|--connect-timeout|--max-time|--retry) shift 2 ;;
+    -*) shift ;;
+    *) url="\$1"; shift ;;
+  esac
+done
+case "\$url" in
+  */bin/aidentity) src='$REPO_DIR/bin/aidentity' ;;
+  */SHA256SUMS)
+    case "\${STUB_SUMS:-good}" in
+      good) src='$REPO_DIR/SHA256SUMS' ;;
+      bad) printf '%064d  bin/aidentity\n' 0; exit 0 ;;
+      *) exit 22 ;;
+    esac ;;
+  *) exit 22 ;;
+esac
+if [ -n "\$out" ]; then cat "\$src" > "\$out"; else cat "\$src"; fi
+STUB
+chmod +x "$CURL_STUB/curl"
+
+inst() { # install dir, then optional VAR=value settings for install.sh
+  local dir="$1"; shift
+  RUN_OUT=$(env HOME="$SANDBOX/inst-home" PATH="$CURL_STUB:/usr/bin:/bin:/usr/sbin:/sbin" \
+    AIDENTITY_INSTALL_DIR="$dir" "$@" /usr/bin/perl -MPOSIX -e '
+      my $pid = fork; die "fork: $!\n" unless defined $pid;
+      if ($pid) { waitpid($pid, 0); exit($? & 127 ? 128 + ($? & 127) : $? >> 8) }
+      POSIX::setsid(); exec @ARGV or exit 127' -- "$BASH_BIN" "$REPO_DIR/install.sh" 2>&1 </dev/null)
+  RUN_RC=$?
+  return 0
+}
+
+INST_A="$SB/inst a"
+inst "$INST_A"
+assert_rc "install.sh installs with no terminal and exits 0" 0 "$RUN_RC" "$RUN_OUT"
+if cmp -s "$INST_A/aidentity" "$REPO_DIR/bin/aidentity"; then _pass "the installed file is this checkout's script"
+else _fail "the installed file is this checkout's script" "differs or missing"; fi
+assert_exec "it is executable" "$INST_A/aidentity"
+assert_contains "the checksum was verified" "$RUN_OUT" "checksum verified"
+assert_not_contains "no walkthrough is offered without a terminal" "$RUN_OUT" "Set up your first"
+inst "$INST_A"
+assert_contains "a second run reports a reinstall" "$RUN_OUT" "Reinstalled"
+
+inst "$SB/inst b" STUB_SUMS=bad
+assert_rc_nonzero "a checksum mismatch refuses to install" "$RUN_RC" "$RUN_OUT"
+assert_no_file "and writes nothing" "$SB/inst b/aidentity"
+inst "$SB/inst c" STUB_SUMS=missing
+assert_rc "a missing checksum file warns and installs" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "and says so" "$RUN_OUT" "No published checksum"
+inst "$SB/inst d" "AIDENTITY_REF=../../evil/repo/main"
+assert_rc_nonzero "a ref that walks out of the repository is refused" "$RUN_RC" "$RUN_OUT"
+mkdir -p "$SB/inst e/aidentity"
+inst "$SB/inst e"
+assert_rc_nonzero "a directory at the target is refused" "$RUN_RC" "$RUN_OUT"
+mkdir -p "$SB/inst f" "$SB/elsewhere"
+ln -s "$SB/elsewhere" "$SB/inst f/aidentity"
+inst "$SB/inst f"
+assert_rc "a symlink at the target is replaced" 0 "$RUN_RC" "$RUN_OUT"
+if [ -f "$SB/inst f/aidentity" ] && [ ! -L "$SB/inst f/aidentity" ]; then _pass "by a real file"
+else _fail "by a real file" "still a link or missing"; fi
+assert_eq "nothing was dropped into the link's target" "" "$(ls -A "$SB/elsewhere")"
+
+# GNU coreutils first on PATH (common with Homebrew): its mv has no -h. The
+# installer must not depend on whichever mv comes first.
+printf '#!/bin/sh\ncase " $* " in *" -h"*|*" -fh "*) echo "mv: invalid option -- h" >&2; exit 1 ;; esac\nexec /bin/mv "$@"\n' \
+  > "$CURL_STUB/mv"
+chmod +x "$CURL_STUB/mv"
+inst "$SB/inst g"
+assert_rc "an mv without -h first on PATH does not break the install" 0 "$RUN_RC" "$RUN_OUT"
+assert_file "the file is installed" "$SB/inst g/aidentity"
+rm -f "$CURL_STUB/mv"
+
+# make formula against a tag that cannot be downloaded must change nothing.
+# It used to hash the empty download and write that checksum into the formula.
+FORMULA_SB="$SB/formula-copy"
+mkdir -p "$FORMULA_SB/Formula"
+cp "$REPO_DIR/Makefile" "$FORMULA_SB/"
+cp "$REPO_DIR/Formula/aidentity.rb" "$FORMULA_SB/Formula/"
+mkdir -p "$SANDBOX/stub-curl-404"
+printf '#!/bin/sh\necho "curl: (22) The requested URL returned error: 404" >&2\nexit 22\n' > "$SANDBOX/stub-curl-404/curl"
+chmod +x "$SANDBOX/stub-curl-404/curl"
+RUN_OUT=$(cd "$FORMULA_SB" && PATH="$SANDBOX/stub-curl-404:$PATH" make -s formula VERSION=9.9.9 2>&1); RUN_RC=$?
+assert_rc_nonzero "make formula fails when the tag cannot be downloaded" "$RUN_RC" "$RUN_OUT"
+if cmp -s "$FORMULA_SB/Formula/aidentity.rb" "$REPO_DIR/Formula/aidentity.rb"; then
+  _pass "and leaves the formula untouched"
+else
+  _fail "and leaves the formula untouched" "the formula changed"
+fi
+RUN_OUT=$(cd "$FORMULA_SB" && make -s release VERSION='1.0.0"; touch pwned; "' 2>&1); RUN_RC=$?
+assert_rc_nonzero "make release refuses a version that is not x.y.z" "$RUN_RC" "$RUN_OUT"
+assert_no_file "and runs nothing it was handed" "$FORMULA_SB/pwned"
+# A valid first line used to carry a second one past a line-by-line check.
+for target in release formula; do
+  RUN_OUT=$(cd "$FORMULA_SB" && PATH="$SANDBOX/stub-curl-404:$PATH" \
+    make -s "$target" VERSION="1.2.3
+touch pwned" 2>&1); RUN_RC=$?
+  assert_rc_nonzero "make $target refuses a version with a second line" "$RUN_RC" "$RUN_OUT"
+  assert_contains "with the usage line, before anything else runs" "$RUN_OUT" "Usage: make $target"
+done
+assert_no_file "and the second line never runs" "$FORMULA_SB/pwned"
+
+
+group "uninstall.sh end to end, every search path in the sandbox"
+
+# AIDENTITY_BIN_DIRS keeps it from finding a real installed copy; HOME and
+# AIDENTITY_APP_DIRS keep its launcher search inside the sandbox.
+UN_BIN="$SB/un-bin"
+mkdir -p "$UN_BIN"
+un_prepare() {
+  cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
+  ai add "$ELECTRON_APP" --profile Bye
+  printf 'session\n' > "$DATA/fake-bye/Cookies"
+}
+un_tty() { # typed input
+  RUN_OUT=$( { { sleep 0.3; printf '%b' "$1"; sleep 1; } \
+      | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$PATH" \
+        script -q /dev/null "$BASH_BIN" "$REPO_DIR/uninstall.sh"
+      echo "__rc=${PIPESTATUS[1]}"; } 2>&1 | tr -d '\r')
+  RUN_RC=${RUN_OUT##*__rc=}
+  RUN_OUT=${RUN_OUT%__rc=*}
+  return 0
+}
+
+un_prepare
+un_tty 'no\n'
+assert_rc "declining exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "and says nothing was deleted" "$RUN_OUT" "Kept"
+assert_dir "the launcher stays" "$APPS/Fake Bye.app"
+assert_file "the data stays" "$DATA/fake-bye/Cookies"
+
+cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
+RUN_OUT=$(HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" detached "$BASH_BIN" "$REPO_DIR/uninstall.sh" 2>&1 </dev/null); RUN_RC=$?
+assert_rc_nonzero "with no terminal to confirm on, it exits non-zero" "$RUN_RC" "$RUN_OUT"
+assert_dir "and deletes no launcher" "$APPS/Fake Bye.app"
+
+un_prepare
+mkdir -p "$DATA/stray-profile"
+un_tty 'delete\n'
+assert_rc "typing delete removes everything" 0 "$RUN_RC" "$RUN_OUT"
+assert_no_file "the command" "$UN_BIN/aidentity"
+assert_no_dir "the launcher" "$APPS/Fake Bye.app"
+assert_no_dir "its data" "$DATA/fake-bye"
+assert_no_dir "data no launcher pointed at" "$DATA/stray-profile"
+assert_contains "and only then says aidentity is gone" "$RUN_OUT" "aidentity is gone"
+assert_file "it never touched this checkout" "$REPO_DIR/bin/aidentity"
+mkdir -p "$DATA"
+
+# A Homebrew-managed copy is left for brew, so "gone" would be false.
+mkdir -p "$SB/Cellar/aidentity/1.1.0/bin"
+cp "$REPO_DIR/bin/aidentity" "$SB/Cellar/aidentity/1.1.0/bin/aidentity"
+ln -sfn "$SB/Cellar/aidentity/1.1.0/bin/aidentity" "$UN_BIN/aidentity"
+ai add "$ELECTRON_APP" --profile Bye
+un_tty 'delete\n'
+assert_contains "a Homebrew copy is left for brew" "$RUN_OUT" "managed by Homebrew"
+assert_not_contains "and the end does not claim it is all gone" "$RUN_OUT" "aidentity is gone"
+assert_no_dir "the launcher is still removed" "$APPS/Fake Bye.app"
+rm -f "$UN_BIN/aidentity"
+mkdir -p "$DATA"
 
 
 group "sandbox isolation — final check"

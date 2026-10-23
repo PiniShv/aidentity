@@ -56,17 +56,22 @@ Steps 3 and 8 are one-time and already done. For a routine release, see
    `sha256` line. Check the `url` names the tag you just pushed: a formula whose
    checksum and tarball disagree fails on the user's machine, not yours.
 
-5. **Test it locally before pushing.**
+5. **Test it through the tap, not a file path.** Current Homebrew refuses to
+   install or audit a formula given as a path (`brew install path/to/x.rb`
+   fails, and `brew audit <path>` is disabled), and a relative path is read as a
+   tap name. Push the formula to a branch of the tap, point your local tap at
+   it, then:
 
    ```sh
-   brew install --build-from-source homebrew-tap/Formula/aidentity.rb
-   brew test aidentity
-   brew audit --strict --new homebrew-tap/Formula/aidentity.rb
+   brew tap PiniShv/tap
+   brew install --build-from-source pinishv/tap/aidentity
+   brew test pinishv/tap/aidentity
+   brew audit --strict pinishv/tap/aidentity
    ```
 
-   `brew audit` is the one that catches naming and metadata mistakes. Fix
-   whatever it flags. `--new` is only meaningful the first time; drop it on
-   later versions.
+   `brew audit` is the one that catches naming and metadata mistakes. Add
+   `--new` only the first time a formula is published. Running `brew audit`
+   switches on Homebrew's developer mode; `brew developer off` turns it off.
 
 6. **Push the tap.**
 
@@ -98,15 +103,42 @@ Steps 3 and 8 are one-time and already done. For a routine release, see
 
 ## Releasing a new version later
 
-1. Tag `vX.Y.Z` and push it.
-2. Bump `AIDENTITY_VERSION` in `bin/aidentity` **before** tagging, and check by
-   hand that `aidentity version` prints the tag's version. The formula's
-   `test do` block only checks the format (so `--HEAD` builds pass), so it no
-   longer catches a mismatch.
-3. In the tap: update `url` to the new tag, recompute `sha256` (step 2 above),
-   commit, push. Nothing else changes.
+Do it in this order. A tag is never moved once it is pushed: people's
+Homebrew installs and the `curl` installer both pin to it.
 
-Users get it with `brew update && brew upgrade aidentity`.
+1. **Prepare the release on a branch.**
+
+   ```sh
+   make release VERSION=X.Y.Z
+   ```
+
+   This sets `AIDENTITY_VERSION`, points `install.sh`'s default ref at
+   `vX.Y.Z` (so `curl | bash` installs the release, script and checksum from the
+   same tag), turns `[Unreleased]` in the changelog into `[X.Y.Z]`, regenerates
+   `SHA256SUMS` and runs the guards. Check `bin/aidentity version` prints
+   `X.Y.Z`: the formula's `test do` block only checks the format, so that
+   `--HEAD` builds pass.
+2. **Commit, open a PR, let CI pass, merge.**
+3. **Tag the merge commit and push the tag — right after the merge.** From
+   the merge on, `main`'s installer asks for `vX.Y.Z`; until that tag exists,
+   `curl | bash` fails with a download error.
+
+   ```sh
+   git tag vX.Y.Z <merge commit> && git push origin vX.Y.Z
+   ```
+
+4. **Point the formula at the tag.** The tarball's checksum exists only once
+   the tag does.
+
+   ```sh
+   make formula VERSION=X.Y.Z
+   ```
+
+   Commit that change to this repository, copy `Formula/aidentity.rb` into the
+   tap, and test it through the tap (step 5 above) before you push the tap.
+
+Users get it with `brew update && brew upgrade aidentity`, and the `curl`
+installer serves it as soon as `main` carries the new default ref.
 
 ## Notes
 
