@@ -56,6 +56,7 @@ FAIL_COUNT=0
 CURRENT_GROUP=''
 
 RUN_OUT=''
+RUN_ERR=''
 RUN_RC=0
 
 # The real locations these tests must never touch.
@@ -201,6 +202,15 @@ ai() {
   return 0
 }
 
+# Same, but stdout and stderr apart: RUN_OUT is stdout only, RUN_ERR is
+# stderr. For output another program reads, where one stray line breaks it.
+ai_stdout() {
+  RUN_OUT=$(detached "$BASH_BIN" "$AIDENTITY" "$@" 2>"$SANDBOX/stderr" </dev/null)
+  RUN_RC=$?
+  RUN_ERR=$(cat "$SANDBOX/stderr")
+  return 0
+}
+
 # Same, but feed a line on stdin (for the rm confirmation prompt).
 ai_in() {
   local input="$1"; shift
@@ -243,6 +253,23 @@ printf '#!/bin/sh\nprintf "stub open: %%s\\n" "$*"\n' > "$STUB_BIN/open"
 chmod +x "$STUB_BIN/open"
 
 plist_key() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
+
+# Read JSON with the JavaScript engine that ships with macOS, so the check
+# needs nothing installed and the script never comes to rely on it. Prints a
+# JavaScript expression's value over the parsed text `d`: a string as it is,
+# anything else as JSON. In the expression, byName(n) is the object named n
+# and arg is the optional third argument. Text that is not valid JSON prints
+# the parser's error and exits non-zero.
+json_get() { # json, expression, [arg]
+  /usr/bin/osascript -l JavaScript - "$1" "$2" "${3:-}" 2>&1 <<'JXA'
+function run(argv) {
+  var d = JSON.parse(argv[0]);
+  function byName(n) { return d.filter(function (o) { return o.name === n; })[0]; }
+  var v = new Function("d", "byName", "arg", "return (" + argv[1] + ");")(d, byName, argv[2]);
+  return typeof v === "string" ? v : JSON.stringify(v);
+}
+JXA
+}
 
 # Structural fingerprint of a directory tree: proves a bundle was not modified.
 fingerprint() {
@@ -366,6 +393,7 @@ ai help
 assert_rc "help exits 0" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "help documents add" "$RUN_OUT" "add"
 assert_contains "help documents list" "$RUN_OUT" "list"
+assert_contains "help documents list --json" "$RUN_OUT" "--json"
 assert_contains "help documents open" "$RUN_OUT" "open"
 assert_contains "help documents rm" "$RUN_OUT" "rm"
 assert_contains "help documents apps" "$RUN_OUT" "apps"
@@ -437,6 +465,9 @@ fi
 ai list
 assert_rc "list exits 0 with no profiles" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "list says so when there is nothing yet" "$RUN_OUT" "No profiles yet."
+ai_stdout list --json
+assert_rc "list --json exits 0 with no profiles" 0 "$RUN_RC" "$RUN_ERR"
+assert_eq "list --json prints an empty array when there is nothing yet" "[]" "$RUN_OUT"
 
 group "profile name validation — rejected"
 
@@ -530,6 +561,42 @@ shquote_roundtrip "a dollar sign"            'a $HOME b'
 # shellcheck disable=SC2016
 shquote_roundtrip "backticks and semicolons" 'a `id`; b'
 shquote_roundtrip "a double quote"           'say "hi"'
+
+group "json_str"
+
+libcall json_str "plain"
+assert_eq "json_str wraps a plain string in double quotes" '"plain"' "$RUN_OUT"
+libcall json_str 'say "hi" \ bye'
+assert_eq "json_str escapes quotes and backslashes" '"say \"hi\" \\ bye"' "$RUN_OUT"
+libcall json_str $'a\tb\nc\rd'
+assert_eq "json_str uses the short forms for tab, newline and return" '"a\tb\nc\rd"' "$RUN_OUT"
+libcall json_str $'bell\a esc\033 one\001'
+assert_eq "json_str writes other control characters as \\u00XX" '"bell\u0007 esc\u001b one\u0001"' "$RUN_OUT"
+libcall json_str 'Ünïcödé — 日本'
+assert_eq "json_str passes UTF-8 through unchanged" '"Ünïcödé — 日本"' "$RUN_OUT"
+libcall json_str ""
+assert_eq "json_str quotes an empty string" '""' "$RUN_OUT"
+libcall json_str_or_null ""
+assert_eq "an empty value becomes null" "null" "$RUN_OUT"
+libcall json_lines $'--lang=de\n\n--disable-gpu'
+assert_eq "json_lines makes an array of strings, skipping blank lines" '["--lang=de","--disable-gpu"]' "$RUN_OUT"
+libcall json_lines ""
+assert_eq "json_lines makes an empty array from nothing" '[]' "$RUN_OUT"
+
+# The property that matters: a JSON parser gives back exactly what went in.
+# Both locales, because the loop walks bytes under C and characters under UTF-8.
+json_roundtrip() { # description input
+  local loc quoted
+  for loc in C en_US.UTF-8; do
+    quoted=$(LC_ALL=$loc "$BASH_BIN" -c '. "$1" >/dev/null 2>&1; json_str "$2"' aidentity-lib "$LIB" "$2")
+    assert_eq "json_str round-trips $1 ($loc)" "true" "$(json_get "$quoted" 'd === arg' "$2")"
+  done
+}
+ALL_ASCII=$(i=1; while [ "$i" -lt 128 ]; do printf '%b' "\\0$(printf '%03o' "$i")"; i=$((i+1)); done)
+assert_eq "the test string holds every ASCII character but NUL" "127" "$(printf '%s' "$ALL_ASCII" | wc -c | tr -d ' ')"
+json_roundtrip "every ASCII character"        "$ALL_ASCII"
+json_roundtrip "a path with quotes and slashes" '/Users/x/My "App" \ 2/a b.app'
+json_roundtrip "UTF-8 text"                   'Ünïcödé — 日本 🙂'
 
 group "colour handling"
 
@@ -1739,6 +1806,100 @@ assert_contains "its launcher gets its own extensions folder" \
   "$(cat "$APPS/Codish Iso.app/Contents/MacOS/launcher")" "--extensions-dir='$DATA/codish-iso/extensions'"
 ai rm "Codish Iso" --purge -y
 rm -rf "$VSC_APP"
+
+
+group "list --json"
+
+JSON_LAUNCHERS_BEFORE=$(count_launchers)
+# App names and paths are whatever is on disk. A quote, a backslash, a tab and
+# non-ASCII in the app's name reach the name, app and app_path fields.
+ODD_APP="$SRC/Wëird \"Q\" \\ Tab	App.app"
+ODD="Wëird \"Q\" \\ Tab	App Work"
+make_electron_app "$ODD_APP"
+ai add "$ODD_APP" --profile Work --badge "é" --color teal --arg --lang=de \
+  --env "HTTPS_PROXY=http://secret.example:8080"
+assert_rc "add takes an app whose name has quotes, a backslash and a tab" 0 "$RUN_RC" "$RUN_OUT"
+ai add "$ELECTRON_APP" --main
+ai add "$ELECTRON_APP" --profile Busy --no-badge
+printf 'session\n' > "$BUSY_DATA/Cookies"
+GONE_APP="$SRC/Gone.app"
+make_electron_app "$GONE_APP"
+ai add "$GONE_APP" --profile Lost
+rm -rf "$GONE_APP"
+EXT_APP="$SRC/Codey.app"
+make_electron_app "$EXT_APP"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.codey" "$EXT_APP/Contents/Info.plist"
+mkdir -p "$EXT_APP/Contents/Resources/app"
+printf '{"darwinBundleIdentifier":"com.example.codey","dataFolderName":".codey"}\n' \
+  > "$EXT_APP/Contents/Resources/app/product.json"
+ai add "$EXT_APP" --profile Ext --own-extensions
+
+ai_stdout list --json
+J=$RUN_OUT
+assert_rc "list --json exits 0" 0 "$RUN_RC" "$RUN_ERR"
+assert_eq "stdout parses as JSON, one object per launcher" "5" "$(json_get "$J" 'd.length')"
+assert_eq "every object has the same keys, in the same order" "true" \
+  "$(json_get "$J" 'd.every(function (o) { return Object.keys(o).join() === arg; })' \
+     "name,app,app_path,profile,data_dir,main,status,badge,color,built_by,args,env,own_extensions")"
+assert_eq "name survives quotes, a backslash, a tab and UTF-8" "true" \
+  "$(json_get "$J" 'byName(arg) !== undefined' "$ODD")"
+assert_eq "app is the app's name" "Wëird \"Q\" \\ Tab	App" "$(json_get "$J" 'byName(arg).app' "$ODD")"
+assert_eq "app_path is the app's path" "$ODD_APP" "$(json_get "$J" 'byName(arg).app_path' "$ODD")"
+assert_eq "profile is the profile name" "Work" "$(json_get "$J" 'byName(arg).profile' "$ODD")"
+assert_eq "data_dir is the profile folder" "$(plist_key "$APPS/$ODD.app" AIdentityDataDir)" \
+  "$(json_get "$J" 'byName(arg).data_dir' "$ODD")"
+assert_eq "main is false for a profile" "false" "$(json_get "$J" 'byName(arg).main' "$ODD")"
+assert_eq "a fresh profile is signed out / new" "signed out / new" "$(json_get "$J" 'byName(arg).status' "$ODD")"
+assert_eq "badge keeps a non-ASCII character" "é" "$(json_get "$J" 'byName(arg).badge' "$ODD")"
+assert_eq "color is the hex value" "12A594" "$(json_get "$J" 'byName(arg).color' "$ODD")"
+assert_eq "built_by is the version that built it" "${VERSION_LINE#aidentity }" \
+  "$(json_get "$J" 'byName(arg).built_by' "$ODD")"
+assert_eq "args lists the switches" '["--lang=de"]' "$(json_get "$J" 'byName(arg).args' "$ODD")"
+assert_eq "env lists variable names" '["HTTPS_PROXY"]' "$(json_get "$J" 'byName(arg).env' "$ODD")"
+assert_not_contains "and never their values" "$J" "secret.example"
+assert_eq "own_extensions is false by default" "false" "$(json_get "$J" 'byName(arg).own_extensions' "$ODD")"
+assert_eq "own_extensions is true when asked for" "true" "$(json_get "$J" 'byName("Codey Ext").own_extensions')"
+
+assert_eq "a main launcher has no data_dir" "null" "$(json_get "$J" 'byName("Fake Main").data_dir')"
+assert_eq "a main launcher is marked main" "true" "$(json_get "$J" 'byName("Fake Main").main')"
+assert_eq "a main launcher that is not running says so" "not running" "$(json_get "$J" 'byName("Fake Main").status')"
+assert_eq "a used profile is in use" "in use" "$(json_get "$J" 'byName("Fake Busy").status')"
+assert_eq "no badge is null" "null" "$(json_get "$J" 'byName("Fake Busy").badge')"
+assert_eq "a launcher whose app is gone says app missing" "app missing" "$(json_get "$J" 'byName("Gone Lost").status')"
+
+PATH="$PGREP_STUB:$PATH" ai_stdout list --json
+assert_eq "a running profile is running" "running" "$(json_get "$RUN_OUT" 'byName("Fake Busy").status')"
+PATH="$PGREP_STUB:$PATH" ai list
+BUSY_STATUS=$(printf '%s\n' "$RUN_OUT" | awk '/^Fake Busy$/ { f = 1; next } f && /status/ { print; exit }')
+assert_contains "the plain list agrees" "$BUSY_STATUS" "running"
+assert_contains "the plain list still says how to fix a missing app" "$RUN_OUT" \
+  'app missing — run: aidentity rebuild "Gone Lost"'
+
+# Warnings go to stderr, so stdout still parses when the running check fails.
+FAIL_PGREP="$SANDBOX/stub-pgrep-fails"
+mkdir -p "$FAIL_PGREP"
+printf '#!/bin/sh\nexit 3\n' > "$FAIL_PGREP/pgrep"
+chmod +x "$FAIL_PGREP/pgrep"
+PATH="$FAIL_PGREP:$PATH" ai_stdout list --json
+assert_eq "stdout parses even when a warning is printed" "5" "$(json_get "$RUN_OUT" 'd.length')"
+assert_contains "the warning goes to stderr" "$RUN_ERR" "Could not check which profiles are running"
+
+ai_tty '' list --json
+assert_not_contains "no colour codes, even on a terminal" "$RUN_OUT" $'\033'
+assert_eq "and it still parses" "5" "$(json_get "$RUN_OUT" 'd.length')"
+
+ai_stdout ls --json
+assert_eq "ls --json works too" "5" "$(json_get "$RUN_OUT" 'd.length')"
+ai list --jsn
+assert_rc_nonzero "list refuses an option it does not know" "$RUN_RC" "$RUN_OUT"
+assert_contains "and names it" "$RUN_OUT" "--jsn"
+ai list extra
+assert_rc_nonzero "list refuses an extra argument" "$RUN_RC" "$RUN_OUT"
+
+for l in "$ODD" "Fake Busy" "Gone Lost" "Codey Ext"; do ai rm "$l" --purge -y; done
+ai rm "Fake Main" -y
+rm -rf "$ODD_APP" "$EXT_APP"
+assert_eq "every launcher this group made is gone" "$JSON_LAUNCHERS_BEFORE" "$(count_launchers)"
 
 
 group "the generated launcher: sign-in guard and a clean environment"
