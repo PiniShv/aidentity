@@ -221,7 +221,7 @@ aidentity set "Claude Work" --badge W
 aidentity set "Claude Work" --no-badge
 ```
 
-`--color`, `--badge` and `--no-badge` take the same values as on `add`; at least one of them is required. Only the launcher bundle is rewritten — the profile directory is never opened — so this is safe with the app running. Asking for a colour on a launcher that has no badge adds one back, using the first letter of the profile name.
+`--color`, `--badge` and `--no-badge` take the same values as on `add`; at least one of them is required. Only the launcher bundle and the small restore record beside the profile are rewritten — the app's own data is never opened — so this is safe with the app running. Asking for a colour on a launcher that has no badge adds one back, using the first letter of the profile name.
 
 ### `aidentity prune`
 
@@ -234,6 +234,18 @@ aidentity prune
 This is what gets left behind when a launcher is deleted in Finder, or removed with `aidentity rm` without `--purge`: the directory stays, holding a signed-in session. `prune` lists each orphan with its disk size and full path, then asks you to type `yes`. `-y` / `--yes` skips that prompt. Anything currently running is skipped, and so is anything recorded outside the data root.
 
 Before calling anything an orphan, `prune` looks for launchers in the launcher directory and the folders inside it, in the app search path, and through Spotlight, and it compares directories by identity rather than by how their path is spelled. If you keep a launcher somewhere else entirely, its data shows up in the list — read it before you type `yes`.
+
+### `aidentity restore`
+
+Rebuild the launcher of a profile whose launcher is gone — deleted in Finder, or removed with `aidentity rm` without `--purge` — so the account opens again, still signed in.
+
+```bash
+aidentity restore                    # list what can be restored
+aidentity restore "Claude Work"
+aidentity restore --all
+```
+
+Every profile folder holds a small restore record, `.aidentity-profile.plist`: the profile name, the app, the badge and the colour. The app ignores it. `restore` reads it, finds the app again (by name or bundle ID if it moved), and builds the launcher with the same look. Everything in the record is checked as if you had typed it. Profiles made before this version get a record the next time their launcher is rebuilt, which `aidentity doctor --fix` does for you. `prune` names the folders that can be restored before it offers to delete them.
 
 ### `aidentity rebuild`
 
@@ -272,11 +284,19 @@ aidentity apps
 
 ### `aidentity doctor`
 
-Checks the macOS version, the aidentity version, the bash version, whether `~/Applications` is writable, whether `codesign` is available, how many compatible apps it can see, and how many profiles exist. Run it first when something looks wrong.
+Checks the macOS version, the aidentity version, the bash version, whether `~/Applications` is writable, whether `codesign` is available and how many compatible apps it can see. Then one row per profile: a launcher built by an older version, an app that moved or is gone, a profile folder other users can read, a missing restore record, two launchers sharing a folder, and profile folders no launcher points at. Run it first when something looks wrong.
 
 ```bash
 aidentity doctor
 ```
+
+`--fix` repairs what it can without a person: it rebuilds stale launchers (which also writes missing restore records) and makes profile folders owner-only. It never reads or changes the data inside a profile folder, and it leaves anything that needs a decision — a deleted app, a folder outside the data root — for you.
+
+```bash
+aidentity doctor --fix
+```
+
+`doctor` always exits 0, so scripts can call it for the report. `doctor --fix` exits 1 if something it tried to fix could not be fixed.
 
 ### `aidentity version` / `aidentity help`
 
