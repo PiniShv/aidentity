@@ -1,9 +1,8 @@
 # Extra entries on the "New issue" page, below the bug and app-support templates.
+# GitHub adds "Report a security vulnerability" itself, because SECURITY.md exists
+# and private vulnerability reporting is on, so it is not repeated here.
 blank_issues_enabled: true
 contact_links:
-  - name: Report a security vulnerability
-    url: https://github.com/PiniShv/aidentity/security/advisories/new
-    about: Report it privately, never in a public issue. SECURITY.md says what is in scope.
   - name: Read the FAQ
     url: https://github.com/PiniShv/aidentity#frequently-asked
     about: Auto-update, more than two accounts, Dock tiles, terms of service, and where to start when something breaks.
