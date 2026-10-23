@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `aidentity add APP --main` builds a launcher for your original account. While
+  any profile runs, macOS treats it as the app itself, so clicking the app only
+  switched to that profile and the original account could not be opened. The
+  main launcher starts the app with no profile directory, so it always opens the
+  original account. `setup` offers one per app. `rm --purge` and `rename` never
+  touch the app's own data.
+- `list` shows `app missing` with the fix when a launcher's app has moved.
+
+### Fixed
+
+- `add` with no `--profile` asks for the account name again. 1.1.0 lost the
+  prompt, so `aidentity add` picked an app and then failed on an empty name.
+- `list` said `signed out / new` for every Electron profile (Claude, Slack, VS
+  Code), because it only looked for Chromium's `Default/` folder.
+- A failed `rename`, `set` or `rebuild` no longer loses the launcher. Launchers
+  are now built in a hidden staging folder and swapped in only when complete.
+  Before, the old launcher was deleted first, and the build then exited instead
+  of returning — so rename's roll-back never ran, the session was left with no
+  launcher, and `prune` offered to delete it.
+- One typo at the app menu ended the whole `setup` walkthrough. It now asks
+  again; `q` stops.
+- `rebuild` and `rename` stripped the badge (and a chosen colour) from
+  launchers built by 1.0.0. They now restore 1.0.0's defaults.
+- `prune` deleted the data of launchers that were moved out of the launcher
+  folder, and of launchers that recorded the data root with a different
+  spelling (a symlink, a trailing slash). It now looks for launchers more widely
+  and compares directories by identity.
+- `rm` without `--purge` suggested `aidentity rm NAME --purge`, which cannot work
+  once the launcher is gone. It now prints the `add` line that reattaches the
+  data and points to `prune`. `rm` also no longer says "Removed" when a locked
+  bundle survived, and `rm A B` is refused instead of removing only `B`.
+- `--profile --seed` created a profile named "--seed". Option values starting
+  with `-` are refused, and so are profile names.
+- A non-ASCII `--badge` under `LC_ALL=C` wrote invalid UTF-8 and failed.
+- Renaming only the capitals of a name (`work` → `Work`) is allowed. A default
+  badge letter now follows the new name.
+- `rebuild` exits non-zero when a launcher could not be rebuilt.
+- `setup`, `add` and the installer test whether a terminal can really be opened.
+  `/dev/tty` reads as accessible on every Mac, so "needs a terminal" never fired
+  — and `make test` hung silently in a real terminal, waiting for a key.
+- The installer exited 1 after a successful install when there was no terminal
+  (CI, MDM). It no longer runs `setup` as root, refuses to install over a
+  directory, and replaces a symlink instead of following it.
+- `uninstall.sh` now also removes profile data no launcher points at, says
+  "gone" only when it is, and exits 1 when there is no terminal to confirm on.
+
+### Security
+
+- **The "is this profile running?" check could report a running profile as
+  stopped** when many app processes were running, so `rm --purge`, `rename`,
+  `prune` and `uninstall.sh` could act on a live profile. The check no longer
+  depends on a pipeline that stops reading early.
+- New profile directories are created owner-only (0700), like the apps' own,
+  and a seeded MCP config is 0600.
+
 ## [1.1.0] - 2026-08-14
 
 Four commands that close gaps found in review, a recorded demo, and a live

@@ -173,23 +173,54 @@ in_repo_checkout() {
 # yields bare PIDs and the match below can never succeed. The list must also be
 # captured before matching, or pgrep matches the grep's own argv. This copy had
 # both bugs, which made the "don't delete a running profile" guard dead code.
+#
+# The match runs in the shell, never as `printf … | grep -q`: on the 100 KB
+# lists real Electron helpers produce, grep -q's early exit killed printf with
+# SIGPIPE, pipefail read that as "no match", and a running profile looked
+# stopped. Quoting "$1" inside the pattern keeps [ * ? in a path literal.
 running_on_profile() {
-  local list
+  local list rc nl=$'\n'
   [ -n "$1" ] || return 1
   # pgrep exits 1 for "no match" but >=2 for a real failure. Treating those the
   # same made a data-loss guard fail OPEN — a broken pgrep read as "nothing is
   # running" and the delete went ahead. Anything but 0 or 1 is reported as
   # running, so the caller refuses to delete.
-  local rc
-  list=$(pgrep -fl "user-data-dir=" 2>/dev/null); rc=$?
+  # -a: on macOS pgrep leaves out the caller's own ancestors unless asked.
+  list=$(pgrep -afl "user-data-dir=" 2>/dev/null); rc=$?
   if [ "$rc" -gt 1 ]; then
     warn "Could not check which profiles are running (pgrep exited $rc); assuming they are."
     return 0
   fi
   [ "$rc" -eq 0 ] && [ -n "$list" ] || return 1
-  printf '%s\n' "$list" | grep -qF -- "user-data-dir=$1 " ||
-  printf '%s\n' "$list" | grep -q -- "user-data-dir=$(printf '%s' "$1" | sed 's/[][\.*^$\/]/\\&/g')\$"
+  case "$list$nl" in
+    *"user-data-dir=$1 "*|*"user-data-dir=$1$nl"*) return 0 ;;
+  esac
+  # The same directory under another spelling — a symlinked root, "//", a
+  # trailing slash — is the same profile. Compare each path a process names
+  # (up to the next " --" or the end of its line) by directory identity.
+  local want line rest path seen="|"
+  want=$(/usr/bin/stat -L -f '%d:%i' "$1" 2>/dev/null) || return 1
+  while IFS= read -r line; do
+    rest=$line
+    while :; do
+      case "$rest" in *user-data-dir=*) rest=${rest#*user-data-dir=} ;; *) break ;; esac
+      path=${rest%% --*}
+      case "$seen" in *"|$path|"*) continue ;; esac
+      seen="$seen$path|"
+      [ "$(/usr/bin/stat -L -f '%d:%i' "$path" 2>/dev/null)" = "$want" ] && return 0
+    done
+  done <<EOF
+$list
+EOF
+  return 1
 }
+
+# Whether /dev/tty can really be opened. Its mode bits say yes on every Mac,
+# terminal or not.
+tty_opens() { ( : < /dev/tty ) 2>/dev/null; }
+
+# A directory's identity, so two spellings of one directory compare equal.
+dir_id() { [ -d "$1" ] && /usr/bin/stat -L -f '%d:%i' "$1" 2>/dev/null; }
 
 human_size() {
   [ -d "$1" ] || { printf 'empty'; return 0; }
@@ -269,39 +300,95 @@ $candidates
 EOF
 
   [ "$removed" -gt 0 ] || [ "$blocked" -gt 0 ] || info "Nothing to remove."
+  LEFT_BEHIND=$((LEFT_BEHIND + blocked))
   info ""
 }
 
 # ------------------------------------------- 2. launchers + profile data --
 
-# Fills LAUNCHERS / LABELS / PROFILES / DATA_DIRS, parallel arrays.
-LAUNCHERS=(); LABELS=(); PROFILES=(); DATA_DIRS=()
+# Fills LAUNCHERS / LABELS / PROFILES / DATA_DIRS, parallel arrays, and ORPHANS:
+# profile directories in the data root that no launcher points at. Those hold
+# signed-in sessions too — left by a launcher deleted in Finder, or by
+# `aidentity rm` without --purge — and leaving them behind while saying
+# "aidentity is gone" was not true.
+LAUNCHERS=(); LABELS=(); PROFILES=(); DATA_DIRS=(); ORPHANS=()
+
+# Things kept on purpose or by failure (a Homebrew copy, a locked launcher,
+# data outside the root or in use). "aidentity is gone" is said only at zero.
+LEFT_BEHIND=0
+
+# Every aidentity launcher worth removing, one path per line: the launcher
+# directory and folders inside it (followed with -H when it is a symlink),
+# /Applications, and what Spotlight knows under your home folder or
+# /Applications. Looking only at the top of the launcher directory listed a
+# filed-away launcher's data as "no launcher points at" and deleted it while
+# the launcher stayed. Our own hidden .aidentity-* folders and the Trash are
+# skipped. Every hit is still checked for the marker key before it is listed.
+discover_launchers() {
+  local app
+  {
+    # The top level by glob as well: find's -type d skips a launcher that is
+    # itself a symlink, and its data would then look orphaned.
+    for app in "$APPS_DIR"/*.app; do
+      if [ -d "$app" ]; then printf '%s\n' "$app"; fi
+    done
+    find -H "$APPS_DIR" -maxdepth 3 -type d -name '.aidentity-*' -prune \
+      -o -type d -name '*.app' -print -prune 2>/dev/null || true
+    find -H /Applications -maxdepth 2 -type d -name '*.app' -print -prune 2>/dev/null || true
+    if command -v mdfind >/dev/null 2>&1; then
+      mdfind "kMDItemCFBundleIdentifier == 'com.aidentity.*'" 2>/dev/null || true
+    fi
+  } | awk 'NF && !seen[$0]++' | while IFS= read -r app; do
+    case "$app" in */.aidentity-*|*/.Trash/*|*/.Trashes/*) continue ;; esac
+    case "$app" in "$APPS_DIR"/*|"$HOME"/*|/Applications/*) ;; *) continue ;; esac
+    is_our_launcher "$app" && printf '%s\n' "$app"
+  done
+  return 0
+}
 
 scan_launchers() {
-  local app label
-  [ -d "$APPS_DIR" ] || return 0
-  for app in "$APPS_DIR"/*.app; do
-    [ -d "$app" ] || continue
-    is_our_launcher "$app" || continue
+  local app label d id claimed=" " found
+  found=$(discover_launchers) || found=""
+  while IFS= read -r app; do
+    [ -n "$app" ] || continue
     label=$(basename "$app" .app)
     LAUNCHERS+=("$app")
     LABELS+=("$label")
     PROFILES+=("$(plist_get "$app" "$MARKER_KEY")")
-    DATA_DIRS+=("$(plist_get "$app" "AIdentityDataDir")")
+    d=$(plist_get "$app" "AIdentityDataDir")
+    DATA_DIRS+=("$d")
+    if id=$(dir_id "$d"); then claimed="$claimed$id "; fi
+  done <<EOF
+$found
+EOF
+  [ -d "$DATA_ROOT" ] || return 0
+  for d in "$DATA_ROOT"/*; do
+    [ -d "$d" ] || continue
+    id=$(dir_id "$d") || continue
+    case "$claimed" in *" $id "*) continue ;; esac
+    data_is_ours "$d" || continue
+    ORPHANS+=("$d")
   done
+  return 0
 }
 
-# Show exactly what would go, then ask. Returns 1 if the user declines.
+# Show exactly what would go, then ask. Returns 1 if the user declines, and 2
+# if there is no terminal to ask on.
 confirm_removal() {
-  local i data running=0
+  local i data running=0 d
 
-  info "${C_BOLD}These launchers were built by aidentity:${C_RESET}"
-  info ""
+  if [ "${#LAUNCHERS[@]}" -gt 0 ]; then
+    info "${C_BOLD}These launchers were built by aidentity:${C_RESET}"
+    info ""
+  fi
   i=0
   while [ "$i" -lt "${#LAUNCHERS[@]}" ]; do
     data="${DATA_DIRS[$i]}"
     printf '  %s%s%s\n' "$C_BOLD" "${LABELS[$i]}" "$C_RESET"
     printf '    launcher  %s\n' "${LAUNCHERS[$i]}"
+    if [ "$(plist_get "${LAUNCHERS[$i]}" AIdentityMain)" = "true" ]; then
+      printf '    data      the app'"'"'s own — your original account, kept\n'
+    fi
     if [ -n "$data" ]; then
       if data_is_ours "$data"; then
         printf '    data      %s  (%s)\n' "$data" "$(human_size "$data")"
@@ -318,25 +405,44 @@ confirm_removal() {
     i=$((i + 1))
   done
 
+  if [ "${#ORPHANS[@]}" -gt 0 ]; then
+    info "${C_BOLD}Profile data no launcher points at${C_RESET} (left by a launcher deleted in"
+    info "Finder, or by 'aidentity rm' without --purge):"
+    info ""
+    for d in "${ORPHANS[@]}"; do
+      printf '    data      %s  (%s)\n' "$d" "$(human_size "$d")"
+      if running_on_profile "$d"; then
+        printf '    status    %sRUNNING%s\n' "$C_YELLOW" "$C_RESET"
+        running=$((running + 1))
+      fi
+    done
+    info ""
+  fi
+
   if [ "$running" -gt 0 ]; then
     die "$running profile(s) are running right now. Quit them, then re-run this script.
     Deleting a profile's data while its app is open loses whatever it has not saved."
   fi
 
   info "Removing them deletes ${C_BOLD}${#LAUNCHERS[@]}${C_RESET} launcher(s) and the profile data listed above."
-  info "Every account signed in through those launchers will have to sign in again."
+  info "Every account signed in through that data will have to sign in again."
   dim "  Your real apps — the ones in /Applications — are not touched."
   info ""
 
+  # Ask on the terminal even when stdin is not one (a piped run), and only
+  # give up when there is genuinely no terminal. Giving up is not success.
+  local reply="" from="/dev/stdin"
   if [ ! -t 0 ]; then
-    warn "Not running in a terminal, so there is nobody to confirm with. Nothing was deleted."
-    dim "  Run ./uninstall.sh directly in a terminal to remove them."
-    return 1
+    if ! tty_opens; then
+      warn "Not running in a terminal, so there is nobody to confirm with. No launchers or profile data were deleted."
+      dim "  Run ./uninstall.sh directly in a terminal to remove them."
+      return 2
+    fi
+    from="/dev/tty"
   fi
 
   printf 'Type %s%s%s to delete them, or anything else to keep them: ' "$C_BOLD" "$CONFIRM_WORD" "$C_RESET"
-  local reply=""
-  read -r reply || reply=""
+  IFS= read -r reply < "$from" || reply="${reply:-}"
   if [ "$reply" != "$CONFIRM_WORD" ]; then
     info ""
     ok "Kept. Nothing was deleted."
@@ -344,6 +450,31 @@ confirm_removal() {
     return 1
   fi
   return 0
+}
+
+# Delete one profile directory, with the same checks as aidentity's own purge:
+# inside the data root, and not running. The running check is repeated here
+# because the confirmation prompt can sit for minutes.
+remove_data() {
+  local data="$1" name="$2"
+  if ! data_is_ours "$data"; then
+    warn "Left profile data in place (outside the aidentity data directory):"
+    dim "    $data"
+    LEFT_BEHIND=$((LEFT_BEHIND + 1))
+    return 0
+  fi
+  [ -d "$data" ] || return 0
+  if running_on_profile "$data"; then
+    warn "Kept the data for $name — it was opened while waiting for confirmation."
+    LEFT_BEHIND=$((LEFT_BEHIND + 1))
+    return 0
+  fi
+  if rm -rf "$data" 2>/dev/null && [ ! -e "$data" ]; then
+    ok "Deleted data for $name"
+  else
+    warn "Could not delete the data for $name; it is still at $data"
+    LEFT_BEHIND=$((LEFT_BEHIND + 1))
+  fi
 }
 
 remove_launchers() {
@@ -357,33 +488,31 @@ remove_launchers() {
     # Checked once at scan time and again here: the list could be minutes old,
     # and nothing without the marker is ever removed.
     if is_our_launcher "$app"; then
-      if rm -rf "$app"; then
+      if rm -rf "$app" 2>/dev/null && [ ! -e "$app" ]; then
         ok "Removed ${LABELS[$i]}.app"
       else
         warn "Could not remove $app — it is still there."
+        LEFT_BEHIND=$((LEFT_BEHIND + 1))
       fi
     else
       warn "Skipped $app — it no longer carries the $MARKER_KEY key."
+      LEFT_BEHIND=$((LEFT_BEHIND + 1))
     fi
 
     if [ -n "$data" ]; then
-      if data_is_ours "$data"; then
-        if [ -d "$data" ]; then
-          if rm -rf "$data"; then
-            ok "Deleted data for ${LABELS[$i]}"
-          else
-            warn "Could not delete the data for ${LABELS[$i]}; it is still at $data"
-          fi
-        fi
-      else
-        warn "Left profile data in place (outside the aidentity data directory):"
-        dim "    $data"
-      fi
+      remove_data "$data" "${LABELS[$i]}"
     fi
     i=$((i + 1))
   done
 
+  local d
+  for d in ${ORPHANS[@]+"${ORPHANS[@]}"}; do
+    remove_data "$d" "$(basename "$d")"
+  done
+
   # Only if it is genuinely empty — rmdir refuses otherwise, which is the point.
+  # Finder's .DS_Store is not data; left alone it kept the folder "not empty".
+  rm -f "$DATA_ROOT/.DS_Store" 2>/dev/null || true
   rmdir "$DATA_ROOT" 2>/dev/null && dim "  Removed the now-empty $DATA_ROOT" || true
   rmdir "$(dirname "$DATA_ROOT")" 2>/dev/null || true
 
@@ -402,22 +531,36 @@ main() {
 
   scan_launchers
 
-  if [ "${#LAUNCHERS[@]}" -eq 0 ]; then
-    info "No aidentity launchers found in $APPS_DIR — nothing else to remove."
+  if [ "${#LAUNCHERS[@]}" -eq 0 ] && [ "${#ORPHANS[@]}" -eq 0 ]; then
+    info "No aidentity launchers or profile data found — nothing else to remove."
     info ""
     ok "Done."
     return 0
   fi
 
-  if confirm_removal; then
+  local rc=0
+  confirm_removal || rc=$?
+  if [ "$rc" -eq 0 ]; then
     info ""
     remove_launchers
     info ""
-    ok "Done. aidentity is gone from this Mac."
+    # Say "gone" only when it is. A Homebrew copy, a locked launcher, data
+    # outside the root or data in use is kept on purpose — and then this must
+    # not claim otherwise.
+    if [ "$LEFT_BEHIND" -eq 0 ] && [ ! -d "$DATA_ROOT" ]; then
+      ok "Done. aidentity is gone from this Mac."
+    else
+      warn "Done, but some things were left in place — see the messages above."
+      [ -d "$DATA_ROOT" ] && dim "    Still there: $DATA_ROOT"
+    fi
   else
     info ""
     dim "  Reinstall any time: curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash"
+    # No terminal to confirm on is not success: a script calling this must not
+    # read "exit 0" as "everything was removed". Declining is a fine answer.
+    if [ "$rc" -eq 2 ]; then exit 1; fi
   fi
+  return 0
 }
 
 main "$@"
