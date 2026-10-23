@@ -175,6 +175,50 @@ xmlescape() {
   printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g'
 }
 
+# A string as a JSON string, quotes included, for `list --json`. App names and
+# paths are whatever is on disk, so a quote, a backslash or a control
+# character must not end the string early. Quote and backslash get a
+# backslash, \n \r \t their short forms, every other control character
+# \u00XX. Anything else, UTF-8 included, is valid JSON as it is. A loop in the
+# shell, not sed: sed works a line at a time and never sees a newline.
+JSON_CTRL=$'\001\002\003\004\005\006\007\010\011\012\013\014\015\016\017\020\021\022\023\024\025\026\027\030\031\032\033\034\035\036\037'
+
+json_str() {
+  local s="$1" out="" c u i=0 n=${#1}
+  while [ "$i" -lt "$n" ]; do
+    c=${s:$i:1}
+    case "$c" in
+      '"')   out="$out\\\"" ;;
+      \\)    out="$out\\\\" ;;
+      $'\n') out="$out\\n" ;;
+      $'\r') out="$out\\r" ;;
+      $'\t') out="$out\\t" ;;
+      *) case "$JSON_CTRL" in
+           *"$c"*) printf -v u '\\u%04x' "'$c"; out="$out$u" ;;
+           *) out="$out$c" ;;
+         esac ;;
+    esac
+    i=$((i+1))
+  done
+  printf '"%s"' "$out"
+}
+
+# The same, but null for an empty value: a key that was never recorded.
+json_str_or_null() { if [ -n "$1" ]; then json_str "$1"; else printf 'null'; fi; }
+
+# One value per line -> a JSON array of strings. Blank lines are skipped.
+json_lines() {
+  local v sep=""
+  printf '['
+  while IFS= read -r v; do
+    [ -n "$v" ] || continue
+    printf '%s%s' "$sep" "$(json_str "$v")"; sep=","
+  done <<EOF
+$1
+EOF
+  printf ']'
+}
+
 # --------------------------------------------------------- app discovery --
 
 # True if the bundle is Chromium- or Electron-based, i.e. it understands
@@ -1274,7 +1318,34 @@ profile_has_data() {
   return 1
 }
 
+# What a launcher is doing, in the words list prints: running, in use,
+# signed out / new, app missing, or not running (a main launcher). One place,
+# so `list` and `list --json` can never disagree.
+launcher_status() { # launcher, target app, data dir
+  local status
+  if is_main_launcher "$1"; then
+    status="not running"
+    main_running "$2" && status="running"
+  else
+    status="signed out / new"
+    profile_has_data "$3" && status="in use"
+    running_on_profile "$3" && status="running"
+  fi
+  [ -d "$2" ] || status="app missing"
+  printf '%s' "$status"
+}
+
 cmd_list() {
+  local json=0
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --json) json=1; shift ;;
+      -*) die "Unknown option for list: $1" ;;
+      *) die "Unexpected argument: $1" ;;
+    esac
+  done
+  if [ "$json" -eq 1 ]; then list_json; return; fi
+
   local app n=0 profile target data label status
   for app in "$APPS_DIR"/*.app; do
     [ -d "$app" ] || continue
@@ -1284,15 +1355,11 @@ cmd_list() {
     profile=$(plist_get "$app" "$MARKER_KEY")
     target=$(plist_get "$app" "AIdentityTargetApp")
     data=$(plist_get "$app" "AIdentityDataDir")
-    if is_main_launcher "$app"; then
-      status="not running"
-      main_running "$target" && status="${C_GREEN}running${C_RESET}"
-    else
-      status="signed out / new"
-      profile_has_data "$data" && status="in use"
-      running_on_profile "$data" && status="${C_GREEN}running${C_RESET}"
-    fi
-    [ -d "$target" ] || status="${C_YELLOW}app missing${C_RESET} — run: aidentity rebuild \"$label\""
+    status=$(launcher_status "$app" "$target" "$data")
+    case "$status" in
+      running) status="${C_GREEN}running${C_RESET}" ;;
+      "app missing") status="${C_YELLOW}app missing${C_RESET} — run: aidentity rebuild \"$label\"" ;;
+    esac
     printf '%s%s%s\n' "$C_BOLD" "$label" "$C_RESET"
     printf '   app      %s\n' "$(bundle_name "$target")"
     printf '   profile  %s\n' "$profile"
@@ -1316,6 +1383,63 @@ cmd_list() {
     info "No profiles yet."
     dim "  Create one with:  aidentity add"
   fi
+}
+
+# `list --json`: one JSON array, one object per launcher, for scripts and other
+# front ends. The plain list is for people and may change its wording; these
+# keys stay. Every object has every key, in this order:
+#   name            launcher name, as `open`, `set` and `rm` take it
+#   app, app_path   the app it opens: name and path (null if not recorded)
+#   profile         profile name
+#   data_dir        profile folder; null for a main launcher
+#   main            true for a launcher that opens the app's own account
+#   status          running, in use, signed out / new, app missing, not running
+#   badge           badge character; null for the app's own icon
+#   color           badge colour, six hex digits
+#   built_by        the aidentity version that built it (null if not recorded)
+#   args            launch switches
+#   env             names of launch variables, never their values: a value
+#                   may be a token or a password
+#   own_extensions  true when a VS Code-style app has its own extensions folder
+# Nothing else is written to stdout, so the output always parses: warnings go
+# to stderr and there is no colour. No launchers prints [].
+list_json() {
+  local app n=0 profile target data label main ex obj
+  for app in "$APPS_DIR"/*.app; do
+    [ -d "$app" ] || continue
+    is_our_launcher "$app" || continue
+    label=$(bundle_name "$app")
+    profile=$(plist_get "$app" "$MARKER_KEY")
+    target=$(plist_get "$app" "AIdentityTargetApp")
+    data=$(plist_get "$app" "AIdentityDataDir")
+    main=false
+    is_main_launcher "$app" && { main=true; data=""; }
+    ex=$(extras_of "$app/Contents/Info.plist")
+    obj="{\"name\":$(json_str "$label")"
+    if [ -n "$target" ]; then
+      obj="$obj,\"app\":$(json_str "$(bundle_name "$target")")"
+    else
+      obj="$obj,\"app\":null"
+    fi
+    obj="$obj,\"app_path\":$(json_str_or_null "$target")"
+    obj="$obj,\"profile\":$(json_str "$profile")"
+    obj="$obj,\"data_dir\":$(json_str_or_null "$data")"
+    obj="$obj,\"main\":$main"
+    obj="$obj,\"status\":$(json_str "$(launcher_status "$app" "$target" "$data")")"
+    obj="$obj,\"badge\":$(json_str_or_null "$(launcher_badge "$app" "$target" "$profile")")"
+    obj="$obj,\"color\":$(json_str "$(launcher_color "$app" "$label")")"
+    obj="$obj,\"built_by\":$(json_str_or_null "$(plist_get "$app" CFBundleShortVersionString)")"
+    obj="$obj,\"args\":$(json_lines "$(extras_lines arg "$ex")")"
+    obj="$obj,\"env\":$(json_lines "$(extras_lines env "$ex" | sed 's/=.*//')")"
+    if [ -n "$(extras_lines ext "$ex")" ]; then
+      obj="$obj,\"own_extensions\":true}"
+    else
+      obj="$obj,\"own_extensions\":false}"
+    fi
+    if [ "$n" -eq 0 ]; then printf '[\n  %s' "$obj"; else printf ',\n  %s' "$obj"; fi
+    n=$((n+1))
+  done
+  if [ "$n" -eq 0 ]; then printf '[]\n'; else printf '\n]\n'; fi
 }
 
 cmd_open() {
@@ -2629,6 +2753,8 @@ ${C_BOLD}COMMANDS${C_RESET}
 
   list                 Show every profile, where its data lives, and what is running
                        Also spelled 'ls'.
+      --json           Print one JSON array instead, an object per launcher, for
+                       scripts. Variables are listed by name, never by value.
   open  NAME           Launch a profile
 
   rename OLD NEW       Rename a profile, moving its data so the account stays

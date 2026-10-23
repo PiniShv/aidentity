@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `aidentity list --json` prints every launcher as one JSON array, for scripts
+  and other front ends. Every object has the same keys: `name`, `app`,
+  `app_path`, `profile`, `data_dir` (null for a main launcher), `main`,
+  `status` (`running`, `in use`, `signed out / new`, `app missing` or
+  `not running`), `badge` (null for the app's own icon), `color`, `built_by`
+  (the aidentity version that built the launcher), `args`, `env` and
+  `own_extensions`. `env` holds variable names only, never values, as in the
+  plain list. With no profiles it prints `[]`. The plain `list` output is
+  unchanged.
+
+### Changed
+
+- `list` now refuses an option or argument it does not know. It used to
+  ignore them, so a mistyped `--json` printed the plain list and exited 0.
+
 ## [1.2.0] - 2026-10-23
 
 ### Added
