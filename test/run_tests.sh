@@ -1886,7 +1886,10 @@ assert_contains "the warning goes to stderr" "$RUN_ERR" "Could not check which p
 
 ai_tty '' list --json
 assert_not_contains "no colour codes, even on a terminal" "$RUN_OUT" $'\033'
-assert_eq "and it still parses" "5" "$(json_get "$RUN_OUT" 'd.length')"
+# A slow run outlasts ai_tty's input, and the terminal then echoes the end of
+# input as "^D" and two backspaces into the output. That echo is the
+# terminal's, not the script's, so it is removed before parsing.
+assert_eq "and it still parses" "5" "$(json_get "${RUN_OUT//^D$'\b\b'/}" 'd.length')"
 
 ai_stdout ls --json
 assert_eq "ls --json works too" "5" "$(json_get "$RUN_OUT" 'd.length')"
