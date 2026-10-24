@@ -4058,160 +4058,172 @@ cmd_version() { printf 'aidentity %s\n' "$AIDENTITY_VERSION"; }
 
 # ---------------------------------------------------------- command table --
 
-# The one place that says which names reach which command. Dispatch, the help
-# for one command and the completion scripts all read it, so an alias added here
-# works everywhere. COMMAND_WORDS must list every plain name in this case (not
-# the dashed ones, which are options); a test compares the two.
-canonical_command() {
-  case "$1" in
-    setup|init|wizard)       printf 'setup' ;;
-    add)                     printf 'add' ;;
-    rename|mv)               printf 'rename' ;;
-    set|modify|edit)         printf 'set' ;;
-    prune)                   printf 'prune' ;;
-    restore)                 printf 'restore' ;;
-    rebuild|repair)          printf 'rebuild' ;;
-    list|ls)                 printf 'list' ;;
-    open)                    printf 'open' ;;
-    rm|remove|delete)        printf 'rm' ;;
-    apps)                    printf 'apps' ;;
-    doctor)                  printf 'doctor' ;;
-    update)                  printf 'update' ;;
-    ui)                      printf 'ui' ;;
-    completion)              printf 'completion' ;;
-    version|--version|-v)    printf 'version' ;;
-    help|--help|-h)          printf 'help' ;;
-    *) return 1 ;;
-  esac
+# Every command, one row each:
+#
+#   name | other spellings | its first argument | options | summary
+#
+# The first argument is apps, launchers, restorable, shells or commands (what
+# Tab offers for it), or - for none. An option lists its spellings joined by /,
+# the one Tab offers first, and ends in = when it takes the next word as its
+# value. A name that starts with __ is hidden: it has no help page and is never
+# listed or offered by Tab, but it and its other spellings still run, and a -h
+# or --help after it is not read as a request for help. Dispatch, help, the
+# overview and completion all read this table, so a command, spelling or option
+# added here reaches all of them. The command runs as the function cmd_ and its
+# name, without the __: cmd_add, cmd_overview.
+COMMANDS='setup|init wizard|-||Guided walkthrough that sets up accounts (start here)
+ui||-||Full-screen menu over your profiles
+add||apps|--profile/-p= --badge/-b= --color/--colour/-c= --no-badge --seed --main --arg= --env= --own-extensions|Create a profile for an app
+list|ls|-|--json|Show every profile and what is running
+open||launchers||Open a profile
+rename|mv|launchers||Rename a profile and keep it signed in
+set|modify edit|launchers|--badge/-b= --color/--colour/-c= --no-badge --arg= --env= --clear-args --clear-env --own-extensions --shared-extensions|Change how a profile looks or starts
+prune||-|--yes/-y|Remove profile data that no launcher uses
+restore||restorable|--all/-a|Rebuild a launcher that was deleted
+rebuild|repair|launchers|--all/-a|Rebuild launchers after an app moved or updated
+rm|remove delete|launchers|--purge --yes/-y|Remove a launcher
+apps||-||List apps that can have extra accounts
+doctor||-|--fix|Check the setup and every profile
+update||-|--check|Install the latest release
+completion||shells||Print a tab-completion script
+version|--version -v|-||Print the version
+help||commands||Show help for all commands or for one
+__overview|-h --help|-||List every command
+__complete||-||Print what Tab can offer'
+
+# command_row WORD: find the row whose name or other spelling is WORD, and set
+# CMD_NAME, CMD_ALIASES, CMD_ARG, CMD_OPTS and CMD_SUMMARY from it. Returns 1,
+# with all five empty, when there is none.
+command_row() {
+  local w
+  while IFS='|' read -r CMD_NAME CMD_ALIASES CMD_ARG CMD_OPTS CMD_SUMMARY; do
+    for w in "$CMD_NAME" $CMD_ALIASES; do
+      [ "$1" = "$w" ] && return 0
+    done
+  done <<EOF
+$COMMANDS
+EOF
+  CMD_NAME=""; CMD_ALIASES=""; CMD_ARG=""; CMD_OPTS=""; CMD_SUMMARY=""
+  return 1
 }
-COMMAND_WORDS="setup init wizard add rename mv set modify edit prune restore rebuild repair list ls open rm remove delete apps doctor update ui completion version help"
 
-# The options a command accepts, for completion. Short spellings and --colour
-# are left out on purpose: they work, but listing both spellings is noise. Every
-# word here must also appear in the command's help; a test checks it.
-command_options() {
-  case "$1" in
-    add)  printf '%s' '--profile --badge --color --no-badge --seed --main --arg --env --own-extensions' ;;
-    set)  printf '%s' '--badge --color --no-badge --arg --env --clear-args --clear-env --own-extensions --shared-extensions' ;;
-    list) printf '%s' '--json' ;;
-    rm)   printf '%s' '--purge --yes' ;;
-    prune) printf '%s' '--yes' ;;
-    restore|rebuild) printf '%s' '--all' ;;
-    doctor) printf '%s' '--fix' ;;
-    update) printf '%s' '--check' ;;
-    *) ;;
-  esac
-}
-
-# Options that take the next word as their value, in every spelling. A
-# completion script skips the value when it counts the arguments typed so far.
-VALUE_OPTIONS="--profile -p --badge -b --color --colour -c --arg --env"
-
-command_summary() {
-  case "$1" in
-    setup)      printf 'Guided walkthrough that sets up accounts' ;;
-    add)        printf 'Create a profile for an app' ;;
-    rename)     printf 'Rename a profile and keep it signed in' ;;
-    set)        printf 'Change how a profile looks or starts' ;;
-    prune)      printf 'Remove profile data that no launcher uses' ;;
-    restore)    printf 'Rebuild a launcher that was deleted' ;;
-    rebuild)    printf 'Rebuild launchers after an app moved or updated' ;;
-    list)       printf 'Show every profile and what is running' ;;
-    open)       printf 'Open a profile' ;;
-    rm)         printf 'Remove a launcher' ;;
-    apps)       printf 'List apps that can have extra accounts' ;;
-    doctor)     printf 'Check the setup and every profile' ;;
-    update)     printf 'Install the latest release' ;;
-    ui)         printf 'Full-screen menu over your profiles' ;;
-    completion) printf 'Print a tab-completion script' ;;
-    version)    printf 'Print the version' ;;
-    help)       printf 'Show help for all commands or for one' ;;
-  esac
+# The words that name a command, a line each: the word, a tab and what it does.
+# Every name and other spelling that is not hidden, or with "-" only those that
+# start with a dash. Another spelling is "Same as" its command, unless that
+# command is hidden.
+command_words() {
+  local n a p o s d w
+  while IFS='|' read -r n a p o s; do
+    d="$s"
+    for w in $n $a; do
+      case "$w:${1:-}" in
+        __*) ;;
+        -*:-|[!-]*:) printf '%s\t%s\n' "$w" "$d" ;;
+      esac
+      case "$n" in __*) ;; *) d="Same as $n" ;; esac
+    done
+  done <<EOF
+$COMMANDS
+EOF
 }
 
 # --------------------------------------------------------- command help --
 
-# The help of one command, by its canonical name. Reached by `aidentity help
-# <command>` and by -h / --help after a command.
+# The help of one command, by its name. The first line, the "Also spelled"
+# line and the -h, --help line come from the command table; help_text has the
+# rest. "Also spelled" goes before the first OPTIONS, EXAMPLES or SET UP
+# heading. The -h, --help line closes the OPTIONS block, at its first blank
+# line, so an OPTIONS block must have no blank line inside and one after it. A
+# page with no OPTIONS gets a short one, so every page has the -h line.
 command_help() {
-  case "$1" in
-    setup) cat <<EOF
-${C_BOLD}aidentity setup${C_RESET} — $(command_summary setup)
+  local line also="" w stage=0 h='  -h, --help           Show this help'
+  command_row "$1" || return 1
+  for w in $CMD_ALIASES; do also="${also:+$also, }$w"; done
+  printf '%saidentity %s%s — %s\n\n' "$C_BOLD" "$CMD_NAME" "$C_RESET" "$CMD_SUMMARY"
+  while IFS= read -r line; do
+    case "$stage:$line" in
+      0:OPTIONS|0:EXAMPLES|"0:SET UP")
+        [ -z "$also" ] || printf 'Also spelled: %s\n\n' "$also"
+        printf '%sOPTIONS%s\n' "$C_BOLD" "$C_RESET"
+        stage=1
+        [ "$line" = OPTIONS ] && continue
+        printf '%s\n\n' "$h"; stage=2 ;;
+      1:) printf '%s\n' "$h"; stage=2 ;;
+    esac
+    case "$line" in
+      USAGE|OPTIONS|EXAMPLES|"SET UP") printf '%s%s%s\n' "$C_BOLD" "$line" "$C_RESET" ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done <<EOF
+$(help_text "$CMD_NAME")
+EOF
+}
 
-${C_BOLD}USAGE${C_RESET}
+# What each command's help says beyond the command table: usage, what it does,
+# its options and examples.
+help_text() {
+  case "$1" in
+    setup) cat <<'EOF'
+USAGE
   aidentity setup
 
 Asks which app to use and what to call each account, then builds all the
 launchers in one pass. It needs a terminal. Without one, use 'aidentity add'.
 
-Also spelled: init, wizard
-
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity setup
 EOF
     ;;
-    add) cat <<EOF
-${C_BOLD}aidentity add${C_RESET} — $(command_summary add)
-
-${C_BOLD}USAGE${C_RESET}
+    add) cat <<'EOF'
+USAGE
   aidentity add [APP] [options]
 
 APP is the name of an installed Chromium or Electron app, such as Claude, or the
 path to its .app. Run 'aidentity apps' to see which apps work. With no APP or no
 --profile, add asks for them. That needs a terminal.
 
-${C_BOLD}OPTIONS${C_RESET}
+OPTIONS
   -p, --profile NAME   Name for this account, e.g. Work
   -b, --badge X        One character for the icon badge (default: first letter)
   -c, --color NAME     Badge colour: blue green orange purple teal pink red
                        yellow gray graphite, or a hex value like 2E7DF6
   --no-badge           Use the app's own icon, with your name
   --seed               Copy Claude Desktop's MCP server config into the profile
-  --main               Build a launcher for your ORIGINAL account (name: Main)
+  --main               Build a launcher for your ORIGINAL account (name: Main).
+                       While a profile runs, macOS treats it as the app, so
+                       the app's own icon only switches to that profile.
   --arg SWITCH         Pass a switch on every launch: a proxy, language,
                        display scale or GPU switch. Repeat to add more.
   --env NAME=VALUE     Set a proxy variable, LANG, LC_ALL, LC_CTYPE, LC_MESSAGES
                        or TZ on every launch. Repeat to add more.
   --own-extensions     VS Code, Cursor, Kiro: a separate extensions folder
-  -h, --help           Show this help
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity add Claude --profile Work
   aidentity add Claude --profile Work --color blue --seed
   aidentity add Claude --main
 EOF
     ;;
-    rename) cat <<EOF
-${C_BOLD}aidentity rename${C_RESET} — $(command_summary rename)
-
-${C_BOLD}USAGE${C_RESET}
+    rename) cat <<'EOF'
+USAGE
   aidentity rename OLD NEW
 
 OLD is the launcher name that 'aidentity list' shows. NEW is the new profile
 name, without the app name. The profile's data folder moves with it, so the
 account stays signed in. It stops if the profile is running.
 
-Also spelled: mv
-
-${C_BOLD}OPTIONS${C_RESET}
-  -h, --help           Show this help
-
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity rename "Claude Work" Client
 EOF
     ;;
-    set) cat <<EOF
-${C_BOLD}aidentity set${C_RESET} — $(command_summary set)
-
-${C_BOLD}USAGE${C_RESET}
+    set) cat <<'EOF'
+USAGE
   aidentity set NAME [options]
 
 NAME is the launcher name that 'aidentity list' shows. Give at least one option.
 The account and its data are not touched.
 
-Also spelled: modify, edit
-
-${C_BOLD}OPTIONS${C_RESET}
+OPTIONS
   -c, --color NAME     New badge colour
   -b, --badge X        New badge character
   --no-badge           Use the app's own icon, unchanged
@@ -4221,17 +4233,14 @@ ${C_BOLD}OPTIONS${C_RESET}
   --clear-env          Remove every launch variable
   --own-extensions     VS Code, Cursor, Kiro: a separate extensions folder
   --shared-extensions  Go back to the app's own extensions folder
-  -h, --help           Show this help
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity set "Claude Work" --color purple
   aidentity set "Claude Work" --arg --lang=de
 EOF
     ;;
-    prune) cat <<EOF
-${C_BOLD}aidentity prune${C_RESET} — $(command_summary prune)
-
-${C_BOLD}USAGE${C_RESET}
+    prune) cat <<'EOF'
+USAGE
   aidentity prune [options]
 
 Finds profile folders that no launcher points at. They are left when a launcher
@@ -4239,154 +4248,123 @@ is deleted in Finder, or removed with 'rm' without --purge. It lists them and
 asks before it deletes anything. Deleting cannot be undone. To get a launcher
 back instead, use 'aidentity restore'.
 
-${C_BOLD}OPTIONS${C_RESET}
+OPTIONS
   -y, --yes            Skip the confirmation prompt
-  -h, --help           Show this help
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity prune
 EOF
     ;;
-    restore) cat <<EOF
-${C_BOLD}aidentity restore${C_RESET} — $(command_summary restore)
-
-${C_BOLD}USAGE${C_RESET}
+    restore) cat <<'EOF'
+USAGE
   aidentity restore [NAME | --all]
 
 Each profile folder keeps a small record of its launcher. restore reads it and
 rebuilds the launcher, still signed in. With no NAME and no --all, it lists the
 profiles that can be restored.
 
-${C_BOLD}OPTIONS${C_RESET}
+OPTIONS
   -a, --all            Restore every one of them
-  -h, --help           Show this help
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity restore
   aidentity restore "Claude Work"
   aidentity restore --all
 EOF
     ;;
-    rebuild) cat <<EOF
-${C_BOLD}aidentity rebuild${C_RESET} — $(command_summary rebuild)
-
-${C_BOLD}USAGE${C_RESET}
+    rebuild) cat <<'EOF'
+USAGE
   aidentity rebuild NAME
   aidentity rebuild --all
 
 Writes the launcher again from what it records. Profile data is not touched,
 so every account stays signed in.
 
-Also spelled: repair
-
-${C_BOLD}OPTIONS${C_RESET}
+OPTIONS
   -a, --all            Rebuild every profile
-  -h, --help           Show this help
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity rebuild "Claude Work"
   aidentity rebuild --all
 EOF
     ;;
-    list) cat <<EOF
-${C_BOLD}aidentity list${C_RESET} — $(command_summary list)
-
-${C_BOLD}USAGE${C_RESET}
+    list) cat <<'EOF'
+USAGE
   aidentity list [options]
 
 For each profile it shows the app, the profile name, where its data lives and
 its status: running, in use, signed out / new, app missing or not running.
 
-Also spelled: ls
-
-${C_BOLD}OPTIONS${C_RESET}
+OPTIONS
   --json               Print one JSON array instead, with an object for each
                        launcher, for scripts. Variables are listed by name,
                        never by value.
-  -h, --help           Show this help
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity list
   aidentity ls --json
 EOF
     ;;
-    open) cat <<EOF
-${C_BOLD}aidentity open${C_RESET} — $(command_summary open)
-
-${C_BOLD}USAGE${C_RESET}
+    open) cat <<'EOF'
+USAGE
   aidentity open NAME
 
 NAME is the launcher name that 'aidentity list' shows. Put it in quotes when it
 has a space.
 
-${C_BOLD}OPTIONS${C_RESET}
-  -h, --help           Show this help
-
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity open "Claude Work"
 EOF
     ;;
-    rm) cat <<EOF
-${C_BOLD}aidentity rm${C_RESET} — $(command_summary rm)
-
-${C_BOLD}USAGE${C_RESET}
+    rm) cat <<'EOF'
+USAGE
   aidentity rm NAME [options]
 
 Removes the launcher and keeps its data, so 'aidentity restore' can bring it
 back. It asks you to type yes first. It stops if the profile is running, and it
 only removes launchers that aidentity built.
 
-Also spelled: remove, delete
-
-${C_BOLD}OPTIONS${C_RESET}
+OPTIONS
   --purge              Also delete the profile's data. This cannot be undone.
                        A main launcher has no profile data, so nothing more is
                        deleted for it.
   -y, --yes            Skip the confirmation prompt
-  -h, --help           Show this help
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity rm "Claude Work"
   aidentity rm "Claude Work" --purge
 EOF
     ;;
-    apps) cat <<EOF
-${C_BOLD}aidentity apps${C_RESET} — $(command_summary apps)
-
-${C_BOLD}USAGE${C_RESET}
+    apps) cat <<'EOF'
+USAGE
   aidentity apps
 
 Lists the Chromium and Electron apps found in /Applications and ~/Applications.
 Only these apps can run more than one account.
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity apps
 EOF
     ;;
-    doctor) cat <<EOF
-${C_BOLD}aidentity doctor${C_RESET} — $(command_summary doctor)
-
-${C_BOLD}USAGE${C_RESET}
+    doctor) cat <<'EOF'
+USAGE
   aidentity doctor [options]
 
 Shows the macOS, aidentity and bash versions, whether the launcher folder can be
 written, and any problem it finds in a profile. It only reports, unless you give
 --fix.
 
-${C_BOLD}OPTIONS${C_RESET}
+OPTIONS
   --fix                Repair what can be repaired: rebuild stale launchers
                        and make profile folders owner-only
-  -h, --help           Show this help
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity doctor
   aidentity doctor --fix
 EOF
     ;;
-    update) cat <<EOF
-${C_BOLD}aidentity update${C_RESET} — $(command_summary update)
-
-${C_BOLD}USAGE${C_RESET}
+    update) cat <<'EOF'
+USAGE
   aidentity update [options]
 
 Asks GitHub for the latest release. If it is newer, downloads it, checks it
@@ -4394,19 +4372,16 @@ against the release's checksum, and replaces this copy in one step. This is the
 only command that uses the network, and only when you run it. It never uses
 sudo. A copy installed with Homebrew is updated with: brew upgrade aidentity
 
-${C_BOLD}OPTIONS${C_RESET}
+OPTIONS
   --check              Only say whether a newer release is out
-  -h, --help           Show this help
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity update --check
   aidentity update
 EOF
     ;;
-    ui) cat <<EOF
-${C_BOLD}aidentity ui${C_RESET} — $(command_summary ui)
-
-${C_BOLD}USAGE${C_RESET}
+    ui) cat <<'EOF'
+USAGE
   aidentity ui
 
 A full-screen menu in Terminal: every profile, what is running, and keys to
@@ -4415,48 +4390,37 @@ runs the same command you would type, with the same checks. It needs a
 terminal; in a script, use the commands themselves or aidentity list --json.
 Press ? in the menu for its keys, and q to leave.
 
-${C_BOLD}OPTIONS${C_RESET}
-  -h, --help           Show this help
-
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity ui
 EOF
     ;;
-    completion) cat <<EOF
-${C_BOLD}aidentity completion${C_RESET} — $(command_summary completion)
-
-${C_BOLD}USAGE${C_RESET}
+    completion) cat <<'EOF'
+USAGE
   aidentity completion SHELL
 
 SHELL is bash, zsh or fish. The script goes to standard output. It completes
 commands, options, profile names, app names and colours. A name with a space
 is quoted for you. Homebrew installs these scripts for you.
 
-${C_BOLD}SET UP${C_RESET}
-  bash   eval "\$(aidentity completion bash)"     in ~/.bashrc
-  zsh    eval "\$(aidentity completion zsh)"      in ~/.zshrc, after compinit
+SET UP
+  bash   eval "$(aidentity completion bash)"     in ~/.bashrc
+  zsh    eval "$(aidentity completion zsh)"      in ~/.zshrc, after compinit
   fish   aidentity completion fish | source      in ~/.config/fish/config.fish
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity completion zsh
 EOF
     ;;
-    version) cat <<EOF
-${C_BOLD}aidentity version${C_RESET} — $(command_summary version)
-
-${C_BOLD}USAGE${C_RESET}
+    version) cat <<'EOF'
+USAGE
   aidentity version
 
-Also spelled: --version, -v
-
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity version
 EOF
     ;;
-    help) cat <<EOF
-${C_BOLD}aidentity help${C_RESET} — $(command_summary help)
-
-${C_BOLD}USAGE${C_RESET}
+    help) cat <<'EOF'
+USAGE
   aidentity help [COMMAND]
   aidentity COMMAND --help
 
@@ -4465,7 +4429,7 @@ options and examples. aidentity -h and aidentity --help show the same overview
 as aidentity help, and ignore what comes after them. After a command, -h or
 --help shows that command's help and does nothing else.
 
-${C_BOLD}EXAMPLES${C_RESET}
+EXAMPLES
   aidentity help
   aidentity help rm
   aidentity rm --help
@@ -4475,519 +4439,33 @@ EOF
 }
 
 # aidentity help [command]
-cmd_help_for() {
-  [ $# -le 1 ] || die "Usage: aidentity help [command]"
-  if [ $# -eq 0 ]; then cmd_help; return 0; fi
-  local canon
-  canon=$(canonical_command "$1") \
-    || die "No help for '$1'. Run 'aidentity help' to see the commands."
-  command_help "$canon"
-}
-
-# -------------------------------------------------------------- completion --
-
-# `aidentity __complete WHAT` prints the candidates for one kind of word, one
-# per line. The completion scripts call it on every Tab, so it prints nothing on
-# stderr and always exits 0, whatever is wrong with the folders it reads.
-cmd_complete() {
-  ( complete_candidates "${1:-}" ) 2>/dev/null
-  return 0
-}
-
-complete_candidates() {
-  local app name dir label
-  case "$1" in
-    launchers)   # the names open, rm, set, rename and rebuild take
-      for app in "$APPS_DIR"/*.app; do
-        [ -d "$app" ] || continue
-        is_our_launcher "$app" || continue
-        name=$(bundle_name "$app")
-        case "$name" in *[[:cntrl:]]*) continue ;; esac
-        printf '%s\n' "$name"
-      done ;;
-    restorable)  # the names restore takes: profiles whose launcher is gone
-      while IFS= read -r dir; do
-        [ -n "$dir" ] || continue
-        label=$(restore_label "$dir") || continue
-        printf '%s\n' "$label"
-      done <<EOF
-$(orphan_dirs)
-EOF
-      ;;
-    apps)        # the names add takes
-      while IFS= read -r app; do
-        [ -n "$app" ] || continue
-        name=$(bundle_name "$app")
-        case "$name" in *[[:cntrl:]]*) continue ;; esac
-        printf '%s\n' "$name"
-      done <<EOF | awk '!seen[$0]++'
-$(list_compatible_apps)
-EOF
-      ;;
-  esac
-}
-
-# The script goes to stdout. Names are embedded from the command table above,
-# so a new command or alias reaches all three shells.
-cmd_completion() {
-  local shell=""
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      -*) die "Unknown option for completion: $1" ;;
-      *) [ -z "$shell" ] && shell="$1" || die "Unexpected argument: $1"; shift ;;
-    esac
-  done
-  [ -n "$shell" ] || die "Usage: aidentity completion bash|zsh|fish"
-  case "$shell" in
-    bash) completion_bash ;;
-    zsh)  completion_zsh ;;
-    fish) completion_fish ;;
-    *) die "Unknown shell '$shell'. Use bash, zsh or fish." ;;
-  esac
-}
-
-# "<alias> <command>" for every alias, one per line.
-command_aliases() {
-  local w c
-  for w in $COMMAND_WORDS; do
-    c=$(canonical_command "$w")
-    [ "$w" = "$c" ] || printf '%s %s\n' "$w" "$c"
-  done
-}
-
-# The canonical command names, one per line.
-command_names() {
-  local w
-  for w in $COMMAND_WORDS; do
-    [ "$(canonical_command "$w")" = "$w" ] && printf '%s\n' "$w"
-  done
-}
-
-# shellcheck disable=SC2016  # the generated script's $ signs are meant literally
-completion_bash() {
-  local w c o
-  cat <<'EOF'
-# bash completion for aidentity
-#
-#   eval "$(aidentity completion bash)"     # in ~/.bashrc
-#
-# It completes commands, options, profile names, app names and colours. The
-# names come from 'aidentity __complete', which is not meant to be run by hand.
-
-# _aidentity_escape QUOTE TEXT: set REPLY to TEXT as it can sit inside a QUOTE
-# (" or ') the user has already opened. Inside double quotes ! cannot be
-# escaped, so a name with one fails (return 1) and the caller leaves it out.
-_aidentity_escape() {
-  local q="$1" s="$2" c i=0
-  REPLY=""
-  while [ "$i" -lt "${#s}" ]; do
-    c="${s:i:1}"
-    if [ "$q" = "'" ]; then
-      if [ "$c" = "'" ]; then c="'\\''"; fi
-    else
-      case "$c" in
-        '!') REPLY=""; return 1 ;;
-        '\'|'"'|'$'|'`') c="\\$c" ;;
-      esac
-    fi
-    REPLY="$REPLY$c"
-    i=$((i + 1))
-  done
-}
-
-# _aidentity_unescape QUOTE TEXT: the reverse, for the part of the word that is
-# typed already. Sets REPLY.
-_aidentity_unescape() {
-  local q="$1" s="$2" c i=0 n
-  REPLY=""
-  while [ "$i" -lt "${#s}" ]; do
-    c="${s:i:1}"
-    n=$((i + 1))
-    if [ "$q" = "'" ]; then
-      if [ "${s:i:4}" = "'\\''" ]; then c="'"; i=$((i + 3)); fi
-    elif [ "$c" = '\' ]; then
-      case "${s:n:1}" in
-        '\'|'"'|'$'|'`') c="${s:n:1}"; i=$n ;;
-        '') c="" ;;   # a backslash with nothing after it yet
-      esac
-    fi
-    REPLY="$REPLY$c"
-    i=$((i + 1))
-  done
-}
-
-# _aidentity_reply WORD LIST: add every line of LIST that starts with WORD to
-# COMPREPLY. A name is escaped for the shell. When WORD already starts with a
-# quote, the name is escaped for that quote instead, so a $ or a quote mark in a
-# folder name is never read by the shell as code.
-_aidentity_reply() {
-  local word="$1" line quote=""
-  case "$word" in
-    \"*) quote='"'; word="${word#\"}" ;;
-    \'*) quote="'"; word="${word#\'}" ;;
-    *)   word="${word//\\/}" ;;
-  esac
-  if [ -n "$quote" ]; then _aidentity_unescape "$quote" "$word"; word="$REPLY"; fi
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    case "$line" in
-      "$word"*)
-        if [ -z "$quote" ]; then
-          COMPREPLY+=("$(printf '%q' "$line")")
-        elif _aidentity_escape "$quote" "$line"; then
-          COMPREPLY+=("$REPLY")
-        fi ;;
-    esac
-  done <<< "$2"
-}
-
-_aidentity() {
-  local IFS=$' \t\n'
-  local cur="${COMP_WORDS[COMP_CWORD]}" cmd="" opts="" valopt="" w i npos=0
-EOF
-  printf '  local commands="%s"\n' "$COMMAND_WORDS"
-  cat <<'EOF'
-  COMPREPLY=()
-
-  if [ "$COMP_CWORD" -le 1 ]; then
-    case "$cur" in
-      -*) COMPREPLY=($(compgen -W "-h --help -v --version" -- "$cur")) ;;
-      *)  COMPREPLY=($(compgen -W "$commands" -- "$cur")) ;;
-    esac
-    return 0
-  fi
-
-  cmd="${COMP_WORDS[1]}"
-  case "$cmd" in
-EOF
-  command_aliases | while read -r w c; do printf '    %s) cmd="%s" ;;\n' "$w" "$c"; done
-  cat <<'EOF'
-  esac
-
-  # Count the arguments typed so far. An option's value is not an argument.
-  i=2
-  while [ "$i" -lt "$COMP_CWORD" ]; do
-    w="${COMP_WORDS[i]}"
-    case "$w" in
-EOF
-  printf '      %s)\n' "$(printf '%s' "$VALUE_OPTIONS" | tr ' ' '|')"
-  cat <<'EOF'
-        [ $((i + 1)) -eq "$COMP_CWORD" ] && valopt="$w"
-        i=$((i + 1)) ;;
-      -*) ;;
-      *) npos=$((npos + 1)) ;;
-    esac
-    i=$((i + 1))
-  done
-
-  case "$valopt" in
-    "") ;;
-EOF
-  printf '    --color|--colour|-c) COMPREPLY=($(compgen -W "%s" -- "$cur")) ;;\n' "$COLOR_NAMES"
-  cat <<'EOF'
-    *) ;;
-  esac
-  [ -z "$valopt" ] || return 0
-
-  case "$cur" in
-    -*)
-      case "$cmd" in
-EOF
-  for c in $(command_names); do
-    o=$(command_options "$c")
-    [ -n "$o" ] && printf '        %s) opts="%s" ;;\n' "$c" "$o"
-  done
-  cat <<'EOF'
-      esac
-      COMPREPLY=($(compgen -W "$opts --help" -- "$cur"))
-      return 0 ;;
-  esac
-
-  [ "$npos" -eq 0 ] || return 0
-  case "$cmd" in
-    add) _aidentity_reply "$cur" "$(aidentity __complete apps 2>/dev/null)" ;;
-    open|rename|set|rebuild|rm) _aidentity_reply "$cur" "$(aidentity __complete launchers 2>/dev/null)" ;;
-    restore) _aidentity_reply "$cur" "$(aidentity __complete restorable 2>/dev/null)" ;;
-    completion) COMPREPLY=($(compgen -W "bash zsh fish" -- "$cur")) ;;
-    help) COMPREPLY=($(compgen -W "$commands" -- "$cur")) ;;
-  esac
-  return 0
-}
-
-complete -F _aidentity aidentity
-EOF
-}
-
-completion_zsh() {
-  local w c o d
-  cat <<'EOF'
-#compdef aidentity
-# zsh completion for aidentity
-#
-#   eval "$(aidentity completion zsh)"      # in ~/.zshrc, after compinit
-#
-# Or save the output as a file named _aidentity in a folder on your fpath.
-# It completes commands, options, profile names, app names and colours. The
-# names come from 'aidentity __complete', which is not meant to be run by hand.
-
-_aidentity() {
-  local cmd="" valopt="" i npos=0
-  local -a names opts commands
-
-  if (( CURRENT == 2 )); then
-    if [[ $words[CURRENT] == -* ]]; then
-      compadd -- -h --help -v --version
-    else
-      commands=(
-EOF
-  for c in $(command_names); do
-    printf "        '%s:%s'\n" "$c" "$(command_summary "$c")"
-  done
-  command_aliases | while read -r w c; do printf "        '%s:Same as %s'\n" "$w" "$c"; done
-  cat <<'EOF'
-      )
-      _describe -t commands 'aidentity command' commands
-    fi
-    return
-  fi
-
-  cmd=$words[2]
-  case $cmd in
-EOF
-  command_aliases | while read -r w c; do printf '    %s) cmd="%s" ;;\n' "$w" "$c"; done
-  cat <<'EOF'
-  esac
-
-  # Count the arguments typed so far. An option's value is not an argument.
-  i=3
-  while (( i < CURRENT )); do
-    case $words[i] in
-EOF
-  printf '      %s)\n' "$(printf '%s' "$VALUE_OPTIONS" | tr ' ' '|')"
-  cat <<'EOF'
-        (( i + 1 == CURRENT )) && valopt=$words[i]
-        i=$(( i + 1 )) ;;
-      -*) ;;
-      *) npos=$(( npos + 1 )) ;;
-    esac
-    i=$(( i + 1 ))
-  done
-
-  case $valopt in
-    '') ;;
-EOF
-  printf '    --color|--colour|-c) compadd -- %s ;;\n' "$COLOR_NAMES"
-  cat <<'EOF'
-  esac
-  [[ -z $valopt ]] || return
-
-  if [[ $words[CURRENT] == -* ]]; then
-    case $cmd in
-EOF
-  for c in $(command_names); do
-    o=$(command_options "$c")
-    [ -n "$o" ] && printf '      %s) opts=(%s) ;;\n' "$c" "$o"
-  done
-  cat <<'EOF'
-    esac
-    compadd -- $opts --help
-    return
-  fi
-
-  (( npos == 0 )) || return
-  case $cmd in
-    add) names=("${(@f)$(command aidentity __complete apps 2>/dev/null)}") ;;
-    open|rename|set|rebuild|rm) names=("${(@f)$(command aidentity __complete launchers 2>/dev/null)}") ;;
-    restore) names=("${(@f)$(command aidentity __complete restorable 2>/dev/null)}") ;;
-    completion) compadd -- bash zsh fish; return ;;
-EOF
-  printf '    help) compadd -- %s; return ;;\n' "$COMMAND_WORDS"
-  cat <<'EOF'
-    *) return ;;
-  esac
-  names=(${names:#})
-  compadd -a names
-}
-
-if [[ $funcstack[1] == _aidentity ]]; then
-  _aidentity "$@"
-else
-  compdef _aidentity aidentity
-fi
-EOF
-}
-
-completion_fish() {
-  local w c o vo
-  cat <<'EOF'
-# fish completion for aidentity
-#
-#   aidentity completion fish | source      # in ~/.config/fish/config.fish
-#
-# Or save the output as ~/.config/fish/completions/aidentity.fish.
-# It completes commands, options, profile names, app names and colours. The
-# names come from 'aidentity __complete', which is not meant to be run by hand.
-
-# The command typed so far, with an alias turned into the command it stands for.
-function __aidentity_command
-    set -l tokens (commandline -opc)
-    test (count $tokens) -ge 2; or return 1
-    switch $tokens[2]
-EOF
-  command_aliases | while read -r w c; do printf "        case %s\n            echo %s\n" "$w" "$c"; done
-  cat <<'EOF'
-        case '*'
-            echo $tokens[2]
-    end
-end
-
-function __aidentity_no_command
-    test (count (commandline -opc)) -eq 1
-end
-
-function __aidentity_has_command
-    test (count (commandline -opc)) -ge 2
-end
-
-# True when the command typed so far is one of the arguments.
-function __aidentity_using
-    set -l cmd (__aidentity_command)
-    test -n "$cmd"; or return 1
-    contains -- $cmd $argv
-end
-
-# True when no argument has been typed after the command yet. Options, and the
-# value of an option that takes one, do not count.
-function __aidentity_wants_name
-    set -l tokens (commandline -opc)
-    test (count $tokens) -ge 2; or return 1
-    set -e tokens[1..2]
-    set -l found 0
-    set -l skip 0
-    for t in $tokens
-        if test $skip -eq 1
-            set skip 0
-            continue
-        end
-        switch $t
-EOF
-  vo=""
-  for o in $VALUE_OPTIONS; do vo="$vo '$o'"; done
-  printf '            case%s\n' "$vo"
-  cat <<'EOF'
-                set skip 1
-            case '-*'
-            case '*'
-                set found 1
-        end
-    end
-    test $found -eq 0
-end
-
-complete -c aidentity -f
-EOF
-  for c in $(command_names); do
-    printf "complete -c aidentity -n __aidentity_no_command -a '%s' -d '%s'\n" "$c" "$(command_summary "$c")"
-  done
-  command_aliases | while read -r w c; do
-    printf "complete -c aidentity -n __aidentity_no_command -a '%s' -d 'Same as %s'\n" "$w" "$c"
-  done
-  cat <<'EOF'
-complete -c aidentity -n __aidentity_no_command -s h -l help -d 'Show help'
-complete -c aidentity -n __aidentity_no_command -s v -l version -d 'Print the version'
-complete -c aidentity -n __aidentity_has_command -l help -d 'Show help for this command'
-EOF
-  for c in $(command_names); do
-    for o in $(command_options "$c"); do
-      case "$o" in
-        --color)   printf "complete -c aidentity -n '__aidentity_using %s' -s c -l color -x -a '%s'\n" "$c" "$COLOR_NAMES" ;;
-        --profile) printf "complete -c aidentity -n '__aidentity_using %s' -s p -l profile -x\n" "$c" ;;
-        --badge)   printf "complete -c aidentity -n '__aidentity_using %s' -s b -l badge -x\n" "$c" ;;
-        --arg|--env) printf "complete -c aidentity -n '__aidentity_using %s' -l %s -x\n" "$c" "${o#--}" ;;
-        *)         printf "complete -c aidentity -n '__aidentity_using %s' -l %s\n" "$c" "${o#--}" ;;
-      esac
-    done
-  done
-  cat <<'EOF'
-complete -c aidentity -n '__aidentity_using add; and __aidentity_wants_name' -a '(aidentity __complete apps 2>/dev/null)'
-complete -c aidentity -n '__aidentity_using open rename set rebuild rm; and __aidentity_wants_name' -a '(aidentity __complete launchers 2>/dev/null)'
-complete -c aidentity -n '__aidentity_using restore; and __aidentity_wants_name' -a '(aidentity __complete restorable 2>/dev/null)'
-complete -c aidentity -n '__aidentity_using completion; and __aidentity_wants_name' -a 'bash zsh fish'
-EOF
-  printf "complete -c aidentity -n '__aidentity_using help; and __aidentity_wants_name' -a '%s'\n" "$COMMAND_WORDS"
-}
-
 cmd_help() {
+  [ $# -le 1 ] || die "Usage: aidentity help [command]"
+  if [ $# -eq 0 ]; then cmd_overview; return 0; fi
+  command_row "$1" && [ "${CMD_NAME#__}" = "$CMD_NAME" ] \
+    || die "No help for '$1'. Run 'aidentity help' to see the commands."
+  command_help "$CMD_NAME"
+}
+
+# aidentity on its own, aidentity help, -h and --help: every command in a line.
+cmd_overview() {
+  local n a p o s
   cat <<EOF
 ${C_BOLD}aidentity${C_RESET} — run several accounts of the same Mac app at the same time.
 
 ${C_BOLD}USAGE${C_RESET}
   aidentity <command> [options]
-  aidentity help <command>       Options and examples for one command.
-                                 Same as: aidentity <command> --help
 
 ${C_BOLD}COMMANDS${C_RESET}
-  setup                Guided walkthrough. Start here — it asks which app, what to
-                       call each account, and sets them all up in one pass.
+EOF
+  while IFS='|' read -r n a p o s; do
+    case "$n" in __*) ;; *) printf '  %-12s %s\n' "$n" "$s" ;; esac
+  done <<EOF
+$COMMANDS
+EOF
+  cat <<EOF
 
-  ui                   Full-screen menu: every profile and what is running, with
-                       a key to open, add, rename, recolour, badge or remove
-                       each one. Needs a terminal. Press ? inside for the keys.
-
-  add [app]            Create one profile directly.
-      --profile NAME   Name for this account, e.g. Work
-      --badge  X       Single character for the icon badge (default: first letter)
-      --color  NAME    blue green orange purple teal pink red yellow gray graphite,
-                       or a hex value like 2E7DF6
-      --no-badge       Use the app's own icon unchanged, just with your name
-      --seed           Copy Claude Desktop's MCP server config into the new profile
-      --main           A launcher for your ORIGINAL account instead (name: Main).
-                       While a profile runs, macOS treats it as the app itself,
-                       so the app's own icon only switches to that profile.
-      --arg SWITCH     Pass a switch every launch: --proxy-server=…, --lang=de,
-                       --force-device-scale-factor=…, --disable-gpu (repeatable)
-      --env NAME=VAL   Set a proxy variable, LANG, LC_ALL, LC_CTYPE, LC_MESSAGES
-                       or TZ (repeatable)
-      --own-extensions VS Code, Cursor, Kiro: a separate extensions folder
-
-  list                 Show every profile, where its data lives, and what is running
-                       Also spelled 'ls'.
-      --json           Print one JSON array instead, an object per launcher, for
-                       scripts. Variables are listed by name, never by value.
-  open  NAME           Launch a profile
-
-  rename OLD NEW       Rename a profile, moving its data so the account stays
-                       signed in. Also spelled 'mv'.
-  set   NAME           Change a profile's look without touching its account
-      --color  NAME    New colour
-      --badge  X       New badge character
-      --no-badge       Use the app's own icon, unchanged
-      --arg, --env, --own-extensions   As on add; --clear-args, --clear-env
-                       and --shared-extensions undo them
-  prune                Find profile data with no launcher pointing at it —
-                       left when a launcher is deleted in Finder, or removed
-                       with rm without --purge — and offer to remove it
-      -y, --yes        Skip the confirmation prompt
-  restore [NAME]       Rebuild the launcher of a profile whose launcher was
-                       deleted, from the record kept in its data folder. With
-                       no name, list the profiles that can be restored.
-      --all            Restore every one of them
-  rebuild NAME         Regenerate a launcher after the app moved or updated
-      --all            Rebuild every profile
-  rm    NAME           Remove a launcher (keeps its data). Also 'remove', 'delete'.
-      --purge          Also delete the profile's data. Cannot be undone.
-      -y, --yes        Skip the confirmation prompt
-  apps                 List apps on this Mac that support extra accounts
-  doctor               Check the setup and every profile, and report anything wrong
-      --fix            Repair what can be repaired: rebuild stale launchers,
-                       make profile folders owner-only
-  completion SHELL     Print a tab-completion script for bash, zsh or fish
-  update               Install the latest release from GitHub, after checking
-                       its checksum. The only command that uses the network.
-                       A Homebrew copy is updated with: brew upgrade aidentity
-      --check          Only say whether a newer release is out
-  version              Print the version
-  help [COMMAND]       Show this help, or the help of one command
+Run 'aidentity help COMMAND' or 'aidentity COMMAND --help' for its options.
 
 ${C_BOLD}EXAMPLES${C_RESET}
   aidentity setup
@@ -5028,47 +4506,290 @@ ${C_BOLD}MORE${C_RESET}
 EOF
 }
 
+# -------------------------------------------------------------- completion --
+
+# `aidentity __complete SHELL CWORD WORD...` prints what Tab can offer for the
+# words typed so far, in the form SHELL's script reads (see complete_words).
+# `aidentity __complete WHAT` prints the names of one kind (launchers,
+# restorable or apps), the form that scripts saved from 1.4.0 use. The scripts
+# call it on every Tab, so it prints nothing on stderr and always exits 0,
+# whatever is wrong with the folders it reads.
+cmd_complete() {
+  case "${1:-}" in
+    bash|zsh|fish) ( complete_words "$@" ) 2>/dev/null ;;
+    *) ( complete_candidates "${1:-}" ) 2>/dev/null ;;
+  esac
+  return 0
+}
+
+complete_candidates() {
+  local app name dir label
+  case "$1" in
+    launchers)   # the names open, rm, set, rename and rebuild take
+      for app in "$APPS_DIR"/*.app; do
+        [ -d "$app" ] || continue
+        is_our_launcher "$app" || continue
+        name=$(bundle_name "$app")
+        case "$name" in *[[:cntrl:]]*) continue ;; esac
+        printf '%s\n' "$name"
+      done ;;
+    restorable)  # the names restore takes: profiles whose launcher is gone
+      while IFS= read -r dir; do
+        [ -n "$dir" ] || continue
+        label=$(restore_label "$dir") || continue
+        printf '%s\n' "$label"
+      done <<EOF
+$(orphan_dirs)
+EOF
+      ;;
+    apps)        # the names add takes
+      while IFS= read -r app; do
+        [ -n "$app" ] || continue
+        name=$(bundle_name "$app")
+        case "$name" in *[[:cntrl:]]*) continue ;; esac
+        printf '%s\n' "$name"
+      done <<EOF | awk '!seen[$0]++'
+$(list_compatible_apps)
+EOF
+      ;;
+  esac
+}
+
+# complete_words SHELL CWORD WORD...: what Tab can offer. WORD 0 is the name
+# aidentity was typed as, and CWORD is the index of the word under the cursor.
+# It turns another spelling into its command, skips the value of an option,
+# then offers a command, an option, a colour or the command's first argument,
+# all from the command table. bash gets the words that match, quoted for it.
+# zsh gets "describe" or "plain" on the first line, then every candidate, as
+# word:description after describe. fish gets every candidate, with a tab and
+# its description when it has one. zsh and fish match the typed word
+# themselves, so their own matching rules (ignoring case, say) keep working.
+complete_words() {
+  local shell="$1" cword="$2" cur w x i=2 npos=0 valopt="" values="" list="" mode=plain n a p o s
+  local -a words
+  shift 2
+  case "$cword" in ''|*[!0-9]*) return 0 ;; esac
+  words=("$@")
+  cur="${words[cword]:-}"
+  if [ "$cword" -le 1 ]; then
+    mode=describe
+    case "$cur" in -*) list=$(command_words -) ;; *) list=$(command_words) ;; esac
+  elif command_row "${words[1]:-}" && [ "${CMD_NAME#__}" = "$CMD_NAME" ]; then
+    # Count the arguments typed so far. The value of an option is not one.
+    while IFS='|' read -r n a p o s; do
+      for x in $o; do case "$x" in *=) values="$values/${x%=}" ;; esac; done
+    done <<EOF
+$COMMANDS
+EOF
+    values="${values//\// } "
+    while [ "$i" -lt "$cword" ]; do
+      w="${words[i]:-}"
+      case "$values" in
+        *" $w "*) [ $((i + 1)) -eq "$cword" ] && valopt="$w"; i=$((i + 1)) ;;
+        *) case "$w" in -*) ;; *) npos=$((npos + 1)) ;; esac ;;
+      esac
+      i=$((i + 1))
+    done
+    if [ -n "$valopt" ]; then
+      # Of all the values, only a colour has a list to offer.
+      for x in $CMD_OPTS; do
+        case "$x" in --color/*) ;; *) continue ;; esac
+        # shellcheck disable=SC2086  # a fixed list of words, split on purpose
+        case "/${x%=}/" in *"/$valopt/"*) list=$(printf '%s\n' $COLOR_NAMES) ;; esac
+      done
+    elif [ "${cur#-}" != "$cur" ]; then
+      list=$(for x in $CMD_OPTS --help; do printf '%s\n' "${x%%[/=]*}"; done)
+    elif [ "$npos" -eq 0 ]; then
+      case "$CMD_ARG" in
+        apps|launchers|restorable) list=$(complete_candidates "$CMD_ARG") ;;
+        shells) list=$(printf '%s\n' bash zsh fish) ;;
+        commands) list=$(command_words) ;;
+      esac
+    fi
+  fi
+  case "$shell" in
+    bash) complete_bash_reply "$cur" <<EOF
+$list
+EOF
+      return 0 ;;
+    zsh) printf '%s\n' "$mode" ;;
+  esac
+  while IFS="$TAB" read -r w x; do
+    [ -n "$w" ] || continue
+    case "$shell:$mode" in
+      zsh:describe) printf '%s:%s\n' "$w" "$x" ;;
+      zsh:*) printf '%s\n' "$w" ;;
+      *) printf '%s%s\n' "$w" "${x:+$TAB$x}" ;;
+    esac
+  done <<EOF
+$list
+EOF
+}
+
+# complete_bash_reply WORD: of the candidates on stdin (a line each, maybe with
+# a tab and a description), print those that start with WORD, quoted for bash.
+# When WORD starts with a quote mark, a name is escaped for that quote instead,
+# so a $ or a quote mark in a folder name is never read by the shell as code.
+complete_bash_reply() {
+  local word="$1" line quote=""
+  case "$word" in
+    \"*) quote='"'; word="${word#\"}" ;;
+    \'*) quote="'"; word="${word#\'}" ;;
+    *)   word="${word//\\/}" ;;
+  esac
+  if [ -n "$quote" ]; then complete_unescape "$quote" "$word"; word="$REPLY"; fi
+  while IFS= read -r line; do
+    line="${line%%"$TAB"*}"
+    [ -n "$line" ] || continue
+    case "$line" in
+      "$word"*)
+        if [ -z "$quote" ]; then
+          printf '%q\n' "$line"
+        elif complete_escape "$quote" "$line"; then
+          printf '%s\n' "$REPLY"
+        fi ;;
+    esac
+  done
+}
+
+# complete_escape QUOTE TEXT: set REPLY to TEXT as it can sit inside a QUOTE
+# (" or ') the user has already opened. Inside double quotes ! cannot be
+# escaped, so a name with one fails (returns 1) and is left out.
+complete_escape() {
+  local q="$1" s="$2" c i=0
+  REPLY=""
+  while [ "$i" -lt "${#s}" ]; do
+    c="${s:i:1}"
+    if [ "$q" = "'" ]; then
+      if [ "$c" = "'" ]; then c="'\\''"; fi
+    else
+      case "$c" in
+        '!') REPLY=""; return 1 ;;
+        \\|'"'|'$'|'`') c="\\$c" ;;
+      esac
+    fi
+    REPLY="$REPLY$c"
+    i=$((i + 1))
+  done
+}
+
+# complete_unescape QUOTE TEXT: the reverse, for the part of the word that is
+# typed already. Sets REPLY.
+complete_unescape() {
+  local q="$1" s="$2" c i=0 n
+  REPLY=""
+  while [ "$i" -lt "${#s}" ]; do
+    c="${s:i:1}"
+    n=$((i + 1))
+    if [ "$q" = "'" ]; then
+      if [ "${s:i:4}" = "'\\''" ]; then c="'"; i=$((i + 3)); fi
+    elif [ "$c" = "\\" ]; then
+      case "${s:n:1}" in
+        \\|'"'|'$'|'`') c="${s:n:1}"; i=$n ;;
+        '') c="" ;;   # a backslash with nothing after it yet
+      esac
+    fi
+    REPLY="$REPLY$c"
+    i=$((i + 1))
+  done
+}
+
+# aidentity completion SHELL. The script goes to stdout. It is a short shim
+# that asks `aidentity __complete` on every Tab, so it holds no list of its
+# own: a new command, spelling or option reaches all three shells at once.
+cmd_completion() {
+  local shell=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      -*) die "Unknown option for completion: $1" ;;
+      *) [ -z "$shell" ] && shell="$1" || die "Unexpected argument: $1"; shift ;;
+    esac
+  done
+  [ -n "$shell" ] || die "Usage: aidentity completion bash|zsh|fish"
+  case "$shell" in
+    bash) cat <<'EOF'
+# bash completion for aidentity
+#
+#   eval "$(aidentity completion bash)"     # in ~/.bashrc
+#
+# On every Tab it asks 'aidentity __complete' what fits, already quoted for
+# bash. That command is not meant to be run by hand.
+_aidentity() {
+  local line
+  COMPREPLY=()
+  while IFS= read -r line; do
+    [ -n "$line" ] && COMPREPLY+=("$line")
+  done <<< "$(command aidentity __complete bash "$COMP_CWORD" "${COMP_WORDS[@]}" 2>/dev/null)"
+  return 0
+}
+complete -F _aidentity aidentity
+EOF
+      ;;
+    zsh) cat <<'EOF'
+#compdef aidentity
+# zsh completion for aidentity
+#
+#   eval "$(aidentity completion zsh)"      # in ~/.zshrc, after compinit
+#
+# Or save the output as a file named _aidentity in a folder on your fpath.
+# On every Tab it asks 'aidentity __complete' what fits. That command is not
+# meant to be run by hand.
+_aidentity() {
+  local -a cands
+  cands=("${(@f)$(command aidentity __complete zsh $(( CURRENT - 1 )) "${words[@]}" 2>/dev/null)}")
+  case $cands[1] in
+    describe) cands=("${(@)cands[2,-1]}"); _describe -t commands 'aidentity command' cands ;;
+    plain) cands=("${(@)cands[2,-1]}"); compadd -a cands ;;
+  esac
+}
+
+if [[ $funcstack[1] == _aidentity ]]; then
+  _aidentity "$@"
+else
+  compdef _aidentity aidentity
+fi
+EOF
+      ;;
+    fish) cat <<'EOF'
+# fish completion for aidentity
+#
+#   aidentity completion fish | source      # in ~/.config/fish/config.fish
+#
+# Or save the output as ~/.config/fish/completions/aidentity.fish.
+# On every Tab it asks 'aidentity __complete' what fits. That command is not
+# meant to be run by hand.
+complete -c aidentity -f -a '(command aidentity __complete fish (count (commandline -opc)) (commandline -opc) (commandline -ct) 2>/dev/null)'
+EOF
+      ;;
+    *) die "Unknown shell '$shell'. Use bash, zsh or fish." ;;
+  esac
+}
+
 # -------------------------------------------------------------- dispatch --
 
 main() {
-  local cmd="${1:-help}" canon a
-  [ $# -gt 0 ] && shift
-  # Hidden: the completion scripts call this on every Tab. It is not a command,
-  # so it has no help and no unknown-command message, and it never fails.
-  if [ "$cmd" = "__complete" ]; then cmd_complete "$@"; return 0; fi
-  if ! canon=$(canonical_command "$cmd"); then
-    printf '%sUnknown command: %s%s\n\n' "$C_RED" "$cmd" "$C_RESET" >&2; cmd_help >&2; exit 1
+  local a
+  # No command at all is the overview, as it always was.
+  if ! command_row "${1:-help}"; then
+    printf '%sUnknown command: %s%s\n\n' "$C_RED" "${1:-}" "$C_RESET" >&2; cmd_overview >&2; exit 1
   fi
+  [ $# -gt 0 ] && shift
   # -h or --help anywhere after a command shows that command's help and runs
   # nothing else, whatever else was typed: `rm Work --help` removes nothing.
   # This runs before the command reads its arguments. A profile name cannot
-  # start with a hyphen, so no real value is ever taken for it.
-  if [ "$canon" != "help" ]; then
-    for a in "$@"; do
-      case "$a" in -h|--help) command_help "$canon"; return 0 ;; esac
-    done
-  fi
-  case "$canon" in
-    setup)   cmd_setup "$@" ;;
-    add)     cmd_add "$@" ;;
-    rename)  cmd_rename "$@" ;;
-    set)     cmd_set "$@" ;;
-    prune)   cmd_prune "$@" ;;
-    restore) cmd_restore "$@" ;;
-    rebuild) cmd_rebuild "$@" ;;
-    list)    cmd_list "$@" ;;
-    open)    cmd_open "$@" ;;
-    rm)      cmd_rm "$@" ;;
-    apps)    cmd_apps "$@" ;;
-    doctor)  cmd_doctor "$@" ;;
-    update)  cmd_update "$@" ;;
-    ui)      cmd_ui "$@" ;;
-    completion) cmd_completion "$@" ;;
-    version) cmd_version ;;
-    # `aidentity help [command]` names a command. A leading -h or --help is the
-    # plain overview, as it always was, whatever follows it.
-    help)    case "$cmd" in help) cmd_help_for "$@" ;; *) cmd_help ;; esac ;;
+  # start with a hyphen, so no real value is ever taken for it. A hidden
+  # command has no help: the overview ignores what follows it, and __complete
+  # is handed the words typed so far, a -h among them.
+  case "$CMD_NAME" in
+    __*) ;;
+    *) for a in "$@"; do
+         case "$a" in -h|--help) command_help "$CMD_NAME"; return 0 ;; esac
+       done ;;
   esac
+  # Each command reads its own arguments and refuses what it does not take.
+  # setup, apps and version take none and ignore extra words on purpose, as
+  # they always have: a script that passes one keeps working.
+  "cmd_${CMD_NAME#__}" "$@"
 }
 
 # Never change this line, and keep it last. Installed copies of 1.4.0 refuse
