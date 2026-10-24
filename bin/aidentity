@@ -9,6 +9,7 @@
 #   aidentity add                 # interactive
 #   aidentity add Claude --profile Work
 #   aidentity list
+#   aidentity ui                  # full-screen menu
 #   aidentity rm "Claude Work" --purge
 #   aidentity update --check
 #
@@ -653,6 +654,45 @@ EOF
   return 1
 }
 
+# The same question for the menu, which asks about every profile on each
+# refresh: the answer comes from a process list read once, and from the
+# identities of the paths it names (proc_dir_ids), so no profile reads the list
+# or looks at a path again. $2 is pgrep's exit status and $3 its list. It
+# answers as running_on_profile does, including "running" when pgrep failed.
+# Keep the two in step; the tests ask both the same questions.
+running_in_list() { # data dir, pgrep status, its list, proc_dir_ids of it
+  local nl=$'\n' want
+  [ -n "$1" ] || return 1
+  [ "$2" -le 1 ] || return 0
+  [ "$2" -eq 0 ] && [ -n "$3" ] || return 1
+  case "$3$nl" in
+    *"user-data-dir=$1 "*|*"user-data-dir=$1$nl"*) return 0 ;;
+  esac
+  want=$(/usr/bin/stat -L -f '%d:%i' "$1" 2>/dev/null) || return 1
+  case "$4" in *"|$want|"*) return 0 ;; esac
+  return 1
+}
+
+# The identity (device:inode) of each path a process in the list names with
+# --user-data-dir, up to the next " --" or the end of its line, as "|id|id|".
+# Each distinct path is looked at once.
+proc_dir_ids() { # process list
+  local line rest path id seen="|" ids="|"
+  while IFS= read -r line; do
+    rest=$line
+    while :; do
+      case "$rest" in *user-data-dir=*) rest=${rest#*user-data-dir=} ;; *) break ;; esac
+      path=${rest%% --*}
+      case "$seen" in *"|$path|"*) continue ;; esac
+      seen="$seen$path|"
+      id=$(/usr/bin/stat -L -f '%d:%i' "$path" 2>/dev/null) && ids="$ids$id|"
+    done
+  done <<EOF
+$1
+EOF
+  printf '%s' "$ids"
+}
+
 # The app's main executable, from its Info.plist.
 app_exe() {
   local exe
@@ -676,12 +716,17 @@ EOF
 
 # Whether the app is running on its own account, with no --user-data-dir: the
 # instance a --main launcher opens. Matched in the shell for the same reason as
-# above — a pipe into grep -q fails open on a long process list.
-main_running() {
+# above — a pipe into grep -q fails open on a long process list. The menu reads
+# the list once for all its rows and passes it in as $2.
+main_running() { # app [, process list]
   local exe list line
   exe=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$1/Contents/Info.plist" 2>/dev/null) || return 1
   exe="$1/Contents/MacOS/$exe"
-  list=$(ps -axww -o command= 2>/dev/null) || return 1
+  if [ $# -ge 2 ]; then
+    list=$2
+  else
+    list=$(ps -axww -o command= 2>/dev/null) || return 1
+  fi
   while IFS= read -r line; do
     case "$line" in
       *--user-data-dir=*) ;;
@@ -1419,19 +1464,34 @@ profile_has_data() {
 
 # What a launcher is doing, in the words list prints: running, in use,
 # signed out / new, app missing, or not running (a main launcher). One place,
-# so `list` and `list --json` can never disagree.
-launcher_status() { # launcher, target app, data dir
+# so `list`, `list --json` and the menu can never disagree. Each argument is
+# 1 or 0: a main launcher, the app is there, the profile is running, and its
+# folder holds a signed-in session.
+status_word() { # main, app present, running, has data
   local status
-  if is_main_launcher "$1"; then
+  if [ "$1" = "1" ]; then
     status="not running"
-    main_running "$2" && status="running"
+    [ "$3" = "1" ] && status="running"
   else
     status="signed out / new"
-    profile_has_data "$3" && status="in use"
-    running_on_profile "$3" && status="running"
+    [ "$4" = "1" ] && status="in use"
+    [ "$3" = "1" ] && status="running"
   fi
-  [ -d "$2" ] || status="app missing"
+  [ "$2" = "1" ] || status="app missing"
   printf '%s' "$status"
+}
+
+launcher_status() { # launcher, target app, data dir
+  local main=0 present=0 run=0 has=0
+  if is_main_launcher "$1"; then
+    main=1
+    main_running "$2" && run=1
+  else
+    profile_has_data "$3" && has=1
+    running_on_profile "$3" && run=1
+  fi
+  [ -d "$2" ] && present=1
+  status_word "$main" "$present" "$run" "$has"
 }
 
 cmd_list() {
@@ -3158,6 +3218,821 @@ cmd_update() {
   return 0
 }
 
+# -------------------------------------------------------------------- ui --
+#
+# `aidentity ui` is a full-screen menu over the commands above. It decides
+# nothing about changing a profile: every action calls the same command
+# function the command line calls, so every safety check stays where it is.
+# What follows is terminal handling and drawing.
+#
+# Three things about bash 3.2 shaped it. `read -t` takes whole seconds. On a
+# timeout it returns 1, the same status as end of input, so the two are told
+# apart by how long the read took. And a trap runs while `read` waits, which is
+# why a resize can redraw at once.
+
+UI_ESC=$'\033'
+# The colours `set --color` takes by name, in the order the picker shows them.
+UI_COLORS="blue green orange purple teal pink red yellow gray graphite"
+
+UI_ACTIVE=0     # 1 while the menu owns the terminal: alternate screen, no echo
+UI_BUSY=0       # 1 while a command runs for the menu
+UI_HOLD=0       # 1 while rows or a frame are built: a resize must not draw then
+UI_RESIZED=0
+UI_STOPPED=0    # 1 after Ctrl-Z took the terminal back: it is entered again on resume
+UI_DIRTY=1
+UI_STTY=""      # the terminal settings to put back
+UI_ROWS=24
+UI_COLS=80
+UI_HDR=2        # header lines, rule included
+UI_LH=1         # list lines
+UI_NH=1         # key hint lines
+UI_NW=12        # width of the name column
+UI_HL=()        # the key hint lines
+UI_RULE=""
+UI_SPACES=""
+UI_FRAME=""
+UI_KEY=""
+UI_PEND=""      # keys read ahead of the one being handled
+UI_ANS=""       # the answer to the last question asked
+UI_MSG=""       # the footer message line: a result, or a question
+UI_MSG_STYLE=""
+UI_SWATCH=""    # a colour shown before the message, as a 256-colour number
+UI_FLASH_AT=0
+UI_LAST=0       # SECONDS at the last refresh
+UI_WANT=""      # the launcher to select after the next load
+UI_N=0
+UI_SEL=0
+UI_TOP=0
+UI_RUNNING=0
+UI_MAXNAME=0
+UI_DIRSIG=""
+UI_STATSIG=""
+UI_L_APP=(); UI_L_NAME=(); UI_L_TARGET=(); UI_L_DATA=(); UI_L_MAIN=()
+UI_L_BADGE=(); UI_L_IDX=(); UI_L_STATUS=()
+
+# Escape sequences for the alternate screen and the cursor. tput knows them for
+# this terminal; the xterm ones stand in when it does not.
+ui_caps() {
+  UI_SMCUP=""; UI_RMCUP=""; UI_CIVIS=""; UI_CNORM=""
+  if command -v tput >/dev/null 2>&1; then
+    UI_SMCUP=$(tput smcup 2>/dev/null) || UI_SMCUP=""
+    UI_RMCUP=$(tput rmcup 2>/dev/null) || UI_RMCUP=""
+    UI_CIVIS=$(tput civis 2>/dev/null) || UI_CIVIS=""
+    UI_CNORM=$(tput cnorm 2>/dev/null) || UI_CNORM=""
+  fi
+  [ -n "$UI_SMCUP" ] || UI_SMCUP="${UI_ESC}[?1049h"
+  [ -n "$UI_RMCUP" ] || UI_RMCUP="${UI_ESC}[?1049l"
+  [ -n "$UI_CIVIS" ] || UI_CIVIS="${UI_ESC}[?25l"
+  [ -n "$UI_CNORM" ] || UI_CNORM="${UI_ESC}[?25h"
+  # Colour is on when the script's own colours are. With NO_COLOR nothing here
+  # writes a colour or any other style: the arrow marks the selected row.
+  if [ -n "$C_RESET" ]; then
+    UI_REV="${UI_ESC}[7m"; UI_NOREV="${UI_ESC}[27m"; UI_GREY="${UI_ESC}[90m"
+  else
+    UI_REV=""; UI_NOREV=""; UI_GREY=""
+  fi
+}
+
+# Take the terminal over. UI_ACTIVE goes up first, so a signal that lands half
+# way through still puts everything back.
+#
+# Ctrl-Z is handled here in two ways, because the terminal sends its stop
+# signal to every process of the job, not only to this one. While the menu is
+# up, the key is turned into a plain byte (susp undef) that ui_key reads and
+# acts on: no process gets a signal, so none can be stopped alone while this
+# script waits for it. At a question or in a command's output the terminal is
+# as the user had it, Ctrl-Z stops the whole job, and the TSTP handler must not
+# be set (a question is asked in a subshell, which would stop alone). So the
+# handler is set here and removed in ui_leave; it is left for a stop signal that
+# is sent to the menu by hand.
+ui_enter() {
+  UI_ACTIVE=1
+  trap 'ui_on_tstp' TSTP
+  stty -echo susp undef 2>/dev/null
+  printf '%s%s%s[2J%s[H' "$UI_SMCUP" "$UI_CIVIS" "$UI_ESC" "$UI_ESC"
+}
+
+# Give it back exactly as it was found. Safe to call twice, and from a trap.
+ui_leave() {
+  [ "$UI_ACTIVE" -eq 1 ] || return 0
+  UI_ACTIVE=0
+  printf '%s%s%s' "$C_RESET" "$UI_CNORM" "$UI_RMCUP"
+  if [ -n "$UI_STTY" ]; then
+    stty "$UI_STTY" 2>/dev/null || stty sane 2>/dev/null
+  else
+    stty sane 2>/dev/null
+  fi
+  trap - TSTP
+  return 0
+}
+
+ui_size() {
+  local out r c
+  out=$(stty size 2>/dev/null) || out=""
+  r=${out%% *}; c=${out##* }
+  case "$r$c" in ''|*[!0-9]*) r=0; c=0 ;; esac
+  # A terminal that reports no size (0 0) gets what terminfo says, then 24x80.
+  if [ "$r" -lt 1 ] || [ "$c" -lt 1 ]; then
+    r=$(tput lines 2>/dev/null) || r=24
+    c=$(tput cols 2>/dev/null) || c=80
+    case "$r$c" in ''|*[!0-9]*) r=24; c=80 ;; esac
+  fi
+  UI_ROWS=$r; UI_COLS=$c
+}
+
+# Six hex digits -> UI_IDX, the nearest colour of the 256-colour cube. Plain
+# 256-colour codes, because Terminal.app does not draw 24-bit ones.
+ui_idx256() {
+  UI_IDX=""
+  case "$1" in
+    [0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]) ;;
+    *) return 1 ;;
+  esac
+  local r g b
+  r=$((16#${1:0:2})); g=$((16#${1:2:2})); b=$((16#${1:4:2}))
+  UI_IDX=$((16 + 36 * ((r * 5 + 127) / 255) + 6 * ((g * 5 + 127) / 255) + (b * 5 + 127) / 255))
+}
+
+# $1 cut to $2 columns, with "…" where it was cut, and padded to exactly $2.
+# Control characters become "?": a name comes off the disk, and an escape
+# sequence in it must not reach the screen. Width is the character count, so it
+# is exact for ASCII; a cut is made by cut(1) in a UTF-8 locale so it never
+# splits a character.
+ui_fit() { # text, width -> UI_FIT
+  local s="$1" w="$2" n pad
+  [ "$w" -ge 0 ] || w=0
+  s=${s//[[:cntrl:]]/?}
+  n=${#s}
+  if [ "$n" -gt "$w" ]; then
+    if [ "$w" -le 1 ]; then
+      s=${s:0:$w}; n=${#s}
+    else
+      s=$(printf '%s' "$s" | LC_ALL=en_US.UTF-8 cut -c1-$((w - 1)) 2>/dev/null)
+      s="${s}…"; n=$w
+    fi
+  fi
+  pad=$((w - n)); [ "$pad" -ge 0 ] || pad=0
+  UI_FIT="$s${UI_SPACES:0:$pad}"
+}
+
+# Append one screen line to the frame being built: move there, write, clear
+# the rest of the line.
+ui_put() { # row, text
+  UI_FRAME="$UI_FRAME${UI_ESC}[$1;1H$2${UI_ESC}[K"
+}
+
+# The key hints, packed into as many lines as the width needs. A narrow
+# window shows only the keys that matter; ? lists the rest.
+ui_pack_hints() {
+  local width=$((UI_COLS - 2)) line="" lw=0 key kw label iw
+  UI_HL=()
+  if [ "$UI_COLS" -lt 60 ]; then
+    set -- "↑↓" 2 move Enter 5 open "?" 1 help q 1 quit
+  else
+    set -- "↑↓" 2 move Enter 5 open a 1 add r 1 rename c 1 colour b 1 badge \
+      d 1 remove x 1 doctor "?" 1 help q 1 quit
+  fi
+  while [ $# -ge 3 ]; do
+    key=$1; kw=$2; label=$3; shift 3
+    iw=$((kw + 1 + ${#label}))
+    if [ "$lw" -gt 0 ] && [ $((lw + 2 + iw)) -gt "$width" ]; then
+      UI_HL[${#UI_HL[@]}]=$line; line=""; lw=0
+    fi
+    if [ "$lw" -gt 0 ]; then line="$line  "; lw=$((lw + 2)); fi
+    line="$line${C_BOLD}${key}${C_RESET} ${C_DIM}${label}${C_RESET}"
+    lw=$((lw + iw))
+  done
+  UI_HL[${#UI_HL[@]}]=$line
+  UI_NH=${#UI_HL[@]}
+}
+
+# Work out the screen: header, list and footer sizes from the window size.
+ui_layout() {
+  local n=0 rule=""
+  printf -v UI_SPACES '%*s' "$((UI_COLS + 4))" ''
+  while [ "$n" -lt $((UI_COLS - 2)) ]; do rule="${rule}─"; n=$((n + 1)); done
+  UI_RULE=" ${C_DIM}${rule}${C_RESET}"
+  ui_pack_hints
+  # The title and the counts share a line when they fit, else take two.
+  if [ "$UI_COLS" -ge $((40 + ${#AIDENTITY_VERSION})) ]; then UI_HDR=2; else UI_HDR=3; fi
+  UI_LH=$((UI_ROWS - UI_HDR - 1 - UI_NH))
+}
+
+ui_resize() { ui_size; ui_layout; UI_DIRTY=1; }
+
+# Keep the selected row on screen.
+ui_clamp() {
+  local lh=$UI_LH
+  [ "$lh" -ge 1 ] || lh=1
+  [ "$UI_SEL" -lt "$UI_N" ] || UI_SEL=$((UI_N - 1))
+  [ "$UI_SEL" -ge 0 ] || UI_SEL=0
+  [ "$UI_SEL" -ge "$UI_TOP" ] || UI_TOP=$UI_SEL
+  [ "$UI_SEL" -lt $((UI_TOP + lh)) ] || UI_TOP=$((UI_SEL - lh + 1))
+  [ "$UI_TOP" -le $((UI_N - lh)) ] || UI_TOP=$((UI_N - lh))
+  [ "$UI_TOP" -ge 0 ] || UI_TOP=0
+}
+
+# What every launcher is doing now. The process lists are read once for all the
+# rows: reading them again for each row took longer than the time between two
+# refreshes once there were a dozen profiles. The facts go to the same
+# status_word that `list` uses. Warnings go nowhere: one on this screen would
+# be written over the menu.
+ui_status_rows() {
+  local i=0 s sig="" pglist pgrc ids pslist="" ps_read=0 run has present
+  UI_RUNNING=0
+  pglist=$(pgrep -afl "user-data-dir=" 2>/dev/null); pgrc=$?
+  ids="|"; [ "$pgrc" -gt 1 ] || ids=$(proc_dir_ids "$pglist")
+  while [ "$i" -lt "$UI_N" ]; do
+    run=0; has=0; present=0
+    if [ "${UI_L_MAIN[$i]}" = "1" ]; then
+      if [ "$ps_read" -eq 0 ]; then pslist=$(ps -axww -o command= 2>/dev/null) || pslist=""; ps_read=1; fi
+      main_running "${UI_L_TARGET[$i]}" "$pslist" && run=1
+    else
+      profile_has_data "${UI_L_DATA[$i]}" && has=1
+      running_in_list "${UI_L_DATA[$i]}" "$pgrc" "$pglist" "$ids" && run=1
+    fi
+    [ -d "${UI_L_TARGET[$i]}" ] && present=1
+    s=$(status_word "${UI_L_MAIN[$i]}" "$present" "$run" "$has")
+    UI_L_STATUS[i]=$s
+    [ "$s" = "running" ] && UI_RUNNING=$((UI_RUNNING + 1))
+    sig="$sig|$s"
+    i=$((i + 1))
+  done
+  UI_STATSIG=$sig
+}
+
+# Read every launcher: what never changes while the menu is open (name, badge,
+# colour, app, folder), then its status. The launcher that was selected stays
+# selected, or UI_WANT if that is set.
+ui_load() {
+  local app label target data profile badge hex keep="" n=0 i=0
+  UI_HOLD=1
+  if [ -n "$UI_WANT" ]; then
+    keep=$UI_WANT
+  elif [ "$UI_N" -gt 0 ] && [ "$UI_SEL" -lt "$UI_N" ]; then
+    keep=${UI_L_NAME[$UI_SEL]}
+  fi
+  UI_WANT=""; UI_DIRSIG=""; UI_MAXNAME=0
+  UI_L_APP=(); UI_L_NAME=(); UI_L_TARGET=(); UI_L_DATA=(); UI_L_MAIN=()
+  UI_L_BADGE=(); UI_L_IDX=(); UI_L_STATUS=()
+  for app in "$APPS_DIR"/*.app; do
+    UI_DIRSIG="$UI_DIRSIG|$app"
+    [ -d "$app" ] || continue
+    is_our_launcher "$app" || continue
+    label=${app##*/}; label=${label%.app}
+    target=$(plist_get "$app" AIdentityTargetApp)
+    data=$(plist_get "$app" AIdentityDataDir)
+    profile=$(plist_get "$app" "$MARKER_KEY")
+    UI_L_MAIN[n]=0
+    if is_main_launcher "$app"; then UI_L_MAIN[n]=1; data=""; fi
+    badge=$(launcher_badge "$app" "$target" "$profile")
+    [ "${#badge}" -le 1 ] || badge=$(first_char "$badge")
+    hex=$(launcher_color "$app" "$label")
+    ui_idx256 "$hex" || true
+    UI_L_APP[n]=$app; UI_L_NAME[n]=$label; UI_L_TARGET[n]=$target
+    UI_L_DATA[n]=$data; UI_L_BADGE[n]=${badge//[[:cntrl:]]/?}; UI_L_IDX[n]=$UI_IDX
+    [ "${#label}" -le "$UI_MAXNAME" ] || UI_MAXNAME=${#label}
+    n=$((n + 1))
+  done
+  UI_N=$n
+  if [ -n "$keep" ]; then
+    while [ "$i" -lt "$n" ]; do
+      [ "${UI_L_NAME[$i]}" = "$keep" ] && { UI_SEL=$i; break; }
+      i=$((i + 1))
+    done
+  fi
+  ui_status_rows
+  UI_HOLD=0
+  UI_LAST=$SECONDS
+  UI_DIRTY=1
+}
+
+# On a timer: load again if launchers came or went (a name list costs no
+# process), else look at the statuses only.
+ui_sync() {
+  local sig="" a old=$UI_STATSIG
+  for a in "$APPS_DIR"/*.app; do sig="$sig|$a"; done
+  if [ "$sig" != "$UI_DIRSIG" ]; then ui_load; return 0; fi
+  UI_HOLD=1; ui_status_rows; UI_HOLD=0
+  [ "$UI_STATSIG" = "$old" ] || UI_DIRTY=1
+  return 0
+}
+
+# One launcher's row, in UI_LINE. $2 is 1 for the selected row, which is
+# marked with ▸ and shown in reverse video. Each coloured part ends by going
+# back to that style, so the highlight is not cut in two.
+ui_row() { # index, selected
+  local i=$1 sel=$2 off="$C_RESET" mk=" " pre="" rev_off="" st nm bs ss dot dsty b used pad
+  st=${UI_L_STATUS[$i]}
+  if [ "$sel" -eq 1 ]; then off="$C_RESET$UI_REV"; mk="▸"; pre=$UI_REV; rev_off=$UI_NOREV; fi
+
+  if [ "$st" = "running" ]; then dot="●"; dsty="$rev_off$C_GREEN"; else dot="○"; dsty="$rev_off$UI_GREY"; fi
+
+  ui_fit "${UI_L_NAME[$i]}" "$UI_NW"; nm=$UI_FIT
+  [ "$sel" -eq 1 ] && nm="${C_BOLD}${nm}${off}"
+
+  case "$st" in
+    running)       ss=$C_GREEN ;;
+    "app missing") ss=$C_YELLOW ;;
+    *)             ss=$C_DIM ;;
+  esac
+  if [ "$UI_COLS" -lt 60 ]; then
+    [ "$st" = "signed out / new" ] && st="signed out"
+    ui_fit "$st" 11; ss="${ss}${UI_FIT}${off}"
+    UI_LINE="$pre $mk ${dsty}${dot}${off} ${nm}  $ss"
+    used=$((18 + UI_NW))
+  else
+    ui_fit "$st" 16; ss="${ss}${UI_FIT}${off}"
+    if [ "${UI_L_MAIN[$i]}" = "1" ]; then
+      bs="original"
+      [ -n "${UI_L_IDX[$i]}" ] && [ -n "$C_RESET" ] && bs="${rev_off}${UI_ESC}[38;5;${UI_L_IDX[$i]}moriginal${off}"
+    elif [ -z "${UI_L_BADGE[$i]}" ]; then
+      bs="${C_DIM}no badge${off}"
+    else
+      b=${UI_L_BADGE[$i]}
+      if [ -n "${UI_L_IDX[$i]}" ] && [ -n "$C_RESET" ]; then
+        bs="${rev_off}${UI_ESC}[48;5;${UI_L_IDX[$i]}m${UI_ESC}[1;97m ${b} ${off}     "
+      else
+        bs="[${b}]     "
+      fi
+    fi
+    UI_LINE="$pre $mk ${dsty}${dot}${off} ${nm}  ${bs}  $ss"
+    used=$((33 + UI_NW))
+  fi
+  # Fill a selected row to the edge, so the highlight is a bar.
+  if [ "$sel" -eq 1 ]; then
+    pad=$((UI_COLS - 1 - used)); [ "$pad" -ge 0 ] || pad=0
+    UI_LINE="$UI_LINE${UI_SPACES:0:$pad}${C_RESET}"
+  else
+    UI_LINE="$UI_LINE${C_RESET}"
+  fi
+}
+
+# Paint the whole screen in one write: no flicker, and a line is never
+# cleared before it is rewritten. The window's last column is left empty so a
+# full line cannot wrap.
+ui_draw() {
+  local title right pc rc rw gap r i end sel w nw mx below hint
+  UI_HOLD=1
+  # A resize that came while a frame was being built is taken up now.
+  if [ "$UI_RESIZED" -eq 1 ]; then UI_RESIZED=0; ui_size; ui_layout; fi
+  ui_clamp
+  UI_FRAME=""
+  if [ "$UI_COLS" -lt 22 ] || [ "$UI_LH" -lt 1 ]; then
+    ui_fit "Window too small." $((UI_COLS - 1)); ui_put 1 "$UI_FIT"
+    ui_fit "Press q to quit." $((UI_COLS - 1)); ui_put 2 "$UI_FIT"
+    printf '%s%s[J' "$UI_FRAME" "$UI_ESC"
+    UI_HOLD=0
+    return 0
+  fi
+  w=$((UI_COLS - 1))
+
+  title=" aidentity $AIDENTITY_VERSION"
+  if [ "$UI_N" -eq 1 ]; then pc="1 profile"; else pc="$UI_N profiles"; fi
+  rc="$UI_RUNNING running"
+  right="$pc · $rc"                    # " · " is three columns
+  if [ "$UI_HDR" -eq 2 ]; then
+    rw=$((${#pc} + 3 + ${#rc}))
+    gap=$((w - 1 - ${#title} - rw)); [ "$gap" -ge 1 ] || gap=1
+    ui_put 1 "${C_BOLD}${title}${C_RESET}${UI_SPACES:0:$gap}${C_DIM}${right}${C_RESET}"
+  else
+    ui_put 1 "${C_BOLD}${title}${C_RESET}"
+    ui_put 2 " ${C_DIM}${right}${C_RESET}"
+  fi
+  ui_put "$UI_HDR" "$UI_RULE"
+
+  # The name column: as wide as the longest name, within what is left.
+  if [ "$UI_COLS" -lt 60 ]; then mx=$((w - 18)); nw=4; else mx=$((w - 33)); nw=12; fi
+  [ "$UI_MAXNAME" -le "$nw" ] || nw=$UI_MAXNAME
+  [ "$nw" -le "$mx" ] || nw=$mx
+  UI_NW=$nw
+
+  r=$((UI_HDR + 1))
+  if [ "$UI_N" -eq 0 ]; then
+    ui_put "$r" " No profiles yet."
+    ui_put $((r + 1)) " ${C_DIM}Press ${C_RESET}${C_BOLD}a${C_RESET}${C_DIM} to add one.${C_RESET}"
+    r=$((r + 2))
+  else
+    i=$UI_TOP; end=$((UI_TOP + UI_LH)); [ "$end" -le "$UI_N" ] || end=$UI_N
+    while [ "$i" -lt "$end" ]; do
+      sel=0; [ "$i" -eq "$UI_SEL" ] && sel=1
+      ui_row "$i" "$sel"; ui_put "$r" "$UI_LINE"
+      r=$((r + 1)); i=$((i + 1))
+    done
+  fi
+  while [ "$r" -le $((UI_HDR + UI_LH)) ]; do ui_put "$r" ""; r=$((r + 1)); done
+
+  # The message line: a result or a question, else how much list is out of view.
+  r=$((UI_HDR + UI_LH + 1))
+  if [ -n "$UI_MSG" ]; then
+    if [ -n "$UI_SWATCH" ] && [ -n "$C_RESET" ]; then
+      ui_fit "$UI_MSG" $((w - 5)); ui_put "$r" " ${UI_ESC}[48;5;${UI_SWATCH}m   ${C_RESET} ${UI_MSG_STYLE}${UI_FIT}${C_RESET}"
+    else
+      ui_fit "$UI_MSG" $((w - 1)); ui_put "$r" " ${UI_MSG_STYLE}${UI_FIT}${C_RESET}"
+    fi
+  elif [ "$UI_TOP" -gt 0 ] || [ $((UI_TOP + UI_LH)) -lt "$UI_N" ]; then
+    below=$((UI_N - UI_TOP - UI_LH)); [ "$below" -ge 0 ] || below=0
+    hint=""
+    [ "$UI_TOP" -eq 0 ] || hint="$UI_TOP more above"
+    [ "$below" -eq 0 ] || hint="${hint:+$hint, }$below more below"
+    ui_fit "$hint" $((w - 1))
+    ui_put "$r" " ${C_DIM}${UI_FIT}${C_RESET}"
+  else
+    ui_put "$r" ""
+  fi
+  i=0
+  while [ "$i" -lt "$UI_NH" ]; do
+    r=$((r + 1)); ui_put "$r" " ${UI_HL[$i]}"; i=$((i + 1))
+  done
+  printf '%s' "$UI_FRAME"
+  UI_HOLD=0
+}
+
+# Redraw from a signal handler, when it is safe to: not while a frame or the
+# rows are being built, and not while a command has the terminal.
+ui_redraw_now() {
+  ui_resize
+  [ "$UI_ACTIVE" -eq 1 ] && [ "$UI_HOLD" -eq 0 ] && [ "$UI_BUSY" -eq 0 ] || return 0
+  UI_DIRTY=0
+  ui_draw
+}
+
+ui_on_winch() {
+  UI_RESIZED=1
+  if [ "$UI_ACTIVE" -eq 1 ] && [ "$UI_HOLD" -eq 0 ] && [ "$UI_BUSY" -eq 0 ]; then
+    UI_RESIZED=0
+    ui_redraw_now
+  fi
+  return 0
+}
+
+# Ctrl-C quits the menu. While a command runs it only ends that command, which
+# has stopped itself: back to the menu, not out of it.
+ui_on_int() {
+  [ "$UI_BUSY" -eq 1 ] && return 0
+  ui_leave; _on_exit; exit 130
+}
+
+# Hand the terminal back and stop (the Ctrl-Z key, or a stop signal sent to the
+# menu). Taking it again on `fg` is done by ui_resume, from ui_key, not here: a
+# `read -t` that ran out while we were stopped jumps out of this handler as
+# soon as it is continued, so nothing after the kill would run.
+ui_on_tstp() {
+  UI_STOPPED=$UI_ACTIVE
+  ui_leave
+  trap - TSTP
+  kill -STOP $$
+}
+
+ui_resume() {
+  [ "$UI_STOPPED" -eq 1 ] || return 0
+  UI_STOPPED=0
+  ui_enter
+  ui_redraw_now
+}
+
+# Wait up to 2 seconds for a key. UI_KEY becomes UP, DOWN, LEFT, RIGHT, ENTER,
+# ESC, EOF or TICK (nothing typed), or the character typed. An arrow key starts
+# with the same byte as Esc, so after one the next two bytes are read too, one
+# at a time (bash 3.2 drops a half-read pair on a timeout). It cannot wait for
+# less than a second, so Esc on its own is slow. If what follows is not an
+# arrow, it was a separate key; it is kept in UI_PEND.
+ui_key() {
+  local k="" b1="" b2="" rc=0 t0=$SECONDS
+  if [ -n "$UI_PEND" ]; then
+    k=${UI_PEND:0:1}; UI_PEND=${UI_PEND:1}
+  else
+    IFS= read -rsn1 -t 2 k || rc=$?
+    [ "$UI_STOPPED" -eq 0 ] || ui_resume
+    if [ "$rc" -ne 0 ]; then
+      if [ "$rc" -gt 128 ] || [ $((SECONDS - t0)) -ge 2 ]; then UI_KEY=TICK; else UI_KEY=EOF; fi
+      return 0
+    fi
+  fi
+  case "$k" in
+    ''|$'\r') UI_KEY=ENTER ;;
+    $'\004')  UI_KEY=EOF ;;
+    $'\032')  # Ctrl-Z, as a byte (see ui_enter). Stop; it is nothing typed.
+      if [ "$UI_ACTIVE" -eq 1 ]; then ui_on_tstp; ui_resume; UI_KEY=TICK; else UI_KEY=$k; fi ;;
+    "$UI_ESC")
+      IFS= read -rsn1 -t 1 b1 || b1=""
+      case "$b1" in
+        '['|O)
+          IFS= read -rsn1 -t 1 b2 || b2=""
+          case "$b1$b2" in
+            '[A'|OA) UI_KEY=UP ;;
+            '[B'|OB) UI_KEY=DOWN ;;
+            '[C'|OC) UI_KEY=RIGHT ;;
+            '[D'|OD) UI_KEY=LEFT ;;
+            *)       UI_KEY=OTHER ;;
+          esac ;;
+        '') UI_KEY=ESC ;;
+        *)  UI_KEY=ESC; UI_PEND=$b1 ;;
+      esac ;;
+    *) UI_KEY=$k ;;
+  esac
+  return 0
+}
+
+ui_wait_key() { # until a key is typed
+  while :; do ui_key; [ "$UI_KEY" = "TICK" ] || break; done
+}
+
+ui_pause() {
+  printf '\n%sPress any key to return.%s' "$C_DIM" "$C_RESET"
+  ui_wait_key
+  printf '\n'
+}
+
+# Run a command function for the menu, as the command line would. In a
+# subshell, so a `die` ends the command and not the menu; the script's own
+# traps are set again inside it, so an interrupted rename still moves its data
+# back and an unfinished build still removes its staging folder.
+ui_run() {
+  UI_BUSY=1
+  (
+    trap '_on_exit' EXIT
+    trap '_on_exit; exit 130' INT
+    trap '_on_exit; exit 143' TERM
+    trap '_on_exit; exit 129' HUP
+    "$@"
+  )
+  UI_BUSY=0
+  return 0
+}
+
+# Leave the menu, run a command with its output and questions on the normal
+# screen, wait for a key, and come back to a menu read again from disk.
+ui_screen() { # command and its arguments
+  ui_leave
+  ui_run "$@"
+  ui_pause
+  ui_enter
+  ui_load
+}
+
+# Ask a question on the normal screen. The answer is in UI_ANS, empty when
+# nothing was typed, at end of input, or after Ctrl-C, which only cancels the
+# question: it is asked in a subshell, like a command.
+ui_ask() { # prompt
+  UI_BUSY=1
+  UI_ANS=$(ui_run ask "$1") || UI_ANS=""
+  UI_BUSY=0
+  printf '\n'
+}
+
+ui_flash() { # ok or err, text
+  case "$1" in err) UI_MSG_STYLE=$C_RED ;; *) UI_MSG_STYLE=$C_GREEN ;; esac
+  UI_MSG=$2; UI_SWATCH=""; UI_FLASH_AT=$SECONDS; UI_DIRTY=1
+}
+
+ui_msg_clear() { UI_MSG=""; UI_MSG_STYLE=""; UI_SWATCH=""; }
+
+ui_move() { # -1 or 1
+  UI_SEL=$((UI_SEL + $1))
+  [ "$UI_SEL" -lt "$UI_N" ] || UI_SEL=$((UI_N - 1))
+  [ "$UI_SEL" -ge 0 ] || UI_SEL=0
+  UI_DIRTY=1
+}
+
+# Whether a launcher is selected; says so in the footer when there is none.
+ui_have_row() {
+  [ "$UI_N" -gt 0 ] && return 0
+  ui_flash err "There is no profile yet. Press a to add one."
+  return 1
+}
+
+# Enter. One line of result, so it goes in the footer instead of a screen.
+ui_do_open() {
+  local out rc
+  ui_have_row || return 0
+  UI_BUSY=1
+  out=$(ui_run cmd_open "${UI_L_NAME[$UI_SEL]}" 2>&1); rc=$?
+  UI_BUSY=0
+  out=$(printf '%s' "$out" | sed "s/${UI_ESC}\[[0-9;]*m//g")
+  out=${out//$'\n'/ }
+  if [ -z "$out" ]; then out="Opened ${UI_L_NAME[$UI_SEL]}."; fi
+  if [ "$rc" -eq 0 ]; then ui_flash ok "$out"; else ui_flash err "$out"; fi
+}
+
+ui_do_add() {
+  local before="|" i=0
+  while [ "$i" -lt "$UI_N" ]; do before="$before${UI_L_NAME[$i]}|"; i=$((i + 1)); done
+  ui_screen cmd_add
+  i=0
+  while [ "$i" -lt "$UI_N" ]; do
+    case "$before" in *"|${UI_L_NAME[$i]}|"*) ;; *) UI_SEL=$i; break ;; esac
+    i=$((i + 1))
+  done
+}
+
+ui_do_rename() {
+  local name new
+  ui_have_row || return 0
+  name=${UI_L_NAME[$UI_SEL]}
+  ui_leave
+  printf 'Rename %s%s%s. The account stays signed in.\n\n' "$C_BOLD" "${name//[[:cntrl:]]/?}" "$C_RESET"
+  while :; do
+    ui_ask 'New account name (e.g. Work, Personal, Client). Empty to cancel: '
+    new=$UI_ANS
+    [ -n "$new" ] || break
+    validate_profile_name "$new" && break
+  done
+  if [ -z "$new" ]; then ui_enter; ui_load; return 0; fi
+  UI_WANT="$(bundle_name "${UI_L_TARGET[$UI_SEL]}") $new"
+  ui_run cmd_rename "$name" "$new"
+  ui_pause
+  ui_enter
+  ui_load
+}
+
+ui_do_badge() {
+  local name ch
+  ui_have_row || return 0
+  name=${UI_L_NAME[$UI_SEL]}
+  ui_leave
+  printf 'Badge for %s%s%s.\n\n' "$C_BOLD" "${name//[[:cntrl:]]/?}" "$C_RESET"
+  ui_ask 'One character for the icon badge. Empty to cancel: '
+  ch=$UI_ANS
+  if [ -z "$ch" ]; then ui_enter; ui_load; return 0; fi
+  ui_run cmd_set "$name" --badge "$ch"
+  ui_pause
+  ui_enter
+  ui_load
+}
+
+# The inline colour picker: left and right choose, Enter applies, Esc cancels.
+ui_do_color() {
+  local name hex n=0 i=0 cur=0 pick="" c
+  ui_have_row || return 0
+  name=${UI_L_NAME[$UI_SEL]}
+  hex=$(launcher_color "${UI_L_APP[$UI_SEL]}" "$name")
+  hex=$(lower "$hex")
+  # shellcheck disable=SC2086  # a fixed list of words, split on purpose
+  set -- $UI_COLORS
+  n=$#
+  for c in "$@"; do
+    [ "$(lower "$(color_hex "$c")")" = "$hex" ] && cur=$i
+    i=$((i + 1))
+  done
+  while :; do
+    i=0
+    for c in "$@"; do [ "$i" -eq "$cur" ] && pick=$c; i=$((i + 1)); done
+    ui_idx256 "$(color_hex "$pick")" || true
+    UI_SWATCH=$UI_IDX; UI_MSG_STYLE=$C_BOLD
+    UI_MSG="Colour  < ${pick} >   Left and Right choose, Enter applies, Esc cancels"
+    ui_draw
+    ui_wait_key
+    case "$UI_KEY" in
+      LEFT)  cur=$(( (cur + n - 1) % n )) ;;
+      RIGHT) cur=$(( (cur + 1) % n )) ;;
+      ENTER) break ;;
+      *)     pick=""; break ;;
+    esac
+  done
+  ui_msg_clear; UI_DIRTY=1
+  [ -n "$pick" ] || return 0
+  ui_screen cmd_set "$name" --color "$pick"
+}
+
+# d: k removes the launcher and keeps the data, p deletes the data as well.
+# Both end in `rm`, which refuses a running profile and, for p, asks for yes.
+# k needs no yes: the data stays, and `restore` brings the launcher back.
+ui_do_remove() {
+  local name short opts room main=${UI_L_MAIN[$UI_SEL]:-0}
+  ui_have_row || return 0
+  name=${UI_L_NAME[$UI_SEL]}
+  # The name is cut first, so a narrow window still shows the keys.
+  room=$((UI_COLS - 70)); [ "$room" -ge 8 ] || room=8
+  ui_fit "$name" $((${#name} < room ? ${#name} : room)); short=$UI_FIT
+  UI_MSG_STYLE=$C_BOLD; UI_SWATCH=""
+  if [ "$main" = "1" ]; then
+    opts="k  remove the launcher only   Esc  cancel"
+  else
+    opts="k  keep the data   p  delete the data too   Esc  cancel"
+  fi
+  if [ "$UI_COLS" -ge 80 ]; then UI_MSG="Remove ${short}?   $opts"; else UI_MSG="$opts   ($short)"; fi
+  ui_draw
+  ui_wait_key
+  ui_msg_clear; UI_DIRTY=1
+  case "$UI_KEY" in
+    k) ui_screen cmd_rm "$name" -y ;;
+    p) if [ "$main" = "1" ]; then
+         ui_flash err "A main launcher never deletes the app's data. Press d, then k, to remove it."
+       else
+         ui_screen cmd_rm "$name" --purge
+       fi ;;
+  esac
+}
+
+# x: the doctor's report. f then runs doctor --fix.
+ui_do_doctor() {
+  ui_leave
+  ui_run cmd_doctor
+  printf '\n%sPress f to repair what can be repaired (doctor --fix). Any other key returns.%s' "$C_DIM" "$C_RESET"
+  ui_wait_key
+  printf '\n'
+  if [ "$UI_KEY" = "f" ]; then
+    printf '\n'
+    ui_run cmd_doctor --fix
+    ui_pause
+  fi
+  ui_enter
+  ui_load
+}
+
+ui_help() {
+  local row=1 line key desc
+  UI_HOLD=1
+  UI_FRAME="${UI_ESC}[2J"
+  ui_put 1 " ${C_BOLD}aidentity ui${C_RESET}"
+  row=3
+  while IFS='|' read -r key desc; do
+    [ -n "$key" ] || continue
+    [ "$row" -lt "$UI_ROWS" ] || break
+    ui_fit "$desc" $((UI_COLS - 19)); line=$UI_FIT
+    ui_fit "$key" 16
+    ui_put "$row" " ${C_BOLD}${UI_FIT}${C_RESET} ${line}"
+    row=$((row + 1))
+  done <<EOF
+Up, Down, k, j|move
+Enter|open the profile
+a|add a profile: pick an app, then name the account
+r|rename the account name (it stays signed in)
+c|colour: arrows choose, Enter applies, Esc cancels
+b|badge: one character on the icon
+d|remove: k keeps the data, p deletes it too
+x|doctor report; f then repairs what it can
+?|this help
+q, Esc|quit
+EOF
+  ui_put $((UI_ROWS)) " ${C_DIM}Press any key to return.${C_RESET}"
+  printf '%s' "$UI_FRAME"
+  UI_HOLD=0
+  ui_wait_key
+  UI_DIRTY=1
+}
+
+ui_loop() {
+  while :; do
+    if [ "$UI_RESIZED" -eq 1 ]; then UI_RESIZED=0; ui_resize; fi
+    if [ $((SECONDS - UI_LAST)) -ge 2 ]; then UI_LAST=$SECONDS; ui_sync; fi
+    if [ -n "$UI_MSG" ] && [ $((SECONDS - UI_FLASH_AT)) -ge 6 ]; then ui_msg_clear; UI_DIRTY=1; fi
+    if [ "$UI_DIRTY" -eq 1 ]; then UI_DIRTY=0; ui_draw; fi
+    ui_key
+    if [ "$UI_KEY" != "TICK" ] && [ -n "$UI_MSG" ]; then ui_msg_clear; UI_DIRTY=1; fi
+    case "$UI_KEY" in
+      TICK) ;;
+      q|Q|ESC|EOF) return 0 ;;
+      UP|k)   ui_move -1 ;;
+      DOWN|j) ui_move 1 ;;
+      ENTER)  ui_do_open ;;
+      a)      ui_do_add ;;
+      r)      ui_do_rename ;;
+      c)      ui_do_color ;;
+      b)      ui_do_badge ;;
+      d)      ui_do_remove ;;
+      x)      ui_do_doctor ;;
+      '?')    ui_help ;;
+    esac
+  done
+}
+
+cmd_ui() {
+  [ $# -eq 0 ] || die "Unexpected argument: $1  (ui takes no arguments)"
+  if [ ! -t 0 ] || [ ! -t 1 ]; then
+    die "aidentity ui needs a terminal. In a script, use: aidentity list --json"
+  fi
+  case "${TERM:-}" in
+    ''|dumb|unknown) die "aidentity ui needs a terminal that can move the cursor. Your TERM is '${TERM:-not set}'." ;;
+  esac
+
+  ui_caps
+  UI_STTY=$(stty -g 2>/dev/null) || UI_STTY=""
+  # Whatever ends us, the terminal is given back first.
+  trap 'ui_leave; _on_exit' EXIT
+  trap 'ui_on_int' INT
+  trap 'ui_leave; _on_exit; exit 143' TERM
+  trap 'ui_leave; _on_exit; exit 129' HUP
+  trap 'ui_on_winch' WINCH
+
+  ui_enter
+  ui_size; ui_layout
+  UI_LAST=$SECONDS
+  # The first read takes a moment when there are many profiles.
+  printf ' Reading the profiles…\n'
+  ui_load
+  ui_loop
+  ui_leave
+
+  trap - WINCH TSTP
+  trap '_on_exit' EXIT
+  trap '_on_exit; exit 130' INT
+  trap '_on_exit; exit 143' TERM
+  trap '_on_exit; exit 129' HUP
+  return 0
+}
+
 cmd_version() { printf 'aidentity %s\n' "$AIDENTITY_VERSION"; }
 
 # ---------------------------------------------------------- command table --
@@ -3181,13 +4056,14 @@ canonical_command() {
     apps)                    printf 'apps' ;;
     doctor)                  printf 'doctor' ;;
     update)                  printf 'update' ;;
+    ui)                      printf 'ui' ;;
     completion)              printf 'completion' ;;
     version|--version|-v)    printf 'version' ;;
     help|--help|-h)          printf 'help' ;;
     *) return 1 ;;
   esac
 }
-COMMAND_WORDS="setup init wizard add rename mv set modify edit prune restore rebuild repair list ls open rm remove delete apps doctor update completion version help"
+COMMAND_WORDS="setup init wizard add rename mv set modify edit prune restore rebuild repair list ls open rm remove delete apps doctor update ui completion version help"
 
 # The options a command accepts, for completion. Short spellings and --colour
 # are left out on purpose: they work, but listing both spellings is noise. Every
@@ -3225,6 +4101,7 @@ command_summary() {
     apps)       printf 'List apps that can have extra accounts' ;;
     doctor)     printf 'Check the setup and every profile' ;;
     update)     printf 'Install the latest release' ;;
+    ui)         printf 'Full-screen menu over your profiles' ;;
     completion) printf 'Print a tab-completion script' ;;
     version)    printf 'Print the version' ;;
     help)       printf 'Show help for all commands or for one' ;;
@@ -3503,6 +4380,25 @@ ${C_BOLD}OPTIONS${C_RESET}
 ${C_BOLD}EXAMPLES${C_RESET}
   aidentity update --check
   aidentity update
+EOF
+    ;;
+    ui) cat <<EOF
+${C_BOLD}aidentity ui${C_RESET} — $(command_summary ui)
+
+${C_BOLD}USAGE${C_RESET}
+  aidentity ui
+
+A full-screen menu in Terminal: every profile, what is running, and keys to
+open, add, rename, recolour, change the badge, remove, and run doctor. Each key
+runs the same command you would type, with the same checks. It needs a
+terminal; in a script, use the commands themselves or aidentity list --json.
+Press ? in the menu for its keys, and q to leave.
+
+${C_BOLD}OPTIONS${C_RESET}
+  -h, --help           Show this help
+
+${C_BOLD}EXAMPLES${C_RESET}
+  aidentity ui
 EOF
     ;;
     completion) cat <<EOF
@@ -4013,6 +4909,10 @@ ${C_BOLD}COMMANDS${C_RESET}
   setup                Guided walkthrough. Start here — it asks which app, what to
                        call each account, and sets them all up in one pass.
 
+  ui                   Full-screen menu: every profile and what is running, with
+                       a key to open, add, rename, recolour, badge or remove
+                       each one. Needs a terminal. Press ? inside for the keys.
+
   add [app]            Create one profile directly.
       --profile NAME   Name for this account, e.g. Work
       --badge  X       Single character for the icon badge (default: first letter)
@@ -4070,6 +4970,7 @@ ${C_BOLD}COMMANDS${C_RESET}
 
 ${C_BOLD}EXAMPLES${C_RESET}
   aidentity setup
+  aidentity ui
   aidentity add Claude --profile Work --color blue --seed
   aidentity add ChatGPT --profile Personal
   aidentity add Claude --main
@@ -4142,6 +5043,7 @@ main() {
     apps)    cmd_apps "$@" ;;
     doctor)  cmd_doctor "$@" ;;
     update)  cmd_update "$@" ;;
+    ui)      cmd_ui "$@" ;;
     completion) cmd_completion "$@" ;;
     version) cmd_version ;;
     # `aidentity help [command]` names a command. A leading -h or --help is the
