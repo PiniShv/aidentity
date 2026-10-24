@@ -48,7 +48,7 @@ jobs:
         run: |
           set -eu
           files=""
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh assets/record-demo.sh; do
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
             [ -f "$f" ] && files="$files $f"
           done
           [ -n "$files" ] || { echo "No shell files found." >&2; exit 1; }
@@ -92,6 +92,26 @@ jobs:
             *) echo "Expected a TAP SKIP plan on Linux." >&2; exit 1 ;;
           esac
 
+      # The release workflow runs these two scripts on this kind of runner, with
+      # GNU tools, and the test suite runs only on macOS. Running them here on
+      # every change means a Linux-only failure shows up in a pull request, not
+      # on release day. The release check gets a copy of the tree with the
+      # installer pointed at this version's tag, as `make release` leaves it.
+      - name: The release scripts run with Linux tools
+        run: |
+          set -eu
+          version=$(sed -n 's/^AIDENTITY_VERSION="\(.*\)"$/\1/p' bin/aidentity)
+          notes=$(bash scripts/release-notes.sh "$version")
+          printf '%s\n' "$notes" | head -n 12
+          if printf '%s\n' "$notes" | grep -q '^\[[^]]*\]: '; then
+            echo "The changelog's link list leaked into the release notes." >&2
+            exit 1
+          fi
+          copy=$(mktemp -d)
+          git archive HEAD | tar -x -C "$copy"
+          V="v$version" perl -pi -e 's/^REF=".*"$/REF="\${AIDENTITY_REF:-$ENV{V}}"/' "$copy/install.sh"
+          bash "$copy/scripts/release-check.sh" "v$version"
+
   test:
     name: Test (macOS)
     runs-on: macos-latest
@@ -110,7 +130,7 @@ jobs:
       - name: Syntax check (bash -n)
         run: |
           set -eu
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh assets/record-demo.sh; do
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
             [ -f "$f" ] || continue
             printf '  bash -n %s\n' "$f"
             bash -n "$f"
@@ -145,7 +165,7 @@ jobs:
         run: |
           set -eu
           files=""
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh assets/record-demo.sh; do
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
             [ -f "$f" ] && files="$files $f"
           done
           # shellcheck disable=SC2086
@@ -155,7 +175,7 @@ jobs:
         continue-on-error: true
         run: |
           files=""
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh assets/record-demo.sh; do
+          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
             [ -f "$f" ] && files="$files $f"
           done
           # shellcheck disable=SC2086
