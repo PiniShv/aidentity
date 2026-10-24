@@ -49,10 +49,11 @@ fi
 
 # 3. Code is pasted into the scripts that cannot source bin/aidentity, and it
 #    MUST stay in step: a drifted copy of running_on_profile once shipped a
-#    dead guard. uninstall.sh carries safety helpers, compared as code without
+#    dead guard. uninstall.sh carries the safety helpers (the running check is
+#    four functions, so all four are compared), compared as code without
 #    comments. install.sh carries the download block, compared byte for byte.
 #    Either copy missing fails.
-for fn in running_on_profile data_is_ours is_our_launcher; do
+for fn in proc_snapshot running_on_profile running_in_snapshot proc_dir_ids data_is_ours is_our_launcher; do
   a=$(sed -n "/^$fn() {/,/^}/p" bin/aidentity | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true)
   b=$(sed -n "/^$fn() {/,/^}/p" uninstall.sh  | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true)
   if [ -z "$a" ] || [ -z "$b" ]; then
