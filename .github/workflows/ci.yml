@@ -127,6 +127,20 @@ jobs:
           fi
           shellcheck --version
 
+      # The test suite syntax-checks the fish completion script when fish is
+      # installed and skips that check when it is not. Installing fish here
+      # keeps the check from being skipped on CI.
+      - name: Install fish
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: |
+          set -eu
+          if ! command -v fish >/dev/null 2>&1; then
+            brew install fish
+          fi
+          fish --version
+
       - name: shellcheck (blocking)
         run: |
           set -eu
