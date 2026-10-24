@@ -168,6 +168,8 @@ html:not(.js) .panel+.panel{border-top:1px solid var(--term-line)}
 .js .ps,.js .cmd{padding-top:0}
 .copy{grid-column:1/-1;width:100%}
 }
+.recipe-cta{margin:14px 0 0;font-weight:600}
+.recipe-cta a{display:inline-flex;align-items:center;gap:6px;min-height:32px}
 .fine{margin:16px 0 0;color:var(--muted);font-size:.9375rem;max-width:70ch}
 .fine summary{display:inline-flex;align-items:center;gap:6px;min-height:32px;cursor:pointer;color:var(--link);list-style:none}
 .fine summary::-webkit-details-marker{display:none}
@@ -439,6 +441,7 @@ html:not(.js) .chapters{display:none}
 <li><a href="#quick-start">Set up</a></li>
 <li><a href="#how-it-works">How it works</a></li>
 <li><a href="#which-apps-work">Apps</a></li>
+<li><a href="recipes/">Recipes</a></li>
 <li><a href="#faq">FAQ</a></li>
 <li class="gh"><a href="https://github.com/PiniShv/aidentity">GitHub <svg class="i" aria-hidden="true"><use href="#i-ext"/></svg></a></li>
 <li class="inst"><a href="#install">Install</a></li>
@@ -502,6 +505,7 @@ html:not(.js) .chapters{display:none}
 <p class="hint">Then run <code>aidentity setup</code> to start the walkthrough.</p>
 </div>
 </div>
+<p class="recipe-cta"><a href="recipes/">Not sure what to type? Build your recipe <svg class="i" aria-hidden="true"><use href="#i-right"/></svg></a></p>
 <details class="fine">
 <summary>New to Terminal? <svg class="i" aria-hidden="true"><use href="#i-down"/></svg></summary>
 <p>Press <kbd>Cmd</kbd> + <kbd>Space</kbd>, type <code>Terminal</code>, press <kbd>Return</kbd>. Paste the line and press <kbd>Return</kbd> again. The installer checks the download, never uses <code>sudo</code> and leaves your shell files alone. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#install-and-upgrade">Read it first, or build from source</a>.</p>

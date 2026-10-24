@@ -1,0 +1,1221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Recipes: build your aidentity commands</title>
+<meta name="description" content="Pick your apps, name your accounts and choose their colours. Get the exact Terminal commands to run several accounts of the same Mac app side by side.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://aidentity.pinishv.com/recipes/">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#070B14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F5F8FE" media="(prefers-color-scheme: light)">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aidentity.pinishv.com/recipes/">
+<meta property="og:site_name" content="aidentity">
+<meta property="og:title" content="aidentity recipes: build your commands">
+<meta property="og:description" content="Pick your apps, name your accounts, choose colours. Get the exact commands to paste into Terminal.">
+<meta property="og:image" content="https://aidentity.pinishv.com/assets/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="aidentity: Stop signing out to switch accounts. Run your work, personal and client accounts of the same Mac app side by side.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="aidentity: Stop signing out to switch accounts. Run your work, personal and client accounts of the same Mac app side by side.">
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="aidentity">
+<script>document.documentElement.className="js"</script>
+<style>
+:root{
+  color-scheme:dark light;
+  --bg:#070B14;--bg2:#0A111F;--surface:#0E1627;--surface2:#131E34;--field:#091120;
+  --line:#1E2B45;--line2:#2A3A5C;--ctl:#5A6E94;
+  --text:#EAF0FA;--muted:#A5B4CB;
+  --accent:#38BDF8;--accent2:#22D3EE;--link:#5CC8FF;
+  --ok:#4ADE80;--warn:#FBBF24;--bad:#F87171;
+  --btn-bg:#38BDF8;--btn-fg:#04111E;--btn-hover:#7DD3FC;
+  --focus:#67E8F9;--grid:rgba(56,189,248,.07);
+  --glow1:rgba(34,211,238,.16);--glow2:rgba(46,125,246,.20);
+  --grad:linear-gradient(90deg,#2E7DF6,#22D3EE);
+  --shadow:0 30px 80px -30px rgba(14,165,233,.38),0 0 0 1px rgba(56,189,248,.06);
+  --term-bg:#0A1019;--term-bar:#111A2B;--term-line:#1F2C45;--term-line2:#2E4066;
+  --term-text:#E6EDF7;--term-muted:#9AA9C0;--term-accent:#38BDF8;--term-ok:#4ADE80;--term-warn:#FBBF24;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:light){
+  :root{
+    --bg:#F5F8FE;--bg2:#EBF1FB;--surface:#FFFFFF;--surface2:#F1F5FC;--field:#FFFFFF;
+    --line:#D5DFEE;--line2:#B9C8E0;--ctl:#7488A8;
+    --text:#0A1222;--muted:#44536B;
+    --accent:#0369A1;--accent2:#0E7490;--link:#1D4ED8;
+    --ok:#047857;--warn:#92400E;--bad:#B91C1C;
+    --btn-bg:#1D4ED8;--btn-fg:#FFFFFF;--btn-hover:#1E40AF;
+    --focus:#1D4ED8;--grid:rgba(29,78,216,.07);
+    --glow1:rgba(14,165,233,.14);--glow2:rgba(46,125,246,.12);
+    --grad:linear-gradient(90deg,#1D4ED8,#0369A1);
+    --shadow:0 24px 60px -28px rgba(29,78,216,.40),0 0 0 1px rgba(29,78,216,.05);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:76px}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+body{margin:0;background:var(--bg);color:var(--text);font:400 1rem/1.65 var(--sans);-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+a{color:var(--link);text-decoration-thickness:1px;text-underline-offset:.2em}
+a:hover{text-decoration-thickness:2px}
+code,kbd{font-family:var(--mono)}
+kbd{padding:.1em .45em;border:1px solid var(--line2);border-bottom-width:2px;border-radius:6px;background:var(--surface);font-size:.85em;color:var(--text)}
+p{margin:0 0 1em}
+h1,h2,h3{margin:0;line-height:1.15;letter-spacing:-.02em;text-wrap:balance}
+button,input{font:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:4px}
+main:focus,[tabindex="-1"]:focus:not(:focus-visible){outline:none}
+[hidden]{display:none!important}
+[role=list]{list-style:none;margin:0;padding:0}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.wrap{width:100%;max-width:1120px;margin:0 auto;padding-inline:clamp(16px,4vw,32px)}
+.i{width:1.1em;height:1.1em;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.15em}
+.skip{position:absolute;left:16px;top:-5em;z-index:30;background:var(--btn-bg);color:var(--btn-fg);padding:.6rem 1rem;border-radius:8px;font-weight:600;text-decoration:none}
+.skip:focus{top:12px}
+:where(p,li,dd,span) code{white-space:nowrap;padding:.12em .4em;border-radius:6px;background:var(--surface2);border:1px solid var(--line);font-size:.875em;color:var(--text)}
+.strip{height:4px;background:linear-gradient(90deg,#1D4ED8,#2E7DF6,#0EA5E9,#38BDF8,#22D3EE)}
+.top{position:sticky;top:0;z-index:20;border-bottom:1px solid var(--line);background:var(--bg)}
+@supports (backdrop-filter:blur(1px)) and (background:color-mix(in srgb,red,blue)){.top{background:color-mix(in srgb,var(--bg) 82%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px)}
+}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:64px}
+.brand{display:inline-flex;align-items:center;gap:10px;color:var(--text);text-decoration:none;font:700 1.0625rem var(--mono);letter-spacing:-.01em}
+.brand img{display:block}
+.top ul{display:flex;align-items:center;gap:4px}
+.top li a{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;color:var(--muted);text-decoration:none;font-size:.9375rem;border-radius:8px;white-space:nowrap}
+.top li a:hover,.top li a[aria-current=page]{color:var(--text);background:var(--surface2)}
+.top li.gh a{color:var(--text);border:1px solid var(--line2)}
+.top li.inst a{background:var(--btn-bg);color:var(--btn-fg);font-weight:700;border:1px solid var(--btn-bg)}
+.top li.inst a:hover{background:var(--btn-hover);border-color:var(--btn-hover)}
+@media (max-width:859px){.top li:not(.gh):not(.inst){display:none}
+}
+@media (max-width:479px){.top li.gh{display:none}
+}
+.hero{position:relative;isolation:isolate;overflow:hidden;padding:clamp(28px,5vw,60px) 0 clamp(28px,4vw,44px)}
+.hero::before{content:"";position:absolute;inset:-10% -10% auto -10%;height:120%;z-index:-2;background:radial-gradient(ellipse 50% 45% at 78% 18%,var(--glow1),transparent 70%),radial-gradient(ellipse 45% 40% at 12% 0%,var(--glow2),transparent 70%)}
+.hero::after{content:"";position:absolute;inset:0;z-index:-1;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:44px 44px;-webkit-mask-image:radial-gradient(ellipse 70% 80% at 70% 20%,#000,transparent 75%);mask-image:radial-gradient(ellipse 70% 80% at 70% 20%,#000,transparent 75%)}
+.kicker{margin:0 0 12px;font:700 .8125rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(2.1rem,1.2rem + 4vw,3.6rem);font-weight:800;letter-spacing:-.032em;line-height:1.05;margin-bottom:18px}
+.grad{color:var(--accent);background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+@media (forced-colors:active){.grad{background:none;-webkit-text-fill-color:currentColor}
+}
+.lead{font-size:clamp(1.0625rem,1rem + .5vw,1.3125rem);line-height:1.5;max-width:48ch;margin-bottom:12px}
+.sub{color:var(--muted);max-width:60ch;margin:0}
+h2{font-size:clamp(1.45rem,1.1rem + 1.5vw,2rem);font-weight:800;letter-spacing:-.03em}
+h3{font-size:1.125rem;font-weight:700;letter-spacing:-.01em}
+.step{padding:clamp(36px,6vw,60px) 0}
+.alt{background:var(--bg2);border-block:1px solid var(--line)}
+.step-head{display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px 16px;margin-bottom:22px}
+.step-head>div{flex:1 1 200px;min-width:0}
+.step-head p{margin:6px 0 0;color:var(--muted)}
+.num{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;border:1px solid var(--line2);background:var(--surface);font:800 1rem/1 var(--mono);color:var(--accent);box-shadow:0 0 24px -8px var(--accent2)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:10px;border:1px solid var(--btn-bg);background:var(--btn-bg);color:var(--btn-fg);font-weight:700;text-decoration:none;cursor:pointer}
+.btn:hover{background:var(--btn-hover);border-color:var(--btn-hover)}
+.btn.ghost{background:transparent;color:var(--text);border-color:var(--line2)}
+.btn.ghost:hover{background:var(--surface2);border-color:var(--accent)}
+.btn.warn{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.next{margin-top:22px}
+.small{font-size:.875rem;color:var(--muted)}
+.note{display:flex;gap:12px;margin:0 0 18px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:10px;color:var(--muted)}
+.note .i{margin-top:.25em;color:var(--warn)}
+.note p{margin:0}
+/* Step 1: recipes */
+.presets{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr))}
+.preset{display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:100%;height:100%;padding:18px;text-align:left;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:14px;cursor:pointer}
+.preset:hover{border-color:var(--accent)}
+.preset[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 32px -12px var(--accent2)}
+.pe{font-size:1.75rem;line-height:1.2}
+.pt{font-weight:700;font-size:1.0625rem;line-height:1.3}
+.pd{color:var(--muted);font-size:.9375rem;line-height:1.5}
+.pm{margin-top:auto;padding-top:6px;font:600 .75rem/1.5 var(--mono);color:var(--accent)}
+@media (max-width:560px){.preset{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;padding:14px}
+.pe{grid-row:span 3;font-size:1.5rem}
+.pd{font-size:.875rem}
+.pm{padding-top:4px}
+}
+@media (prefers-reduced-motion:no-preference){.preset{transition:border-color .15s,transform .15s}
+.preset:hover{transform:translateY(-2px)}
+}
+/* Step 2: apps */
+.apps{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,210px),1fr))}
+.app{position:relative;display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;cursor:pointer}
+.app:hover{border-color:var(--accent)}
+.app input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.app.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.app:focus-within{outline:3px solid var(--focus);outline-offset:3px}
+.app:has(input:focus:not(:focus-visible)){outline:none}
+.at{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:linear-gradient(160deg,#3A4A68,#1E2A44);border:1px solid #41537A;color:#C5D2E8}
+.at .i{width:20px;height:20px}
+.an{display:flex;flex-direction:column;align-items:flex-start;gap:3px;flex:1;min-width:0;font-weight:600;line-height:1.25}
+.ck{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;border:2px solid var(--ctl);color:transparent}
+.app.on .ck{background:var(--accent);border-color:var(--accent);color:var(--btn-fg)}
+.ck .i{width:15px;height:15px;stroke-width:3}
+@media (max-width:480px){.apps{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.app{gap:8px;padding:10px}
+.app .at{display:none}
+}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:1px 9px;border:1px solid var(--st);border-radius:999px;color:var(--st);font:600 .6875rem/1.6 var(--mono);white-space:nowrap}
+.tag .i{width:1em;height:1em}
+.v-ok{--st:var(--ok)}
+.v-det{--st:var(--accent)}
+.v-br{--st:var(--warn)}
+.picked{margin:14px 0 0;font:600 .8125rem var(--mono);color:var(--muted)}
+.more{margin-top:14px;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.more summary{display:flex;align-items:center;gap:8px;min-height:48px;padding:8px 16px;font-weight:600;cursor:pointer;list-style:none;border-radius:12px}
+.more summary::-webkit-details-marker{display:none}
+.more summary .i{margin-left:auto;color:var(--muted)}
+.more[open] summary .i{transform:rotate(180deg)}
+.more .in{padding:0 16px 16px;color:var(--muted)}
+.more .in p{margin:0 0 12px}
+.nots{display:grid;gap:8px;margin:0 0 12px}
+.nots li{display:flex;gap:10px;align-items:flex-start}
+.nots li::before{content:"\2715";content:"\2715" / "";flex:none;margin-top:.15em;font:700 1em/1.4 var(--mono);color:var(--bad)}
+.nots strong{color:var(--text)}
+/* Step 3: accounts */
+.s3{display:grid;gap:28px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:1000px){.s3{grid-template-columns:minmax(0,1fr) 360px;align-items:start}
+.preview{position:sticky;top:84px}
+.preview.tall{position:static}
+}
+.empty{padding:22px;border:1px dashed var(--line2);border-radius:14px;color:var(--muted);text-align:center}
+.empty p{margin:0}
+.grp{padding:clamp(14px,3vw,20px);background:var(--surface);border:1px solid var(--line);border-radius:16px}
+.grp+.grp{margin-top:16px}
+.grp-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:6px}
+.gnote{margin:6px 0 0;font-size:.875rem;color:var(--muted)}
+.rows{display:grid;gap:12px;margin-top:14px}
+.row{padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface2)}
+.row.bad{border-color:var(--bad)}
+.row.soft{border-color:var(--warn)}
+.row-top{display:grid;grid-template-columns:auto minmax(0,1fr) 78px auto;gap:10px;align-items:end}
+@media (max-width:520px){.row-top{grid-template-columns:minmax(0,1fr) 64px auto}
+.row-top .mt{display:none}
+}
+.fl{display:block;margin:0 0 4px;font:600 .6875rem var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.tx{width:100%;min-height:44px;padding:0 12px;border-radius:9px;border:1px solid var(--ctl);background:var(--field);color:var(--text);font:500 1rem var(--sans)}
+.tx:hover{border-color:var(--accent)}
+.tx[aria-invalid=true]{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+.bdg{text-align:center;font-weight:700}
+.rm{display:grid;place-items:center;width:44px;height:44px;border-radius:9px;border:1px solid var(--line2);background:transparent;color:var(--muted);cursor:pointer}
+.rm:hover{color:var(--bad);border-color:var(--bad)}
+.cols{min-width:0;margin:12px 0 0;padding:0;border:0}
+.cols legend{padding:0}
+.sw{display:flex;flex-wrap:wrap;align-items:center;gap:2px}
+.swl{position:relative;display:grid;place-items:center;width:38px;height:38px;border-radius:50%;cursor:pointer}
+.swl input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.dot{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--c,#6B7280);box-shadow:inset 0 0 0 1px rgba(255,255,255,.28),0 0 0 1px rgba(0,0,0,.3);color:#fff;pointer-events:none}
+.dot.cu{background:conic-gradient(#E5484D,#F5B400,#2FB344,#12A594,#2E7DF6,#8E4EC6,#D6409F,#E5484D)}
+.dot.cu.set{background:var(--c)}
+.dot .i{width:15px;height:15px;stroke-width:3;opacity:0}
+.swl input:checked+.dot{box-shadow:0 0 0 2px var(--surface2),0 0 0 4px var(--text)}
+.swl input:checked+.dot .i{opacity:1}
+.swl input:focus-visible+.dot{outline:3px solid var(--focus);outline-offset:5px}
+.hexf{display:inline-flex;align-items:center;gap:6px;margin-left:6px}
+.hexf .tx{width:7.5em;min-height:38px;font-family:var(--mono);font-size:1rem;text-transform:uppercase}
+.hexf .tx::placeholder{text-transform:none}
+@media (max-width:520px){.swl{width:35px;height:35px}
+.dot{width:26px;height:26px}
+.hexf{margin-left:2px}
+.hexf .tx{width:6.2em}
+}
+.opts{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:10px}
+.tg{display:inline-flex;align-items:flex-start;gap:10px;min-height:40px;padding-top:8px;cursor:pointer;font-size:.9375rem;line-height:1.4}
+.tg small{display:block;color:var(--muted);font-size:.8125rem}
+.swi{appearance:none;-webkit-appearance:none;position:relative;flex:none;width:40px;height:24px;margin:0;border-radius:999px;background:var(--ctl);cursor:pointer}
+.swi::before{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+.swi:checked{background:var(--btn-bg)}
+.swi:checked::before{transform:translateX(16px)}
+@media (prefers-reduced-motion:no-preference){.swi::before{transition:transform .15s}
+}
+@media (forced-colors:active){.swi{border:1px solid CanvasText}
+.swi:checked{background:Highlight}
+}
+.msg{display:flex;gap:8px;margin:10px 0 0;font-size:.875rem;line-height:1.5}
+.msg:empty{display:none}
+.msg.e{color:var(--bad)}
+.msg.w{color:var(--warn)}
+.msg .i{margin-top:.2em}
+.add{display:inline-flex;align-items:center;gap:8px;min-height:44px;margin-top:12px;padding:0 16px;border-radius:10px;border:1px dashed var(--line2);background:transparent;color:var(--text);font-weight:600;cursor:pointer}
+.add:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.add:disabled{opacity:.55;cursor:not-allowed}
+.mainopt{margin-top:14px;padding-top:6px;border-top:1px solid var(--line)}
+.mainopt p{margin:2px 0 0 50px}
+/* Step 4: preview */
+.desk{overflow:hidden;border:1px solid var(--term-line);border-radius:16px;color:var(--term-text);background:radial-gradient(ellipse 80% 60% at 85% 0%,rgba(34,211,238,.22),transparent 70%),radial-gradient(ellipse 70% 60% at 0% 100%,rgba(46,125,246,.28),transparent 70%),linear-gradient(160deg,#101C34,#0A1222);box-shadow:var(--shadow)}
+.desk-bar{display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(10,16,25,.55);border-bottom:1px solid var(--term-line)}
+.dots{display:flex;gap:7px;flex:none}
+.dots i{width:11px;height:11px;border-radius:50%;background:#FF5F57;opacity:.9}
+.dots i:nth-child(2){background:#FEBC2E}
+.dots i:nth-child(3){background:#28C840}
+.desk-t{font:500 .8125rem var(--mono);color:var(--term-muted)}
+.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:18px 8px;min-height:132px;padding:20px 12px 18px}
+.icons .none{grid-column:1/-1;align-self:center;margin:0;color:var(--term-muted);text-align:center;font-size:.9375rem}
+.t{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0;text-align:center;font:500 .75rem/1.3 var(--sans);color:#E6EDF7;overflow-wrap:anywhere}
+.t small{display:block;margin-top:2px;color:#FCA5A5;font-size:.6875rem}
+.tile{position:relative;display:grid;place-items:center;width:56px;height:56px;border-radius:14px;background:linear-gradient(160deg,#3A4A68,#1E2A44);border:1px solid #41537A;color:#C5D2E8;box-shadow:0 8px 18px -10px rgba(0,0,0,.7)}
+.tile .i{width:26px;height:26px}
+.bd{position:absolute;right:-6px;bottom:-6px;display:grid;place-items:center;width:27px;height:27px;border-radius:50%;border:2px solid rgba(255,255,255,.96);background:var(--c,#6B7280);color:#fff;font:800 .8125rem/1 var(--sans);text-transform:none;overflow:hidden}
+.t.bad .tile{opacity:.55;outline:2px dashed #F87171;outline-offset:3px}
+.mt{width:44px;height:44px;border-radius:11px;margin-bottom:0}
+.mt .i{width:20px;height:20px}
+.mt .bd{width:22px;height:22px;right:-5px;bottom:-5px;font-size:.6875rem}
+/* The Dock tiles shrink to fit the panel, down to 24px, before the Dock scrolls. --n is the tile count. */
+.dock-wrap{display:flex;justify-content:center;padding:0 10px 12px;container-type:inline-size}
+.dock{--t:clamp(24px,calc((100cqi - 60px) / var(--n,6) - 8px),42px);display:flex;align-items:flex-end;gap:8px;max-width:100%;min-height:64px;padding:9px 12px 11px;overflow-x:auto;border:1px solid rgba(148,163,184,.3);border-radius:18px;background:rgba(148,163,184,.14)}
+.dock li{flex:none;transform-origin:50% 100%}
+.dock .tile{width:var(--t);height:var(--t);border-radius:calc(var(--t) * .26)}
+.dock .tile .i{width:48%;height:48%}
+.dock .bd{width:calc(var(--t) * .46);height:calc(var(--t) * .46);right:-4px;bottom:-4px;font-size:calc(var(--t) * .24);border-width:1.5px}
+.dock .sep{align-self:stretch;width:1px;margin:2px;background:rgba(148,163,184,.4)}
+.dock .bin{background:linear-gradient(160deg,#4B5563,#1F2937);border-color:#6B7280}
+.dock .wait{align-self:center;padding:0 6px;color:var(--term-muted);font:500 .75rem var(--mono);white-space:nowrap}
+.dnote{margin:0;padding:0 16px 16px;color:var(--term-muted);font-size:.8125rem;text-align:center}
+@media (prefers-reduced-motion:no-preference){
+.pop{animation:pop .5s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes pop{from{opacity:0;transform:translateY(14px) scale(.4)}to{opacity:1;transform:none}}
+@media (hover:hover){.dock li{transition:transform .15s}
+.dock li:hover{transform:translateY(-6px) scale(1.22)}
+}
+}
+/* Step 5: commands */
+.seg{display:inline-flex;flex-wrap:wrap;gap:4px;margin:0;padding:4px;border:1px solid var(--ctl);border-radius:12px;background:var(--surface)}
+.seg legend{float:left;width:100%;padding:4px 8px 6px;font:600 .6875rem var(--mono);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.seg+.small{margin:8px 0 16px}
+.seg label{position:relative;display:block}
+.seg input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.seg input+span{display:flex;align-items:center;min-height:40px;padding:0 14px;border-radius:8px;font:600 .875rem var(--mono);color:var(--muted);cursor:pointer}
+.seg input:checked+span{background:var(--btn-bg);color:var(--btn-fg)}
+.seg input:focus-visible+span{outline:3px solid var(--focus);outline-offset:2px}
+@media (max-width:480px){.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+.seg input+span{justify-content:center;padding:0 6px;font-size:.8125rem}
+.seg legend{grid-column:1/-1}
+}
+.term{min-width:0;overflow:hidden;background:var(--term-bg);color:var(--term-text);border:1px solid var(--term-line);border-radius:14px;box-shadow:var(--shadow)}
+.term-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;min-height:52px;padding:8px 10px 8px 14px;background:var(--term-bar);border-bottom:1px solid var(--term-line)}
+.term-title{font:500 .8125rem var(--mono);color:var(--term-muted)}
+.ready{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border:1px solid var(--term-ok);border-radius:999px;color:var(--term-ok);font:700 .75rem/1.6 var(--mono)}
+.ready.go{animation:none}
+@media (prefers-reduced-motion:no-preference){.ready.go{animation:ready .9s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes ready{0%{transform:scale(.6);box-shadow:0 0 0 0 rgba(74,222,128,.6)}55%{transform:scale(1.08)}100%{transform:none;box-shadow:0 0 0 14px rgba(74,222,128,0)}}
+}
+.copy{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;margin-left:auto;padding:0 16px;border-radius:9px;border:1px solid var(--term-accent);background:var(--term-accent);color:#04111E;font:700 .8125rem var(--mono);cursor:pointer}
+.copy:hover{background:#7DD3FC;border-color:#7DD3FC}
+.copy.done{background:var(--term-ok);border-color:var(--term-ok)}
+.copy:disabled{opacity:.45;cursor:not-allowed}
+.term :focus-visible{outline-color:#67E8F9}
+.lines{padding:12px 0 14px;overflow-x:auto;font:500 .875rem/1.7 var(--mono);-webkit-overflow-scrolling:touch}
+.ln{width:max-content;min-width:100%;padding:0 12px 0 16px;white-space:pre}
+.cm{padding:0 16px;white-space:pre-wrap}
+.ln{display:flex;align-items:center;gap:10px;min-height:38px}
+.ln:hover{background:rgba(148,163,184,.07)}
+.cm{color:var(--term-muted);user-select:none;-webkit-user-select:none}
+.cm.w{color:var(--term-warn)}
+.cm+.ln,.ln+.cm{margin-top:2px}
+.gap{height:12px}
+.ps{color:var(--term-ok);user-select:none;-webkit-user-select:none}
+.ln code{color:var(--term-text)}
+.k-cmd{color:#7DD3FC;font-weight:700}
+.k-sub{color:#E6EDF7;font-weight:700}
+.k-flag{color:#9AA9C0}
+.k-val,.k-arg,.k-col,.k-url{color:#FDE68A}
+.k-op{color:#F0ABFC}
+.swd{display:inline-block;width:.7em;height:.7em;margin-right:.35em;border-radius:50%;background:var(--c);vertical-align:-.02em;user-select:none;-webkit-user-select:none}
+.lc{position:sticky;right:8px;display:inline-flex;align-items:center;gap:6px;flex:none;min-height:34px;margin-left:auto;padding:0 10px;border-radius:8px;border:1px solid var(--term-line2);background:var(--term-bar);color:var(--term-muted);font:600 .75rem var(--mono);cursor:pointer;box-shadow:-10px 0 12px -2px var(--term-bg);user-select:none;-webkit-user-select:none}
+.lc:hover{color:var(--term-text);border-color:var(--term-accent)}
+.lc.done{color:var(--term-ok);border-color:var(--term-ok)}
+/* Phones: wrap long commands so the whole line can be read; the copy buttons copy the real line. */
+@media (max-width:600px){.lc{position:static;padding:0 9px;box-shadow:none}
+.lc .lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ln{width:auto;white-space:normal}
+.ln code{flex:1 1 auto;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.ln :is(.k-cmd,.k-sub,.k-flag,.k-col){white-space:nowrap}
+}
+.status{margin:14px 0 0;font-weight:600}
+.status.ok{color:var(--ok)}
+.status.e{color:var(--bad)}
+.plain{display:block;width:100%;min-height:150px;margin-top:12px;padding:12px 14px;border-radius:10px;border:1px solid var(--term-line2);background:var(--term-bg);color:var(--term-text);font:500 .875rem/1.6 var(--mono);white-space:pre;resize:vertical}
+.acts{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;margin-top:18px}
+.acts .tx{flex:1 1 260px;font-family:var(--mono);font-size:.8125rem}
+@media (max-width:600px){.acts .tx{font-size:1rem}
+}
+.tips{display:grid;gap:12px;margin:26px 0 0;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}
+.tips li{padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--muted);font-size:.9375rem}
+.tips strong{display:block;margin-bottom:4px;color:var(--text)}
+.tips code{white-space:normal}
+/* Without JavaScript */
+.nojs{padding:clamp(32px,5vw,56px) 0}
+.js .nojs{display:none}
+html:not(.js) .builder{display:none}
+.nojs h2{margin-bottom:12px}
+.nojs .term{margin:18px 0}
+.foot{border-top:1px solid var(--line);padding:clamp(40px,7vw,64px) 0 40px;background:var(--bg2)}
+.foot-top{display:grid;gap:24px 48px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.foot-top{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:start}
+}
+.foot-top p{margin:12px 0 0;color:var(--muted);font-size:.9375rem;max-width:24rem}
+.foot ul{display:flex;flex-wrap:wrap;gap:0 22px}
+@media (min-width:860px){.foot ul{justify-content:flex-end}
+}
+.foot li a{display:inline-flex;align-items:center;min-height:40px;font-size:.9375rem;color:var(--muted);text-decoration:none}
+.foot li a:hover{color:var(--text);text-decoration:underline}
+.legal{margin-top:32px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.875rem}
+.legal p{margin:0 0 6px}
+@media (forced-colors:active){.term,.desk,.preset,.app,.grp,.row,.tag,.more,.tips li{border:1px solid CanvasText}
+.dots i,.dot,.bd,.swd{forced-color-adjust:none}
+.app.on,.preset[aria-pressed=true]{outline:2px solid Highlight}
+}
+</style>
+</head>
+<body id="top">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-ext" viewBox="0 0 24 24"><path d="M7 17 17 7M7 7h10v10"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
+<symbol id="i-win" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h8"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96 12 12.01l8.73-5.05M12 22.08V12"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></symbol>
+</svg>
+
+<a class="skip" href="#main">Skip to content</a>
+<div class="strip" aria-hidden="true"></div>
+
+<header class="top">
+<div class="wrap bar">
+<a class="brand" href="../"><img src="../assets/logo.svg" alt="" width="30" height="30"><span>aidentity</span></a>
+<nav aria-label="Main">
+<ul role="list">
+<li><a href="../#demo">Demo</a></li>
+<li><a href="../#quick-start">Set up</a></li>
+<li><a href="../#which-apps-work">Apps</a></li>
+<li><a href="./" aria-current="page">Recipes</a></li>
+<li><a href="../#faq">FAQ</a></li>
+<li class="gh"><a href="https://github.com/PiniShv/aidentity">GitHub <svg class="i" aria-hidden="true"><use href="#i-ext"/></svg></a></li>
+<li class="inst"><a href="../#install">Install</a></li>
+</ul>
+</nav>
+</div>
+</header>
+
+<main id="main" tabindex="-1">
+
+<section class="hero" aria-labelledby="h-top">
+<div class="wrap">
+<p class="kicker">Recipes</p>
+<h1 id="h-top">Build your setup. <span class="grad">Paste. Done.</span></h1>
+<p class="lead">Pick your apps, name your accounts and choose their colours. You get the exact commands to paste into Terminal.</p>
+<p class="sub">It all happens on this page, and nothing is sent anywhere. Your recipe is kept in the page link, so you can come back to it or share it.</p>
+</div>
+</section>
+
+<section class="nojs" aria-labelledby="h-nojs">
+<div class="wrap">
+<h2 id="h-nojs">An example recipe</h2>
+<p>The recipe builder needs JavaScript. Here is a ready recipe instead: a work and a personal Claude account, plus an icon that opens the account you use today.</p>
+<div class="term">
+<div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="term-title">Terminal: Work + Personal Claude</span></div>
+<div class="lines">
+<div class="cm"># 1. Install aidentity. Run this line on its own first.</div>
+<div class="cm">#    When it asks to set up your first account, type n and press Return.</div>
+<div class="cm">#    If it says aidentity is "not on your PATH", do the 2 steps it shows, then go on.</div>
+<div class="ln"><span class="ps" aria-hidden="true">$</span><code>curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash</code></div>
+<div class="gap"></div>
+<div class="cm"># 2. Add your accounts.</div>
+<div class="ln"><span class="ps" aria-hidden="true">$</span><code>aidentity add Claude --profile Work --color blue</code></div>
+<div class="ln"><span class="ps" aria-hidden="true">$</span><code>aidentity add Claude --profile Personal --color green</code></div>
+<div class="gap"></div>
+<div class="cm"># 3. Keep your original account one click away.</div>
+<div class="ln"><span class="ps" aria-hidden="true">$</span><code>aidentity add Claude --main</code></div>
+<div class="gap"></div>
+<div class="cm"># 4. Open your first new account and sign in.</div>
+<div class="ln"><span class="ps" aria-hidden="true">$</span><code>aidentity open "Claude Work"</code></div>
+<div class="gap"></div>
+<div class="cm"># 5. Show your new icons, then drag them to your Dock.</div>
+<div class="ln"><span class="ps" aria-hidden="true">$</span><code>open ~/Applications</code></div>
+</div>
+</div>
+<p>For other apps, colours and badges, see <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-add"><code>aidentity add</code> in the guide</a>.</p>
+</div>
+</section>
+
+<div class="builder">
+
+<section class="step" id="s1" aria-labelledby="h-s1">
+<div class="wrap">
+<div class="step-head">
+<span class="num" aria-hidden="true">1</span>
+<div><h2 id="h-s1" tabindex="-1">Start with a recipe</h2><p>Pick the one closest to what you need. You can change everything after.</p></div>
+<button type="button" class="btn ghost" id="reset"><svg class="i" aria-hidden="true"><use href="#i-undo"/></svg><span id="reset-l">Start over</span></button>
+</div>
+<div class="note" id="badlink" hidden><svg class="i" aria-hidden="true"><use href="#i-alert"/></svg><p id="badlink-t">That recipe link could not be read, so this is a starter recipe instead.</p></div>
+<ul class="presets" id="presets" role="list"></ul>
+</div>
+</section>
+
+<section class="step alt" id="s2" aria-labelledby="h-s2">
+<div class="wrap">
+<div class="step-head">
+<span class="num" aria-hidden="true">2</span>
+<div><h2 id="h-s2" tabindex="-1">Pick your apps</h2><p>Choose each app you want more than one account in. Pick only apps you already have in Applications: a line for an app that is not installed will fail.</p></div>
+</div>
+<div class="apps" id="apps" role="group" aria-labelledby="h-s2"></div>
+<p class="picked" id="picked"></p>
+<details class="more" id="browsers">
+<summary>Browsers too <svg class="i" aria-hidden="true"><use href="#i-down"/></svg></summary>
+<div class="in">
+<p>These are detected, but not tested. Their own built-in profiles usually do the job better, so try those first.</p>
+<div class="apps" id="apps-b" role="group" aria-label="Browsers"></div>
+</div>
+</details>
+<details class="more">
+<summary>Is your app missing? <svg class="i" aria-hidden="true"><use href="#i-down"/></svg></summary>
+<div class="in">
+<p>These cannot work, so they are not on the list:</p>
+<ul class="nots" role="list">
+<li><span><strong>ChatGPT Classic</strong> and other apps written in Swift or AppKit. They have no Chromium inside, so there is no separate-profile option. The newer ChatGPT app is fine.</span></li>
+<li><span><strong>Microsoft Teams (classic)</strong> and <strong>MiniMax Design</strong>. They ignore the separate folder, so every profile would share one account.</span></li>
+</ul>
+<p>Another app built on Chromium or Electron may still work. Run <code>aidentity apps</code> to see yours, then use <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-add"><code>aidentity add</code></a> by hand.</p>
+</div>
+</details>
+<button type="button" class="btn ghost next" data-go="h-s3">Next: name your accounts <svg class="i" aria-hidden="true"><use href="#i-right"/></svg></button>
+</div>
+</section>
+
+<section class="step" id="s3" aria-labelledby="h-s3">
+<div class="wrap s3">
+<div>
+<div class="step-head">
+<span class="num" aria-hidden="true">3</span>
+<div><h2 id="h-s3" tabindex="-1">Name your accounts</h2><p>One row per account. The icon gets the app's name plus yours, like <code>Claude Work</code>.</p></div>
+</div>
+<div class="empty" id="empty3"><p>No apps yet. <a href="#s2" data-go="h-s2">Pick an app</a> to start.</p></div>
+<div id="groups"></div>
+<button type="button" class="btn ghost next" data-go="h-s5">See my commands <svg class="i" aria-hidden="true"><use href="#i-right"/></svg></button>
+</div>
+
+<aside class="preview" id="pv" aria-labelledby="h-s4">
+<div class="step-head">
+<span class="num" aria-hidden="true">4</span>
+<div><h2 id="h-s4">Preview</h2><p>A sketch of the icons your recipe makes.</p></div>
+</div>
+<div class="desk">
+<div class="desk-bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="desk-t" aria-hidden="true">~/Applications</span></div>
+<ul class="icons" id="icons" role="list" aria-label="New icons"></ul>
+<div class="dock-wrap" aria-hidden="true"><ul class="dock" id="dock" role="list" tabindex="-1"></ul></div>
+<p class="dnote" id="dnote"></p>
+</div>
+</aside>
+</div>
+</section>
+
+<section class="step alt" id="s5" aria-labelledby="h-s5">
+<div class="wrap">
+<div class="step-head">
+<span class="num" aria-hidden="true">5</span>
+<div><h2 id="h-s5" tabindex="-1">Your commands</h2><p>Open Terminal (press <kbd>Cmd</kbd> + <kbd>Space</kbd>, type Terminal, press <kbd>Return</kbd>). Paste with <kbd>Cmd</kbd> + <kbd>V</kbd>, then press <kbd>Return</kbd>. Run the install line first, on its own, then paste the rest. Each icon you add prints a line like <code>✓ Created Claude Work</code>.</p></div>
+</div>
+<fieldset class="seg" aria-describedby="inst-d">
+<legend>How to install</legend>
+<label><input type="radio" name="inst" value="curl" checked><span>curl</span></label>
+<label><input type="radio" name="inst" value="brew"><span>Homebrew</span></label>
+<label><input type="radio" name="inst" value="have"><span>I have it<span class="sr"> already</span></span></label>
+</fieldset>
+<p class="small" id="inst-d">curl works on every Mac. If you use Homebrew already, pick it: Terminal then finds <code>aidentity</code> straight away.</p>
+<div class="term">
+<div class="term-bar">
+<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+<span class="term-title">Terminal: your recipe</span>
+<span class="ready" id="ready" hidden><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Ready to paste</span>
+<button type="button" class="copy" id="copyall" aria-describedby="copyall-d"><svg class="i" aria-hidden="true"><use href="#i-copy"/></svg><span class="lbl">Copy all</span></button>
+</div>
+<div class="lines" id="lines" role="region" aria-label="Commands" tabindex="0"></div>
+</div>
+<p class="small" id="copyall-d">Copy all takes only the lines that make your icons. It leaves out the install line, the comments and the lines that open things, so run those yourself when you are ready.</p>
+<label class="sr" for="plain">All commands as plain text</label>
+<textarea class="plain" id="plain" readonly hidden></textarea>
+<p class="status" id="status" role="status"></p>
+<div class="acts">
+<button type="button" class="btn" id="share"><svg class="i" aria-hidden="true"><use href="#i-link"/></svg><span class="lbl">Copy share link</span></button>
+<label class="sr" for="sharef">Share link</label>
+<input class="tx" id="sharef" type="text" readonly hidden>
+</div>
+<p class="small">The link holds your account names, so share it only with people who may see them.</p>
+<ul class="tips" role="list">
+<li><strong>“command not found: aidentity”?</strong>Terminal does not know where aidentity is yet. Run the install line again and do the 2 steps it shows under “not on your PATH”. Or pick Homebrew above.</li>
+<li><strong>Safe to run again</strong>Running <code>add</code> again for an icon that exists rebuilds the icon. Its data and sign-in stay as they are.</li>
+<li><strong>Sign in once</strong>Each new icon opens signed out. Sign in with that account, once. If the app is open, quit it first: some apps finish the sign-in in the window that started first. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#signing-in-to-a-new-profile">Why quit first</a></li>
+<li><strong>Prefer menus?</strong>From version 1.4.0, <code>aidentity ui</code> opens a menu in Terminal. You choose with the arrow keys instead of typing.</li>
+<li><strong>More options</strong>Proxies, language and other start-up settings: see <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#per-profile-settings">per-profile settings</a> in the guide.</li>
+</ul>
+</div>
+</section>
+
+</div>
+</main>
+
+<footer class="foot">
+<div class="wrap">
+<div class="foot-top">
+<div>
+<a class="brand" href="../"><img src="../assets/logo.svg" alt="" width="30" height="30"><span>aidentity</span></a>
+<p>Run your work, personal and client accounts side by side on your Mac. Each one stays signed in.</p>
+</div>
+<nav aria-label="Project links">
+<ul role="list">
+<li><a href="https://github.com/PiniShv/aidentity">GitHub</a></li>
+<li><a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md">Full guide</a></li>
+<li><a href="https://github.com/PiniShv/aidentity/blob/main/CHANGELOG.md">Changelog</a></li>
+<li><a href="https://github.com/PiniShv/aidentity/issues">Issues</a></li>
+<li><a href="https://github.com/PiniShv/aidentity/blob/main/SECURITY.md">Security policy</a></li>
+<li><a href="https://github.com/PiniShv/aidentity/blob/main/CONTRIBUTING.md">Contributing</a></li>
+<li><a href="https://github.com/PiniShv/aidentity/blob/main/LICENSE">Licence (MIT)</a></li>
+</ul>
+</nav>
+</div>
+<div class="legal">
+<p>Built by <a href="https://pinishv.com">Pini Shvartsman</a>. MIT licence.</p>
+<p>Not affiliated with Anthropic, OpenAI or the makers of the other apps named here.</p>
+</div>
+</div>
+</footer>
+
+<div class="sr" role="status" aria-live="polite" id="live"></div>
+
+<script>
+(function(){
+'use strict';
+var d=document;
+function $(id){return d.getElementById(id)}
+var reduce=window.matchMedia('(prefers-reduced-motion: reduce)');
+var hasOwn=function(o,k){return Object.prototype.hasOwnProperty.call(o,k)};
+
+/* ---------- Facts from bin/aidentity. Keep these in step with the script. ---------- */
+/* color_hex: the named colours and their hex values. grey and black are aliases. */
+var COLORS=[['blue','2E7DF6'],['green','2FB344'],['orange','F76B15'],['purple','8E4EC6'],['teal','12A594'],['pink','D6409F'],['red','E5484D'],['yellow','F5B400'],['gray','6B7280'],['graphite','1F2430']];
+var CHEX={};COLORS.forEach(function(c){CHEX[c[0]]=c[1]});
+var ALIAS={grey:'gray',black:'graphite'};
+/* auto_color picks from these eight, by the cksum of the launcher name. */
+var AUTO=['blue','green','orange','purple','teal','pink','red','yellow'];
+/* name: the app's bundle name, which add takes and which starts the launcher name.
+   seed: --seed applies (Claude Desktop). vs: a VS Code fork by is_vscode_family, so
+   --own-extensions applies and the socket-path limit is checked. */
+var APPS=[
+  {id:'claude',name:'Claude',tier:'v',g:'chat',seed:1},
+  {id:'chatgpt',name:'ChatGPT',tier:'t',g:'chat',note:'The newer ChatGPT app. ChatGPT Classic cannot work.'},
+  {id:'slack',name:'Slack',tier:'t',g:'users',note:'For separate sign-ins. More workspaces in one account need only Slack’s own switcher.'},
+  {id:'vscode',name:'Visual Studio Code',short:'VS Code',tier:'t',g:'code',vs:1},
+  {id:'cursor',name:'Cursor',tier:'t',g:'code',vs:1},
+  {id:'kiro',name:'Kiro',tier:'t',g:'code',vs:1},
+  {id:'antigravity',name:'Antigravity',tier:'t',g:'code'},
+  {id:'notion',name:'Notion',tier:'t',g:'file'},
+  {id:'notioncal',name:'Notion Calendar',tier:'t',g:'cal'},
+  {id:'obsidian',name:'Obsidian',tier:'t',g:'file'},
+  {id:'podman',name:'Podman Desktop',tier:'t',g:'box'},
+  {id:'postman',name:'Postman',tier:'t',g:'send'},
+  {id:'chrome',name:'Google Chrome',tier:'b',g:'globe'},
+  {id:'edge',name:'Microsoft Edge',tier:'b',g:'globe'},
+  {id:'brave',name:'Brave Browser',tier:'b',g:'globe'},
+  {id:'arc',name:'Arc',tier:'b',g:'globe'},
+  {id:'vivaldi',name:'Vivaldi',tier:'b',g:'globe'},
+  {id:'comet',name:'Comet',tier:'b',g:'globe'}
+];
+var APP={},APPNAME={};APPS.forEach(function(a){APP[a.id]=a;a.short=a.short||a.name;APPNAME[a.name.toLowerCase()]=a.id});
+var TIERS={v:['Verified','v-ok'],t:['Tested','v-det'],b:['Detected','v-br']};
+var NAMES=['Work','Personal','Client','Side','Team','Home','Lab','Test','Study','Play','Demo','Extra'];
+var MAX_ROWS=12,MAX_TOTAL=40,USER_GUESS=5;
+var BADGE=/^[\p{L}\p{N}]$/u,HEX=/^#?[0-9A-Fa-f]{6}$/;
+
+var PRESETS=[
+  {id:'wp',e:'💼',t:'Work + Personal Claude',d:'Your work account and your own, side by side. No more signing out.',apps:[['claude',[['Work','blue'],['Personal','green']]]]},
+  {id:'cl',e:'🤝',t:'One Claude per client',d:'A signed-in Claude for each client. Remove one when the job ends.',apps:[['claude',[['Acme','orange'],['Globex','purple'],['Initech','teal']]]]},
+  {id:'sl',e:'💬',t:'Two Slack accounts',d:'Two separate Slack sign-ins, open at the same time.',apps:[['slack',[['Work','purple'],['Personal','green']]]]},
+  {id:'ed',e:'🧑‍💻',t:'An editor per client',d:'VS Code and Cursor, each with its own settings and extensions.',apps:[['vscode',[['Acme','orange','',2]]],['cursor',[['Globex','purple','',2]]]]},
+  {id:'ai',e:'⚡',t:'AI power user',d:'Claude and ChatGPT, for work and for you. Work Claude gets a copy of your MCP servers.',apps:[['claude',[['Work','blue','',1],['Personal','green']]],['chatgpt',[['Work','teal'],['Personal','pink']]]]},
+  {id:'new',e:'✨',t:'Start from scratch',d:'An empty recipe. Pick your apps and name your accounts.',apps:[]}
+];
+
+/* ---------- Rules, the same as the script's ---------- */
+/* validate_profile_name, in the same order. */
+function nameError(n){
+  if(!n)return 'Give this account a name.';
+  var bad=[];
+  Array.from(n).forEach(function(ch){if(!/^[A-Za-z0-9 _-]$/.test(ch)&&bad.indexOf(ch)<0&&bad.length<4)bad.push(ch)});
+  if(bad.length)return 'Use only letters A to Z, numbers, spaces, - and _. Not allowed: '+bad.map(showChar).join(' ')+'.';
+  if(n.length>40)return 'Too long. A name can have up to 40 characters.';
+  if(n.charAt(0)===' '||n.charAt(n.length-1)===' ')return 'Remove the space at the start or the end.';
+  if(n.charAt(0)==='-')return 'It cannot start with -, because Terminal would read it as an option.';
+  return '';
+}
+function showChar(ch){var c=ch.codePointAt(0);return c<33||c===127||(c>=128&&c<160)?'U+'+('000'+c.toString(16).toUpperCase()).slice(-4):'“'+ch+'”'}
+/* slugify: lower case, spaces and _ become -, everything else is dropped. */
+function slugify(s){return s.toLowerCase().replace(/[ _]/g,'-').replace(/[^a-z0-9-]/g,'')}
+function firstUpper(n){return n.charAt(0).toUpperCase()}
+/* macOS socket-path limit for VS Code forks: room for the profile name is
+   32 - (app slug) - (Mac user name), with the default data folder. */
+function room(app){return 32-slugify(app.name).length}
+/* POSIX cksum, as auto_color uses it, so the Main icon shows the colour the script picks. */
+var CRC=(function(){var t=[],i,j,c;for(i=0;i<256;i++){c=i<<24;for(j=0;j<8;j++)c=(c&0x80000000)?(c<<1)^0x04C11DB7:c<<1;t[i]=c>>>0}return t})();
+function cksum(s){
+  var b=new TextEncoder().encode(s),crc=0,i,n;
+  function up(x){crc=((crc<<8)^CRC[((crc>>>24)^x)&255])>>>0}
+  for(i=0;i<b.length;i++)up(b[i]);
+  for(n=b.length;n>0;n=Math.floor(n/256))up(n&255);
+  return (~crc)>>>0;
+}
+function autoColor(label){return AUTO[cksum(label)%AUTO.length]}
+/* Shell quoting. Every value is checked first, so double quotes are enough:
+   nothing left can expand inside them. */
+function q(s){
+  if(/^[A-Za-z0-9._\/:-]+$/.test(s))return s;
+  if(/["$`\\!\n\r]/.test(s))throw new Error('unsafe value');
+  return '"'+s+'"';
+}
+
+/* ---------- State ---------- */
+var S,uid=0;
+function blank(inst){return {inst:inst||'curl',order:[],apps:{},preset:''}}
+function appState(s,id){return hasOwn(s.apps,id)?s.apps[id]:(s.apps[id]={on:false,main:true,rows:[]})}
+function mkRow(name,color,badge,flags,hex){return {id:'r'+(++uid),name:name,color:color,hex:hex||'',badge:badge||'',seed:!!(flags&1),ext:!!(flags&2)}}
+function nextColor(a){
+  var used={};a.rows.forEach(function(r){used[r.color]=1});
+  for(var i=0;i<COLORS.length;i++)if(!used[COLORS[i][0]])return COLORS[i][0];
+  return COLORS[a.rows.length%COLORS.length][0];
+}
+function nextName(a){
+  var used={};a.rows.forEach(function(r){used[r.name.toLowerCase()]=1});
+  for(var i=0;i<NAMES.length;i++)if(!used[NAMES[i].toLowerCase()])return NAMES[i];
+  return 'Account '+(a.rows.length+1);
+}
+function selected(){return S.order.filter(function(id){return hasOwn(S.apps,id)&&S.apps[id].on})}
+function totalRows(){return selected().reduce(function(n,id){return n+S.apps[id].rows.length},0)}
+function loadPreset(p){
+  S=blank(S?S.inst:'curl');S.preset=p.id;
+  p.apps.forEach(function(x){
+    var a=appState(S,x[0]);a.on=true;S.order.push(x[0]);
+    x[1].forEach(function(r){a.rows.push(mkRow(r[0],r[1],r[2],r[3]))});
+  });
+}
+function setApp(id,on){
+  var a=appState(S,id);
+  S.order=S.order.filter(function(x){return x!==id});
+  a.on=on;
+  if(on){S.order.push(id);if(!a.rows.length&&totalRows()<MAX_TOTAL)a.rows.push(mkRow(nextName(a),nextColor(a)))}
+}
+
+/* ---------- The link: compact JSON, base64url, in the hash ---------- */
+function b64e(s){var b=new TextEncoder().encode(s),bin='';for(var i=0;i<b.length;i++)bin+=String.fromCharCode(b[i]);return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+function b64d(s){
+  if(!/^[A-Za-z0-9_-]{1,6000}$/.test(s))return null;
+  s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';
+  try{var bin=atob(s),b=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)b[i]=bin.charCodeAt(i);return new TextDecoder('utf-8',{fatal:true}).decode(b)}catch(e){return null}
+}
+function encode(){
+  var apps=selected().map(function(id){
+    var a=S.apps[id];
+    var rows=a.rows.filter(function(r){return !nameError(r.name)}).map(function(r){
+      var c=r.color==='custom'?(HEX.test(r.hex)?r.hex.replace('#','').toUpperCase():''):r.color;
+      var f=(r.seed?1:0)|(r.ext?2:0),x=[r.name,c];
+      if(r.badge||f)x.push(r.badge);
+      if(f)x.push(f);
+      return x;
+    });
+    var e=[id,rows];if(!a.main)e.push(0);return e;
+  });
+  /* An empty recipe is written too, so a reload keeps it empty instead of loading the starter. */
+  var o={v:1,a:apps};if(S.inst!=='curl')o.i=S.inst==='brew'?'b':'h';
+  return b64e(JSON.stringify(o));
+}
+/* The hash comes from whoever made the link. Take only known apps, valid names,
+   known colours and one-character badges, and drop everything else. */
+function decode(hash){
+  var m=/^#r=([A-Za-z0-9_-]+)$/.exec(hash);if(!m)return null;
+  var txt=b64d(m[1]);if(txt===null)return null;
+  var o;try{o=JSON.parse(txt)}catch(e){return null}
+  if(!o||typeof o!=='object'||Array.isArray(o)||o.v!==1)return null;
+  var s=blank(o.i==='b'?'brew':o.i==='h'?'have':'curl'),total=0;
+  if(Array.isArray(o.a))o.a.slice(0,APPS.length).forEach(function(e){
+    if(!Array.isArray(e)||typeof e[0]!=='string'||!hasOwn(APP,e[0])||s.order.indexOf(e[0])>=0)return;
+    var app=APP[e[0]],a=appState(s,e[0]);a.on=true;a.main=e[2]!==0;s.order.push(e[0]);
+    if(!Array.isArray(e[1]))return;
+    e[1].slice(0,MAX_ROWS).forEach(function(x){
+      if(total>=MAX_TOTAL||!Array.isArray(x)||typeof x[0]!=='string'||nameError(x[0]))return;
+      var c=typeof x[1]==='string'?x[1]:'',lc=c.toLowerCase(),color='',hex='';
+      lc=hasOwn(ALIAS,lc)?ALIAS[lc]:lc;
+      if(hasOwn(CHEX,lc))color=lc;else if(/^[0-9A-Fa-f]{6}$/.test(c)){color='custom';hex=c.toUpperCase()}
+      if(!color)color=nextColor(a);
+      var badge=typeof x[2]==='string'&&BADGE.test(x[2])?x[2]:'';
+      var f=(x[3]===1||x[3]===2||x[3]===3)?x[3]:0;
+      if(!app.seed)f&=2;
+      if(!app.vs)f&=1;
+      a.rows.push(mkRow(x[0],color,badge,f,hex));total++;
+    });
+  });
+  return s;
+}
+
+/* ---------- DOM helpers. Text always goes in as text, never as HTML. ---------- */
+function h(tag,attrs,kids){
+  var el=d.createElement(tag),k,v;
+  if(attrs)for(k in attrs){
+    v=attrs[k];if(v==null||v===false)continue;
+    if(k==='text')el.textContent=v;
+    else if(k==='c')el.style.setProperty('--c',v);
+    else if(k.slice(0,2)==='on')el.addEventListener(k.slice(2),v);
+    else el.setAttribute(k,v===true?'':v);
+  }
+  if(kids)[].concat(kids).forEach(function(c){if(c!=null&&c!==false)el.appendChild(typeof c==='string'?d.createTextNode(c):c)});
+  return el;
+}
+function icon(name){
+  var ns='http://www.w3.org/2000/svg',s=d.createElementNS(ns,'svg'),u=d.createElementNS(ns,'use');
+  s.setAttribute('class','i');s.setAttribute('aria-hidden','true');s.setAttribute('focusable','false');
+  u.setAttribute('href','#i-'+name);s.appendChild(u);return s;
+}
+var live=$('live'),liveT;
+function say(t){clearTimeout(liveT);live.textContent='';liveT=setTimeout(function(){live.textContent=t},60)}
+function plural(n,w){return n+' '+w+(n===1?'':'s')}
+function go(id){
+  var el=$(id);if(!el)return;
+  el.scrollIntoView({behavior:reduce.matches?'auto':'smooth',block:'start'});
+  el.focus({preventScroll:true});
+}
+
+/* ---------- Step 1: recipes ---------- */
+function renderPresets(){
+  var ul=$('presets');
+  PRESETS.forEach(function(p){
+    var n=0;p.apps.forEach(function(x){n+=x[1].length});
+    var meta=p.apps.length?p.apps.map(function(x){return APP[x[0]].short}).join(' + ')+' · '+plural(n,'account'):'Blank';
+    var b=h('button',{type:'button',class:'preset','data-p':p.id,'aria-pressed':'false'},[
+      h('span',{class:'pe','aria-hidden':'true',text:p.e}),
+      h('span',{class:'pt',text:p.t}),
+      h('span',{class:'pd',text:p.d}),
+      h('span',{class:'pm',text:meta})
+    ]);
+    b.addEventListener('click',function(){
+      loadPreset(p);popAll=true;renderAll();
+      say('Loaded the recipe '+p.t+'. '+plural(totalRows(),'account')+'.');
+      go(p.apps.length?'h-s3':'h-s2');
+    });
+    ul.appendChild(h('li',null,[b]));
+  });
+}
+function updatePresets(){
+  [].forEach.call(d.querySelectorAll('.preset'),function(b){b.setAttribute('aria-pressed',b.getAttribute('data-p')===S.preset?'true':'false')});
+}
+
+/* ---------- Step 2: apps ---------- */
+function renderApps(){
+  APPS.forEach(function(app){
+    var t=TIERS[app.tier];
+    var inp=h('input',{type:'checkbox',id:'app-'+app.id,value:app.id});
+    inp.addEventListener('change',function(){
+      setApp(app.id,inp.checked);S.preset='';renderAll();
+      say(inp.checked?app.name+' added. '+plural(S.apps[app.id].rows.length,'account')+' in step 3.':app.name+' removed from the recipe.');
+    });
+    var card=h('label',{class:'app',id:'card-'+app.id},[
+      inp,
+      h('span',{class:'at','aria-hidden':'true'},[icon(app.g)]),
+      h('span',{class:'an'},[h('span',{text:app.name}),h('span',{class:'tag '+t[1],text:t[0]})]),
+      h('span',{class:'ck','aria-hidden':'true'},[icon('check')])
+    ]);
+    $(app.tier==='b'?'apps-b':'apps').appendChild(card);
+  });
+}
+function updateApps(){
+  var anyB=false;
+  APPS.forEach(function(app){
+    var on=hasOwn(S.apps,app.id)&&S.apps[app.id].on;
+    $('app-'+app.id).checked=on;$('card-'+app.id).classList.toggle('on',on);
+    if(on&&app.tier==='b')anyB=true;
+  });
+  if(anyB)$('browsers').open=true;
+  var n=selected().length;
+  $('picked').textContent=n?plural(n,'app')+' picked: '+selected().map(function(id){return APP[id].short}).join(', ')+'.':'No apps picked yet.';
+}
+
+/* ---------- Step 3: accounts ---------- */
+function toggle(id,checked,label,hint,onchange){
+  var inp=h('input',{type:'checkbox',class:'swi',id:id});inp.checked=checked;
+  inp.addEventListener('change',function(){onchange(inp.checked)});
+  return h('label',{class:'tg'},[inp,h('span',null,[label,hint?h('small',{text:hint}):null])]);
+}
+function rowEl(app,a,r){
+  var rid=r.id;
+  var name=h('input',{type:'text',class:'tx',id:'n-'+rid,autocomplete:'off',autocapitalize:'off',autocorrect:'off',spellcheck:'false','aria-describedby':'m-'+rid});
+  name.value=r.name;
+  name.addEventListener('input',function(){r.name=name.value;changed()});
+  var badge=h('input',{type:'text',class:'tx bdg',id:'b-'+rid,maxlength:'2',autocomplete:'off',autocorrect:'off',spellcheck:'false','aria-describedby':'k-'+rid});
+  badge.value=r.badge;
+  badge.addEventListener('input',function(){r.badge=badge.value.trim();changed()});
+  var sw=h('div',{class:'sw'});
+  COLORS.forEach(function(c){
+    var inp=h('input',{type:'radio',name:'c-'+rid,value:c[0]});inp.checked=r.color===c[0];
+    inp.addEventListener('change',function(){if(inp.checked){r.color=c[0];changed()}});
+    var cname=c[0].charAt(0).toUpperCase()+c[0].slice(1);
+    sw.appendChild(h('label',{class:'swl',title:cname},[inp,h('span',{class:'dot',c:'#'+c[1]},[icon('check')]),h('span',{class:'sr',text:cname})]));
+  });
+  var cu=h('input',{type:'radio',name:'c-'+rid,value:'custom','aria-describedby':'k-'+rid});cu.checked=r.color==='custom';
+  var hex=h('input',{type:'text',class:'tx',id:'x-'+rid,maxlength:'7',placeholder:'hex',autocomplete:'off',autocorrect:'off',spellcheck:'false','aria-describedby':'k-'+rid});
+  hex.value=r.hex;
+  /* Jump to the hex box only after a click or tap, so arrow keys keep moving through the colours. */
+  var ptr=0;
+  cu.addEventListener('change',function(){if(cu.checked){r.color='custom';changed();if(!HEX.test(r.hex)&&Date.now()-ptr<1000)hex.focus()}});
+  hex.addEventListener('input',function(){r.hex=hex.value.trim();r.color='custom';cu.checked=true;changed()});
+  sw.appendChild(h('label',{class:'swl',title:'Custom',onpointerdown:function(){ptr=Date.now()}},[cu,h('span',{class:'dot cu',id:'cu-'+rid},[icon('check')]),h('span',{class:'sr',text:'Custom colour'})]));
+  sw.appendChild(h('span',{class:'hexf'},[h('label',{class:'sr',for:'x-'+rid,text:'Custom colour, 6 hex digits'}),h('span',{'aria-hidden':'true',class:'small',text:'#'}),hex]));
+  var opts=[];
+  if(app.seed)opts.push(toggle('s-'+rid,r.seed,'Copy my MCP servers','Starts with a copy of the tools your Claude has now.',function(v){r.seed=v;changed()}));
+  if(app.vs)opts.push(toggle('e-'+rid,r.ext,'Own extensions','A separate extensions folder for this account.',function(v){r.ext=v;changed()}));
+  var rm=h('button',{type:'button',class:'rm',id:'rm-'+rid},[icon('x')]);
+  rm.addEventListener('click',function(){removeRow(app.id,rid)});
+  return h('div',{class:'row',id:'row-'+rid,role:'group'},[
+    h('div',{class:'row-top'},[
+      h('span',{class:'tile mt','aria-hidden':'true'},[icon(app.g),h('span',{class:'bd',id:'mb-'+rid})]),
+      h('div',null,[h('label',{class:'fl',for:'n-'+rid,text:'Account name'}),name]),
+      h('div',null,[h('label',{class:'fl',for:'b-'+rid,text:'Badge'}),badge]),
+      rm
+    ]),
+    h('p',{class:'msg',id:'m-'+rid,'aria-live':'polite'}),
+    h('fieldset',{class:'cols'},[h('legend',{class:'fl',text:'Colour'}),sw]),
+    opts.length?h('div',{class:'opts'},opts):null,
+    h('p',{class:'msg e',id:'k-'+rid,'aria-live':'polite'})
+  ]);
+}
+function groupEl(id){
+  var app=APP[id],a=S.apps[id],t=TIERS[app.tier];
+  var rows=h('div',{class:'rows'});
+  a.rows.forEach(function(r){rows.appendChild(rowEl(app,a,r))});
+  if(!a.rows.length)rows.appendChild(h('p',{class:'gnote',text:'No accounts yet. Add one below.'}));
+  var full=a.rows.length>=MAX_ROWS||totalRows()>=MAX_TOTAL;
+  var add=h('button',{type:'button',class:'add',id:'add-'+id},[icon('plus'),'Add a '+app.short+' account']);
+  add.disabled=full;
+  add.addEventListener('click',function(){addRow(id)});
+  var main=toggle('main-'+id,a.main,'Keep my original account one click away',null,function(v){a.main=v;changed()});
+  return h('section',{class:'grp',id:'grp-'+id,'aria-labelledby':'gh-'+id},[
+    h('div',{class:'grp-h'},[h('span',{class:'at','aria-hidden':'true'},[icon(app.g)]),h('h3',{id:'gh-'+id,text:app.name}),h('span',{class:'tag '+t[1],text:t[0]})]),
+    app.note?h('p',{class:'gnote',text:app.note}):null,
+    app.vs?h('p',{class:'gnote',text:'Keep names short. macOS limits the path to the profile folder, so '+app.short+' has room for '+room(app)+' characters minus the length of your Mac user name (type whoami in Terminal to see it).'}):null,
+    rows,
+    add,
+    full?h('p',{class:'gnote',text:'That is the most this page makes at once. Run add again later for more.'}):null,
+    h('div',{class:'mainopt'},[main,h('p',{class:'small'},['Adds ',h('code',{text:app.name+' Main'}),', an icon that always opens the account you use today.'])])
+  ]);
+}
+function renderGroups(){
+  var box=$('groups'),list=selected();
+  box.textContent='';
+  $('empty3').hidden=list.length>0;
+  list.forEach(function(id){box.appendChild(groupEl(id))});
+}
+function addRow(id){
+  var a=S.apps[id];
+  if(a.rows.length>=MAX_ROWS||totalRows()>=MAX_TOTAL)return;
+  var r=mkRow(nextName(a),nextColor(a));a.rows.push(r);
+  edited();renderGroups();refresh();
+  var n=$('n-'+r.id);n.focus();n.select();
+  say('Added '+APP[id].name+' '+r.name+'. Type a name for it.');
+}
+function removeRow(id,rid){
+  var a=S.apps[id],i=a.rows.findIndex(function(r){return r.id===rid});
+  if(i<0)return;
+  var gone=a.rows.splice(i,1)[0];
+  edited();renderGroups();refresh();
+  var next=a.rows[i]||a.rows[i-1];
+  (next?$('n-'+next.id):$('add-'+id)).focus();
+  say('Removed '+APP[id].name+' '+gone.name+'.');
+}
+
+/* ---------- Checks across the whole recipe ---------- */
+function analyse(){
+  var list=selected(),mains={},slugs={},groups=[];
+  /* add --main makes "<App> Main". A profile with that launcher name is refused. */
+  list.forEach(function(id){var a=S.apps[id];if(a.main&&a.rows.length)mains[(APP[id].name+' Main').toLowerCase()]=APP[id].name});
+  list.forEach(function(id){
+    var app=APP[id],a=S.apps[id],g={app:app,rows:[],main:null};
+    a.rows.forEach(function(r){
+      var label=app.name+' '+r.name,slug=slugify(label),lab=label.toLowerCase();
+      var x={r:r,label:label,err:nameError(r.name),warn:'',cerr:'',hex:'',badge:''};
+      if(!x.err){
+        if(hasOwn(mains,lab))x.err='“'+label+'” is the icon for your original '+mains[lab]+' account. Pick another name'+(mains[lab]===app.name?', or turn off “Keep my original account one click away”.':'.');
+        else if(hasOwn(slugs,slug))x.err='Clashes with “'+slugs[slug]+'”: both would use the folder '+slug+'. Spaces, - and _ count as the same, and so do capitals.';
+        else slugs[slug]=label;
+      }
+      if(!x.err&&app.vs&&r.name.length>room(app)-USER_GUESS)x.warn='This may be too long for '+app.short+'. It has room for '+room(app)+' characters minus the length of your Mac user name (type whoami in Terminal to see it). aidentity checks, and tells you how many to cut.';
+      /* add refuses a launcher name that another app already uses in ~/Applications. */
+      else if(!x.err&&hasOwn(APPNAME,lab)&&APPNAME[lab]!==id)x.warn='“'+label+'” is also the name of another app. If that app is in your own Applications folder (~/Applications), aidentity will refuse this name, so you may want another.';
+      var be='';
+      if(r.badge&&!BADGE.test(r.badge))be='For the badge, use one letter or number, or leave it empty for '+(firstUpper(r.name)||'the first letter')+'.';
+      var ce='';
+      if(r.color==='custom'){if(HEX.test(r.hex))x.hex=r.hex.replace('#','').toUpperCase();else ce='For a custom colour, type 6 hex digits, like 2E7DF6.'}
+      else x.hex=hasOwn(CHEX,r.color)?CHEX[r.color]:'';
+      x.cerr=[be,ce].filter(Boolean).join(' ');
+      x.badge=r.badge&&BADGE.test(r.badge)?r.badge:(firstUpper(r.name)||'?');
+      x.ok=!x.err&&!x.cerr&&!!x.hex;
+      g.rows.push(x);
+    });
+    if(a.main&&g.rows.some(function(x){return x.ok})){var ml=app.name+' Main';g.main={label:ml,hex:CHEX[autoColor(ml)],badge:'M',key:'main-'+id}}
+    groups.push(g);
+  });
+  return groups;
+}
+
+/* ---------- Commands ---------- */
+var INSTALL={
+  curl:[['cmd','curl'],['flag','-fsSL'],['url','https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh'],['op','|'],['cmd','bash']],
+  brew:[['cmd','brew'],['sub','install'],['arg','pinishv/tap/aidentity']]
+};
+function addParts(app,x){
+  var r=x.r,p=[['cmd','aidentity'],['sub','add'],['arg',app.name],['flag','--profile'],['val',r.name],['flag','--color']];
+  p.push(r.color==='custom'?['col',x.hex,x.hex]:['col',r.color,x.hex]);
+  if(r.badge&&r.badge!==firstUpper(r.name))p.push(['flag','--badge'],['val',r.badge]);
+  if(r.seed&&app.seed)p.push(['flag','--seed']);
+  if(r.ext&&app.vs)p.push(['flag','--own-extensions']);
+  return p;
+}
+/* An operator and the fixed URLs go in as they are; every other value is quoted when it needs it. */
+function tok(p){return p[0]==='op'||p[0]==='url'?p[1]:q(p[1])}
+function text(parts){return parts.map(tok).join(' ')}
+function build(groups){
+  var L=[],ok=[],bad=0,mains=[],n=1;
+  groups.forEach(function(g){g.rows.forEach(function(x){if(x.ok)ok.push([g.app,x]);else bad++});if(g.main)mains.push(g)});
+  function c(t,w){L.push({t:'c',text:t,w:w})}
+  function gap(){L.push({t:'gap'})}
+  function line(parts,aria,all){L.push({t:'l',parts:parts,text:text(parts),aria:aria,all:all})}
+  if(S.inst==='have'){
+    c('You have aidentity already. --main and --own-extensions need 1.2.0 or later.');
+    c('   To check, run: aidentity version');gap();
+  }else{
+    c((n++)+'. Install aidentity'+(S.inst==='brew'?' with Homebrew':'')+'. Run this line on its own first.');
+    if(S.inst==='curl'){
+      c('   When it asks to set up your first account, type n and press Return. This recipe does that.');
+      /* install.sh falls back to ~/.local/bin when /usr/local/bin is not writable, and prints how to add it to PATH. */
+      c('   If it says aidentity is "not on your PATH", do the 2 steps it shows, then go on.');
+    }
+    line(INSTALL[S.inst],'Copy the install command',false);gap();
+  }
+  if(!ok.length){
+    c(bad?'Fix the '+plural(bad,'account')+' marked in step 3 to get your commands.':'Pick an app and name an account. Your commands appear here.',!!bad);
+    return {lines:L,ok:0,bad:bad,apps:0,all:''};
+  }
+  c((n++)+'. Add your accounts. Each line makes one icon.');
+  /* The socket-path room depends on the Mac user name, which this page cannot see. */
+  var vs=[];ok.forEach(function(e){if(e[0].vs&&vs.indexOf(e[0].short)<0)vs.push(e[0].short)});
+  if(vs.length)c('   If '+vs.join(' or ')+' says the path is too long, pick a shorter name in step 3 and run that line again.');
+  ok.forEach(function(e){line(addParts(e[0],e[1]),'Copy the command for '+e[1].label,true)});
+  if(bad)c(plural(bad,'account')+' in step 3 '+(bad===1?'needs':'need')+' a fix. '+(bad===1?'Its line is':'Their lines are')+' left out until then.',true);
+  gap();
+  if(mains.length){
+    c((n++)+'. Keep your original '+(mains.length===1?'account':'accounts')+' one click away.');
+    mains.forEach(function(g){line([['cmd','aidentity'],['sub','add'],['arg',g.app.name],['flag','--main']],'Copy the command for '+g.main.label,true)});
+    gap();
+  }
+  var first=ok[0];
+  c((n++)+'. Open your first new account and sign in with its own details.');
+  c('   Is '+first[0].name+' open? Quit it first, so the sign-in comes back to this window.');
+  /* Not in Copy all: these open things, so they wait until the reader has read the note above. */
+  line([['cmd','aidentity'],['sub','open'],['val',first[1].label]],'Copy the command that opens '+first[1].label,false);
+  gap();
+  c((n++)+'. Show your new icons, then drag them to your Dock.');
+  line([['cmd','open'],['url','~/Applications']],'Copy the command that shows your icons',false);
+  var apps={};ok.forEach(function(e){apps[e[0].id]=1});
+  return {lines:L,ok:ok.length,bad:bad,apps:Object.keys(apps).length,all:L.filter(function(x){return x.all}).map(function(x){return x.text}).join('\n')};
+}
+function renderLines(R){
+  var box=$('lines');box.textContent='';
+  R.lines.forEach(function(x){
+    if(x.t==='c'){box.appendChild(h('div',{class:'cm'+(x.w?' w':''),text:'# '+x.text}));return}
+    if(x.t==='gap'){box.appendChild(h('div',{class:'gap','aria-hidden':'true'}));return}
+    var code=h('code');
+    x.parts.forEach(function(p,j){
+      if(j)code.appendChild(d.createTextNode(' '));
+      if(p[0]==='col')code.appendChild(h('span',{class:'swd','aria-hidden':'true',c:'#'+p[2]}));
+      code.appendChild(h('span',{class:'k-'+p[0],text:tok(p)}));
+    });
+    var btn=h('button',{type:'button',class:'lc','aria-label':x.aria},[icon('copy'),h('span',{class:'lbl',text:'Copy'})]);
+    btn.addEventListener('click',function(){copy(x.text,btn,code,'Copy')});
+    box.appendChild(h('div',{class:'ln'},[h('span',{class:'ps','aria-hidden':'true',text:'$'}),code,btn]));
+  });
+}
+
+/* ---------- Copy, with a select-the-text fallback ---------- */
+function copy(txt,btn,sel,idle){
+  var lbl=btn.querySelector('.lbl');
+  function done(ok){
+    lbl.textContent=ok?'Copied':'Selected';btn.classList.toggle('done',ok);
+    say(ok?'Copied to the clipboard.':'Copy did not work here. The text is selected: press Command and C.');
+    clearTimeout(btn._t);btn._t=setTimeout(function(){lbl.textContent=idle;btn.classList.remove('done')},2500);
+  }
+  function fallback(){
+    var ok=false;
+    try{
+      if(sel.tagName==='TEXTAREA'||sel.tagName==='INPUT'){sel.hidden=false;sel.value=txt;sel.focus();sel.select()}
+      else{var r=d.createRange(),s=window.getSelection();r.selectNodeContents(sel);s.removeAllRanges();s.addRange(r)}
+      ok=d.execCommand('copy');
+    }catch(e){}
+    done(!!ok);
+  }
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(txt).then(function(){done(true)},fallback);
+  else fallback();
+}
+
+/* ---------- Preview ---------- */
+var shown={},popAll=false,first=true;
+/* The preview sticks beside step 3 only while it fits the window; a long one scrolls with the page. */
+function sticky(){var pv=$('pv');pv.classList.toggle('tall',pv.offsetHeight>window.innerHeight-100)}
+function tileEl(t){
+  return h('span',{class:'tile'},[icon(t.g),h('span',{class:'bd',c:'#'+(t.hex||'6B7280'),text:t.badge})]);
+}
+function renderPreview(groups){
+  var tiles=[];
+  groups.forEach(function(g){
+    g.rows.forEach(function(x){tiles.push({key:x.r.id,label:x.label,hex:x.hex,badge:x.badge,ok:x.ok,g:g.app.g})});
+    if(g.main)tiles.push({key:g.main.key,label:g.main.label,hex:g.main.hex,badge:'M',ok:true,g:g.app.g});
+  });
+  var icons=$('icons'),dock=$('dock'),now={},k=0,good=tiles.filter(function(t){return t.ok});
+  icons.textContent='';dock.textContent='';
+  if(!tiles.length)icons.appendChild(h('li',{class:'none',text:'Your new icons appear here.'}));
+  tiles.forEach(function(t){
+    icons.appendChild(h('li',{class:'t'+(t.ok?'':' bad')},[tileEl(t),h('span',null,[t.label,t.ok?null:h('small',{text:'Needs a fix'})])]));
+  });
+  good.forEach(function(t){
+    now[t.key]=1;
+    var li=h('li',{title:t.label},[tileEl(t)]);
+    if(!first&&(popAll||!hasOwn(shown,t.key))&&!reduce.matches){li.className='pop';li.style.animationDelay=(popAll?k++*70:0)+'ms'}
+    dock.appendChild(li);
+  });
+  if(!good.length)dock.appendChild(h('li',{class:'wait',text:'Your Dock is waiting'}));
+  dock.style.setProperty('--n',good.length+1);
+  dock.appendChild(h('li',{class:'sep'}));
+  dock.appendChild(h('li',null,[h('span',{class:'tile bin'},[icon('trash')])]));
+  shown=now;popAll=false;
+  sticky();
+  var n=good.length;
+  $('dnote').textContent=!n?'Pick an app to fill your Dock.':n<4?'Looking good. Each icon opens its own account.':n<8?'Nice and tidy. One click, one account.':'That is a busy Dock! Each open account uses memory, so open only what you need.';
+}
+
+/* ---------- Refresh everything that follows from the state ---------- */
+var wasReady=false,statusT,hashT,lastHash=null,R={all:''};
+function refresh(){
+  var groups=analyse();
+  groups.forEach(function(g){
+    g.rows.forEach(function(x){
+      var rid=x.r.id,row=$('row-'+rid);if(!row)return;
+      var m=$('m-'+rid),k=$('k-'+rid),n=$('n-'+rid);
+      var mt=x.err||x.warn;
+      if(m.textContent!==mt){m.textContent='';if(mt){m.appendChild(icon('alert'));m.appendChild(d.createTextNode(mt))}}
+      m.className='msg '+(x.err?'e':'w');
+      if(k.textContent!==x.cerr)k.textContent=x.cerr;
+      n.setAttribute('aria-invalid',x.err?'true':'false');
+      $('b-'+rid).setAttribute('aria-invalid',x.r.badge&&!BADGE.test(x.r.badge)?'true':'false');
+      $('x-'+rid).setAttribute('aria-invalid',x.r.color==='custom'&&!HEX.test(x.r.hex)?'true':'false');
+      $('b-'+rid).placeholder=firstUpper(x.r.name)||'';
+      row.className='row'+(x.err||x.cerr?' bad':x.warn?' soft':'');
+      row.setAttribute('aria-label',x.label);
+      $('rm-'+rid).setAttribute('aria-label','Remove '+x.label);
+      var mb=$('mb-'+rid);mb.textContent=x.badge;mb.style.setProperty('--c','#'+(x.hex||'6B7280'));
+      var cu=$('cu-'+rid),ch=HEX.test(x.r.hex)?x.r.hex.replace('#',''):'';
+      cu.classList.toggle('set',!!ch);if(ch)cu.style.setProperty('--c','#'+ch);
+    });
+  });
+  renderPreview(groups);
+  R=build(groups);
+  renderLines(R);
+  var ready=R.ok>0&&!R.bad;
+  $('copyall').disabled=!R.ok;$('share').disabled=!selected().length;
+  $('plain').hidden=true;$('sharef').hidden=true;
+  var rd=$('ready');rd.hidden=!ready;
+  if(ready&&!wasReady&&!first){rd.classList.remove('go');void rd.offsetWidth;rd.classList.add('go')}
+  var st=$('status');
+  st.className='status'+(R.bad?' e':ready?' ok':'');
+  var msg=!R.ok&&!R.bad?'Pick an app and name an account to get your commands.':R.bad?plural(R.bad,'account')+' in step 3 '+(R.bad===1?'needs':'need')+' a fix. '+(R.bad===1?'Its line is':'Their lines are')+' left out until then.':'Ready to paste: '+plural(R.ok,'account')+' in '+plural(R.apps,'app')+'.';
+  clearTimeout(statusT);
+  /* Write only a new message, so screen readers do not read the same one after every pause in typing. */
+  if(first){if(st.textContent!==msg)st.textContent=msg}
+  else statusT=setTimeout(function(){if(st.textContent!==msg)st.textContent=msg},ready&&!wasReady?50:700);
+  wasReady=ready;
+  clearTimeout(hashT);hashT=setTimeout(writeHash,250);
+}
+/* Any edit means the recipe no longer matches the card picked in step 1. */
+function edited(){if(S.preset){S.preset='';updatePresets()}}
+function changed(){edited();refresh()}
+function writeHash(){
+  var e=encode(),url=location.pathname+location.search+(e?'#r='+e:'');
+  lastHash=e?'#r='+e:'';
+  try{history.replaceState(null,'',url)}catch(err){}
+}
+function renderAll(){updatePresets();updateApps();renderGroups();refresh()}
+
+/* ---------- Wire up ---------- */
+renderPresets();renderApps();
+[].forEach.call(d.querySelectorAll('input[name=inst]'),function(r){
+  r.addEventListener('change',function(){if(r.checked){S.inst=r.value;refresh()}});
+});
+function syncInst(){[].forEach.call(d.querySelectorAll('input[name=inst]'),function(r){r.checked=r.value===S.inst})}
+[].forEach.call(d.querySelectorAll('[data-go]'),function(b){
+  b.addEventListener('click',function(e){e.preventDefault();go(b.getAttribute('data-go'))});
+});
+$('copyall').addEventListener('click',function(){if(R.all)copy(R.all,$('copyall'),$('plain'),'Copy all')});
+$('share').addEventListener('click',function(){
+  writeHash();
+  copy(location.href,$('share'),$('sharef'),'Copy share link');
+});
+var resetArmed=false,resetT;
+$('reset').addEventListener('click',function(){
+  var l=$('reset-l');
+  if(!resetArmed){resetArmed=true;l.textContent='Sure? Click again';$('reset').classList.add('warn');say('Press Start over again to clear the recipe.');resetT=setTimeout(disarm,4000);return}
+  disarm();
+  S=blank();$('badlink').hidden=true;syncInst();renderAll();
+  say('Started over. Pick a recipe, or pick your apps.');
+  go('h-s1');
+});
+function disarm(){clearTimeout(resetT);resetArmed=false;$('reset-l').textContent='Start over';$('reset').classList.remove('warn')}
+
+/* Returns true when the link was read. A bad link on first load gives the starter;
+   a bad link typed into the open page keeps the recipe that is there. */
+function boot(fromLink){
+  var h0=location.hash,s=h0?decode(h0):null,keep=!s&&fromLink&&!!S;
+  $('badlink').hidden=!(h0&&!s&&/^#r=/.test(h0));
+  $('badlink-t').textContent='That recipe link could not be read, so '+(keep?'your recipe is as it was.':'this is a starter recipe instead.');
+  if(s){S=s}
+  else if(!keep){S=null;loadPreset(PRESETS[0])}
+  else{writeHash();return false}
+  syncInst();renderAll();
+  return !!s;
+}
+boot(false);
+first=false;
+window.addEventListener('hashchange',function(){
+  if(location.hash===lastHash)return;
+  if(/^#r=/.test(location.hash))say(boot(true)?'Loaded the recipe from the link.':'That recipe link could not be read. Your recipe is as it was.');
+});
+/* The skip link moves focus without touching the address bar, which holds the recipe. */
+d.querySelector('.skip').addEventListener('click',function(e){e.preventDefault();var m=$('main');m.focus();m.scrollIntoView({block:'start'})});
+var resizeT;window.addEventListener('resize',function(){clearTimeout(resizeT);resizeT=setTimeout(sticky,150)});
+})();
+</script>
+</body>
+</html>
