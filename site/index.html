@@ -285,6 +285,7 @@ html:not(.js) .chapters{display:none}
 @media (min-width:900px){.verify{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
 }
 .verify p{color:var(--muted)}
+.verify p code{white-space:normal}
 .verify h3{margin-bottom:10px}
 .code{padding:16px 18px;font:500 .875rem/1.75 var(--mono)}
 .code p{margin:0;overflow-wrap:anywhere}
@@ -455,7 +456,7 @@ html:not(.js) .chapters{display:none}
 <section class="hero" aria-labelledby="h-hero">
 <div class="wrap hero-grid">
 <div class="hero-copy">
-<a class="pill" href="https://github.com/PiniShv/aidentity/releases/tag/v1.3.0"><b>New in 1.3</b><span><code>list --json</code> for scripts</span><svg class="i" aria-hidden="true"><use href="#i-right"/></svg></a>
+<a class="pill" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-ui"><b>New in 1.4</b><span><code>aidentity ui</code>, a menu in your terminal</span><svg class="i" aria-hidden="true"><use href="#i-right"/></svg></a>
 <h1 id="h-hero">Stop signing out to <span class="grad">switch accounts.</span></h1>
 <p class="lead">Run your work, personal and client accounts of the same app side by side on your Mac. Each one stays signed in.</p>
 <p class="sub">A free, open-source command-line tool for Chromium and Electron apps. It never changes your app. It opens it again, with one data folder per account.</p>
@@ -643,6 +644,7 @@ html:not(.js) .chapters{display:none}
 <div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="term-title" aria-hidden="true">Terminal: everyday commands</span></div>
 <ul class="cmdlist" role="list">
 <li><code>aidentity apps</code><span class="d">Which of your apps can take extra accounts.</span></li>
+<li><code>aidentity ui</code><span class="d">A menu in your terminal. Pick a profile with the arrow keys, then open, rename, recolour or remove it.</span></li>
 <li><code>aidentity add Claude <span class="nw">--profile Work</span> <span class="nw">--color blue</span></code><span class="d">One more account, no questions.</span></li>
 <li><code>aidentity list</code><span class="d">Every profile, and which are running.</span></li>
 <li><code>aidentity list <span class="nw">--json</span></code><span class="d">The same list as JSON, for scripts.</span></li>
@@ -676,7 +678,7 @@ html:not(.js) .chapters{display:none}
 <article class="card">
 <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-moon"/></svg></span>
 <h3>Nothing runs in the background</h3>
-<p>After install it makes no network calls and never uses <code>sudo</code>. It adds no login item and no background service.</p>
+<p>It makes no network calls except when you run <code>aidentity update</code>, and it never uses <code>sudo</code>. It adds no login item and no background service.</p>
 </article>
 <article class="card">
 <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-file"/></svg></span>
@@ -691,7 +693,7 @@ html:not(.js) .chapters{display:none}
 <article class="card">
 <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-refresh"/></svg></span>
 <h3>Your app still updates itself</h3>
-<p>An icon stores the path to the app, not a copy. So the next launch uses the new version. aidentity itself never checks for updates.</p>
+<p>An icon stores the path to the app, not a copy. So the next launch uses the new version. aidentity itself never checks for updates on its own. Run <code>aidentity update</code> when you want its newest version.</p>
 </article>
 </div>
 <div class="verify">
@@ -705,7 +707,8 @@ html:not(.js) .chapters{display:none}
 </div>
 <div>
 <h3>Check it yourself</h3>
-<p>The first command looks for network tools and <code>sudo</code> in the script. It prints one line: a code comment about the installer. The second checks the script against the checksum of its release.</p>
+<p>The first command looks for network tools and <code>sudo</code> in the script. Only one line runs <code>curl</code>: the download in <code>aidentity update</code>. The second checks the script against the checksum of its release.</p>
+<p>Release files are signed too. <code>gh attestation verify aidentity --repo PiniShv/aidentity</code> checks a download. <a href="https://github.com/PiniShv/aidentity/blob/main/SECURITY.md#verifying-a-release">What that proves, and what it does not</a></p>
 <p><a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#check-it-yourself">More checks in the guide</a></p>
 </div>
 </div>
@@ -839,7 +842,7 @@ html:not(.js) .chapters{display:none}
 </details>
 <details>
 <summary>Is it safe?</summary>
-<div class="a"><p>The installer checks the download, never uses <code>sudo</code> and leaves your shell files alone. After install, aidentity makes no network calls and runs nothing in the background.</p>
+<div class="a"><p>The installer checks the download, never uses <code>sudo</code> and leaves your shell files alone. After install, aidentity makes no network calls except when you run <code>aidentity update</code>, and it runs nothing in the background.</p>
 <p>One thing to know: it does not encrypt profile data. Each data folder holds a live sign-in, just like the app's own folder. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#is-this-safe">Read more about safety</a> or see the <a href="https://github.com/PiniShv/aidentity/blob/main/SECURITY.md">security policy</a>.</p></div>
 </details>
 <details>
@@ -865,7 +868,8 @@ html:not(.js) .chapters{display:none}
 </details>
 <details>
 <summary>How do I upgrade it?</summary>
-<div class="a"><p>Run <code>brew upgrade aidentity</code>, or run the install line again. aidentity never checks for updates itself.</p></div>
+<div class="a"><p>Run <code>aidentity update</code>. It downloads the latest release, checks it against its published checksum and replaces the old version in one step. It never uses <code>sudo</code>. Add <code>--check</code> to see first whether a newer release is out. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-update">What update checks</a></p>
+<p>If you used Homebrew, run <code>brew upgrade aidentity</code> instead. A copy older than 1.4 has no <code>update</code> command, so run the install line again. aidentity never checks for updates on its own.</p></div>
 </details>
 <details>
 <summary>How do I remove it?</summary>
