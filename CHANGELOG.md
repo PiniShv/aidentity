@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Help for one command: `aidentity COMMAND --help`, `aidentity COMMAND -h` and
+  `aidentity help COMMAND` print that command's usage, its options with a short
+  meaning each, and examples. Every command and alias has one. `--help` or
+  `-h` anywhere after a command shows the help and does nothing else, so
+  `aidentity rm Work --purge --help` removes nothing. `aidentity help` with an
+  unknown name exits 1. `aidentity help`, `aidentity -h`, `aidentity --help` and
+  `aidentity` on their own print the overview as before, which now lists
+  `completion` and the per-command help.
+- `aidentity completion bash|zsh|fish` prints a tab-completion script. It
+  completes command names and aliases, each command's options, the names of
+  profiles for `open`, `rename`, `set`, `rebuild`, `restore` and `rm`, app names
+  for `add`, colour names after `--color`, and the shells for `completion`.
+  A name with a space or another special character is escaped for you, also
+  after an opening quote, where it is escaped for that quote. In bash, a name
+  with `!` is not offered after an opening double quote. The names come from a
+  hidden `aidentity __complete` command, which prints nothing on error. The
+  Homebrew formula installs the three scripts.
+
 ## [1.3.0] - 2026-10-23
 
 ### Added

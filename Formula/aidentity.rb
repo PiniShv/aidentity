@@ -21,6 +21,8 @@ class Aidentity < Formula
 
   def install
     bin.install "bin/aidentity"
+    # Tab completion for the three shells aidentity writes a script for.
+    generate_completions_from_executable(bin/"aidentity", "completion", shells: [:bash, :zsh, :fish])
   end
 
   def caveats

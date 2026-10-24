@@ -21,7 +21,9 @@ Run the suite before you open a PR and again after review changes. It is fast.
 `make check` runs the lint, the suite and the source guards in
 `scripts/guards.sh` — the checks CI blocks on. CI also repeats the suite under a
 second bash and smoke-tests the CLI. Without shellcheck installed, `make lint`
-only checks syntax and says so.
+only checks syntax and says so. The completion tests that need zsh or fish run
+when that shell is installed and are skipped, with a note, when it is not. CI
+installs fish; zsh comes with macOS.
 
 You can drive the script the same way by hand:
 
