@@ -234,11 +234,11 @@ h3{font-size:1.125rem;font-weight:700;letter-spacing:-.01em}
 .ctl{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:8px;border:1px solid var(--term-line2);background:#14203A;color:var(--term-text);font:600 .8125rem var(--mono);cursor:pointer}
 .ctl:hover{border-color:var(--term-accent);color:#fff}
 .ctl .i{fill:currentColor;stroke:none}
-#fs .i{fill:none;stroke:currentColor}
+.fs .i{fill:none;stroke:currentColor}
 .vtime{display:none;margin-left:auto;font:500 .8125rem var(--mono);color:var(--term-muted);font-variant-numeric:tabular-nums}
 .js .vtime{display:inline}
 @media (max-width:600px){.js .vtime{display:none}
-#vbtn{margin-left:auto}
+.vbtn{margin-left:auto}
 }
 @media (max-width:420px){.demo .term-title{display:none}
 }
@@ -405,10 +405,9 @@ html:not(.js) .chapters{display:none}
   .dots i,.badge{forced-color-adjust:none}
   .tabs button[aria-selected=true]{border-color:Highlight;text-decoration:underline}
 }
-.menu-demo{margin-top:40px}
+.menu-demo{max-width:920px;margin:clamp(36px,6vw,56px) auto 0}
 .menu-demo h3{margin:0 0 6px}
-.menu-demo video{display:block;width:100%;height:auto;margin-top:14px;border-radius:12px;border:1px solid var(--term-line);background:#0D1117}
-.menu-demo .tx{margin-top:10px;font-size:.92rem;color:var(--muted)}
+.menu-demo>p{margin:0 0 16px;color:var(--muted)}
 </style>
 </head>
 <body id="top">
@@ -569,29 +568,29 @@ html:not(.js) .chapters{display:none}
 <h2 id="h-demo">Set up accounts in Terminal. Open them with a click.</h2>
 <p>A 77-second recording. It adds Claude and ChatGPT accounts, then renames, recolours, removes and restores one.</p>
 </div>
-<figure class="term demo">
+<figure class="term demo" data-player data-len="77">
 <div class="term-bar">
 <span class="dots"><i></i><i></i><i></i></span>
 <span class="term-title" aria-hidden="true">aidentity: demo</span>
-<span class="vtime" id="vtime" aria-hidden="true">0:00 / 1:17</span>
-<button type="button" class="ctl" id="vbtn" aria-controls="demo-vid" hidden><svg class="i" aria-hidden="true"><use id="vico" href="#i-play"/></svg><span id="vlbl">Play</span><span class="sr"> the demo</span></button>
-<button type="button" class="ctl" id="fs" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg>Expand<span class="sr"> the demo to full screen</span></button>
+<span class="vtime" aria-hidden="true">0:00 / 1:17</span>
+<button type="button" class="ctl vbtn" aria-controls="demo-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the demo</span></button>
+<button type="button" class="ctl fs" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg>Expand<span class="sr"> the demo to full screen</span></button>
 </div>
-<div class="shot" id="shot">
+<div class="shot">
 <video id="demo-vid" width="920" height="592" controls muted loop playsinline preload="none" poster="assets/demo-poster.jpg" aria-label="Terminal demo: aidentity creates Claude and ChatGPT profiles, then renames, recolours, removes and restores one">
 <source src="assets/demo.webm" type='video/webm; codecs="vp9"'>
 <source src="assets/demo.mp4" type="video/mp4">
 <a href="assets/demo.mp4">Watch the demo (MP4, 1.1 MB)</a>
 </video>
-<div class="ov" id="ov" hidden>
-<button type="button" class="bigplay" id="bigplay"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play the demo</button>
-<p class="why" id="vwhy" hidden></p>
+<div class="ov" hidden>
+<button type="button" class="bigplay"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play the demo</button>
+<p class="why" hidden></p>
 </div>
-<div class="prog" aria-hidden="true"><i id="prog"></i></div>
+<div class="prog" aria-hidden="true"><i></i></div>
 </div>
 <div class="chapters">
-<span class="cl" id="cl">Jump to</span>
-<ul role="list" aria-labelledby="cl">
+<span class="cl" id="cl-demo">Jump to</span>
+<ul role="list" aria-labelledby="cl-demo">
 <li><button type="button" data-t="0">Add accounts <small>0:00</small></button></li>
 <li><button type="button" data-t="32">List <small>0:32</small></button></li>
 <li><button type="button" data-t="41">Rename <small>0:41</small></button></li>
@@ -618,11 +617,50 @@ html:not(.js) .chapters{display:none}
 <div class="menu-demo">
 <h3 id="h-menu-demo">Prefer a menu? <code>aidentity ui</code></h3>
 <p>Every profile on one screen. Pick one with the arrow keys, then one key recolours, renames, removes or opens it.</p>
-<video width="920" height="482" controls muted loop playsinline preload="none" poster="assets/demo-ui-poster.jpg" aria-labelledby="h-menu-demo" aria-describedby="menu-demo-tx">
-<source src="assets/demo-ui.webm" type="video/webm">
+<figure class="term demo" data-player data-len="30">
+<div class="term-bar">
+<span class="dots"><i></i><i></i><i></i></span>
+<span class="term-title" aria-hidden="true">aidentity ui</span>
+<span class="vtime" aria-hidden="true">0:00 / 0:30</span>
+<button type="button" class="ctl vbtn" aria-controls="menu-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the menu demo</span></button>
+<button type="button" class="ctl fs" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg>Expand<span class="sr"> the menu demo to full screen</span></button>
+</div>
+<div class="shot">
+<video id="menu-vid" width="920" height="592" controls muted loop playsinline preload="none" poster="assets/demo-ui-poster.jpg" aria-label="Terminal demo: aidentity ui shows the profiles in a menu, then recolours and renames one and lists every key">
+<source src="assets/demo-ui.webm" type='video/webm; codecs="vp9"'>
 <source src="assets/demo-ui.mp4" type="video/mp4">
+<a href="assets/demo-ui.mp4">Watch the menu demo (MP4, 0.3 MB)</a>
 </video>
-<p class="tx" id="menu-demo-tx">In the clip: <code>aidentity ui</code> lists four profiles. The arrow keys pick <code>Claude Personal</code>, <code>c</code> changes its colour to teal, <code>r</code> renames it to <code>Client</code>, and <code>?</code> shows every key. <code>q</code> returns to the shell.</p>
+<div class="ov" hidden>
+<button type="button" class="bigplay"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play the menu demo</button>
+<p class="why" hidden></p>
+</div>
+<div class="prog" aria-hidden="true"><i></i></div>
+</div>
+<div class="chapters">
+<span class="cl" id="cl-menu">Jump to</span>
+<ul role="list" aria-labelledby="cl-menu">
+<li><button type="button" data-t="0">Open the menu <small>0:00</small></button></li>
+<li><button type="button" data-t="5">Pick and recolour <small>0:05</small></button></li>
+<li><button type="button" data-t="13">Rename <small>0:13</small></button></li>
+<li><button type="button" data-t="20">Show the keys <small>0:20</small></button></li>
+<li><button type="button" data-t="24">Quit <small>0:24</small></button></li>
+</ul>
+</div>
+<figcaption class="cap">The menu is optional. Recorded with stand-in apps in a temporary folder, so no real account is shown.</figcaption>
+</figure>
+<details class="tx">
+<summary>Read the menu demo as text <svg class="i" aria-hidden="true"><use href="#i-down"/></svg></summary>
+<ol>
+<li><code>aidentity ui</code> opens a menu with four profiles: <code>ChatGPT Work</code>, <code>Claude Main</code>, <code>Claude Personal</code> and <code>Claude Work</code>.</li>
+<li>The Down arrow moves to <code>Claude Personal</code>.</li>
+<li><code>c</code> opens the colour picker. The Right arrow steps through the colours and Enter picks teal. Only the icon changes.</li>
+<li><code>r</code> renames it. Typing <code>Client</code> and pressing Enter gives it the new name. The account stays signed in.</li>
+<li><code>?</code> shows every key. Any key goes back to the menu.</li>
+<li><code>q</code> quits and returns to the shell.</li>
+</ol>
+</details>
+</div>
 </div>
 </div>
 </section>
@@ -1018,96 +1056,110 @@ tabs.forEach(function(t,i){
   });
 });
 
-/* Demo video. Pause keeps the place and Play carries on from there. It plays (muted) only while it
-   is on screen, and never by itself when the device asks for less motion or Data Saver is on. */
-var v=d.getElementById('demo-vid');
-if(!v||!v.play)return;
-var shot=d.getElementById('shot'),btn=d.getElementById('vbtn'),ico=d.getElementById('vico'),lbl=d.getElementById('vlbl');
-var ov=d.getElementById('ov'),big=d.getElementById('bigplay'),why=d.getElementById('vwhy');
-var bar=d.getElementById('prog'),vt=d.getElementById('vtime'),fsb=d.getElementById('fs');
-var chap=[].slice.call(d.querySelectorAll('.chapters button'));
+/* Demo videos. One function sets up a player from its own root element (a figure marked
+   data-player), so the command-line demo and the menu demo share every behaviour. Pause keeps the
+   place and Play carries on from there. A video plays (muted) only while it is on screen, and
+   never by itself when the device asks for less motion or Data Saver is on. Only one plays at a
+   time: starting one pauses the others. */
 var mq=window.matchMedia('(prefers-reduced-motion: reduce)');
 var saver=!!(navigator.connection&&navigator.connection.saveData);
-var userPaused=false,autoPaused=false,started=false,blocked=false,failed=false,seen=false,raf=0;
-v.controls=false;
-function quiet(){return mq.matches||saver}
+var narrow=window.matchMedia('(max-width: 700px)');
+var players=[];
 function fmt(x){x=Math.max(0,Math.floor(x||0));return Math.floor(x/60)+':'+('0'+x%60).slice(-2)}
-function ui(){
-  if(failed){
-    shot.classList.add('paused');ov.hidden=false;big.hidden=true;btn.hidden=true;fsb.hidden=true;why.hidden=false;
-    why.innerHTML='The demo could not load. <a href="assets/demo.mp4">Open the video file</a> or reload the page.';
-    return;
+function initPlayer(root){
+  var v=root.querySelector('video');
+  if(!v||!v.play)return;
+  var shot=root.querySelector('.shot'),btn=root.querySelector('.vbtn'),ico=root.querySelector('.vico'),lbl=root.querySelector('.vlbl');
+  var ov=root.querySelector('.ov'),big=root.querySelector('.bigplay'),why=root.querySelector('.why');
+  var bar=root.querySelector('.prog i'),vt=root.querySelector('.vtime'),fsb=root.querySelector('.fs');
+  var chap=[].slice.call(root.querySelectorAll('.chapters button'));
+  var len=+root.getAttribute('data-len')||1;
+  var last=v.querySelector('source:last-of-type');
+  var userPaused=false,autoPaused=false,started=false,blocked=false,failed=false,seen=false,raf=0;
+  v.controls=false;
+  function quiet(){return mq.matches||saver}
+  function ui(){
+    if(failed){
+      shot.classList.add('paused');ov.hidden=false;big.hidden=true;btn.hidden=true;fsb.hidden=true;why.hidden=false;
+      var a=d.createElement('a');a.href=last?last.getAttribute('src'):'';a.textContent='Open the video file';
+      why.textContent='The demo could not load. ';why.appendChild(a);why.appendChild(d.createTextNode(' or reload the page.'));
+      return;
+    }
+    /* Before the first start: dim the poster and show a big Play. Later, a pause leaves the frame clear to read. */
+    var p=v.paused,pre=p&&!started,w='';
+    shot.classList.toggle('paused',pre);
+    ov.hidden=!pre;btn.hidden=false;
+    ico.setAttribute('href',p?'#i-play':'#i-pause');
+    lbl.textContent=p?'Play':'Pause';
+    if(pre)w=blocked?'Your browser did not start the demo by itself.':mq.matches?'Autoplay is off, because your device asks for less motion.':saver?'Autoplay is off, because Data Saver is on.':'';
+    why.textContent=w;why.hidden=!w;
   }
-  /* Before the first start: dim the poster and show a big Play. Later, a pause leaves the frame clear to read. */
-  var p=v.paused,pre=p&&!started,w='';
-  shot.classList.toggle('paused',pre);
-  ov.hidden=!pre;btn.hidden=false;
-  ico.setAttribute('href',p?'#i-play':'#i-pause');
-  lbl.textContent=p?'Play':'Pause';
-  if(pre)w=blocked?'Your browser did not start the demo by itself.':mq.matches?'Autoplay is off, because your device asks for less motion.':saver?'Autoplay is off, because Data Saver is on.':'';
-  why.textContent=w;why.hidden=!w;
-}
-function paint(){
-  var t=v.currentTime||0,n=v.duration||77,cur=0;
-  bar.style.setProperty('--p',Math.min(1,t/n).toFixed(4));
-  vt.textContent=fmt(t)+' / '+fmt(n);
-  chap.forEach(function(b,i){if(t>=+b.getAttribute('data-t')-.25)cur=i});
-  chap.forEach(function(b,i){if(i===cur)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});
-}
-function loop(){paint();raf=v.paused?0:requestAnimationFrame(loop)}
-function go(){
-  var r=v.play();
-  if(r&&r.catch)r.catch(function(e){if(e&&e.name==='NotAllowedError')blocked=true;ui()});
-}
-function toggle(){
-  if(v.paused){userPaused=false;go()}else{userPaused=true;v.pause()}
-}
-function fail(){failed=true;ui()}
-v.addEventListener('play',function(){started=true;autoPaused=false;ui();if(!raf)raf=requestAnimationFrame(loop)});
-v.addEventListener('pause',function(){ui();paint()});
-v.addEventListener('loadedmetadata',paint);
-v.addEventListener('seeked',paint);
-v.addEventListener('error',fail);
-var last=v.querySelector('source:last-of-type');
-if(last)last.addEventListener('error',fail);
-btn.addEventListener('click',toggle);
-v.addEventListener('click',toggle);
-big.addEventListener('click',function(){userPaused=false;go();btn.focus()});
-/* A jump before the video has loaded waits for its metadata: until then the browser does not know
-   the video's length, and some browsers drop the seek. The video has a keyframe at every chapter
-   time, so a browser that seeks only to keyframes still lands exactly there. */
-function seekTo(t){
-  if(v.readyState>=1){v.currentTime=t;return}
-  v.addEventListener('loadedmetadata',function h(){v.removeEventListener('loadedmetadata',h);v.currentTime=t;paint()});
-}
-chap.forEach(function(b){b.addEventListener('click',function(){seekTo(+b.getAttribute('data-t'));userPaused=false;go();paint()})});
-if('IntersectionObserver' in window){
-  new IntersectionObserver(function(es){
-    seen=es[0].isIntersecting;
-    if(seen){if(autoPaused||(!started&&!userPaused&&!quiet()))go()}
-    else if(!v.paused){autoPaused=true;v.pause()}
-  },{threshold:.5}).observe(shot);
-}else if(!quiet())go();
-function motion(){
-  if(mq.matches){autoPaused=false;if(!v.paused)v.pause()}
-  else if(seen&&!userPaused&&!saver&&v.paused)go();
-  ui();
-}
-if(mq.addEventListener)mq.addEventListener('change',motion);else if(mq.addListener)mq.addListener(motion);
-
-/* A phone is too narrow to read the terminal text, so offer full screen. The picture can then turn sideways. */
-if(v.requestFullscreen||v.webkitEnterFullscreen){
-  var narrow=window.matchMedia('(max-width: 700px)');
-  function fsShow(){fsb.hidden=failed||!narrow.matches}
-  fsShow();
-  if(narrow.addEventListener)narrow.addEventListener('change',fsShow);
-  fsb.addEventListener('click',function(){
-    userPaused=false;go();
-    if(v.requestFullscreen)v.requestFullscreen();else v.webkitEnterFullscreen();
+  function paint(){
+    var t=v.currentTime||0,n=v.duration||len,cur=0;
+    bar.style.setProperty('--p',Math.min(1,t/n).toFixed(4));
+    vt.textContent=fmt(t)+' / '+fmt(n);
+    chap.forEach(function(b,i){if(t>=+b.getAttribute('data-t')-.25)cur=i});
+    chap.forEach(function(b,i){if(i===cur)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});
+  }
+  function loop(){paint();raf=v.paused?0:requestAnimationFrame(loop)}
+  function go(){
+    var r=v.play();
+    if(r&&r.catch)r.catch(function(e){if(e&&e.name==='NotAllowedError')blocked=true;ui()});
+  }
+  function toggle(){
+    if(v.paused){userPaused=false;go()}else{userPaused=true;v.pause()}
+  }
+  function fail(){failed=true;ui()}
+  var me={yieldToOther:function(){if(!v.paused){userPaused=true;autoPaused=false;v.pause()}}};
+  players.push(me);
+  v.addEventListener('play',function(){
+    started=true;autoPaused=false;ui();if(!raf)raf=requestAnimationFrame(loop);
+    players.forEach(function(o){if(o!==me)o.yieldToOther()});
   });
-  d.addEventListener('fullscreenchange',function(){v.controls=d.fullscreenElement===v});
+  v.addEventListener('pause',function(){ui();paint()});
+  v.addEventListener('loadedmetadata',paint);
+  v.addEventListener('seeked',paint);
+  v.addEventListener('error',fail);
+  if(last)last.addEventListener('error',fail);
+  btn.addEventListener('click',toggle);
+  v.addEventListener('click',toggle);
+  big.addEventListener('click',function(){userPaused=false;go();btn.focus()});
+  /* A jump before the video has loaded waits for its metadata: until then the browser does not know
+     the video's length, and some browsers drop the seek. The video has a keyframe at every chapter
+     time, so a browser that seeks only to keyframes still lands exactly there. */
+  function seekTo(t){
+    if(v.readyState>=1){v.currentTime=t;return}
+    v.addEventListener('loadedmetadata',function h(){v.removeEventListener('loadedmetadata',h);v.currentTime=t;paint()});
+  }
+  chap.forEach(function(b){b.addEventListener('click',function(){seekTo(+b.getAttribute('data-t'));userPaused=false;go();paint()})});
+  if('IntersectionObserver' in window){
+    new IntersectionObserver(function(es){
+      seen=es[0].isIntersecting;
+      if(seen){if(autoPaused||(!started&&!userPaused&&!quiet()))go()}
+      else if(!v.paused){autoPaused=true;v.pause()}
+    },{threshold:.5}).observe(shot);
+  }else if(!quiet())go();
+  function motion(){
+    if(mq.matches){autoPaused=false;if(!v.paused)v.pause()}
+    else if(seen&&!userPaused&&!saver&&v.paused)go();
+    ui();
+  }
+  if(mq.addEventListener)mq.addEventListener('change',motion);else if(mq.addListener)mq.addListener(motion);
+
+  /* A phone is too narrow to read the terminal text, so offer full screen. The picture can then turn sideways. */
+  if(v.requestFullscreen||v.webkitEnterFullscreen){
+    var fsShow=function(){fsb.hidden=failed||!narrow.matches};
+    fsShow();
+    if(narrow.addEventListener)narrow.addEventListener('change',fsShow);
+    fsb.addEventListener('click',function(){
+      userPaused=false;go();
+      if(v.requestFullscreen)v.requestFullscreen();else v.webkitEnterFullscreen();
+    });
+    d.addEventListener('fullscreenchange',function(){v.controls=d.fullscreenElement===v});
+  }
+  ui();paint();
 }
-ui();paint();
+[].slice.call(d.querySelectorAll('[data-player]')).forEach(initPlayer);
 })();
 </script>
 </body>
