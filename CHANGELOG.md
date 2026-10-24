@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `aidentity ui` opens a full-screen menu over your profiles. Each row shows
+  the launcher, its badge in its own colour (or `original` for a main
+  launcher) and whether it is running. One key does the rest: Enter opens the
+  profile, `a` adds one, `r` renames it, `c` picks a colour, `b` sets the
+  badge, `d` removes it (`k` keeps its data; `p` deletes the data too and asks
+  you to type yes) and `x` shows the doctor's report (`f` then repairs).
+  `?` lists the keys and `q` quits. Every key runs the same command as the
+  command line, so every check stays as it is: a running profile is refused,
+  and a main launcher never deletes the app's data. The list refreshes every
+  two seconds and when the window is resized. The menu needs a terminal,
+  follows `NO_COLOR`, fits a narrow window and scrolls a long list. It puts
+  the terminal back as it found it when it ends, including after Ctrl-C and
+  when the terminal is closed. `aidentity` with no arguments still prints the
+  help.
 - Help for one command: `aidentity COMMAND --help`, `aidentity COMMAND -h` and
   `aidentity help COMMAND` print that command's usage, its options with a short
   meaning each, and examples. Every command and alias has one. `--help` or
@@ -69,6 +83,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   guards allow. Both scripts are linted and tested, and CI runs them with Linux
   tools. `docs/homebrew-tap.md` and the hint `make release` prints describe the
   new release step.
+- The test suite drives the menu on a pseudo-terminal: keys, the screen it
+  writes, signals, a resize, and the terminal's settings before and after.
+- The menu looks at the running processes once per refresh, not once per
+  profile, so a long list refreshes quickly. `list`, `rm`, `rename` and the
+  other commands still read a fresh process list each time they ask.
 
 ## [1.3.0] - 2026-10-23
 
