@@ -46,17 +46,24 @@ jobs:
           cp -R site/. _site/
 
       # Every local file a page points to must be in the upload, or the deploy
-      # stops here instead of publishing a broken page.
+      # stops here instead of publishing a broken page. Pages in subfolders
+      # count too. A path that starts with / is read from the site root, any
+      # other path from the page's own folder.
       - name: Check the site
         run: |
           set -eu
           missing=0
-          for page in _site/*.html; do
+          for page in $(find _site -name '*.html' | sort); do
+            dir=$(dirname "$page")
             for ref in $(grep -oE '(src|href|poster)="[^"]*"' "$page" | sed -E 's/^[a-z]+="//; s/"$//' | sort -u); do
               case "$ref" in http:*|https:*|mailto:*|data:*|javascript:*|\#*|'') continue ;; esac
-              path="${ref%%[#?]*}"; path="${path#/}"; path="${path#./}"
+              path="${ref%%[#?]*}"
               [ -n "$path" ] || continue
-              if [ ! -e "_site/$path" ]; then
+              case "$path" in
+                /*) file="_site$path" ;;
+                *)  file="$dir/$path" ;;
+              esac
+              if [ ! -e "$file" ]; then
                 echo "::error::$page points to $ref, which is not in the site"
                 missing=1
               fi
