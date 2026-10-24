@@ -64,6 +64,10 @@ aidentity doctor --fix                             # check and repair
 aidentity help rm                                  # options for one command (also: rm --help)
 ```
 
+Prefer a menu? `aidentity ui` shows every profile on one screen; pick one with the arrow keys, then one key recolours, renames or removes it.
+
+<img src="assets/demo-ui.gif" alt="Terminal recording of aidentity ui: picking a profile, changing its colour, renaming it, and showing the key list" width="720">
+
 Tab completion for bash, zsh and fish is built in. Homebrew installs it for you; for other installs it takes [one line](docs/guide.md#aidentity-completion).
 
 [All commands](docs/guide.md#commands)
