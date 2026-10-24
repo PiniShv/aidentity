@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"
+     role="img" aria-label="aidentity — one app, separate identities">
+  <title>aidentity</title>
+
+  <defs>
+    <!-- Deep blue at the trunk rising to cyan at the tips: one source, many
+         identities. Mid-tone on purpose so the mark reads on white and on
+         near-black without needing two files. -->
+    <linearGradient id="aid-strand" x1="256" y1="472" x2="256" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0"   stop-color="#1D4ED8"/>
+      <stop offset="0.45" stop-color="#2E7DF6"/>
+      <stop offset="1"   stop-color="#38BDF8"/>
+    </linearGradient>
+
+    <linearGradient id="aid-node" x1="222" y1="266" x2="290" y2="334" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#0EA5E9"/>
+    </linearGradient>
+
+    <!-- Kept deliberately restrained. A strong bloom looks right on a dark
+         surface and turns into grey mud on a light one. -->
+    <filter id="aid-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="7" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#aid-glow)">
+    <g fill="none" stroke="url(#aid-strand)" stroke-width="15"
+       stroke-linecap="round" stroke-linejoin="round">
+      <!-- Four arms above the split, folding into three strands below it. -->
+      <path d="M166 64 V 278 C 166 350 196 372 232 398 V 468"/>
+      <path d="M198 64 V 278 C 198 340 226 358 256 382 V 468"/>
+      <path d="M314 64 V 278 C 314 340 286 358 256 382 V 468"/>
+      <path d="M346 64 V 278 C 346 350 316 372 280 398 V 468"/>
+    </g>
+
+    <!-- The junction: where one app becomes several signed-in identities. -->
+    <g stroke="url(#aid-node)" stroke-width="6" stroke-linecap="round" fill="none" opacity="1">
+      <path d="M256 268 L 285 285 L 285 319 L 256 336 L 227 319 L 227 285 Z"/>
+      <path d="M256 268 L 256 302 M 285 285 L 256 302 M 285 319 L 256 302
+               M 256 336 L 256 302 M 227 319 L 256 302 M 227 285 L 256 302"/>
+    </g>
+    <g fill="url(#aid-node)">
+      <circle cx="256" cy="268" r="9"/>
+      <circle cx="285" cy="285" r="9"/>
+      <circle cx="285" cy="319" r="9"/>
+      <circle cx="256" cy="336" r="9"/>
+      <circle cx="227" cy="319" r="9"/>
+      <circle cx="227" cy="285" r="9"/>
+      <circle cx="256" cy="302" r="11" fill="#7DD3FC"/>
+    </g>
+  </g>
+</svg>

@@ -61,5 +61,19 @@ ffmpeg -y -loglevel error -i aidentity-demo.gif -i palette.png \
   -lavfi "fps=11,scale=920:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=4" \
   "$REPO/assets/demo.gif"
 
-echo "Wrote $REPO/assets/demo.gif"
-echo "Check it for anything machine-specific before committing."
+# The site plays a video instead: it can pause and resume in place, which a
+# GIF cannot, and it is half the size. Same frames, made from the GIF above.
+# Metadata is stripped, including x264's settings note, which names the
+# encoder options used on this machine. The poster is the frame at 20 s.
+vf="scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1"
+clean=(-map_metadata -1 -fflags +bitexact -flags:v +bitexact)
+ffmpeg -y -loglevel error -i "$REPO/assets/demo.gif" "${clean[@]}" -movflags +faststart \
+  -pix_fmt yuv420p -c:v libx264 -preset veryslow -tune animation -crf 24 \
+  -bsf:v filter_units=remove_types=6 -vf "$vf" "$REPO/site/assets/demo.mp4"
+ffmpeg -y -loglevel error -i "$REPO/assets/demo.gif" "${clean[@]}" -pix_fmt yuv420p \
+  -c:v libvpx-vp9 -b:v 0 -crf 36 -row-mt 1 -vf "$vf" "$REPO/site/assets/demo.webm"
+ffmpeg -y -loglevel error -ss 20 -i "$REPO/site/assets/demo.mp4" "${clean[@]}" \
+  -frames:v 1 -q:v 4 "$REPO/site/assets/demo-poster.jpg"
+
+echo "Wrote $REPO/assets/demo.gif and site/assets/demo.mp4, demo.webm, demo-poster.jpg"
+echo "Check them for anything machine-specific before committing."
