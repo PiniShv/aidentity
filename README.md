@@ -82,7 +82,7 @@ There is still one `Claude.app`. [The full picture](docs/guide.md#how-it-works)
 ## Why aidentity
 
 - **Your app stays untouched.** It is never copied, changed or signed again, so it keeps its signature, its keychain access and its own updates.
-- **One script you can read.** About 2,700 lines of bash. [Read it](bin/aidentity) before you run it. It needs nothing extra; the Xcode Command Line Tools are optional. After install it makes no network calls, never uses `sudo` and runs nothing in the background.
+- **One script you can read.** About 3,000 lines of bash. [Read it](bin/aidentity) before you run it. It needs nothing extra; the Xcode Command Line Tools are optional. After install it makes no network calls, never uses `sudo` and runs nothing in the background.
 - **Easy to undo.** Deleted an icon? `aidentity restore` brings it back, still signed in. Something looks wrong? `aidentity doctor --fix`. `rm` keeps your data unless you add `--purge`. The [uninstaller](docs/guide.md#uninstall) asks before it deletes any profile.
 - **Your original account stays one click away.** While a profile runs, clicking `Claude.app` takes you to that profile. `aidentity add Claude --main` builds a Main launcher that opens your original account instead. [Why](docs/guide.md#opening-your-original-account-while-a-profile-runs)
 
