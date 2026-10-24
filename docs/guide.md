@@ -1,6 +1,6 @@
 # aidentity guide
 
-This is the full user guide for `aidentity`, a command-line tool that runs several accounts of the same Mac app at once, for apps built on Chromium or Electron. It describes version 1.3.0.
+This is the full user guide for `aidentity`, a command-line tool that runs several accounts of the same Mac app at once, for apps built on Chromium or Electron. It describes version 1.4.0.
 
 **On this page:** [Quick start](#quick-start) · [Install and upgrade](#install-and-upgrade) · [The problem](#the-problem) · [Which apps work](#which-apps-work) · [How it works](#how-it-works) · [Is this safe?](#is-this-safe) · [Signing in to a new profile](#signing-in-to-a-new-profile) · [Opening your original account](#opening-your-original-account-while-a-profile-runs) · [Dock tiles](#the-rough-edge-dock-tiles-show-the-original-app) · [Commands](#commands) · [Per-profile settings](#per-profile-settings) · [FAQ](#frequently-asked) · [Uninstall](#uninstall) · [Requirements](#requirements) · [Contributing](#contributing)
 
@@ -10,7 +10,7 @@ macOS runs an app only once, so you get one account at a time. To check your per
 
 - **Verified with** Claude Desktop. Also tested with ChatGPT, Slack, VS Code, Cursor, Notion and other apps built on Chromium (the engine inside Google Chrome) or Electron. See [Which apps work](#which-apps-work).
 - **Your real app is not changed.** It is never copied, patched or re-signed. See [Is this safe?](#is-this-safe)
-- **One shell script** (a text file of Terminal commands). Once installed, it makes no network calls, never uses `sudo` (admin rights) and runs nothing in the background.
+- **One shell script** (a text file of Terminal commands). It makes no network calls except when you run `aidentity update`, never uses `sudo` (admin rights) and runs nothing in the background.
 - **Set up once in Terminal.** After that, you open each account by clicking its icon, like any other app.
 
 ---
@@ -46,6 +46,8 @@ Not sure your app will work? This lists the apps on your Mac that can take extra
 aidentity apps
 ```
 
+Not sure what to type? [Build your recipe](https://aidentity.pinishv.com/recipes/). Pick your apps, name your accounts and choose their colours, and the page gives you the commands to paste. It runs in your browser and sends nothing anywhere. Prefer a menu to typing? After you install, [`aidentity ui`](#aidentity-ui) opens one in Terminal.
+
 ### What it looks like
 
 ![Terminal recording of aidentity: it lists apps, then creates, lists, renames, recolours, removes and restores profiles](../assets/demo.gif)
@@ -57,18 +59,22 @@ aidentity apps
 | I want to... | Go to |
 |---|---|
 | Add another account, in this app or another one | [`aidentity add`](#aidentity-add) |
+| Use a menu instead of typing commands | [`aidentity ui`](#aidentity-ui) |
 | Open my original account while another one runs | [Opening your original account](#opening-your-original-account-while-a-profile-runs) |
 | Tell the running windows apart | [The rough edge: Dock tiles](#the-rough-edge-dock-tiles-show-the-original-app) |
 | Change a name or a colour | [`aidentity rename`](#aidentity-rename), [`aidentity set`](#aidentity-set) |
 | Bring back an icon I deleted | [`aidentity restore`](#aidentity-restore) |
 | Fix something that looks wrong | [`aidentity doctor`](#aidentity-doctor) |
 | Remove one account, or everything | [`aidentity rm`](#aidentity-rm), [Uninstall](#uninstall) |
+| Upgrade aidentity | [`aidentity update`](#aidentity-update), [Install and upgrade](#install-and-upgrade) |
+| See the options of one command | [`aidentity help`](#aidentity-version--aidentity-help) |
+| Get tab completion | [`aidentity completion`](#aidentity-completion) |
 
 ---
 
 ## Install and upgrade
 
-This page describes version 1.3.0. You need macOS and the `bash` that comes with it. See [Requirements](#requirements).
+This page describes version 1.4.0. You need macOS and the `bash` that comes with it. See [Requirements](#requirements).
 
 **Install script (recommended).** This is the line from the quick start. It installs into `/usr/local/bin`, or into `~/.local/bin` if it cannot write there. Terminal finds commands only in the folders on your `PATH` (a list of folders). If the new folder is not on it, the installer prints the line to add and leaves your shell files alone. It installs a fixed, numbered version (a release tag), not the newest code on `main`. At the end it offers to start the walkthrough.
 
@@ -101,7 +107,7 @@ Homebrew does not start the walkthrough, so run it yourself:
 aidentity setup
 ```
 
-Homebrew installs the latest release in the tap. Run `aidentity version` to see which one you have. Before 1.2.0, `restore`, `--main`, `--arg`, `--env`, `--own-extensions` and `doctor --fix` did not exist, so upgrade if you see an older version.
+Homebrew installs the latest release in the tap. It also installs [tab completion](#aidentity-completion) for bash, zsh and fish. Run `aidentity version` to see which release you have. Before 1.2.0, `restore`, `--main`, `--arg`, `--env`, `--own-extensions` and `doctor --fix` did not exist. `list --json` came in 1.3.0. `ui`, `update`, `completion` and the help for one command came in 1.4.0. If you see an older version, upgrade.
 
 <details>
 <summary>Install from source</summary>
@@ -118,13 +124,24 @@ This copies the same single script to `/usr/local/bin`. If that folder is not wr
 
 </details>
 
-**Upgrade.** `aidentity` never checks for updates by itself. Upgrade when you choose to. With Homebrew:
+**Upgrade.** `aidentity` never checks for updates by itself. It looks for a new release only when you run `aidentity update`:
+
+```bash
+aidentity update --check   # is a newer release out? Installs nothing.
+aidentity update           # install the latest release
+```
+
+`update` downloads the release from GitHub, checks it against the published checksum and replaces the script in one step. It never downgrades and never uses `sudo`. [What it checks, step by step](#aidentity-update). The command exists from version 1.4.0. If your copy is older, use one of the next two ways instead.
+
+With Homebrew, let Homebrew do it. `aidentity update` leaves a Homebrew copy alone and tells you to use `brew upgrade` instead:
 
 ```bash
 brew update && brew upgrade aidentity
 ```
 
-With the install script, run the install line again. It replaces the old version. Launchers you built earlier keep working. `aidentity doctor` lists older ones, and `aidentity doctor --fix` brings them up to date.
+With the install script, you can also run the install line again. It replaces the old version.
+
+After any upgrade, launchers you built earlier keep working. `aidentity doctor` lists older ones, and `aidentity doctor --fix` brings them up to date.
 
 To see what each way checks, read [What each install channel checks](#what-each-install-channel-checks).
 
@@ -220,7 +237,7 @@ The launcher is a short shell script inside a small `.app` folder. Here it is, s
 
 ```sh
 #!/bin/sh
-# Generated by aidentity 1.3.0. Safe to delete.
+# Generated by aidentity 1.4.0. Safe to delete.
 # 1. Drop risky variables (DYLD_*, LD_*, ELECTRON_*, NODE_*, ...) from the environment.
 # 2. On a new profile's first open, warn if another instance of the app is already running.
 # 3. Open the app again, with this profile's folder:
@@ -246,13 +263,13 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 
 ## Is this safe?
 
-`aidentity` is one shell script, about 3,000 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it.
+`aidentity` is one shell script, about 5,000 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it.
 
 ### What it touches
 
 | What | What aidentity does | How to undo it |
 |---|---|---|
-| The `aidentity` command | Puts one file on your Mac: in `/usr/local/bin` or `~/.local/bin` with the install script, or where Homebrew keeps its commands. | [Uninstall](#uninstall) |
+| The `aidentity` command | Puts one file on your Mac: in `/usr/local/bin` or `~/.local/bin` with the install script, or where Homebrew keeps its commands. `aidentity update` replaces that file with a newer release, when you run it. | [Uninstall](#uninstall) |
 | One launcher per profile | Builds a small app in `~/Applications`, for example `Claude Work.app`. It holds a script, an `Info.plist` with an `AIdentityProfile` marker, and an icon. It tells macOS about the new app so the icon shows at once. | `aidentity rm "Claude Work"` |
 | One data folder per profile | Makes a folder under `~/Library/Application Support/aidentity/profiles/` that only you can open. The app keeps that account's sign-in there. `aidentity` adds one small restore record. | `aidentity rm "Claude Work" --purge`, or `aidentity prune` |
 | Your real app | Read only. It looks at the app's `Info.plist`, its icon and its files, to check that it is a Chromium or Electron app. | Nothing to undo |
@@ -266,8 +283,8 @@ One thing does change. While a profile is running, clicking the app itself switc
 - **Touch a launcher it did not build.** Every launcher carries the `AIdentityProfile` marker. `open`, `rm`, `rename`, `set` and `rebuild` refuse an app without it. `add` and `restore` refuse to overwrite one.
 - **Delete profile data outside its profiles folder.** `--purge`, `prune` and the uninstaller delete a data folder only if it is inside `~/Library/Application Support/aidentity/profiles`, or the folder set by `AIDENTITY_DATA_ROOT`.
 - **Delete or rename a profile's data while the profile is running.** If it cannot tell, it treats the profile as running and stops.
-- **Use the network.** No update check, no telemetry, no crash reports. Only the installer downloads anything.
-- **Use `sudo` or run in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. When the installer or uninstaller needs admin rights, they print a `sudo` line for you to run.
+- **Use the network, except when you run `aidentity update`.** No telemetry, no analytics, no automatic update check, no crash reports. `aidentity update` (and `update --check`) is the only code in the script that connects anywhere, and only to GitHub. Apart from it, only the installer downloads anything, and only when you run it. [What `update` does](#aidentity-update).
+- **Use `sudo` or run in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
 - **Edit your shell files.** If you need a `PATH` line, the installer prints it, and you add it.
 - **Control other apps.** It does not use System Events, so it needs no Accessibility permission.
 - **Handle your passwords.** You sign in inside the app, with that account's own details.
@@ -295,7 +312,7 @@ In a clone of the repository, look for network tools and `sudo`:
 grep -nwE 'curl|wget|nc|ncat|ssh|scp|sudo|telnet' bin/aidentity
 ```
 
-This should print only one line: a code comment about the installer.
+This prints a short list. Only one line runs `curl`: the download in the function `update_fetch`, which only `aidentity update` calls. The other lines are comments, messages and help text that name `curl` or `sudo`, and one check that `curl` is installed. `make check` fails if another `curl` command appears in the script.
 
 Check the script against its checksum (a fingerprint of the file):
 
@@ -309,7 +326,15 @@ To check the file you installed, run this:
 shasum -a 256 "$(command -v aidentity)"
 ```
 
-Compare the long number it prints with the `bin/aidentity` line in `SHA256SUMS` for your version. For 1.3.0, that file is at <https://raw.githubusercontent.com/PiniShv/aidentity/v1.3.0/SHA256SUMS>. For another version, change `v1.3.0` in the address.
+Compare the long number it prints with the `bin/aidentity` line in `SHA256SUMS` for your version. For 1.4.0, that file is at <https://raw.githubusercontent.com/PiniShv/aidentity/v1.4.0/SHA256SUMS>. For another version, change `v1.4.0` in the address.
+
+Releases from 1.4.0 on also carry signed build provenance: a record, signed by GitHub, of where a file was built. The four files on each [release page](https://github.com/PiniShv/aidentity/releases) (`aidentity`, `install.sh`, `uninstall.sh` and `SHA256SUMS`) have it. The release workflow makes it when a release tag is pushed. To check a file you downloaded, use the GitHub CLI. Install it with `brew install gh`, and sign in once with `gh auth login`, because the check reads the provenance from GitHub:
+
+```bash
+gh attestation verify aidentity --repo PiniShv/aidentity
+```
+
+A pass means a GitHub Actions run in this repository signed that exact file. It does not mean the code is safe: read the script for that. GitHub's "Source code" archives are not signed, and releases before 1.4.0 have no provenance. The install script, Homebrew and `aidentity update` do not run this check. [SECURITY.md](../SECURITY.md#verifying-a-release) says what a pass proves and what it does not, and gives the stricter command that also names the workflow and the tag.
 
 Get a report of your setup. It changes nothing unless you add `--fix`:
 
@@ -323,6 +348,7 @@ aidentity doctor
 |---|---|---|
 | Install script | The download is complete and matches its checksum. See the list below. | A hacked repository, because the checksum comes from the same place. |
 | Homebrew | The formula pins the SHA-256 checksum of the release. Homebrew refuses a download that does not match. | It is a third-party tap, so you trust its owner. This is stronger than the install script. |
+| `aidentity update` | The download uses HTTPS only and matches the release's checksum. It is a complete script that says it is that release's version. See [What it checks](#aidentity-update). | A hacked repository, because the checksum comes from the same place as the script. |
 | From source | You read what you build. `make install` copies one file. | Only what you skip reading. |
 
 The install script checks the download like this:
@@ -399,11 +425,12 @@ Changing the tile would mean copying the app and signing it again. That does not
 
 ## Commands
 
-Type `aidentity` and a command. Put a name that has a space in quotes, like `"Claude Work"`. Type `aidentity` on its own to see the built-in help. The output is plain text for people. For scripts, [`list --json`](#for-scripts-list---json) prints the list as JSON. It was added in version 1.3.0. Colour is off when the output is not a terminal, or when `NO_COLOR` is set.
+Type `aidentity` and a command. Put a name that has a space in quotes, like `"Claude Work"`. Type `aidentity` on its own to see the built-in help. For the options and examples of one command, type `aidentity help rm` or `aidentity rm --help`. [More on help](#aidentity-version--aidentity-help). The output is plain text for people. For scripts, [`list --json`](#for-scripts-list---json) prints the list as JSON. It was added in version 1.3.0. Colour is off when the output is not a terminal, or when `NO_COLOR` is set.
 
 | Command | Also spelled | What it does |
 |---|---|---|
 | [`setup`](#aidentity-setup) | `init`, `wizard` | Guided walkthrough. Start here. |
+| [`ui`](#aidentity-ui) | | A menu in your terminal: open, add, rename, recolour or remove profiles with one key. |
 | [`add [app]`](#aidentity-add) | | Create one profile directly. |
 | [`list`](#aidentity-list) | `ls` | Show every profile and whether it is running. `--json` prints it for scripts. |
 | [`open NAME`](#aidentity-open) | | Open a profile from Terminal. |
@@ -415,7 +442,9 @@ Type `aidentity` and a command. Put a name that has a space in quotes, like `"Cl
 | [`rm NAME`](#aidentity-rm) | `remove`, `delete` | Remove a launcher. The data stays unless you add `--purge`. |
 | [`apps`](#aidentity-apps) | | List apps that can take extra accounts. |
 | [`doctor`](#aidentity-doctor) | | Check the setup and every profile. `--fix` repairs what it can. |
-| [`version`, `help`](#aidentity-version--aidentity-help) | `--version`, `-v`, `--help`, `-h` | Print the version, or the help. |
+| [`update`](#aidentity-update) | | Install the latest release. `--check` only looks. |
+| [`completion SHELL`](#aidentity-completion) | | Print a tab-completion script for bash, zsh or fish. |
+| [`version`, `help [COMMAND]`](#aidentity-version--aidentity-help) | `--version`, `-v`, `--help`, `-h` | Print the version, or the help of everything or of one command. |
 
 ### `aidentity setup`
 
@@ -437,6 +466,48 @@ It asks, in this order:
 At the end it offers to open `~/Applications`, so you can drag the new icons to your Dock. If one profile fails, the walkthrough says so and continues.
 
 It needs a terminal. In a script, use `add` with its options instead.
+
+### `aidentity ui`
+
+A menu in your terminal. It lists your profiles and whether each one is running. One key opens, adds, renames, recolours, badges or removes the profile you select.
+
+```bash
+aidentity ui
+```
+
+```text
+ aidentity 1.4.0                                   4 profiles · 1 running
+ ──────────────────────────────────────────────────────────────────────
+ ▸ ● Claude Work     [W]       running
+   ○ Claude Personal [P]       in use
+   ○ Claude Main     original  not running
+   ○ Slack Client    [S]       signed out / new
+
+ ↑↓ move  Enter open  a add  r rename  c colour  b badge  d remove  x doctor
+ ? help  q quit
+```
+
+Each row is one launcher, the same ones `aidentity list` shows, with the same status words. `▸` marks the selected row, and a green `●` marks a profile that is running. The screen checks again every 2 seconds, so a profile that starts or stops shows up without a key press.
+
+| Key | What it does |
+|---|---|
+| Up, Down (or `k`, `j`) | Move the selection. |
+| Enter | Open the profile, like `aidentity open`. The result shows at the bottom of the screen. |
+| `a` | Add a profile, like `aidentity add` with no options. You pick the app, then name the account. |
+| `r` | Rename the account, like `aidentity rename`. It stays signed in. An empty answer cancels. |
+| `c` | Change the colour, like `aidentity set --color`. Left and Right choose, Enter applies, Esc cancels. |
+| `b` | Change the badge, like `aidentity set --badge`. It asks for one character. An empty answer cancels. |
+| `d` | Remove, like `aidentity rm`. Then press `k` to remove the launcher and keep the data, or `p` to delete the data too. `p` asks you to type `yes` first. Any other key cancels. |
+| `x` | Run `aidentity doctor` and show the report. Press `f` afterwards to run `doctor --fix`. |
+| `?` | Show these keys. |
+| `q`, Esc | Quit. Ctrl-D also quits. |
+
+- **The keys run the normal commands.** The menu has no rules of its own, so every check is the one the command has. For example, a running profile cannot be renamed or removed. Questions and messages look as they do on the command line. Except for Enter, the menu steps aside while the command runs, asks you to press a key, and then draws itself again.
+- **A Main launcher** (your original account) can be removed with `d` then `k`. `p` only tells you that `aidentity` never deletes the app's own data.
+- **It needs a terminal.** Both input and output must be a terminal, and it must be able to move the cursor. If not, `aidentity ui` changes nothing and exits with an error. In a script, use [`list --json`](#for-scripts-list---json). The command takes no options.
+- **`aidentity` on its own still shows the help.** It does not open the menu.
+- **It leaves your terminal as it found it.** The menu draws on a separate screen, like the one `less` uses, so your scrollback stays as it was. Quit with `q`. Ctrl-C and closing the window also put the terminal back. While a command waits for an answer, Ctrl-C only cancels that command and returns to the menu.
+- **Limits.** The menu manages launchers only, like `list`. It does not show data folders or launch settings, and it has no keys for `rebuild`, `restore`, `prune` or `set --arg`. Use the commands for those. There is no mouse support. Esc takes about a second to register, because an arrow key starts with the same key code. `q` is instant. A narrow window gets a shorter layout, and colour is off when `NO_COLOR` is set.
 
 ### `aidentity add`
 
@@ -506,7 +577,7 @@ aidentity list --json
 
 ```json
 [
-  {"name":"Claude Work","app":"Claude","app_path":"/Applications/Claude.app","profile":"Work","data_dir":"/Users/you/Library/Application Support/aidentity/profiles/claude-work","main":false,"status":"running","badge":"W","color":"2E7DF6","built_by":"1.3.0","args":["--lang=de"],"env":["HTTPS_PROXY"],"own_extensions":false}
+  {"name":"Claude Work","app":"Claude","app_path":"/Applications/Claude.app","profile":"Work","data_dir":"/Users/you/Library/Application Support/aidentity/profiles/claude-work","main":false,"status":"running","badge":"W","color":"2E7DF6","built_by":"1.4.0","args":["--lang=de"],"env":["HTTPS_PROXY"],"own_extensions":false}
 ]
 ```
 
@@ -671,14 +742,106 @@ aidentity doctor --fix
 
 `doctor` always exits with success, so a script can read its report. `doctor --fix` exits with an error if something it tried to fix could not be fixed.
 
+### `aidentity update`
+
+Installs the latest release in place of the copy you run. Nothing else in `aidentity` uses the network, and `update` does so only when you run it.
+
+```bash
+aidentity update --check   # is a newer release out? Installs nothing.
+aidentity update           # install the latest release
+```
+
+There are no other options. It needs `curl` and `shasum`, which come with macOS. It never asks a question, so it also works in a script, and it prints each step it takes. It exists from version 1.4.0.
+
+```text
+Checking for the latest release of aidentity …
+Downloading aidentity 1.4.0 …
+  checksum verified
+Installing to /usr/local/bin/aidentity …
+✓ Updated 1.3.0 → 1.4.0
+```
+
+What it does, in order:
+
+1. **Finds the file it runs from.** It follows links to the real file. It stops at once, before any network call, when that file is not its to replace:
+   - A Homebrew copy: it prints `brew upgrade aidentity`.
+   - A copy inside a clone of the repository: it prints the `git pull` line to use. Inside unpacked source code with no `.git`, it says to download the new release from GitHub.
+   - A script that was piped into `bash`: it asks you to run it by its full path.
+
+   With `--check`, it still asks GitHub, and then prints the command to use for your kind of copy.
+2. **Asks GitHub for the latest release** and reads its tag. The tag must be a plain version number such as `v1.4.0`.
+3. **Compares versions as numbers.** If you are up to date, it says so. If your copy is newer than the latest release, it says that and changes nothing. It never downgrades.
+4. **Checks that it can write to the folder.** If not, it stops and prints a line for you to run, for example `sudo /usr/local/bin/aidentity update`. `aidentity` never runs `sudo` itself.
+5. **Downloads two files over HTTPS:** `bin/aidentity` and `SHA256SUMS` of that release.
+6. **Checks the download.** All of these must pass, or nothing is installed. `SHA256SUMS` must have a valid line for `bin/aidentity` (no checksum, no update), and the file's SHA-256 must match it. The file must start with `#!`, say that it is the version of the tag, pass `bash -n` (a syntax check) and end on the line every real copy ends on.
+7. **Replaces the old file in one step.** It writes the new file beside the old one, then moves it into place. A failed update leaves the old file exactly as it was.
+
+Afterwards, your launchers keep working. To rebuild the ones made by an older version, run `aidentity doctor --fix`.
+
+`--check` looks only at the release tag, so it downloads no script. It exits with 0 when you are up to date, and also when a newer release is out. A non-zero status means an error, for example no network. `update` exits with 0 when it updated or had nothing to do, and with an error when it refused or failed.
+
+Good to know:
+
+- **It contacts two hosts:** `api.github.com`, to read the tag, and `raw.githubusercontent.com`, to download the files (not with `--check`). It sends nothing about your profiles or your apps, only what any HTTPS request sends, such as your IP address.
+- **It does not read your `~/.curlrc`,** so a setting there cannot turn off certificate checks. If you reach the internet through a proxy, set it in the environment, for example `https_proxy=http://proxy.example:8080`.
+- **GitHub limits how many requests one IP address can make without signing in.** If you hit the limit, `update` fails and changes nothing. Try again later.
+- **The checksum comes from the same repository as the script.** It catches a damaged, cut-off or swapped download, but not a compromise of the repository itself. The Homebrew formula pins a checksum reviewed at release time, so Homebrew is the stronger channel. For the signed provenance of a release file, see [Check it yourself](#check-it-yourself).
+
+[SECURITY.md](../SECURITY.md) lists the same checks, and what is in and out of scope.
+
+### `aidentity completion`
+
+Prints a tab-completion script for bash, zsh or fish. It writes the script to standard output and changes nothing on your Mac.
+
+```bash
+aidentity completion zsh
+```
+
+Press Tab to complete command names, each command's options, the names of your profiles for `open`, `rename`, `set`, `rebuild`, `restore` and `rm`, app names for `add`, and colour names after `--color`. A name with a space is escaped for you.
+
+**Homebrew** installs the scripts for all three shells. If completion does not work yet, follow [Homebrew's shell completion steps](https://docs.brew.sh/Shell-Completion) once.
+
+**Other installs:** add one line to your shell's start-up file, then open a new Terminal window.
+
+For bash, add this to `~/.bashrc`:
+
+```bash
+eval "$(aidentity completion bash)"
+```
+
+For zsh, add this to `~/.zshrc`, after the line that runs `compinit`:
+
+```bash
+eval "$(aidentity completion zsh)"
+```
+
+For fish, add this to `~/.config/fish/config.fish`:
+
+```fish
+aidentity completion fish | source
+```
+
+- Names are looked up each time you press Tab, so a new profile shows up at once.
+- It offers the long spellings of options (`--profile`, not `-p`). Short ones still work when you type them. Values for `--profile`, `--badge`, `--arg` and `--env` are not completed.
+- The line above runs `aidentity` each time a new shell starts, which takes a few tens of milliseconds. You can instead save the output once as a file your shell reads, for example `aidentity completion fish > ~/.config/fish/completions/aidentity.fish`. Then make the file again after each upgrade.
+- It needs `aidentity` on your `PATH`.
+
 ### `aidentity version` / `aidentity help`
 
 ```bash
 aidentity version
 aidentity help
+aidentity help rm
+aidentity rm --help
 ```
 
-`aidentity --version` and `aidentity -v` also print the version. `aidentity --help`, `aidentity -h` and `aidentity` on its own show the help. An unknown command prints the help and exits with an error.
+`aidentity --version` and `aidentity -v` also print the version. `aidentity --help`, `aidentity -h` and `aidentity` on its own show the overview of every command. An unknown command prints the overview and exits with an error.
+
+**Help for one command.** `aidentity help rm` and `aidentity rm --help` print the same page: how to use the command, each option with a short meaning, and examples. `-h` works too. Every command and every spelling has a page, for example `aidentity ls --help`.
+
+- `--help` or `-h` anywhere after a command shows its help and does nothing else. `aidentity rm "Claude Work" --purge --help` removes nothing.
+- `aidentity -h rm` shows the overview, not the help of `rm`, because `-h` comes first. Use `aidentity rm -h` or `aidentity help rm`.
+- `aidentity help` with a name that is not a command prints a message and exits with an error.
 
 ### Environment variables
 
@@ -692,6 +855,7 @@ An environment variable is a named setting you put in front of a command. You do
 | `NO_COLOR` | `aidentity`, installer, uninstaller | Any non-empty value turns colour off. |
 | `AIDENTITY_INSTALL_DIR` | installer, uninstaller | Install into this folder instead of `/usr/local/bin` or `~/.local/bin`. The uninstaller looks here for the command. |
 | `AIDENTITY_REF` | installer | The branch, tag or commit to install. Default: the release tag named in the script. |
+| `AIDENTITY_UPDATE_URL` | `aidentity update` | For tests only. A `https://` address that `update` uses instead of GitHub. Every run that uses it prints a warning. |
 | `AIDENTITY_BIN_DIRS` | uninstaller | Colon-separated folders to look in for the command, instead of the usual places. |
 
 `AIDENTITY_APP_DIRS` and `AIDENTITY_APPS_DIR` differ only by where the `S` sits, and they mean different things. `APP_DIRS` is where your *apps* are searched for. `APPS_DIR` is where `aidentity` *writes* its launchers.
@@ -762,7 +926,7 @@ No. Your app updates itself as it always did. It is still the same untouched app
 
 ### Does aidentity update itself?
 
-No. It has no update check and makes no network calls. See [Install and upgrade](#install-and-upgrade) for how to upgrade it.
+Not on its own. It never checks for updates by itself, and it makes no network calls except when you run `aidentity update`. Run `aidentity update --check` to see whether a newer release is out, and `aidentity update` to install it. With Homebrew, use `brew upgrade aidentity`. See [Install and upgrade](#install-and-upgrade).
 
 ### What happens when the app updates?
 
@@ -886,7 +1050,7 @@ Do these steps in order, one block at a time. Quit every profile first.
 - **The `bash` that comes with macOS** (version 3.2). You do not need a newer one.
 - **Tools that come with macOS**, such as `PlistBuddy`, `plutil`, `iconutil`, `osascript` and `open`. It uses no Python, Node, Perl or `jq`.
 - **Optional: the Xcode Command Line Tools.** Without them, launchers are unsigned. They still run. The tools also provide `strings`, which `add` uses for a slower, deeper check of an app with an unusual layout. `aidentity doctor` shows how to install the tools.
-- **To install:** `curl` and `shasum` for the install script, or `git` and `make` for a source install.
+- **To install or update:** `curl` and `shasum` for the install script and for `aidentity update`, or `git` and `make` for a source install. `aidentity ui` needs a terminal.
 
 ---
 
