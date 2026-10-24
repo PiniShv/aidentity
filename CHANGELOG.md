@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The overview that `aidentity help`, `aidentity -h`, `aidentity --help` and
+  `aidentity` on its own print is shorter. It lists each command with one line
+  on what it does, and points to `aidentity help COMMAND` for the options. The
+  options were written in two places before, and the two had started to
+  differ. The help of every command now lists `-h, --help` under OPTIONS.
+  `aidentity help rm --help` shows the help of `help`; it was an error.
+- Tab completion asks `aidentity` what fits on every Tab, for commands and
+  options as well as names, so the scripts that `aidentity completion` prints
+  are a few lines long. bash, zsh and fish offer the same words, decided in one
+  place. In fish, that means options come without a description, and short
+  spellings such as `-p` are no longer offered. A script saved from 1.4.0
+  keeps working. A script saved from this release on never needs to be made
+  again after an upgrade.
 - `aidentity update` checks a download in three ways: `SHA256SUMS` has a
   valid line for `bin/aidentity`, the file matches that checksum, and the file
   says it is the version of the release tag. It no longer also checks that the

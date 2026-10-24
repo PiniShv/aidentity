@@ -398,14 +398,6 @@ group "help, version and exit codes"
 
 ai help
 assert_rc "help exits 0" 0 "$RUN_RC" "$RUN_OUT"
-assert_contains "help documents add" "$RUN_OUT" "add"
-assert_contains "help documents list" "$RUN_OUT" "list"
-assert_contains "help documents list --json" "$RUN_OUT" "--json"
-assert_contains "help documents open" "$RUN_OUT" "open"
-assert_contains "help documents rm" "$RUN_OUT" "rm"
-assert_contains "help documents apps" "$RUN_OUT" "apps"
-assert_contains "help documents doctor" "$RUN_OUT" "doctor"
-assert_contains "help documents --purge" "$RUN_OUT" "--purge"
 assert_contains "help explains the single-instance-lock mechanism" "$RUN_OUT" "single-instance lock"
 
 ai --help
@@ -3187,51 +3179,79 @@ mkdir -p "$DATA"
 
 group "help for one command"
 
-# Every name main() takes, each with the command it stands for.
-HELP_PAIRS="setup:setup init:setup wizard:setup add:add rename:rename mv:rename
-set:set modify:set edit:set prune:prune restore:restore rebuild:rebuild
-repair:rebuild list:list ls:list open:open rm:rm remove:rm delete:rm apps:apps
-doctor:doctor update:update ui:ui completion:completion version:version --version:version -v:version
-help:help"
-for pair in $HELP_PAIRS; do
-  w=${pair%%:*}; c=${pair#*:}
-  ai "$w" --help
-  assert_rc "$w --help exits 0" 0 "$RUN_RC" "$RUN_OUT"
-  assert_contains "$w --help names its command" "$RUN_OUT" "aidentity $c"
-  assert_contains "$w --help has a usage section" "$RUN_OUT" "USAGE"
-  assert_contains "$w --help has an example" "$RUN_OUT" "EXAMPLES"
-  HELP_LONG="$RUN_OUT"
-  ai "$w" -h
-  assert_eq "$w -h prints the same as $w --help" "$HELP_LONG" "$RUN_OUT"
-  ai help "$w"
-  assert_eq "help $w prints the same as $w --help" "$HELP_LONG" "$RUN_OUT"
-done
-
-# Every alias is named in the help of the command it stands for.
-for pair in $HELP_PAIRS; do
-  w=${pair%%:*}; c=${pair#*:}
-  [ "$w" = "$c" ] && continue
-  ai "$c" --help
-  assert_contains "help for $c mentions its alias $w" "$RUN_OUT" "$w"
-done
-
-# Every option the completion offers is in that command's help, so the two
-# cannot drift apart unseen.
-for c in add set list rm prune restore rebuild doctor update; do
-  libcall command_options "$c"
-  OPTS_OF_C="$RUN_OUT"
-  assert_nonempty "$c has options for completion" "$OPTS_OF_C"
-  ai "$c" --help
-  for o in $OPTS_OF_C; do
-    assert_contains "help for $c documents $o" "$RUN_OUT" "$o"
-  done
-done
+# The command table, a row per command: name|spellings|argument|options|summary.
+# The checks below loop over it, so a new command or spelling is tested too.
+libcall eval 'printf "%s\n" "$COMMANDS"'
+assert_rc "the command table can be read" 0 "$RUN_RC" "$RUN_OUT"
+CMD_ROWS=()
+while IFS= read -r row; do [ -n "$row" ] && CMD_ROWS+=("$row"); done <<EOF_ROWS
+$RUN_OUT
+EOF_ROWS
+assert_nonempty "it has rows" "${CMD_ROWS[*]:-}"
 
 ai help
 HELP_ALL="$RUN_OUT"
 assert_rc "help exits 0" 0 "$RUN_RC" "$RUN_OUT"
-assert_contains "the overview points to per-command help" "$HELP_ALL" "aidentity help <command>"
-assert_contains "the overview lists completion" "$HELP_ALL" "completion SHELL"
+for row in "${CMD_ROWS[@]}"; do
+  IFS='|' read -r c als arg opts summary <<< "$row"
+  pipes=${row//[!|]/}
+  assert_eq "the row for $c has five fields" "||||" "$pipes"
+  libcall type -t "cmd_${c#__}"
+  assert_eq "$c runs as the function cmd_${c#__}" "function" "$RUN_OUT"
+  case "$c" in
+    __*)
+      ai help "$c"
+      assert_rc_nonzero "the hidden $c has no help" "$RUN_RC" "$RUN_OUT"
+      assert_not_contains "and the overview leaves it out" "$HELP_ALL" "$c"
+      continue ;;
+  esac
+  assert_contains "the overview lists $c with what it does" "$HELP_ALL" "$(printf '  %-12s %s' "$c" "$summary")"
+  for w in "$c" $als; do
+    ai "$w" --help
+    assert_rc "$w --help exits 0" 0 "$RUN_RC" "$RUN_OUT"
+    assert_contains "$w --help names its command and what it does" "$RUN_OUT" "aidentity $c — $summary"
+    assert_contains "$w --help has a usage section" "$RUN_OUT" "USAGE"
+    assert_contains "$w --help lists -h, --help" "$RUN_OUT" "  -h, --help "
+    assert_contains "$w --help has an example" "$RUN_OUT" "EXAMPLES"
+    HELP_LONG="$RUN_OUT"
+    ai "$w" -h
+    assert_eq "$w -h prints the same as $w --help" "$HELP_LONG" "$RUN_OUT"
+    ai help "$w"
+    assert_eq "help $w prints the same as $w --help" "$HELP_LONG" "$RUN_OUT"
+    [ "$w" = "$c" ] || assert_contains "help for $c names its spelling $w" "$HELP_LONG" "$w"
+  done
+  # Tab offers what the row says the first argument is. The usage line, written
+  # by hand, must say the same: NAME or OLD is a profile, APP an app, and so on.
+  first=$(printf '%s\n' "$HELP_LONG" | awk '/USAGE/ { getline; print $3; exit }' | tr -d '[]')
+  case "$first" in
+    NAME|OLD) took="launchers restorable" ;;
+    APP)      took=apps ;;
+    SHELL)    took=shells ;;
+    COMMAND)  took=commands ;;
+    *)        took=- ;;
+  esac
+  case " $took " in
+    *" $arg "*) _pass "the row for $c takes what its usage line says ($arg)" ;;
+    *) _fail "the row for $c takes what its usage line says" "row: [$arg]" "usage: [$first]" ;;
+  esac
+  # Every option is in the help, by the spelling Tab offers and its short one.
+  # The help shows a value after it exactly when the row says it takes one,
+  # which is what Tab skips.
+  for o in $opts; do
+    long=${o%%[/=]*}; short=""
+    for s in $(printf '%s' "${o%=}" | tr '/' ' '); do
+      case "$s" in --*) ;; -*) short="$s, " ;; esac
+    done
+    assert_contains "help for $c documents $long" "$HELP_LONG" "  $short$long"
+    value=$(printf '%s\n' "$HELP_LONG" | awk -v o="  $short$long" \
+      'index($0, o " ") == 1 { s = substr($0, length(o) + 1); sub(/  .*/, "", s); print s; exit }')
+    case "$o" in *=) want=yes ;; *) want=no ;; esac
+    [ -n "$value" ] && got=yes || got=no
+    assert_eq "help for $c shows a value after $long exactly when its row does" "$want" "$got"
+  done
+done
+
+assert_contains "the overview points to the help of one command" "$HELP_ALL" "Run 'aidentity help COMMAND'"
 ai
 assert_eq "no arguments print the overview, as before" "$HELP_ALL" "$RUN_OUT"
 ai --help
@@ -3239,6 +3259,8 @@ assert_eq "--help prints the overview" "$HELP_ALL" "$RUN_OUT"
 ai -h rm
 assert_rc "-h before a command is still the overview" 0 "$RUN_RC" "$RUN_OUT"
 assert_eq "and ignores what follows, as before" "$HELP_ALL" "$RUN_OUT"
+ai --help rm -h
+assert_eq "a -h after it too: the overview is hidden, so it has no help page" "$HELP_ALL" "$RUN_OUT"
 ai help help
 assert_contains "the help for help says -h on its own shows the overview" "$RUN_OUT" "aidentity -h and aidentity --help show the same overview"
 assert_contains "and that what follows it is ignored" "$RUN_OUT" "ignore what comes after them"
@@ -3249,8 +3271,6 @@ assert_eq "and prints nothing on stdout" "" "$RUN_OUT"
 assert_contains "and says which name has no help" "$RUN_ERR" "definitely-not-a-command"
 ai help --bogus
 assert_rc_nonzero "help for an unknown option fails" "$RUN_RC" "$RUN_OUT"
-ai help __complete
-assert_rc_nonzero "the hidden command has no help" "$RUN_RC" "$RUN_OUT"
 ai help rm add
 assert_rc_nonzero "help takes one command" "$RUN_RC" "$RUN_OUT"
 ai definitely-not-a-command --help
@@ -3329,22 +3349,8 @@ for sh in bash zsh fish; do
   assert_rc "completion $sh exits 0" 0 "$RUN_RC" "$RUN_ERR"
   assert_nonempty "completion $sh prints a script" "$RUN_OUT"
   assert_eq "completion $sh prints nothing on stderr" "" "$RUN_ERR"
-  assert_contains "completion $sh asks aidentity for names" "$RUN_OUT" "aidentity __complete"
+  assert_contains "completion $sh asks aidentity what fits" "$RUN_OUT" "aidentity __complete $sh"
   printf '%s\n' "$RUN_OUT" > "$SANDBOX/completion.$sh"
-  for w in setup init wizard add rename mv set modify edit prune restore rebuild \
-           repair list ls open rm remove delete apps doctor completion version help; do
-    case "$RUN_OUT" in
-      *"$w"*) ;;
-      *) _fail "completion $sh knows the command $w" "no $w in the script" ;;
-    esac
-  done
-  for o in --purge --json --own-extensions --shared-extensions --clear-args --fix --all; do
-    case "$RUN_OUT" in
-      *"${o#--}"*) ;;
-      *) _fail "completion $sh knows the option $o" "no ${o#--} in the script" ;;
-    esac
-  done
-  assert_contains "completion $sh offers colour names" "$RUN_OUT" "graphite"
 done
 
 if "$BASH_BIN" -n "$SANDBOX/completion.bash" 2>/dev/null; then
@@ -3398,18 +3404,6 @@ ai completion bash zsh
 assert_rc_nonzero "two shells are refused" "$RUN_RC" "$RUN_OUT"
 ai completion --bogus
 assert_rc_nonzero "an unknown option is refused" "$RUN_RC" "$RUN_OUT"
-
-# The names the scripts complete are the names main() takes.
-libcall eval 'printf "%s\n" $COMMAND_WORDS'
-WORDS_LISTED=$(printf '%s\n' "$RUN_OUT" | LC_ALL=C sort)
-WORDS_DISPATCHED=$(sed -n '/^canonical_command() {/,/^}/p' "$AIDENTITY" \
-  | sed -n 's/^    \([a-z|-]*\)) .*/\1/p' | tr '|' '\n' | grep -v '^-' | LC_ALL=C sort)
-assert_nonempty "the command table can be read from the script" "$WORDS_DISPATCHED"
-assert_eq "COMMAND_WORDS lists exactly the names the dispatch accepts" "$WORDS_DISPATCHED" "$WORDS_LISTED"
-for w in $WORDS_LISTED; do
-  libcall canonical_command "$w"
-  assert_rc "canonical_command accepts $w" 0 "$RUN_RC" "$RUN_OUT"
-done
 
 # Homebrew's default shells are bash, zsh and fish. Naming them is refused by
 # brew audit --strict, so the line must not list them.
@@ -3489,6 +3483,125 @@ for what in launchers restorable apps; do
   assert_eq "and prints nothing" "" "$RUN_OUT$(cat "$SANDBOX/stderr")"
 done
 
+group "completion words, one table for all three shells"
+
+# complete_words decides what Tab offers, for all three shells. Each case below
+# gives the words typed after "aidentity", the last one under the cursor, and
+# the words that must be offered. bash gets only the matches, quoted for it;
+# zsh and fish get every candidate and match the typed word themselves, so
+# comp_offered does that matching here, the way those shells do.
+comp_offered() { # shell, then the words typed after "aidentity"
+  local shell="$1" cur; shift
+  cur="${!#}"
+  libcall complete_words "$shell" "$#" aidentity "$@"
+  case "$shell" in
+    bash) printf '%s\n' "$RUN_OUT" | sed 's/\\\(.\)/\1/g' ;;
+    zsh)  case "$RUN_OUT" in
+            describe*) printf '%s\n' "$RUN_OUT" | sed '1d; s/:.*//' ;;
+            *) printf '%s\n' "$RUN_OUT" | sed '1d' ;;
+          esac ;;
+    fish) printf '%s\n' "$RUN_OUT" | cut -f1 ;;
+  esac | P="$cur" awk 'NF && index($0, ENVIRON["P"]) == 1' | LC_ALL=C sort
+}
+comp_case() { # description, the words offered (joined by |), the words typed
+  local desc="$1" want sh; shift
+  want=$(printf '%s' "$1" | tr '|' '\n' | LC_ALL=C sort); shift
+  for sh in bash zsh fish; do
+    assert_eq "$sh: $desc" "$want" "$(comp_offered "$sh" "$@")"
+  done
+}
+
+# The command words come from the command table, like the help tests above.
+ALL_WORDS=""; DASH_WORDS=""
+for row in "${CMD_ROWS[@]}"; do
+  IFS='|' read -r c als _ <<< "$row"
+  for w in "$c" $als; do
+    case "$w" in __*) ;; -*) DASH_WORDS="$DASH_WORDS|$w" ;; *) ALL_WORDS="$ALL_WORDS|$w" ;; esac
+  done
+done
+libcall eval 'printf "%s|" $COLOR_NAMES'
+COLOURS="$RUN_OUT"
+
+comp_case "an empty word offers every command and spelling" "${ALL_WORDS#|}" ""
+comp_case "a prefix narrows the commands" "rename|restore|rebuild|repair|remove" re
+comp_case "a dash offers the dashed spellings" "${DASH_WORDS#|}" -
+comp_case "an option prefix completes the option" "--purge" rm --p
+comp_case "another spelling gets its command's options" "--purge" delete --pu
+comp_case "list offers --json and --help" "--json|--help" ls --
+comp_case "a command with no options offers --help" "--help" version -
+comp_case "options are still offered after other arguments" "--seed" add Fake --profile Work --se
+comp_case "an option before the name does not count as the name" "Fake Home Office|Fake Work" rm --purge ""
+comp_case "a name with a space completes" "Fake Home Office" open "Fake H"
+comp_case "rm takes one name, so nothing more is offered" "" rm "Fake Work" ""
+comp_case "the new name for rename is not completed" "" rename "Fake Work" ""
+comp_case "an app name with a space completes" "Space Case" add Spa
+comp_case "--color offers every colour" "${COLOURS%|}" add --color ""
+comp_case "-c completes a colour too" "purple" set "Fake Work" -c pu
+comp_case "--colour completes a colour as well" "teal" set "Fake Work" --colour te
+comp_case "a value that has no list offers nothing" "" add --profile ""
+comp_case "an unknown command offers nothing" "" definitely-not-a-command ""
+comp_case "a hidden command offers nothing" "" --help ""
+# The help tests check each row against its usage line, which says NAME for
+# both kinds of profile name. So this one is pinned here.
+comp_case "restore offers only profiles that can be restored" "Fake Gone" restore ""
+
+# Every command and every other spelling offers what its row says it takes
+# first, and the value of each of its options is not taken for that. The
+# typed word narrows the apps and the commands, as there are many.
+for row in "${CMD_ROWS[@]}"; do
+  IFS='|' read -r c als arg opts _ <<< "$row"
+  case "$c" in __*) continue ;; esac
+  typed=""
+  case "$arg" in
+    launchers)  want="Fake Home Office|Fake Work"; what="the launchers" ;;
+    restorable) want="Fake Gone"; what="only the profiles that can be restored" ;;
+    apps)       want="Forky"; typed=Fo; what="the apps" ;;
+    shells)     want="bash|zsh|fish"; what="the three shells" ;;
+    commands)   want="restore"; typed=rest; what="the commands" ;;
+    -)          want=""; what="nothing, as it takes no name" ;;
+    *)          _fail "the row for $c takes a known kind of argument" "[$arg]"; continue ;;
+  esac
+  for w in "$c" $als; do
+    comp_case "$w offers $what" "$want" "$w" "$typed"
+  done
+  [ "$arg" = - ] && continue
+  for o in $opts; do
+    case "$o" in *=) ;; *) continue ;; esac
+    o=${o%=}
+    for s in ${o//\// }; do
+      comp_case "$c $s VALUE still offers $what" "$want" "$c" "$s" x "$typed"
+    done
+  done
+done
+
+# __complete is hidden, so main hands it every word: a -h or --help typed
+# before the Tab must reach it, not show a help page.
+ai_stdout __complete zsh 3 aidentity rm -h ''
+assert_rc "Tab after rm -h exits 0" 0 "$RUN_RC" "$RUN_ERR"
+has_line "and offers the launchers" "$RUN_OUT" "Fake Work"
+assert_not_contains "and prints no help page" "$RUN_OUT" "Show this help"
+ai_stdout __complete bash 3 aidentity rm --help ''
+has_line "Tab after rm --help offers the launchers in bash too" "$RUN_OUT" 'Fake\ Work'
+ai_stdout __complete zsh 2 aidentity -h
+assert_eq "Tab after -h alone offers nothing" "0:plain" "$RUN_RC:$RUN_OUT"
+
+# What each shell gets besides the words.
+libcall complete_words zsh 1 aidentity ""
+assert_eq "zsh: the command is offered with descriptions" "describe" "$(printf '%s\n' "$RUN_OUT" | head -n 1)"
+has_line "zsh: each with what it does" "$RUN_OUT" "add:Create a profile for an app"
+has_line "zsh: and another spelling as the same as its command" "$RUN_OUT" "ls:Same as list"
+libcall complete_words zsh 2 aidentity rm ""
+assert_eq "zsh: names are offered plain" "plain" "$(printf '%s\n' "$RUN_OUT" | head -n 1)"
+libcall complete_words fish 1 aidentity ""
+has_line "fish: each command comes with what it does" "$RUN_OUT" "add"$'\t'"Create a profile for an app"
+libcall complete_words fish 2 aidentity rm ""
+has_line "fish: a name comes alone" "$RUN_OUT" "Fake Work"
+for args in "bash" "bash x aidentity" "bash 7 aidentity rm" "fish 3 aidentity"; do
+  # shellcheck disable=SC2086  # the words of each case, split on purpose
+  ai_stdout __complete $args
+  assert_eq "__complete $args prints nothing and exits 0" "0:" "$RUN_RC:$RUN_OUT$RUN_ERR"
+done
+
 group "bash completion behaviour"
 
 COMP_BIN="$SANDBOX/comp-bin"
@@ -3496,7 +3609,7 @@ mkdir -p "$COMP_BIN"
 printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$BASH_BIN" "$AIDENTITY" > "$COMP_BIN/aidentity"
 chmod +x "$COMP_BIN/aidentity"
 
-# Run the generated function as bash would, with the words typed so far; the
+# Run the script's function as bash would, with the words typed so far; the
 # last one is the word under the cursor. RUN_OUT holds what COMPREPLY ends up
 # with, one entry per line.
 bash_complete() {
@@ -3511,32 +3624,8 @@ bash_complete() {
 bash_complete aidentity ""
 assert_rc "completing the command works" 0 "$RUN_RC" "$RUN_OUT"
 has_line "an empty word offers commands: add" "$RUN_OUT" "add"
-has_line "and aliases: ls" "$RUN_OUT" "ls"
-has_line "and completion itself" "$RUN_OUT" "completion"
+has_line "and other spellings: ls" "$RUN_OUT" "ls"
 lacks_line "but not options" "$RUN_OUT" "--help"
-bash_complete aidentity re
-assert_eq "a prefix narrows the commands" "rename
-restore
-rebuild
-repair
-remove" "$RUN_OUT"
-bash_complete aidentity -
-assert_eq "a dash offers the global options" "-h
---help
--v
---version" "$RUN_OUT"
-bash_complete aidentity rm --p
-assert_eq "an option prefix completes the option" "--purge" "$RUN_OUT"
-bash_complete aidentity delete --pu
-assert_eq "an alias gets its command's options" "--purge" "$RUN_OUT"
-bash_complete aidentity ls --
-assert_eq "list offers --json and --help" "--json
---help" "$RUN_OUT"
-bash_complete aidentity add --
-has_line "add offers --profile" "$RUN_OUT" "--profile"
-has_line "add offers --own-extensions" "$RUN_OUT" "--own-extensions"
-bash_complete aidentity add Fake --profile Work --se
-assert_eq "options are still offered after other arguments" "--seed" "$RUN_OUT"
 
 bash_complete aidentity rm ""
 has_line "rm offers a profile name, escaped for the shell" "$RUN_OUT" 'Fake\ Work'
@@ -3548,41 +3637,8 @@ bash_complete aidentity open '"Fake H'
 assert_eq "a name inside double quotes completes unescaped" 'Fake Home Office' "$RUN_OUT"
 bash_complete aidentity open "'Fake W"
 assert_eq "a name inside single quotes completes unescaped" 'Fake Work' "$RUN_OUT"
-bash_complete aidentity rm "Fake Work" ""
-assert_eq "rm takes one name, so nothing more is offered" "" "$RUN_OUT"
-bash_complete aidentity rename "Fake Work" ""
-assert_eq "the new name for rename is not completed" "" "$RUN_OUT"
-for c in open set rebuild rename; do
-  bash_complete aidentity "$c" "Fake\\ W"
-  assert_eq "$c completes a profile name" 'Fake\ Work' "$RUN_OUT"
-done
-bash_complete aidentity restore ""
-assert_eq "restore offers only profiles that can be restored" 'Fake\ Gone' "$RUN_OUT"
-bash_complete aidentity add ""
-has_line "add offers an app name" "$RUN_OUT" "Fake"
-has_line "and an app whose name has a space is escaped" "$RUN_OUT" 'Space\ Case'
-lacks_line "and not a launcher" "$RUN_OUT" 'Fake\ Work'
-bash_complete aidentity add Fo
-assert_eq "an app prefix narrows the apps" "Forky" "$RUN_OUT"
 bash_complete aidentity add Spa
 assert_eq "a spaced app name completes with its space escaped" 'Space\ Case' "$RUN_OUT"
-bash_complete aidentity add --color ""
-has_line "--color offers colours" "$RUN_OUT" "blue"
-has_line "including the neutrals" "$RUN_OUT" "graphite"
-bash_complete aidentity set "Fake Work" -c pu
-assert_eq "-c completes a colour too" "purple" "$RUN_OUT"
-bash_complete aidentity set "Fake Work" --colour te
-assert_eq "--colour completes a colour as well" "teal" "$RUN_OUT"
-bash_complete aidentity add --profile ""
-assert_eq "a value that has no list offers nothing" "" "$RUN_OUT"
-bash_complete aidentity completion ""
-assert_eq "completion offers the three shells" "bash
-zsh
-fish" "$RUN_OUT"
-bash_complete aidentity help rest
-assert_eq "help completes a command name" "restore" "$RUN_OUT"
-bash_complete aidentity definitely-not-a-command ""
-assert_eq "an unknown command offers nothing" "" "$RUN_OUT"
 
 # A folder name is not trusted. After an opening quote the name is escaped for
 # that quote, so a $, a backtick or a quote mark in it is never run as code.
@@ -3655,11 +3711,10 @@ assert_eq "an escaped apostrophe already typed still matches" "Fake It'\\''s Wor
 group "zsh completion behaviour"
 
 if [ -n "$ZSH_BIN" ]; then
-# The generated function runs under zsh -f. compadd and _describe, which only
+# The script's function runs under zsh -f. compadd and _describe, which only
 # exist inside zsh's completion system, are replaced by stand-ins that print the
 # candidates starting with the word under the cursor. zsh's own compadd does the
-# quoting of names, so these tests cover what the function decides: which words
-# count as arguments, which list it asks for and which options it offers.
+# quoting of names, so these tests cover what reaches it: the words, as they are.
 ZSH_DRIVER="$SANDBOX/zsh-driver.zsh"
 cat > "$ZSH_DRIVER" <<'ZSH_DRIVER_END'
 compdef() { :; }
@@ -3692,86 +3747,66 @@ zsh_complete() {
 zsh_complete aidentity ""
 assert_rc "zsh: completing the command works" 0 "$RUN_RC" "$RUN_OUT"
 has_line "zsh: an empty word offers commands: add" "$RUN_OUT" "add"
-has_line "zsh: and aliases: ls" "$RUN_OUT" "ls"
-has_line "zsh: and completion itself" "$RUN_OUT" "completion"
+has_line "zsh: and other spellings: ls" "$RUN_OUT" "ls"
 lacks_line "zsh: but not options" "$RUN_OUT" "--help"
-zsh_complete aidentity re
-assert_eq "zsh: a prefix narrows the commands" "rebuild
-remove
-rename
-repair
-restore" "$RUN_OUT"
-zsh_complete aidentity -
-assert_eq "zsh: a dash offers the global options" "--help
---version
--h
--v" "$RUN_OUT"
-zsh_complete aidentity rm --p
-assert_eq "zsh: an option prefix completes the option" "--purge" "$RUN_OUT"
-zsh_complete aidentity delete --pu
-assert_eq "zsh: an alias gets its command's options" "--purge" "$RUN_OUT"
-zsh_complete aidentity ls --
-assert_eq "zsh: list offers --json and --help" "--help
---json" "$RUN_OUT"
-zsh_complete aidentity add --
-has_line "zsh: add offers --profile" "$RUN_OUT" "--profile"
-has_line "zsh: add offers --own-extensions" "$RUN_OUT" "--own-extensions"
-zsh_complete aidentity add Fake --profile Work --se
-assert_eq "zsh: options are still offered after other arguments" "--seed" "$RUN_OUT"
-
 zsh_complete aidentity rm ""
 has_line "zsh: rm offers a profile name" "$RUN_OUT" "Fake Work"
 has_line "zsh: and one whose profile name has a space" "$RUN_OUT" "Fake Home Office"
 lacks_line "zsh: and not an app that is not a launcher" "$RUN_OUT" "Decoy"
-lacks_line "zsh: and not a profile that can only be restored" "$RUN_OUT" "Fake Gone"
 zsh_complete aidentity open "Fake H"
 assert_eq "zsh: a name with a space completes" "Fake Home Office" "$RUN_OUT"
-zsh_complete aidentity rm "Fake Work" ""
-assert_eq "zsh: rm takes one name, so nothing more is offered" "" "$RUN_OUT"
-zsh_complete aidentity rename "Fake Work" ""
-assert_eq "zsh: the new name for rename is not completed" "" "$RUN_OUT"
-zsh_complete aidentity rm --purge ""
-has_line "zsh: an option before the name does not count as the name" "$RUN_OUT" "Fake Work"
-for c in open set rebuild rename; do
-  zsh_complete aidentity "$c" "Fake W"
-  assert_eq "zsh: $c completes a profile name" "Fake Work" "$RUN_OUT"
-done
-zsh_complete aidentity restore ""
-assert_eq "zsh: restore offers only profiles that can be restored" "Fake Gone" "$RUN_OUT"
-zsh_complete aidentity add ""
-has_line "zsh: add offers an app name" "$RUN_OUT" "Fake"
-has_line "zsh: and an app whose name has a space" "$RUN_OUT" "Space Case"
-lacks_line "zsh: and not a launcher" "$RUN_OUT" "Fake Work"
-zsh_complete aidentity add Fo
-assert_eq "zsh: an app prefix narrows the apps" "Forky" "$RUN_OUT"
-zsh_complete aidentity add --color ""
-has_line "zsh: --color offers colours" "$RUN_OUT" "blue"
-has_line "zsh: including the neutrals" "$RUN_OUT" "graphite"
-zsh_complete aidentity set "Fake Work" -c pu
-assert_eq "zsh: -c completes a colour too" "purple" "$RUN_OUT"
-zsh_complete aidentity set "Fake Work" --colour te
-assert_eq "zsh: --colour completes a colour as well" "teal" "$RUN_OUT"
-zsh_complete aidentity add --profile ""
-assert_eq "zsh: a value that has no list offers nothing" "" "$RUN_OUT"
-zsh_complete aidentity completion ""
-assert_eq "zsh: completion offers the three shells" "bash
-fish
-zsh" "$RUN_OUT"
-zsh_complete aidentity help rest
-assert_eq "zsh: help completes a command name" "restore" "$RUN_OUT"
-zsh_complete aidentity definitely-not-a-command ""
-assert_eq "zsh: an unknown command offers nothing" "" "$RUN_OUT"
 
 # Folder names are handed to zsh as they are. zsh quotes them itself, and
 # nothing in the function reads them as code.
-for want in 'Fake Dollar $HOME Work' 'Fake Sub $(touch pwned-marker) Work' 'Fake Tick `touch pwned-marker` Work' \
-            "Fake It's Work" 'Fake Quote"d Work' 'Fake Slash\ed Work' 'Fake Bang! Work'; do
+for want in "${HOSTILE_NAMES[@]}"; do
   zsh_complete aidentity open "${want% Work}"
   has_line "zsh: the name [$want] is offered as it is" "$RUN_OUT" "$want"
 done
 assert_no_file "zsh: and no folder name ran as code" "$EVAL_DIR/pwned-marker"
 else
   _skip "zsh completion behaviour" "zsh is not installed"
+fi
+
+group "fish completion behaviour"
+
+# fish's own `complete -C` completes a command line with the script loaded,
+# the way Tab does. It prints each candidate as fish reads it back (no
+# escapes), with a tab and the description when there is one. --no-config and
+# a home in the sandbox keep out the fish setup of whoever runs the tests.
+FISH_HOME="$SANDBOX/fish-home"
+mkdir -p "$FISH_HOME"
+if [ -n "$FISH_BIN" ] && HOME="$FISH_HOME" "$FISH_BIN" --no-config -c true >/dev/null 2>&1; then
+fish_complete() { # the command line typed so far, as typed
+  RUN_OUT=$(cd "$EVAL_DIR" && PATH="$COMP_BIN:$PATH" HOME="$FISH_HOME" XDG_CONFIG_HOME="$FISH_HOME" \
+    XDG_DATA_HOME="$FISH_HOME" XDG_CACHE_HOME="$FISH_HOME" "$FISH_BIN" --no-config \
+    -c 'source $argv[1]; complete -C $argv[2]' "$SANDBOX/completion.fish" "$1" 2>"$SANDBOX/fish.err")
+  RUN_RC=$?
+  RUN_OUT=$(printf '%s\n' "$RUN_OUT" | LC_ALL=C sort)
+}
+
+fish_complete "aidentity "
+assert_rc "fish: completing the command works" 0 "$RUN_RC" "$RUN_OUT"
+has_line "fish: an empty word offers commands, with what each does" "$RUN_OUT" "add"$'\t'"Create a profile for an app"
+has_line "fish: and other spellings" "$RUN_OUT" "ls"$'\t'"Same as list"
+fish_complete "aidentity rm --p"
+assert_eq "fish: an option prefix completes the option" "--purge" "$RUN_OUT"
+fish_complete "aidentity rm "
+has_line "fish: rm offers a profile name" "$RUN_OUT" "Fake Work"
+has_line "fish: and one whose profile name has a space" "$RUN_OUT" "Fake Home Office"
+lacks_line "fish: and not an app that is not a launcher" "$RUN_OUT" "Decoy"
+fish_complete "aidentity rm 'Fake Work' "
+assert_eq "fish: rm takes one name, so nothing more is offered" "" "$RUN_OUT"
+fish_complete 'aidentity open Fake\ H'
+assert_eq "fish: a name with a space completes" "Fake Home Office" "$RUN_OUT"
+
+for want in "${HOSTILE_NAMES[@]}"; do
+  typed=${want#Fake }; typed=${typed%%[!A-Za-z]*}
+  fish_complete "aidentity open Fake\\ $typed"
+  has_line "fish: the name [$want] is offered as it is" "$RUN_OUT" "$want"
+done
+assert_no_file "fish: and no folder name ran as code" "$EVAL_DIR/pwned-marker"
+else
+  _skip "fish completion behaviour" "fish is not installed or does not start; CI installs it and runs these"
 fi
 
 for n in "${HOSTILE_NAMES[@]}"; do rm -rf "$APPS/$n.app"; done
@@ -3931,7 +3966,6 @@ only_script_in() { # folder: nothing but the script is left there
 
 ai help
 assert_contains "help documents update" "$RUN_OUT" "update"
-assert_contains "help documents update --check" "$RUN_OUT" "Only say whether a newer release is out"
 
 U_DIR="$SB/upd bin"
 U="$U_DIR/aidentity"
