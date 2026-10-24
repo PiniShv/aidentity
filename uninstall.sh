@@ -173,38 +173,56 @@ in_repo_checkout() {
   [ -f "$root/install.sh" ] && [ -f "$root/uninstall.sh" ] && [ -f "$root/LICENSE" ]
 }
 
-# Kept deliberately identical to bin/aidentity's version. On macOS `pgrep -a`
-# means "include ancestors", NOT "print the command line" as on Linux, so -af
-# yields bare PIDs and the match below can never succeed. The list must also be
-# captured before matching, or pgrep matches the grep's own argv. This copy had
-# both bugs, which made the "don't delete a running profile" guard dead code.
-#
+# proc_snapshot, running_on_profile, running_in_snapshot and proc_dir_ids are
+# kept identical to bin/aidentity's; scripts/guards.sh compares them. On macOS
+# `pgrep -a` means "include ancestors", NOT "print the command line" as on
+# Linux, so -af yields bare PIDs and the match below can never succeed. The
+# list must also be captured before matching, or pgrep matches the grep's own
+# argv. This copy had both bugs, which made the "don't delete a running
+# profile" guard dead code.
+proc_snapshot() {
+  # -a: on macOS pgrep leaves out the caller's own ancestors unless asked.
+  PS_RC=0; PS_LIST=$(pgrep -afl "user-data-dir=" 2>/dev/null) || PS_RC=$?
+  PS_IDS=""; PS_ALL=""
+  [ "$PS_RC" -le 1 ] || warn "Could not check which profiles are running (pgrep exited $PS_RC); assuming they are."
+}
+
+# Every check looks afresh: remove_data asks again after its prompt.
+running_on_profile() {
+  [ -n "$1" ] || return 1
+  local PS_RC="" PS_LIST="" PS_IDS="" PS_ALL=""
+  proc_snapshot
+  running_in_snapshot "$1"
+}
+
 # The match runs in the shell, never as `printf … | grep -q`: on the 100 KB
 # lists real Electron helpers produce, grep -q's early exit killed printf with
 # SIGPIPE, pipefail read that as "no match", and a running profile looked
 # stopped. Quoting "$1" inside the pattern keeps [ * ? in a path literal.
-running_on_profile() {
-  local list rc nl=$'\n'
+running_in_snapshot() {
+  local want nl=$'\n'
   [ -n "$1" ] || return 1
   # pgrep exits 1 for "no match" but >=2 for a real failure. Treating those the
   # same made a data-loss guard fail OPEN — a broken pgrep read as "nothing is
   # running" and the delete went ahead. Anything but 0 or 1 is reported as
   # running, so the caller refuses to delete.
-  # -a: on macOS pgrep leaves out the caller's own ancestors unless asked.
-  list=$(pgrep -afl "user-data-dir=" 2>/dev/null); rc=$?
-  if [ "$rc" -gt 1 ]; then
-    warn "Could not check which profiles are running (pgrep exited $rc); assuming they are."
-    return 0
-  fi
-  [ "$rc" -eq 0 ] && [ -n "$list" ] || return 1
-  case "$list$nl" in
+  [ "$PS_RC" -le 1 ] || return 0
+  [ "$PS_RC" -eq 0 ] && [ -n "$PS_LIST" ] || return 1
+  case "$PS_LIST$nl" in
     *"user-data-dir=$1 "*|*"user-data-dir=$1$nl"*) return 0 ;;
   esac
   # The same directory under another spelling — a symlinked root, "//", a
-  # trailing slash — is the same profile. Compare each path a process names
-  # (up to the next " --" or the end of its line) by directory identity.
-  local want line rest path seen="|"
+  # trailing slash — is the same profile: compare directory identities.
   want=$(/usr/bin/stat -L -f '%d:%i' "$1" 2>/dev/null) || return 1
+  [ -n "$PS_IDS" ] || PS_IDS=$(proc_dir_ids "$PS_LIST")
+  case "$PS_IDS" in *"|$want|"*) return 0 ;; esac
+  return 1
+}
+
+# The identity (device:inode) of each path a process in the list names with
+# --user-data-dir, up to the next " --" or the end of its line, as "|id|id|".
+proc_dir_ids() { # process list
+  local line rest path id seen="|" ids="|"
   while IFS= read -r line; do
     rest=$line
     while :; do
@@ -212,12 +230,12 @@ running_on_profile() {
       path=${rest%% --*}
       case "$seen" in *"|$path|"*) continue ;; esac
       seen="$seen$path|"
-      [ "$(/usr/bin/stat -L -f '%d:%i' "$path" 2>/dev/null)" = "$want" ] && return 0
+      id=$(/usr/bin/stat -L -f '%d:%i' "$path" 2>/dev/null) && ids="$ids$id|"
     done
   done <<EOF
-$list
+$1
 EOF
-  return 1
+  printf '%s' "$ids"
 }
 
 # Whether /dev/tty can really be opened. Its mode bits say yes on every Mac,

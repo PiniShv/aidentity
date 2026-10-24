@@ -610,6 +610,30 @@ assert_ours() {
 #      grep starts both at once, and the grep's own argv contains the path we
 #      are searching for — so pgrep matches the grep and every profile looks
 #      like it is running.
+#
+# One look at the processes, held in the caller's own
+# `local PS_RC="" PS_LIST="" PS_IDS="" PS_ALL=""`: pgrep's exit status (2 or
+# more is a failure) and its list; then, worked out when first needed, the
+# folder identities in that list (proc_dir_ids) and every process (ps).
+proc_snapshot() {
+  # -a: on macOS pgrep leaves out the caller's own ancestors unless asked.
+  PS_RC=0; PS_LIST=$(pgrep -afl "user-data-dir=" 2>/dev/null) || PS_RC=$?
+  PS_IDS=""; PS_ALL=""
+  [ "$PS_RC" -le 1 ] || warn "Could not check which profiles are running (pgrep exited $PS_RC); assuming they are."
+}
+
+# Whether a process runs on the profile folder $1, from a fresh look: every
+# delete asks this, and rm asks again after its prompt.
+running_on_profile() {
+  [ -n "$1" ] || return 1
+  local PS_RC="" PS_LIST="" PS_IDS="" PS_ALL=""
+  proc_snapshot
+  running_in_snapshot "$1"
+}
+
+# The same question against the caller's snapshot, for list and the menu.
+# Never for a delete.
+#
 # The match is anchored on purpose. A bare substring test made ".../claude-work"
 # match a process running ".../claude-work-2", so one profile reported another
 # as running and refused to remove or rebuild it. The flag is always followed by
@@ -621,59 +645,23 @@ assert_ours() {
 # profile read as stopped exactly when its line came early — fail OPEN, on a
 # guard whose whole job is to stop a delete. Quoting "$1" inside the pattern
 # keeps [ * ? in a path literal.
-running_on_profile() {
-  local list rc nl=$'\n'
+running_in_snapshot() {
+  local want nl=$'\n'
   [ -n "$1" ] || return 1
   # pgrep exits 1 for "no match" but >=2 for a real failure. Treating those the
   # same made a data-loss guard fail OPEN — a broken pgrep read as "nothing is
   # running" and the delete went ahead. Anything but 0 or 1 is reported as
   # running, so the caller refuses to delete.
-  # -a: on macOS pgrep leaves out the caller's own ancestors unless asked.
-  list=$(pgrep -afl "user-data-dir=" 2>/dev/null); rc=$?
-  if [ "$rc" -gt 1 ]; then
-    warn "Could not check which profiles are running (pgrep exited $rc); assuming they are."
-    return 0
-  fi
-  [ "$rc" -eq 0 ] && [ -n "$list" ] || return 1
-  case "$list$nl" in
+  [ "$PS_RC" -le 1 ] || return 0
+  [ "$PS_RC" -eq 0 ] && [ -n "$PS_LIST" ] || return 1
+  case "$PS_LIST$nl" in
     *"user-data-dir=$1 "*|*"user-data-dir=$1$nl"*) return 0 ;;
   esac
   # The same directory under another spelling — a symlinked root, "//", a
-  # trailing slash — is the same profile. Compare each path a process names
-  # (up to the next " --" or the end of its line) by directory identity.
-  local want line rest path seen="|"
+  # trailing slash — is the same profile: compare directory identities.
   want=$(/usr/bin/stat -L -f '%d:%i' "$1" 2>/dev/null) || return 1
-  while IFS= read -r line; do
-    rest=$line
-    while :; do
-      case "$rest" in *user-data-dir=*) rest=${rest#*user-data-dir=} ;; *) break ;; esac
-      path=${rest%% --*}
-      case "$seen" in *"|$path|"*) continue ;; esac
-      seen="$seen$path|"
-      [ "$(/usr/bin/stat -L -f '%d:%i' "$path" 2>/dev/null)" = "$want" ] && return 0
-    done
-  done <<EOF
-$list
-EOF
-  return 1
-}
-
-# The same question for the menu, which asks about every profile on each
-# refresh: the answer comes from a process list read once, and from the
-# identities of the paths it names (proc_dir_ids), so no profile reads the list
-# or looks at a path again. $2 is pgrep's exit status and $3 its list. It
-# answers as running_on_profile does, including "running" when pgrep failed.
-# Keep the two in step; the tests ask both the same questions.
-running_in_list() { # data dir, pgrep status, its list, proc_dir_ids of it
-  local nl=$'\n' want
-  [ -n "$1" ] || return 1
-  [ "$2" -le 1 ] || return 0
-  [ "$2" -eq 0 ] && [ -n "$3" ] || return 1
-  case "$3$nl" in
-    *"user-data-dir=$1 "*|*"user-data-dir=$1$nl"*) return 0 ;;
-  esac
-  want=$(/usr/bin/stat -L -f '%d:%i' "$1" 2>/dev/null) || return 1
-  case "$4" in *"|$want|"*) return 0 ;; esac
+  [ -n "$PS_IDS" ] || PS_IDS=$(proc_dir_ids "$PS_LIST")
+  case "$PS_IDS" in *"|$want|"*) return 0 ;; esac
   return 1
 }
 
@@ -720,24 +708,19 @@ EOF
 
 # Whether the app is running on its own account, with no --user-data-dir: the
 # instance a --main launcher opens. Matched in the shell for the same reason as
-# above — a pipe into grep -q fails open on a long process list. The menu reads
-# the list once for all its rows and passes it in as $2.
-main_running() { # app [, process list]
-  local exe list line
-  exe=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$1/Contents/Info.plist" 2>/dev/null) || return 1
-  exe="$1/Contents/MacOS/$exe"
-  if [ $# -ge 2 ]; then
-    list=$2
-  else
-    list=$(ps -axww -o command= 2>/dev/null) || return 1
-  fi
+# above — a pipe into grep -q fails open on a long process list. ps runs once
+# per snapshot; " " stands for a ps that failed.
+main_running() { # app
+  local exe line
+  exe=$(app_exe "$1") || return 1
+  [ -n "$PS_ALL" ] || PS_ALL=$(ps -axww -o command= 2>/dev/null) || PS_ALL=" "
   while IFS= read -r line; do
     case "$line" in
       *--user-data-dir=*) ;;
       "$exe"|"$exe "*) return 0 ;;
     esac
   done <<EOF
-$list
+$PS_ALL
 EOF
   return 1
 }
@@ -1485,34 +1468,53 @@ profile_has_data() {
 
 # What a launcher is doing, in the words list prints: running, in use,
 # signed out / new, app missing, or not running (a main launcher). One place,
-# so `list`, `list --json` and the menu can never disagree. Each argument is
-# 1 or 0: a main launcher, the app is there, the profile is running, and its
-# folder holds a signed-in session.
-status_word() { # main, app present, running, has data
-  local status
-  if [ "$1" = "1" ]; then
-    status="not running"
-    [ "$3" = "1" ] && status="running"
+# so `list`, `list --json` and the menu can never disagree. It asks under the
+# caller's snapshot and sets STATUS, which the caller makes local: printed from
+# a subshell, what the snapshot reads would be lost after each launcher.
+launcher_status() { # app, data dir, main (1 or 0) -> STATUS
+  if [ ! -d "$1" ]; then
+    STATUS="app missing"
+  elif [ "$3" = "1" ]; then
+    STATUS="not running"
+    main_running "$1" && STATUS="running"
   else
-    status="signed out / new"
-    [ "$4" = "1" ] && status="in use"
-    [ "$3" = "1" ] && status="running"
+    STATUS="signed out / new"
+    profile_has_data "$2" && STATUS="in use"
+    running_in_snapshot "$2" && STATUS="running"
   fi
-  [ "$2" = "1" ] || status="app missing"
-  printf '%s' "$status"
+  return 0
 }
 
-launcher_status() { # launcher, target app, data dir
-  local main=0 present=0 run=0 has=0
-  if is_main_launcher "$1"; then
-    main=1
-    main_running "$2" && run=1
-  else
-    profile_has_data "$3" && has=1
-    running_on_profile "$3" && run=1
-  fi
-  [ -d "$2" ] && present=1
-  status_word "$main" "$present" "$run" "$has"
+# Text from the disk as a person sees it, into the variable named $1: each
+# control character becomes "?", so an escape sequence cannot reach the
+# terminal. In a UTF-8 locale that includes some invisible characters, such as
+# the joiner inside some emoji.
+shown() { # variable, text
+  printf -v "$1" '%s' "${2//[[:cntrl:]]/?}"
+}
+
+# Every launcher, for list, list --json, the menu and completion: LR_N of them,
+# launcher i at LR_PATH[i] named LR_NAME[i] (as on the disk), opening the app
+# LR_TARGET[i] with LR_DATA[i], LR_PROFILE[i] and LR_MAIN[i] (1 or 0). A main
+# launcher has no data folder of its own, whatever its Info.plist says. With
+# "names", only paths and names are read: completion runs on every Tab.
+launcher_rows() { # [names]
+  local app label
+  LR_N=0; LR_PATH=(); LR_NAME=(); LR_TARGET=(); LR_DATA=(); LR_PROFILE=(); LR_MAIN=()
+  for app in "$APPS_DIR"/*.app; do
+    [ -d "$app" ] || continue
+    is_our_launcher "$app" || continue
+    label=${app##*/}
+    LR_PATH[LR_N]=$app; LR_NAME[LR_N]=${label%.app}
+    if [ "${1:-}" != names ]; then
+      LR_TARGET[LR_N]=$(plist_get "$app" AIdentityTargetApp)
+      LR_DATA[LR_N]=$(plist_get "$app" AIdentityDataDir)
+      LR_PROFILE[LR_N]=$(plist_get "$app" "$MARKER_KEY")
+      LR_MAIN[LR_N]=0
+      if is_main_launcher "$app"; then LR_MAIN[LR_N]=1; LR_DATA[LR_N]=""; fi
+    fi
+    LR_N=$((LR_N + 1))
+  done
 }
 
 cmd_list() {
@@ -1526,40 +1528,41 @@ cmd_list() {
   done
   if [ "$json" -eq 1 ]; then list_json; return; fi
 
-  local app n=0 profile target data label status
-  for app in "$APPS_DIR"/*.app; do
-    [ -d "$app" ] || continue
-    is_our_launcher "$app" || continue
-    n=$((n+1))
-    label=$(bundle_name "$app")
-    profile=$(plist_get "$app" "$MARKER_KEY")
-    target=$(plist_get "$app" "AIdentityTargetApp")
-    data=$(plist_get "$app" "AIdentityDataDir")
-    status=$(launcher_status "$app" "$target" "$data")
-    case "$status" in
+  # One look at the processes for all the rows. Disk text goes through shown.
+  local i=0 label app profile data status ex sw envs STATUS PS_RC="" PS_LIST="" PS_IDS="" PS_ALL=""
+  launcher_rows
+  [ "$LR_N" -eq 0 ] || proc_snapshot
+  while [ "$i" -lt "$LR_N" ]; do
+    launcher_status "${LR_TARGET[$i]}" "${LR_DATA[$i]}" "${LR_MAIN[$i]}"
+    shown label "${LR_NAME[$i]}"
+    shown app "$(bundle_name "${LR_TARGET[$i]}")"
+    shown profile "${LR_PROFILE[$i]}"
+    case "$STATUS" in
       running) status="${C_GREEN}running${C_RESET}" ;;
       "app missing") status="${C_YELLOW}app missing${C_RESET} — run: aidentity rebuild \"$label\"" ;;
+      *) status=$STATUS ;;
     esac
     printf '%s%s%s\n' "$C_BOLD" "$label" "$C_RESET"
-    printf '   app      %s\n' "$(bundle_name "$target")"
+    printf '   app      %s\n' "$app"
     printf '   profile  %s\n' "$profile"
     printf '   status   %s\n' "$status"
-    if is_main_launcher "$app"; then
+    if [ "${LR_MAIN[$i]}" = "1" ]; then
       printf '   data     %s\n' "$(dim "the app's own — your original account, never touched")"
     else
+      shown data "${LR_DATA[$i]}"
       printf '   data     %s\n' "$(dim "$data")"
     fi
-    local ex sw envs
-    ex=$(extras_of "$app/Contents/Info.plist")
-    sw=$(extras_lines arg "$ex" | tr '\n' ' ')
+    ex=$(extras_of "${LR_PATH[$i]}/Contents/Info.plist")
+    shown sw "$(extras_lines arg "$ex" | tr '\n' ' ')"
     # Names only: a value may be a token or a password.
-    envs=$(extras_lines env "$ex" | sed 's/=.*//' | tr '\n' ' ')
+    shown envs "$(extras_lines env "$ex" | sed 's/=.*//' | tr '\n' ' ')"
     [ -n "$sw" ] && printf '   flags    %s\n' "${sw% }"
     [ -n "$envs" ] && printf '   env      %s\n' "$(dim "${envs% } (values hidden)")"
     [ -n "$(extras_lines ext "$ex")" ] && printf '   ext      %s\n' "$(dim "its own extensions folder, inside the profile folder")"
     info ""
+    i=$((i + 1))
   done
-  if [ "$n" -eq 0 ]; then
+  if [ "$LR_N" -eq 0 ]; then
     info "No profiles yet."
     dim "  Create one with:  aidentity add"
   fi
@@ -1584,30 +1587,28 @@ cmd_list() {
 # Nothing else is written to stdout, so the output always parses: warnings go
 # to stderr and there is no colour. No launchers prints [].
 list_json() {
-  local app n=0 profile target data label main ex obj
-  for app in "$APPS_DIR"/*.app; do
-    [ -d "$app" ] || continue
-    is_our_launcher "$app" || continue
-    label=$(bundle_name "$app")
-    profile=$(plist_get "$app" "$MARKER_KEY")
-    target=$(plist_get "$app" "AIdentityTargetApp")
-    data=$(plist_get "$app" "AIdentityDataDir")
+  local i=0 app target main ex obj STATUS PS_RC="" PS_LIST="" PS_IDS="" PS_ALL=""
+  launcher_rows
+  [ "$LR_N" -eq 0 ] || proc_snapshot
+  while [ "$i" -lt "$LR_N" ]; do
+    app=${LR_PATH[$i]}; target=${LR_TARGET[$i]}
+    launcher_status "$target" "${LR_DATA[$i]}" "${LR_MAIN[$i]}"
     main=false
-    is_main_launcher "$app" && { main=true; data=""; }
+    [ "${LR_MAIN[$i]}" = "1" ] && main=true
     ex=$(extras_of "$app/Contents/Info.plist")
-    obj="{\"name\":$(json_str "$label")"
+    obj="{\"name\":$(json_str "${LR_NAME[$i]}")"
     if [ -n "$target" ]; then
       obj="$obj,\"app\":$(json_str "$(bundle_name "$target")")"
     else
       obj="$obj,\"app\":null"
     fi
     obj="$obj,\"app_path\":$(json_str_or_null "$target")"
-    obj="$obj,\"profile\":$(json_str "$profile")"
-    obj="$obj,\"data_dir\":$(json_str_or_null "$data")"
+    obj="$obj,\"profile\":$(json_str "${LR_PROFILE[$i]}")"
+    obj="$obj,\"data_dir\":$(json_str_or_null "${LR_DATA[$i]}")"
     obj="$obj,\"main\":$main"
-    obj="$obj,\"status\":$(json_str "$(launcher_status "$app" "$target" "$data")")"
-    obj="$obj,\"badge\":$(json_str_or_null "$(launcher_badge "$app" "$target" "$profile")")"
-    obj="$obj,\"color\":$(json_str "$(launcher_color "$app" "$label")")"
+    obj="$obj,\"status\":$(json_str "$STATUS")"
+    obj="$obj,\"badge\":$(json_str_or_null "$(launcher_badge "$app" "$target" "${LR_PROFILE[$i]}")")"
+    obj="$obj,\"color\":$(json_str "$(launcher_color "$app" "${LR_NAME[$i]}")")"
     obj="$obj,\"built_by\":$(json_str_or_null "$(plist_get "$app" CFBundleShortVersionString)")"
     obj="$obj,\"args\":$(json_lines "$(extras_lines arg "$ex")")"
     obj="$obj,\"env\":$(json_lines "$(extras_lines env "$ex" | sed 's/=.*//')")"
@@ -1616,10 +1617,10 @@ list_json() {
     else
       obj="$obj,\"own_extensions\":false}"
     fi
-    if [ "$n" -eq 0 ]; then printf '[\n  %s' "$obj"; else printf ',\n  %s' "$obj"; fi
-    n=$((n+1))
+    if [ "$i" -eq 0 ]; then printf '[\n  %s' "$obj"; else printf ',\n  %s' "$obj"; fi
+    i=$((i + 1))
   done
-  if [ "$n" -eq 0 ]; then printf '[]\n'; else printf '\n]\n'; fi
+  if [ "$LR_N" -eq 0 ]; then printf '[]\n'; else printf '\n]\n'; fi
 }
 
 cmd_open() {
@@ -3364,14 +3365,13 @@ ui_idx256() {
 }
 
 # $1 cut to $2 columns, with "…" where it was cut, and padded to exactly $2.
-# Control characters become "?": a name comes off the disk, and an escape
-# sequence in it must not reach the screen. Width is the character count, so it
-# is exact for ASCII; a cut is made by cut(1) in a UTF-8 locale so it never
-# splits a character.
+# The text goes through shown: a name comes off the disk. Width is the
+# character count, so it is exact for ASCII; a cut is made by cut(1) in a UTF-8
+# locale so it never splits a character.
 ui_fit() { # text, width -> UI_FIT
-  local s="$1" w="$2" n pad
+  local s w="$2" n pad
   [ "$w" -ge 0 ] || w=0
-  s=${s//[[:cntrl:]]/?}
+  shown s "$1"
   n=${#s}
   if [ "$n" -gt "$w" ]; then
     if [ "$w" -le 1 ]; then
@@ -3442,30 +3442,20 @@ ui_clamp() {
   [ "$UI_TOP" -ge 0 ] || UI_TOP=0
 }
 
-# What every launcher is doing now. The process lists are read once for all the
-# rows: reading them again for each row took longer than the time between two
-# refreshes once there were a dozen profiles. The facts go to the same
-# status_word that `list` uses. Warnings go nowhere: one on this screen would
-# be written over the menu.
+# What every launcher is doing now, from one look at the processes for all the
+# rows: a look for each row took longer than the time between two refreshes
+# once there were a dozen profiles. The words are launcher_status's, as in
+# `list`. Warnings go nowhere: one on this screen would be written over the
+# menu.
 ui_status_rows() {
-  local i=0 s sig="" pglist pgrc ids pslist="" ps_read=0 run has present
+  local i=0 sig="" STATUS PS_RC="" PS_LIST="" PS_IDS="" PS_ALL=""
   UI_RUNNING=0
-  pglist=$(pgrep -afl "user-data-dir=" 2>/dev/null); pgrc=$?
-  ids="|"; [ "$pgrc" -gt 1 ] || ids=$(proc_dir_ids "$pglist")
+  proc_snapshot 2>/dev/null
   while [ "$i" -lt "$UI_N" ]; do
-    run=0; has=0; present=0
-    if [ "${UI_L_MAIN[$i]}" = "1" ]; then
-      if [ "$ps_read" -eq 0 ]; then pslist=$(ps -axww -o command= 2>/dev/null) || pslist=""; ps_read=1; fi
-      main_running "${UI_L_TARGET[$i]}" "$pslist" && run=1
-    else
-      profile_has_data "${UI_L_DATA[$i]}" && has=1
-      running_in_list "${UI_L_DATA[$i]}" "$pgrc" "$pglist" "$ids" && run=1
-    fi
-    [ -d "${UI_L_TARGET[$i]}" ] && present=1
-    s=$(status_word "${UI_L_MAIN[$i]}" "$present" "$run" "$has")
-    UI_L_STATUS[i]=$s
-    [ "$s" = "running" ] && UI_RUNNING=$((UI_RUNNING + 1))
-    sig="$sig|$s"
+    launcher_status "${UI_L_TARGET[$i]}" "${UI_L_DATA[$i]}" "${UI_L_MAIN[$i]}"
+    UI_L_STATUS[i]=$STATUS
+    [ "$STATUS" = "running" ] && UI_RUNNING=$((UI_RUNNING + 1))
+    sig="$sig|$STATUS"
     i=$((i + 1))
   done
   UI_STATSIG=$sig
@@ -3475,7 +3465,7 @@ ui_status_rows() {
 # colour, app, folder), then its status. The launcher that was selected stays
 # selected, or UI_WANT if that is set.
 ui_load() {
-  local app label target data profile badge hex keep="" n=0 i=0
+  local app badge keep="" n=0 i=0
   UI_HOLD=1
   if [ -n "$UI_WANT" ]; then
     keep=$UI_WANT
@@ -3485,23 +3475,19 @@ ui_load() {
   UI_WANT=""; UI_DIRSIG=""; UI_MAXNAME=0
   UI_L_APP=(); UI_L_NAME=(); UI_L_TARGET=(); UI_L_DATA=(); UI_L_MAIN=()
   UI_L_BADGE=(); UI_L_IDX=(); UI_L_STATUS=()
-  for app in "$APPS_DIR"/*.app; do
-    UI_DIRSIG="$UI_DIRSIG|$app"
-    [ -d "$app" ] || continue
-    is_our_launcher "$app" || continue
-    label=${app##*/}; label=${label%.app}
-    target=$(plist_get "$app" AIdentityTargetApp)
-    data=$(plist_get "$app" AIdentityDataDir)
-    profile=$(plist_get "$app" "$MARKER_KEY")
-    UI_L_MAIN[n]=0
-    if is_main_launcher "$app"; then UI_L_MAIN[n]=1; data=""; fi
-    badge=$(launcher_badge "$app" "$target" "$profile")
+  # The names ui_sync compares, taken before the launchers are read: one that
+  # comes in between then shows on the next refresh, not never.
+  for app in "$APPS_DIR"/*.app; do UI_DIRSIG="$UI_DIRSIG|$app"; done
+  launcher_rows
+  while [ "$n" -lt "$LR_N" ]; do
+    app=${LR_PATH[$n]}
+    badge=$(launcher_badge "$app" "${LR_TARGET[$n]}" "${LR_PROFILE[$n]}")
     [ "${#badge}" -le 1 ] || badge=$(first_char "$badge")
-    hex=$(launcher_color "$app" "$label")
-    ui_idx256 "$hex" || true
-    UI_L_APP[n]=$app; UI_L_NAME[n]=$label; UI_L_TARGET[n]=$target
-    UI_L_DATA[n]=$data; UI_L_BADGE[n]=${badge//[[:cntrl:]]/?}; UI_L_IDX[n]=$UI_IDX
-    [ "${#label}" -le "$UI_MAXNAME" ] || UI_MAXNAME=${#label}
+    ui_idx256 "$(launcher_color "$app" "${LR_NAME[$n]}")" || true
+    UI_L_APP[n]=$app; UI_L_NAME[n]=${LR_NAME[$n]}; UI_L_TARGET[n]=${LR_TARGET[$n]}
+    UI_L_DATA[n]=${LR_DATA[$n]}; UI_L_MAIN[n]=${LR_MAIN[$n]}; UI_L_IDX[n]=$UI_IDX
+    shown badge "$badge"; UI_L_BADGE[n]=$badge
+    [ "${#LR_NAME[$n]}" -le "$UI_MAXNAME" ] || UI_MAXNAME=${#LR_NAME[$n]}
     n=$((n + 1))
   done
   UI_N=$n
@@ -3837,11 +3823,12 @@ ui_do_add() {
 }
 
 ui_do_rename() {
-  local name new
+  local name label new
   ui_have_row || return 0
   name=${UI_L_NAME[$UI_SEL]}
+  shown label "$name"
   ui_leave
-  printf 'Rename %s%s%s. The account stays signed in.\n\n' "$C_BOLD" "${name//[[:cntrl:]]/?}" "$C_RESET"
+  printf 'Rename %s%s%s. The account stays signed in.\n\n' "$C_BOLD" "$label" "$C_RESET"
   while :; do
     ui_ask 'New account name (e.g. Work, Personal, Client). Empty to cancel: '
     new=$UI_ANS
@@ -3857,11 +3844,12 @@ ui_do_rename() {
 }
 
 ui_do_badge() {
-  local name ch
+  local name label ch
   ui_have_row || return 0
   name=${UI_L_NAME[$UI_SEL]}
+  shown label "$name"
   ui_leave
-  printf 'Badge for %s%s%s.\n\n' "$C_BOLD" "${name//[[:cntrl:]]/?}" "$C_RESET"
+  printf 'Badge for %s%s%s.\n\n' "$C_BOLD" "$label" "$C_RESET"
   ui_ask 'One character for the icon badge. Empty to cancel: '
   ch=$UI_ANS
   if [ -z "$ch" ]; then ui_enter; ui_load; return 0; fi
@@ -4523,15 +4511,13 @@ cmd_complete() {
 }
 
 complete_candidates() {
-  local app name dir label
+  local app name dir label i=0
   case "$1" in
     launchers)   # the names open, rm, set, rename and rebuild take
-      for app in "$APPS_DIR"/*.app; do
-        [ -d "$app" ] || continue
-        is_our_launcher "$app" || continue
-        name=$(bundle_name "$app")
-        case "$name" in *[[:cntrl:]]*) continue ;; esac
-        printf '%s\n' "$name"
+      launcher_rows names
+      while [ "$i" -lt "$LR_N" ]; do
+        case "${LR_NAME[$i]}" in *[[:cntrl:]]*) ;; *) printf '%s\n' "${LR_NAME[$i]}" ;; esac
+        i=$((i + 1))
       done ;;
     restorable)  # the names restore takes: profiles whose launcher is gone
       while IFS= read -r dir; do

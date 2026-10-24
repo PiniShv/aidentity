@@ -80,8 +80,11 @@ back regardless of what else it does.
    string. Every delete is also gated on `running_on_profile()`, which must
    fail closed: if it cannot tell, it says "running". Never pipe its process
    list into `grep -q` — under `pipefail` an early exit reads as "no match".
-   Both helpers are copied into `uninstall.sh`, and CI fails if the copies
-   differ.
+   `running_on_profile()` takes a fresh look every time. Views that ask about
+   many profiles hold one `proc_snapshot()` in their own `local` variables and
+   ask `running_in_snapshot()`; a delete never does. Both helpers, and the
+   other three functions of the running check, are copied into `uninstall.sh`,
+   and CI fails if the copies differ.
 
 3. **Never widen profile-name validation without an escaping review.** A profile
    name becomes a directory name, a bundle name, a slug and a string embedded in
