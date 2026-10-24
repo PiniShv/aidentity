@@ -2488,6 +2488,9 @@ assert_contains "the one with a process is running" "$RUN_OUT" "S 1 running"
 
 # The menu runs in the background so a signal can be sent to it; <&0 keeps the
 # terminal as its input. Each step waits for what the one before it caused.
+# TERM and HUP are sent once the first screen is drawn and the menu waits for a
+# key: a signal during that read once left the terminal with echo off. The
+# resize waits for the narrow layout's own header line, not for any redraw.
 UI_BG='
 flags() { stty -a | tr " " "\n" | grep -E "^-?(echo|icanon|isig|icrnl|opost|onlcr)\$"; }
 size() { wc -c < "$UI_LOG" | tr -d " "; }
@@ -2504,9 +2507,9 @@ before=$(flags)
 "$1" "$2" ui <&0 & p=$!
 waitfor "?1049h" 0
 case "$3" in
-  WINCH) o=$(size); stty rows 12 cols 40 </dev/tty; waitfor "3 profiles" "$o"; kill -TERM $p ;;
+  WINCH) o=$(size); stty rows 12 cols 40 </dev/tty; waitfor "[2;1H 3 profiles" "$o"; kill -TERM $p ;;
   TSTP)  o=$(size); kill -TSTP $p; waitfor "?1049l" "$o"; o=$(size); kill -CONT $p; waitfor "?1049h" "$o"; kill -TERM $p ;;
-  *)     kill -"$3" $p ;;
+  *)     waitfor "quit" 0; sleep 0.5; kill -"$3" $p ;;
 esac
 wait $p; rc=$?
 after=$(flags)
