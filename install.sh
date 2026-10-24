@@ -68,6 +68,9 @@ MIN_BYTES=2000
 # version marker near the top, and — since a shell script cut at the wrong point
 # is often still valid shell — pass "bash -n" too. Only the tail proves the whole
 # file arrived. bin/aidentity must keep ending on this line.
+# Never change it: every installed copy's `aidentity update` checks the same
+# line with its own fixed copy, so a new value here would not reach them and
+# they could no longer update. scripts/guards.sh pins the exact text.
 END_MARKER='main "$@"'
 
 # ---------------------------------------------------------------- output --

@@ -26,6 +26,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with `!` is not offered after an opening double quote. The names come from a
   hidden `aidentity __complete` command, which prints nothing on error. The
   Homebrew formula installs the three scripts.
+- `aidentity update` installs the latest release from GitHub in place of the
+  copy you run. It downloads that release's `bin/aidentity` and `SHA256SUMS`
+  over HTTPS and installs nothing unless the checksum matches, the file is a
+  complete shell script, and it says it is the version of the release tag.
+  The new file is written beside the old one and moved into place in one step,
+  so a failed update leaves the old file exactly as it was. It never downgrades
+  and never runs `sudo`: when you cannot write to the folder, it prints the
+  command to run yourself. A Homebrew copy is left to `brew upgrade aidentity`,
+  and a copy in a git checkout to `git pull`. `aidentity update --check` only
+  says whether a newer release is out and installs nothing.
+- `aidentity help` lists the `AIDENTITY_*` environment variables the script
+  reads.
+
+### Security
+
+- `aidentity update` is the only command that uses the network, and only when
+  you run it. It contacts `api.github.com` for the latest release tag and
+  `raw.githubusercontent.com` for the files. The tag must be a plain version
+  number before it is used in a URL or shown. `SECURITY.md` now says this
+  instead of "no network calls".
+- `aidentity update` does not read your `~/.curlrc`. A setting there could
+  otherwise turn off certificate checks or change where a download is saved.
+  A proxy set with `https_proxy` still works.
 
 ## [1.3.0] - 2026-10-23
 
