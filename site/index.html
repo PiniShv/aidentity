@@ -405,6 +405,10 @@ html:not(.js) .chapters{display:none}
   .dots i,.badge{forced-color-adjust:none}
   .tabs button[aria-selected=true]{border-color:Highlight;text-decoration:underline}
 }
+.menu-demo{margin-top:40px}
+.menu-demo h3{margin:0 0 6px}
+.menu-demo video{display:block;width:100%;height:auto;margin-top:14px;border-radius:12px;border:1px solid var(--term-line);background:#0D1117}
+.menu-demo .tx{margin-top:10px;font-size:.92rem;color:var(--muted)}
 </style>
 </head>
 <body id="top">
@@ -611,6 +615,15 @@ html:not(.js) .chapters{display:none}
 <li><code>aidentity restore 'Claude Client'</code> brings the icon back. It opens the same profile folder as before.</li>
 </ol>
 </details>
+<div class="menu-demo">
+<h3 id="h-menu-demo">Prefer a menu? <code>aidentity ui</code></h3>
+<p>Every profile on one screen. Pick one with the arrow keys, then one key recolours, renames, removes or opens it.</p>
+<video width="920" height="482" controls muted loop playsinline preload="none" poster="assets/demo-ui-poster.jpg" aria-labelledby="h-menu-demo" aria-describedby="menu-demo-tx">
+<source src="assets/demo-ui.webm" type="video/webm">
+<source src="assets/demo-ui.mp4" type="video/mp4">
+</video>
+<p class="tx" id="menu-demo-tx">In the clip: <code>aidentity ui</code> lists four profiles. The arrow keys pick <code>Claude Personal</code>, <code>c</code> changes its colour to teal, <code>r</code> renames it to <code>Client</code>, and <code>?</code> shows every key. <code>q</code> returns to the shell.</p>
+</div>
 </div>
 </section>
 
