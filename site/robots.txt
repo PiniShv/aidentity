@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://aidentity.pinishv.com/sitemap.xml

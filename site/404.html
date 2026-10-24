@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Page not found | aidentity</title>
+<meta name="description" content="This page does not exist. aidentity runs several accounts of the same Mac app side by side.">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#070B14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F5F8FE" media="(prefers-color-scheme: light)">
+<link rel="icon" href="/assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<style>
+:root{
+  color-scheme:dark light;
+  --bg:#070B14;--surface2:#131E34;--line:#1E2B45;--line2:#2A3A5C;
+  --text:#EAF0FA;--muted:#A5B4CB;--accent:#38BDF8;--link:#5CC8FF;
+  --btn-bg:#38BDF8;--btn-fg:#04111E;--btn-hover:#7DD3FC;--focus:#67E8F9;
+  --glow1:rgba(34,211,238,.16);--glow2:rgba(46,125,246,.20);
+  --grad:linear-gradient(90deg,#2E7DF6,#22D3EE);
+  --shadow:0 30px 80px -30px rgba(14,165,233,.38),0 0 0 1px rgba(56,189,248,.06);
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme:light){
+  :root{
+    --bg:#F5F8FE;--surface2:#F1F5FC;--line:#D5DFEE;--line2:#B9C8E0;
+    --text:#0A1222;--muted:#44536B;--accent:#0369A1;--link:#1D4ED8;
+    --btn-bg:#1D4ED8;--btn-fg:#FFFFFF;--btn-hover:#1E40AF;--focus:#1D4ED8;
+    --glow1:rgba(14,165,233,.14);--glow2:rgba(46,125,246,.12);
+    --grad:linear-gradient(90deg,#1D4ED8,#0369A1);
+    --shadow:0 24px 60px -28px rgba(29,78,216,.40),0 0 0 1px rgba(29,78,216,.05);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);font:400 1rem/1.65 var(--sans);-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(ellipse 50% 45% at 78% 12%,var(--glow1),transparent 70%),radial-gradient(ellipse 45% 40% at 12% 0%,var(--glow2),transparent 70%)}
+a{color:var(--link);text-decoration-thickness:1px;text-underline-offset:.2em}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:4px}
+.wrap{width:100%;max-width:1120px;margin:0 auto;padding-inline:clamp(16px,4vw,32px)}
+.strip{height:4px;background:linear-gradient(90deg,#1D4ED8,#2E7DF6,#0EA5E9,#38BDF8,#22D3EE)}
+header .wrap{display:flex;align-items:center;min-height:64px}
+.brand{display:inline-flex;align-items:center;gap:10px;min-height:44px;color:var(--text);text-decoration:none;font:700 1.0625rem var(--mono);letter-spacing:-.01em}
+.brand img{display:block}
+main{flex:1;display:flex;align-items:center;padding:clamp(40px,8vw,96px) 0}
+.kicker{margin:0 0 12px;font:700 .8125rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{margin:0 0 16px;font-size:clamp(2.2rem,1.2rem + 5vw,4rem);font-weight:800;letter-spacing:-.035em;line-height:1.05;text-wrap:balance}
+.grad{color:var(--accent);background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+@media (forced-colors:active){.grad{background:none;-webkit-text-fill-color:currentColor}}
+.lead{max-width:46ch;margin:0 0 28px;color:var(--muted);font-size:1.125rem;line-height:1.5}
+.term{max-width:640px;margin:0 0 32px;background:#0A1019;color:#E6EDF7;border:1px solid #1F2C45;border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.bar{display:flex;align-items:center;gap:7px;padding:12px 14px;background:#111A2B;border-bottom:1px solid #1F2C45}
+.bar i{width:11px;height:11px;border-radius:50%;background:#FF5F57;opacity:.9}
+.bar i:nth-child(2){background:#FEBC2E}
+.bar i:nth-child(3){background:#28C840}
+.term pre{margin:0;padding:18px 16px;font:500 .9rem/1.6 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.ps{color:#4ADE80}
+.err{color:#F87171}
+.actions{display:flex;flex-wrap:wrap;gap:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 20px;border-radius:10px;border:1px solid var(--btn-bg);background:var(--btn-bg);color:var(--btn-fg);font-weight:700;text-decoration:none}
+.btn:hover{background:var(--btn-hover);border-color:var(--btn-hover)}
+.btn.ghost{background:transparent;color:var(--text);border-color:var(--line2)}
+.btn.ghost:hover{background:var(--surface2);border-color:var(--accent)}
+footer{border-top:1px solid var(--line);padding:24px 0;color:var(--muted);font-size:.875rem}
+footer p{margin:0}
+</style>
+</head>
+<body>
+<div class="strip" aria-hidden="true"></div>
+<header>
+  <div class="wrap"><a class="brand" href="/"><img src="/assets/logo.svg" alt="" width="30" height="30"><span>aidentity</span></a></div>
+</header>
+<main>
+  <div class="wrap">
+    <p class="kicker">Error 404</p>
+    <h1>This page <span class="grad">does not exist.</span></h1>
+    <p class="lead">The link may be old, or the address may have a typo. Start again from the home page.</p>
+    <div class="term" aria-hidden="true">
+      <div class="bar"><i></i><i></i><i></i></div>
+<pre><span class="ps">$</span> aidentity open "this page"
+<span class="err">&#10007;</span> No launcher named 'this page'. Run 'aidentity list' to see what exists.</pre>
+    </div>
+    <div class="actions">
+      <a class="btn" href="/">Go to the home page</a>
+      <a class="btn ghost" href="https://github.com/PiniShv/aidentity">View on GitHub</a>
+    </div>
+  </div>
+</main>
+<footer>
+  <div class="wrap"><p>Built by <a href="https://pinishv.com">Pini Shvartsman</a>. MIT licence.</p></div>
+</footer>
+</body>
+</html>
