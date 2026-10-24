@@ -508,7 +508,7 @@ html:not(.js) .chapters{display:none}
 </details>
 <p class="works">
 <span class="wg"><span class="wl">Verified</span><span class="chip v"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Claude Desktop</span></span>
-<span class="wg"><span class="wl">Tested</span><span class="chip">ChatGPT</span><span class="chip">Slack</span><span class="chip">VS Code</span><span class="chip">Cursor</span><span class="chip">Notion</span><a href="#which-apps-work">and 6 more</a></span>
+<span class="wg"><span class="wl">Tested</span><span class="chip">ChatGPT</span><span class="chip">Slack</span><span class="chip">VS Code</span><span class="chip">Cursor</span><span class="chip">Notion</span><a href="#which-apps-work">and 5 more</a></span>
 </p>
 <ul class="facts" role="list" aria-label="Key facts">
 <li>Never changes your app</li>
@@ -754,7 +754,7 @@ html:not(.js) .chapters{display:none}
 </div>
 <div class="rung v-det">
 <div><h3><svg class="i" aria-hidden="true"><use href="#i-dot"/></svg>Tested</h3><p>Starts as its own copy, with its own data. Two sign-ins not checked by hand yet.</p></div>
-<ul class="chips" role="list"><li>ChatGPT</li><li>Slack</li><li>Visual Studio Code</li><li>Cursor</li><li>Kiro</li><li>Antigravity</li><li>Notion</li><li>Notion Calendar</li><li>Obsidian</li><li>Podman Desktop</li><li>Postman</li></ul>
+<ul class="chips" role="list"><li>ChatGPT</li><li>Slack</li><li>Visual Studio Code</li><li>Cursor</li><li>Kiro</li><li>Antigravity</li><li>Notion</li><li>Notion Calendar</li><li>Podman Desktop</li><li>Postman</li></ul>
 <p class="ask">Used one of these with two accounts? <a href="https://github.com/PiniShv/aidentity/issues">Tell us how it went</a>. That is how an app moves to Verified.</p>
 </div>
 </div>
@@ -767,7 +767,7 @@ html:not(.js) .chapters{display:none}
 <div class="low v-no">
 <h3><svg class="i" aria-hidden="true"><use href="#i-x"/></svg>Does not work</h3>
 <p>Native apps have no Chromium inside, so they have no <code>--user-data-dir</code> option. <code>aidentity add</code> checks for this and refuses them. A few Electron apps ignore the option, so profiles would share one account. <code>add</code> cannot tell these apart, so check this list before you add one.</p>
-<ul class="chips" role="list"><li>ChatGPT Classic</li><li>Any app written in Swift or AppKit</li><li>Microsoft Teams (classic)</li><li>MiniMax Design</li></ul>
+<ul class="chips" role="list"><li>ChatGPT Classic</li><li>Any app written in Swift or AppKit</li></ul>
 </div>
 </div>
 <p class="blurb">The newer ChatGPT app is Chromium inside. ChatGPT Classic is native, so it cannot work. VS Code, Cursor and Kiro keep a small connection file in the profile folder, and macOS limits how long its path can be. If a profile name would make that path too long, aidentity refuses it and says how many characters to cut. Support for native apps is not planned for version 1. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#which-apps-work">Full list and notes</a></p>
@@ -1052,7 +1052,14 @@ if(last)last.addEventListener('error',fail);
 btn.addEventListener('click',toggle);
 v.addEventListener('click',toggle);
 big.addEventListener('click',function(){userPaused=false;go();btn.focus()});
-chap.forEach(function(b){b.addEventListener('click',function(){v.currentTime=+b.getAttribute('data-t');userPaused=false;go();paint()})});
+/* A jump before the video has loaded waits for its metadata: until then the browser does not know
+   the video's length, and some browsers drop the seek. The video has a keyframe at every chapter
+   time, so a browser that seeks only to keyframes still lands exactly there. */
+function seekTo(t){
+  if(v.readyState>=1){v.currentTime=t;return}
+  v.addEventListener('loadedmetadata',function h(){v.removeEventListener('loadedmetadata',h);v.currentTime=t;paint()});
+}
+chap.forEach(function(b){b.addEventListener('click',function(){seekTo(+b.getAttribute('data-t'));userPaused=false;go();paint()})});
 if('IntersectionObserver' in window){
   new IntersectionObserver(function(es){
     seen=es[0].isIntersecting;
