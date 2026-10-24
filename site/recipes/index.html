@@ -495,7 +495,7 @@ html:not(.js) .builder{display:none}
 <p>These cannot work, so they are not on the list:</p>
 <ul class="nots" role="list">
 <li><span><strong>ChatGPT Classic</strong> and other apps written in Swift or AppKit. They have no Chromium inside, so there is no separate-profile option. The newer ChatGPT app is fine.</span></li>
-<li><span><strong>Microsoft Teams (classic)</strong> and <strong>MiniMax Design</strong>. They ignore the separate folder, so every profile would share one account.</span></li>
+<li><span>A few Electron apps ignore the separate folder, so every profile would share one account. If you find one, tell us in an issue.</span></li>
 </ul>
 <p>Another app built on Chromium or Electron may still work. Run <code>aidentity apps</code> to see yours, then use <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-add"><code>aidentity add</code></a> by hand.</p>
 </div>
@@ -632,7 +632,6 @@ var APPS=[
   {id:'antigravity',name:'Antigravity',tier:'t',g:'code'},
   {id:'notion',name:'Notion',tier:'t',g:'file'},
   {id:'notioncal',name:'Notion Calendar',tier:'t',g:'cal'},
-  {id:'obsidian',name:'Obsidian',tier:'t',g:'file'},
   {id:'podman',name:'Podman Desktop',tier:'t',g:'box'},
   {id:'postman',name:'Postman',tier:'t',g:'send'},
   {id:'chrome',name:'Google Chrome',tier:'b',g:'globe'},
