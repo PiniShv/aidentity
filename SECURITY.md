@@ -40,6 +40,9 @@ Read this before deciding whether a finding is a bug.
   - `raw.githubusercontent.com`, to download that release's `bin/aidentity`
     and `SHA256SUMS` (not with `--check`).
 
+  The test-only setting `AIDENTITY_UPDATE_URL` can point `update` at another
+  `https://` address. It prints a warning on every run.
+
   It sends nothing about your profiles or apps — only what any HTTPS download
   sends, such as your IP address and curl's user agent.
 

@@ -283,7 +283,7 @@ One thing does change. While a profile is running, clicking the app itself switc
 - **Touch a launcher it did not build.** Every launcher carries the `AIdentityProfile` marker. `open`, `rm`, `rename`, `set` and `rebuild` refuse an app without it. `add` and `restore` refuse to overwrite one.
 - **Delete profile data outside its profiles folder.** `--purge`, `prune` and the uninstaller delete a data folder only if it is inside `~/Library/Application Support/aidentity/profiles`, or the folder set by `AIDENTITY_DATA_ROOT`.
 - **Delete or rename a profile's data while the profile is running.** If it cannot tell, it treats the profile as running and stops.
-- **Use the network, except when you run `aidentity update`.** No telemetry, no analytics, no automatic update check, no crash reports. `aidentity update` (and `update --check`) is the only code in the script that connects anywhere, and only to GitHub. Apart from it, only the installer downloads anything, and only when you run it. [What `update` does](#aidentity-update).
+- **Use the network, except when you run `aidentity update`.** No telemetry, no analytics, no automatic update check, no crash reports. `aidentity update` (and `update --check`) is the only code in the script that connects anywhere, and only to GitHub. (The one exception is the test setting `AIDENTITY_UPDATE_URL`, which prints a warning on every run.) Apart from it, only the installer downloads anything, and only when you run it. [What `update` does](#aidentity-update).
 - **Use `sudo` or run in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
 - **Edit your shell files.** If you need a `PATH` line, the installer prints it, and you add it.
 - **Control other apps.** It does not use System Events, so it needs no Accessibility permission.
@@ -759,6 +759,10 @@ Downloading aidentity 1.4.0 …
   checksum verified
 Installing to /usr/local/bin/aidentity …
 ✓ Updated 1.3.0 → 1.4.0
+   /usr/local/bin/aidentity
+
+Your launchers keep working. To rebuild them with the new version, run:
+  aidentity doctor --fix
 ```
 
 What it does, in order:
@@ -773,7 +777,7 @@ What it does, in order:
 3. **Compares versions as numbers.** If you are up to date, it says so. If your copy is newer than the latest release, it says that and changes nothing. It never downgrades.
 4. **Checks that it can write to the folder.** If not, it stops and prints a line for you to run, for example `sudo /usr/local/bin/aidentity update`. `aidentity` never runs `sudo` itself.
 5. **Downloads two files over HTTPS:** `bin/aidentity` and `SHA256SUMS` of that release.
-6. **Checks the download.** All of these must pass, or nothing is installed. `SHA256SUMS` must have a valid line for `bin/aidentity` (no checksum, no update), and the file's SHA-256 must match it. The file must start with `#!`, say that it is the version of the tag, pass `bash -n` (a syntax check) and end on the line every real copy ends on.
+6. **Checks the download.** All of these must pass, or nothing is installed. `SHA256SUMS` must have a valid line for `bin/aidentity` (no checksum, no update), and the file's SHA-256 must match it. The file must start with `#!`, say that it is the version of the tag, pass `bash -n` (a syntax check) and end on the script's normal last line, which a download cut short would miss.
 7. **Replaces the old file in one step.** It writes the new file beside the old one, then moves it into place. A failed update leaves the old file exactly as it was.
 
 Afterwards, your launchers keep working. To rebuild the ones made by an older version, run `aidentity doctor --fix`.
@@ -797,7 +801,7 @@ Prints a tab-completion script for bash, zsh or fish. It writes the script to st
 aidentity completion zsh
 ```
 
-Press Tab to complete command names, each command's options, the names of your profiles for `open`, `rename`, `set`, `rebuild`, `restore` and `rm`, app names for `add`, and colour names after `--color`. A name with a space is escaped for you.
+Press Tab to complete command names, each command's options, the names of your profiles for `open`, `rename`, `set`, `rebuild` and `rm`, the profiles whose launcher is gone for `restore`, app names for `add`, and colour names after `--color`. A name with a space is escaped for you.
 
 **Homebrew** installs the scripts for all three shells. If completion does not work yet, follow [Homebrew's shell completion steps](https://docs.brew.sh/Shell-Completion) once.
 
@@ -823,7 +827,7 @@ aidentity completion fish | source
 
 - Names are looked up each time you press Tab, so a new profile shows up at once.
 - It offers the long spellings of options (`--profile`, not `-p`). Short ones still work when you type them. Values for `--profile`, `--badge`, `--arg` and `--env` are not completed.
-- The line above runs `aidentity` each time a new shell starts, which takes a few tens of milliseconds. You can instead save the output once as a file your shell reads, for example `aidentity completion fish > ~/.config/fish/completions/aidentity.fish`. Then make the file again after each upgrade.
+- The line above runs `aidentity` each time a new shell starts, which takes about a tenth of a second. You can instead save the output once as a file your shell reads, for example `aidentity completion fish > ~/.config/fish/completions/aidentity.fish`. Then make the file again after each upgrade.
 - It needs `aidentity` on your `PATH`.
 
 ### `aidentity version` / `aidentity help`
