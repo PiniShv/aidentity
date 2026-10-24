@@ -30,9 +30,30 @@ Read this before deciding whether a finding is a bug.
   `~/Applications` is ad-hoc signed at most (`codesign --sign -`). It is not
   notarised and never will be, because it is generated on your Mac. macOS treats
   it as a locally-built app.
-- **It never transmits anything anywhere.** No network calls, no telemetry, no
-  analytics, no update check, no crash reporting. The script makes zero outbound
-  connections; `grep` it if you want to confirm.
+- **It makes no network calls except when you run `aidentity update`.** No
+  telemetry, no analytics, no automatic update check, no crash reporting.
+  `aidentity update` (and `update --check`) is the only code in the script that
+  connects anywhere. It uses `curl` over HTTPS only (TLS 1.2 or later, also on
+  redirects). It does not read your `~/.curlrc`, so settings there cannot turn
+  off certificate checks. It contacts:
+  - `api.github.com`, to read the tag of the latest release;
+  - `raw.githubusercontent.com`, to download that release's `bin/aidentity`
+    and `SHA256SUMS` (not with `--check`).
+
+  It sends nothing about your profiles or apps — only what any HTTPS download
+  sends, such as your IP address and curl's user agent.
+
+  Before it replaces anything, it checks that the tag is a plain version
+  number (`v1.2.3`), that the script matches the published checksum (no
+  checksum, no update), that it is a complete shell script, and that it says
+  it is the version of the tag. It never downgrades and never runs `sudo`. A
+  copy managed by Homebrew, or run from a git checkout, is left to
+  `brew upgrade` or `git pull`. A failed check leaves the old file untouched.
+
+  The checksum is published in the same repository as the script. It catches
+  a damaged, cut-off or swapped download, but not a compromise of the
+  repository itself. The Homebrew formula pins a checksum reviewed at release
+  time, so it is the stronger channel.
 - **It never copies, patches or re-signs the app you already have.** The
   launcher points at the installed app in place. Your app keeps its Apple
   signature, its keychain access groups and its auto-update.
@@ -65,6 +86,9 @@ Read this before deciding whether a finding is a bug.
   a switch or variable outside the allowlist reaching the app.
 - **The restore record**: anything in it that `restore` acts on without the
   checks a command-line value gets.
+- **`aidentity update`**: anything that makes it install a file other than the
+  release's published script, replace a file other than the copy you ran,
+  downgrade, connect over plain HTTP, or leave a broken file in place.
 - **The deletion logic** (`rm`, `--purge`, and the overwrite path in `add`):
   anything that removes or overwrites a bundle without the `AIdentityProfile`
   marker key, or deletes a path outside `$AIDENTITY_DATA_ROOT`. Symlink and
@@ -90,4 +114,5 @@ Read this before deciding whether a finding is a bug.
 ## Supported versions
 
 The latest tagged release. There are no backported fixes to older versions —
-upgrade with `brew upgrade aidentity`, or re-run the installer.
+upgrade with `brew upgrade aidentity`, `aidentity update`, or re-run the
+installer.
