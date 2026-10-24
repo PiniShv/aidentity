@@ -8,10 +8,10 @@
 class Aidentity < Formula
   desc "Run several accounts of the same Mac app at the same time"
   homepage "https://github.com/PiniShv/aidentity"
-  url "https://github.com/PiniShv/aidentity/archive/refs/tags/v1.3.0.tar.gz"
+  url "https://github.com/PiniShv/aidentity/archive/refs/tags/v1.4.0.tar.gz"
   # Get the real value with:
-  #   curl -sL https://github.com/PiniShv/aidentity/archive/refs/tags/v1.3.0.tar.gz | shasum -a 256
-  sha256 "3f1898032b70c4b39f7c5bb0c5a3f2d64e87327a82b694062543892a4669a02a"
+  #   curl -sL https://github.com/PiniShv/aidentity/archive/refs/tags/v1.4.0.tar.gz | shasum -a 256
+  sha256 "a24fa8db64caba6101e16e52cc4f330922eb6260f842bf1118f459914fc9d0e3"
   license "MIT"
   head "https://github.com/PiniShv/aidentity.git", branch: "main"
 
@@ -22,7 +22,7 @@ class Aidentity < Formula
   def install
     bin.install "bin/aidentity"
     # Tab completion for the three shells aidentity writes a script for.
-    generate_completions_from_executable(bin/"aidentity", "completion", shells: [:bash, :zsh, :fish])
+    generate_completions_from_executable(bin/"aidentity", "completion")
   end
 
   def caveats
