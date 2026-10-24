@@ -211,8 +211,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      # The same script `make check` runs locally: braces before multi-byte
-      # characters, install.sh's end marker, the safety helpers copied into
-      # uninstall.sh, SHA256SUMS, and the installer's default ref.
+      # The same script `make check` runs locally. Each check's reason is
+      # written beside it in scripts/guards.sh.
       - name: Source guards
         run: bash scripts/guards.sh

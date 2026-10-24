@@ -283,7 +283,7 @@ One thing does change. While a profile is running, clicking the app itself switc
 - **Touch a launcher it did not build.** Every launcher carries the `AIdentityProfile` marker. `open`, `rm`, `rename`, `set` and `rebuild` refuse an app without it. `add` and `restore` refuse to overwrite one.
 - **Delete profile data outside its profiles folder.** `--purge`, `prune` and the uninstaller delete a data folder only if it is inside `~/Library/Application Support/aidentity/profiles`, or the folder set by `AIDENTITY_DATA_ROOT`.
 - **Delete or rename a profile's data while the profile is running.** If it cannot tell, it treats the profile as running and stops.
-- **Use the network, except when you run `aidentity update`.** No telemetry, no analytics, no automatic update check, no crash reports. `aidentity update` (and `update --check`) is the only code in the script that connects anywhere, and only to GitHub. (The one exception is the test setting `AIDENTITY_UPDATE_URL`, which prints a warning on every run.) Apart from it, only the installer downloads anything, and only when you run it. [What `update` does](#aidentity-update).
+- **Use the network, except when you run `aidentity update`.** No telemetry, no analytics, no automatic update check, no crash reports. `aidentity update` (and `update --check`) is the only code in the script that connects anywhere, and only to GitHub. Apart from it, only the installer downloads anything, and only when you run it. [What `update` does](#aidentity-update).
 - **Use `sudo` or run in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
 - **Edit your shell files.** If you need a `PATH` line, the installer prints it, and you add it.
 - **Control other apps.** It does not use System Events, so it needs no Accessibility permission.
@@ -312,7 +312,7 @@ In a clone of the repository, look for network tools and `sudo`:
 grep -nwE 'curl|wget|nc|ncat|ssh|scp|sudo|telnet' bin/aidentity
 ```
 
-This prints a short list. Only one line runs `curl`: the download in the function `update_fetch`, which only `aidentity update` calls. The other lines are comments, messages and help text that name `curl` or `sudo`, and one check that `curl` is installed. `make check` fails if another `curl` command appears in the script.
+This prints a short list. Only one line runs `curl`: the download in the function `https_fetch`, which only `aidentity update` calls. The other lines are comments, messages and help text that name `curl` or `sudo`, and one check that `curl` is installed. `make check` fails if another `curl` command appears in the script.
 
 Check the script against its checksum (a fingerprint of the file):
 
@@ -346,19 +346,18 @@ aidentity doctor
 
 | Channel | What it checks | What it does not protect against |
 |---|---|---|
-| Install script | The download is complete and matches its checksum. See the list below. | A hacked repository, because the checksum comes from the same place. |
+| Install script | The download matches its checksum, and a release says it is that version. See the list below. | A hacked repository, because the checksum comes from the same place. |
 | Homebrew | The formula pins the SHA-256 checksum of the release. Homebrew refuses a download that does not match. | It is a third-party tap, so you trust its owner. This is stronger than the install script. |
-| `aidentity update` | The download uses HTTPS only and matches the release's checksum. It is a complete script that says it is that release's version. See [What it checks](#aidentity-update). | A hacked repository, because the checksum comes from the same place as the script. |
+| `aidentity update` | The download uses HTTPS only, matches the release's checksum and says it is that release's version. See [What it checks](#aidentity-update). | A hacked repository, because the checksum comes from the same place as the script. |
 | From source | You read what you build. `make install` copies one file. | Only what you skip reading. |
 
-The install script checks the download like this:
+The install script checks the download like this, with the same code as `aidentity update`:
 
-- It uses HTTPS only.
-- The file must look like a complete script. It must start with `#!`, have a version line, pass `bash -n` (a syntax check) and end on the expected last line.
-- It compares the file's SHA-256 checksum with `SHA256SUMS` from the same release tag. If they do not match, it refuses to install.
-- If no checksum exists for the tag, or `shasum` fails, it warns and continues with the other checks.
+- It uses HTTPS only, and its own downloads do not read your `~/.curlrc`. (The `curl` you pipe into `bash` still reads it.)
+- It downloads `SHA256SUMS` from the same ref as the script, and the file's SHA-256 checksum must match the line for `bin/aidentity`. If `SHA256SUMS` cannot be downloaded, has no such line, or does not match, it refuses to install, changes nothing and names the ref it tried (`AIDENTITY_REF`).
+- For a release tag such as `v1.4.0`, the file must also say it is that version. A branch or a commit names no version, so the checksum alone decides.
 
-So it catches a cut-off or damaged download.
+So it catches a cut-off or damaged download. Each release is checked before it is published: the script must pass `bash -n` (a syntax check) and end on its normal last line.
 
 `SHA256SUMS` lists only `bin/aidentity`. The installer and uninstaller have no checksum, so read them first if that matters to you.
 
@@ -777,7 +776,7 @@ What it does, in order:
 3. **Compares versions as numbers.** If you are up to date, it says so. If your copy is newer than the latest release, it says that and changes nothing. It never downgrades.
 4. **Checks that it can write to the folder.** If not, it stops and prints a line for you to run, for example `sudo /usr/local/bin/aidentity update`. `aidentity` never runs `sudo` itself.
 5. **Downloads two files over HTTPS:** `bin/aidentity` and `SHA256SUMS` of that release.
-6. **Checks the download.** All of these must pass, or nothing is installed. `SHA256SUMS` must have a valid line for `bin/aidentity` (no checksum, no update), and the file's SHA-256 must match it. The file must start with `#!`, say that it is the version of the tag, pass `bash -n` (a syntax check) and end on the script's normal last line, which a download cut short would miss.
+6. **Checks the download.** All of these must pass, or nothing is installed. `SHA256SUMS` must have a valid line for `bin/aidentity` (no checksum, no update), the file's SHA-256 must match it, and the file must say that it is the version of the tag. The checksum proves the file is the published one, so a damaged or cut-off download fails it. Each release is checked before it is published: the script must pass `bash -n` (a syntax check) and end on its normal last line.
 7. **Replaces the old file in one step.** It writes the new file beside the old one, then moves it into place. A failed update leaves the old file exactly as it was.
 
 Afterwards, your launchers keep working. To rebuild the ones made by an older version, run `aidentity doctor --fix`.
@@ -859,7 +858,6 @@ An environment variable is a named setting you put in front of a command. You do
 | `NO_COLOR` | `aidentity`, installer, uninstaller | Any non-empty value turns colour off. |
 | `AIDENTITY_INSTALL_DIR` | installer, uninstaller | Install into this folder instead of `/usr/local/bin` or `~/.local/bin`. The uninstaller looks here for the command. |
 | `AIDENTITY_REF` | installer | The branch, tag or commit to install. Default: the release tag named in the script. |
-| `AIDENTITY_UPDATE_URL` | `aidentity update` | For tests only. A `https://` address that `update` uses instead of GitHub. Every run that uses it prints a warning. |
 | `AIDENTITY_BIN_DIRS` | uninstaller | Colon-separated folders to look in for the command, instead of the usual places. |
 
 `AIDENTITY_APP_DIRS` and `AIDENTITY_APPS_DIR` differ only by where the `S` sits, and they mean different things. `APP_DIRS` is where your *apps* are searched for. `APPS_DIR` is where `aidentity` *writes* its launchers.

@@ -19,8 +19,6 @@
 #                         (default: ~/Library/Application Support/aidentity/profiles)
 #   AIDENTITY_APP_DIRS    colon-separated folders searched for apps
 #                         (default: /Applications:~/Applications)
-#   AIDENTITY_UPDATE_URL  for tests only: where `update` looks for releases
-#                         instead of GitHub. HTTPS only, and always announced.
 #
 # The network is used by one command only: `aidentity update`, which asks
 # GitHub for the latest release over HTTPS. Nothing else connects anywhere.
@@ -161,8 +159,12 @@ first_upper() { printf '%s' "$1" | cut -c1 | tr '[:lower:]' '[:upper:]'; }
 # re-prompt on a bad name, and the old exit-based version forced it to spawn a
 # subshell and throw the message away — so the user saw a generic rule that did
 # not match the actual reason their name was refused.
+#
+# LC_ALL=C in this function and the other checks below: in a UTF-8 locale,
+# the default in Terminal, bash lets [A-Za-z] match letters such as é, ß and
+# fullwidth ａ. Under C it means the ASCII letters only, whatever the locale.
 validate_profile_name() {
-  local name="$1"
+  local LC_ALL=C name="$1"
   [ -n "$name" ] || { warn "Profile name cannot be empty."; return 1; }
   case "$name" in
     *[!A-Za-z0-9\ _-]*)
@@ -420,7 +422,9 @@ EOF
 
 # ---------------------------------------------------------------- colours --
 
+# A colour name, or six hex digits: ASCII ones only (see validate_profile_name).
 color_hex() {
+  local LC_ALL=C
   case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
     blue)   printf '2E7DF6' ;; green)  printf '2FB344' ;; red)    printf 'E5484D' ;;
     orange) printf 'F76B15' ;; purple) printf '8E4EC6' ;; pink)   printf 'D6409F' ;;
@@ -843,15 +847,17 @@ _undo_rename() {
 
 # Set by update while it holds a download folder and a staged copy of the new
 # script beside the old one. Both go on the way out, finished or not, so a
-# failed or interrupted update leaves nothing behind.
+# failed or interrupted update leaves nothing behind. VERIFIED_SUM is the
+# checksum the download passed (set by verify_release_file).
 UPDATE_TMP=""
-UPDATE_STAGED=""
+INSTALL_STAGED=""
+VERIFIED_SUM=""
 
 _cleanup_update() {
-  [ -n "$UPDATE_STAGED" ] && rm -f "$UPDATE_STAGED" 2>/dev/null
+  [ -n "$INSTALL_STAGED" ] && rm -f "$INSTALL_STAGED" 2>/dev/null
   # Only ever a folder update made itself with mktemp.
   case "$UPDATE_TMP" in */aidentity-update.?*) rm -rf "$UPDATE_TMP" 2>/dev/null ;; esac
-  UPDATE_STAGED=""; UPDATE_TMP=""
+  INSTALL_STAGED=""; UPDATE_TMP=""
   return 0
 }
 
@@ -1020,7 +1026,7 @@ ALLOWED_ENV="HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY http_proxy https_proxy al
 # A language tag: 2-3 lower-case letters, optionally "-" and 2-8 letters or
 # digits (de, pt-BR, zh-Hant).
 is_lang_tag() {
-  local base="${1%%-*}" rest=""
+  local LC_ALL=C base="${1%%-*}" rest=""
   case "$1" in *-*) rest="${1#*-}" ;; esac
   case "$base" in [a-z][a-z]|[a-z][a-z][a-z]) ;; *) return 1 ;; esac
   case "$1" in *-) return 1 ;; esac
@@ -1031,14 +1037,19 @@ is_lang_tag() {
 
 # A proxy server or bypass list: the characters those lists use, nothing else.
 is_proxy_value() {
+  local LC_ALL=C
   [ -n "$1" ] && [ "${#1}" -le 512 ] || return 1
   case "$1" in *[!A-Za-z0-9:/._\;=*,\<\>@+-]*) return 1 ;; esac
   return 0
 }
 
 validate_switch() {
-  local s="$1" name val=""
+  local LC_ALL=C s="$1" name val=""
   case "$s" in *[[:cntrl:]]*) warn "A switch cannot contain a tab, a line break or another control character."; return 1 ;; esac
+  # Under C, [[:cntrl:]] stops at byte 127, but a terminal can read some later
+  # bytes as control codes too. No allowed setting needs them, so refuse them
+  # here, without printing the value back.
+  case "$s" in *[!\ -~]*) warn "A switch can use only ASCII letters, digits and symbols."; return 1 ;; esac
   case "$s" in
     --[a-z]*) ;;
     *) warn "'$s' is not a switch. A switch looks like --lang=de or --disable-gpu."; return 1 ;;
@@ -1065,8 +1076,10 @@ validate_switch() {
 }
 
 validate_env() {
-  local kv="$1" name val
+  local LC_ALL=C kv="$1" name val
   case "$kv" in *[[:cntrl:]]*) warn "An environment value cannot contain a tab, a line break or another control character."; return 1 ;; esac
+  # Bytes above 127 too, as in validate_switch.
+  case "$kv" in *[!\ -~]*) warn "An environment value can use only ASCII letters, digits and symbols."; return 1 ;; esac
   case "$kv" in
     *=*) ;;
     *) warn "'$kv' must look like NAME=value."; return 1 ;;
@@ -1087,6 +1100,14 @@ validate_env() {
     TZ)
       case "$val" in ''|*..*|*[!A-Za-z0-9_+:/-]*) warn "TZ needs a time zone, e.g. TZ=Europe/Berlin"; return 1 ;; esac ;;
   esac
+  return 0
+}
+
+# A bundle identifier as restore trusts one: ASCII letters, digits, dots and
+# hyphens.
+is_bundle_id() {
+  local LC_ALL=C
+  case "$1" in ''|*[!A-Za-z0-9.-]*) return 1 ;; esac
   return 0
 }
 
@@ -2654,7 +2675,7 @@ restore_one() {
   validate_profile_name "$profile" || return 1
   src=$(record_get "$dir" AIdentityTargetApp)
   bid=$(record_get "$dir" AIdentityTargetBundleID)
-  case "$bid" in *[!A-Za-z0-9.-]*) bid="" ;; esac
+  is_bundle_id "$bid" || bid=""
 
   if [ ! -d "$src" ]; then
     # The app moved: look it up by name, then by bundle identifier — but only
@@ -2911,7 +2932,10 @@ cmd_rebuild() {
 # in place of this one. Every check below must pass first; any failure leaves
 # the old file exactly as it was. It never runs sudo and never downgrades.
 
-# x.y.z, each part 1 to 9 digits. The cap keeps the compare below inside
+# >>> download block: identical in bin/aidentity and install.sh
+# scripts/guards.sh fails when the two copies differ (see CONTRIBUTING.md).
+
+# x.y.z, each part 1 to 9 digits. The cap keeps a version compare inside
 # bash's 64-bit arithmetic, where a longer part wraps round to a small number.
 # The case test goes first: it refuses a newline, which a regex might not.
 is_version() {
@@ -2920,13 +2944,92 @@ is_version() {
   [[ $1 =~ $re ]]
 }
 
-# A release tag: v, then x.y.z, and nothing else. The tag arrives from the
-# network, and it is checked before it goes into a URL or onto the screen: a
-# "/" or ".." could steer the download elsewhere, and an escape sequence could
+# A release tag: v, then x.y.z, and nothing else. A tag that arrives from the
+# network is checked before it goes into a URL or onto the screen: a "/" or
+# ".." could steer the download elsewhere, and an escape sequence could
 # rewrite the terminal.
 is_release_tag() {
   case "$1" in v*) is_version "${1#v}" ;; *) return 1 ;; esac
 }
+
+# One HTTPS download into a file. -q must stay the FIRST argument: it stops
+# curl from reading the user's .curlrc, where a line like "insecure" would turn
+# off certificate checks and "output" would send the file somewhere else.
+# --proto and --proto-redir hold every transfer, redirects included, to HTTPS.
+# --max-filesize stops an answer far bigger than the file asked for. Into a
+# file, never a pipe, so curl's own exit status is what gets checked.
+https_fetch() { # url, output file, max bytes, [extra curl options]
+  local url="$1" out="$2" max="$3"
+  shift 3
+  curl -q -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
+       --connect-timeout 10 --max-time 60 --retry 2 --max-filesize "$max" \
+       "$@" -o "$out" "$url"
+}
+
+# The version a copy of the script says it is: its first AIDENTITY_VERSION
+# line, read from the file and never by running it. Empty when there is none.
+file_version() { # file
+  sed -n '/^AIDENTITY_VERSION="\([^"]*\)"$/{s//\1/p;q;}' "$1" 2>/dev/null || true
+}
+
+# Check a download against the SHA256SUMS published beside it, or say why not
+# and return 1: a line for bin/aidentity with 64 hex digits (no checksum, no
+# install), a matching SHA-256 and, unless the version is "-", the file's own
+# version line. Sets VERIFIED_SUM, which install_atomic installs against.
+verify_release_file() { # file, checksum file, version (x.y.z, or - for none)
+  local LC_ALL=C want got
+  VERIFIED_SUM=""
+  [ -n "${3:-}" ] || { warn "No version was given to check the download against."; return 1; }
+  want=$(awk '$2 == "bin/aidentity" { print $1; exit }' "$2" 2>/dev/null) || want=""
+  case "$want" in *[!0-9a-f]*) want="" ;; esac
+  if [ "${#want}" -ne 64 ]; then
+    warn "The checksum file has no valid line for bin/aidentity, so the download cannot be checked."
+    return 1
+  fi
+  got=$(shasum -a 256 "$1" 2>/dev/null | awk '{print $1}') || got=""
+  if [ "$got" != "$want" ]; then
+    warn "Checksum mismatch: the download is not the published file.
+    expected ${want}
+    got      ${got:-(none)}"
+    return 1
+  fi
+  if [ "$3" != - ] && [ "$(file_version "$1")" != "$3" ]; then
+    warn "The download does not say it is version $3."
+    return 1
+  fi
+  VERIFIED_SUM="$want"
+}
+
+# Put a checked file in place of the destination in one step: write it beside
+# the destination, check it against the verified checksum, then mv it over. A
+# half-written file is never seen under the real name, and a copy running now
+# keeps reading its old file. mktemp, not a fixed name: in a folder others can
+# write to, as /usr/local/bin often is, a fixed name can be planted as a
+# symlink and the file written through it. Any failure dies; the EXIT trap
+# removes INSTALL_STAGED.
+install_atomic() { # checked file, destination, its VERIFIED_SUM
+  local src="$1" dest="$2" sum="$3" dir
+  dir=$(dirname "$dest")
+  [ "${#sum}" -eq 64 ] || die "The download was not checked. Nothing was changed."
+  INSTALL_STAGED=$(mktemp "$dir/.aidentity.XXXXXX" 2>/dev/null) \
+    || { INSTALL_STAGED=""; die "Could not write to $dir. Nothing was changed."; }
+  cat "$src" > "$INSTALL_STAGED" && chmod 755 "$INSTALL_STAGED" \
+    || die "Could not write the new copy to $dir. Nothing was changed."
+  [ "$(shasum -a 256 "$INSTALL_STAGED" 2>/dev/null | awk '{print $1}')" = "$sum" ] \
+    || die "The copy written to $dir does not match the download. Nothing was changed."
+  # -h replaces a link at the destination instead of following it into a
+  # folder. /bin/mv: -h is BSD-only, and a GNU mv first on PATH rejects it.
+  /bin/mv -fh "$INSTALL_STAGED" "$dest" \
+    || die "Could not replace $dest. Nothing was changed."
+  INSTALL_STAGED=""
+  [ -f "$dest" ] && [ ! -L "$dest" ] \
+    && [ "$(shasum -a 256 "$dest" 2>/dev/null | awk '{print $1}')" = "$sum" ] \
+    || die "Installing did not leave the new copy at $dest.
+    Check what is at that path, then run the installer again."
+}
+
+# <<< download block
+
 
 version_newer() { # a, b (both x.y.z) -> true when a is newer than b
   local a b i
@@ -2941,43 +3044,17 @@ version_newer() { # a, b (both x.y.z) -> true when a is newer than b
 }
 
 # Where releases come from: the GitHub API for the latest tag, raw files for
-# the download. AIDENTITY_UPDATE_URL replaces both, for tests only: the release
-# is then read from "$it/releases/latest" and the files from "$it/<tag>/…". It
-# must be HTTPS, and every run that uses it says so on screen.
-update_sources() {
-  local o="${AIDENTITY_UPDATE_URL:-}"
-  UPDATE_API="https://api.github.com/repos/PiniShv/aidentity"
-  UPDATE_RAW="https://raw.githubusercontent.com/PiniShv/aidentity"
-  [ -n "$o" ] || return 0
-  o="${o%/}"
-  case "$o" in
-    https://?*) ;;
-    *) die "AIDENTITY_UPDATE_URL must start with https://. It is meant for tests only." ;;
-  esac
-  case "$o" in
-    *..*|*[!A-Za-z0-9._~:/-]*)
-      die "AIDENTITY_UPDATE_URL may hold only letters, numbers and . _ ~ : / -, and no \"..\"." ;;
-  esac
-  warn "Using AIDENTITY_UPDATE_URL ($o) instead of GitHub. It is meant for tests only."
-  UPDATE_API="$o"; UPDATE_RAW="$o"
-}
-
-# One HTTPS download into a file. -q must stay the FIRST argument: it stops
-# curl from reading the user's .curlrc, where a line like "insecure" would turn
-# off certificate checks and "output" would send the file somewhere else. A
-# proxy set in the environment (https_proxy) still works. -f makes an HTTP
-# error a failure instead of a saved error page. --proto already holds every
-# transfer, redirects included, to HTTPS; --proto-redir says the same for
-# redirects in plain words, so the rule does not rest on curl's defaults.
-# Into a file, never a pipe, so curl's own exit status is what gets checked.
-# This is the only place the script runs curl; scripts/guards.sh checks that.
-update_fetch() { # url, output file, max bytes, [extra curl options]
-  local url="$1" out="$2" max="$3"
-  shift 3
-  curl -q -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
-       --connect-timeout 10 --max-time 60 --retry 2 --max-filesize "$max" \
-       "$@" -o "$out" "$url"
-}
+# the download. Fixed: no setting can point update anywhere else.
+#
+# Copies already installed check every later release with their own fixed
+# code, so each release must keep what they expect: the files at
+# <tag>/bin/aidentity and <tag>/SHA256SUMS, a "<64 hex>  bin/aidentity" line in
+# SHA256SUMS, and one AIDENTITY_VERSION="x.y.z" line. Copies of 1.4.0 also
+# want #! on the first line, a file that passes bash -n, and main "$@" as the
+# last line. A release that breaks any of these can never be installed by
+# their `aidentity update`. scripts/guards.sh checks all of them.
+UPDATE_API="https://api.github.com/repos/PiniShv/aidentity"
+UPDATE_RAW="https://raw.githubusercontent.com/PiniShv/aidentity"
 
 # The tag of the latest release, from the API's JSON. grep, because jq is not
 # on a stock Mac. Text in the release notes cannot pose as this key: a quote
@@ -3038,14 +3115,9 @@ source_root() { # real path
   printf '%s' "$root"
 }
 
-# The version a copy of the script says it is: its first version line, read
-# from the file and never by running it, as install.sh reads it.
-file_version() {
-  sed -n 's/^AIDENTITY_VERSION="\([^"]*\)"$/\1/p' "$1" 2>/dev/null | head -n 1
-}
-
 # A path as the user should type it: quoted only when it has to be.
 typed_path() {
+  local LC_ALL=C
   case "$1" in *[!A-Za-z0-9/._+-]*) shquote "$1" ;; *) printf '%s' "$1" ;; esac
 }
 
@@ -3057,54 +3129,8 @@ can_replace() { # file
   [ ! -k "$dir" ] || [ -O "$1" ] || [ -O "$dir" ]
 }
 
-# Check a downloaded script before it may replace this one. The checksum is
-# required: no checksum file, no line for bin/aidentity, or a mismatch, and
-# nothing is installed. The rest are the installer's own checks.
-#
-# What it expects is fixed for every release to come, because copies already
-# installed run this exact code: the files at <tag>/bin/aidentity and
-# <tag>/SHA256SUMS, a "<64 hex>  bin/aidentity" line in SHA256SUMS, one
-# AIDENTITY_VERSION="x.y.z" line, and main "$@" as the last line. A release
-# that changes any of these can never be installed by `aidentity update`.
-# scripts/guards.sh checks all of them.
-update_verify() { # file, checksum file, version
-  local f="$1" want got first ver last
-  want=$(awk '$2 == "bin/aidentity" { print $1; exit }' "$2" 2>/dev/null)
-  case "$want" in
-    *[!0-9a-f]*|'') want="" ;;
-  esac
-  if [ "${#want}" -ne 64 ]; then
-    warn "The checksum file has no valid line for bin/aidentity, so the download cannot be checked."
-    return 1
-  fi
-  got=$(shasum -a 256 "$f" 2>/dev/null | awk '{print $1}')
-  if [ "$got" != "$want" ]; then
-    warn "Checksum mismatch: the download is not the published file.
-    expected ${want}
-    got      ${got:-(none)}"
-    return 1
-  fi
-  first=$(head -n 1 "$f")
-  case "$first" in
-    '#!'*) ;;
-    *) warn "The download is not a script (it does not start with #!)."; return 1 ;;
-  esac
-  ver=$(file_version "$f")
-  if [ "$ver" != "$3" ]; then
-    warn "The download does not say it is version $3."
-    return 1
-  fi
-  "${BASH:-/bin/bash}" -n "$f" 2>/dev/null || { warn "The download is not valid shell."; return 1; }
-  # A script cut short is often still valid shell; only its last line proves
-  # the whole file arrived. The same line install.sh checks.
-  last=$(awk 'NF { l = $0 } END { sub(/[ \t\r]+$/, "", l); print l }' "$f")
-  # shellcheck disable=SC2016  # the literal text of the last line
-  [ "$last" = 'main "$@"' ] || { warn "The download does not end with aidentity's last line, so it may be cut off."; return 1; }
-  return 0
-}
-
 cmd_update() {
-  local check=0 real="" how="" root="" hint tag new dir sum tmp
+  local check=0 real="" how="" root="" hint tag new tmp
   while [ $# -gt 0 ]; do
     case "$1" in
       --check) check=1; shift ;;
@@ -3140,13 +3166,12 @@ cmd_update() {
     Run it by its full path, for example: /usr/local/bin/aidentity update"
   fi
 
-  update_sources
   tmp="${TMPDIR:-/tmp}"
   UPDATE_TMP=$(mktemp -d "${tmp%/}/aidentity-update.XXXXXX" 2>/dev/null) \
     || { UPDATE_TMP=""; die "Could not create a temporary folder."; }
 
   info "Checking for the latest release of aidentity …"
-  update_fetch "$UPDATE_API/releases/latest" "$UPDATE_TMP/release.json" 1048576 \
+  https_fetch "$UPDATE_API/releases/latest" "$UPDATE_TMP/release.json" 1048576 \
       -H 'Accept: application/vnd.github+json' \
     || die "Could not get the latest release from GitHub (curl's reason is above).
     Check your internet connection, or try again later. Nothing was changed."
@@ -3179,36 +3204,17 @@ cmd_update() {
   fi
 
   info "Downloading aidentity $new …"
-  update_fetch "$UPDATE_RAW/$tag/bin/aidentity" "$UPDATE_TMP/aidentity" 4194304 \
+  https_fetch "$UPDATE_RAW/$tag/bin/aidentity" "$UPDATE_TMP/aidentity" 4194304 \
     || die "Could not download aidentity $new. Nothing was changed."
-  update_fetch "$UPDATE_RAW/$tag/SHA256SUMS" "$UPDATE_TMP/SHA256SUMS" 65536 \
+  https_fetch "$UPDATE_RAW/$tag/SHA256SUMS" "$UPDATE_TMP/SHA256SUMS" 65536 \
     || die "Could not download the checksum file for $new, so the download cannot be checked.
     Nothing was changed."
-  update_verify "$UPDATE_TMP/aidentity" "$UPDATE_TMP/SHA256SUMS" "$new" \
+  verify_release_file "$UPDATE_TMP/aidentity" "$UPDATE_TMP/SHA256SUMS" "$new" \
     || die "Refusing to install it. Nothing was changed."
-  sum=$(shasum -a 256 "$UPDATE_TMP/aidentity" | awk '{print $1}')
   dim "  checksum verified"
 
-  # Write beside the old file, then move it into place in one step. mv swaps
-  # the directory entry, so a half-written file is never seen as aidentity, and
-  # the copy running now keeps reading its old file to the end. mktemp, not a
-  # fixed name: in a shared folder a fixed name can be planted as a symlink.
-  dir=$(dirname "$real")
   info "Installing to $real …"
-  UPDATE_STAGED=$(mktemp "$dir/.aidentity-update.XXXXXX" 2>/dev/null) \
-    || { UPDATE_STAGED=""; die "Could not write to $dir. Nothing was changed."; }
-  cat "$UPDATE_TMP/aidentity" > "$UPDATE_STAGED" && chmod 755 "$UPDATE_STAGED" \
-    || die "Could not write the new version to $dir. Nothing was changed."
-  [ "$(shasum -a 256 "$UPDATE_STAGED" | awk '{print $1}')" = "$sum" ] \
-    || die "The copy written to $dir does not match the download. Nothing was changed."
-  # -h: never follow a link at the destination. /bin/mv by full path, because
-  # -h is BSD-only and a GNU mv first on PATH rejects it.
-  /bin/mv -fh "$UPDATE_STAGED" "$real" \
-    || die "Could not replace $real. Nothing was changed."
-  UPDATE_STAGED=""
-
-  [ -f "$real" ] && [ ! -L "$real" ] && [ "$(file_version "$real")" = "$new" ] \
-    || die "The update did not leave version $new at $real. Check that file, then run the installer again."
+  install_atomic "$UPDATE_TMP/aidentity" "$real" "$VERIFIED_SUM"
 
   ok "Updated $AIDENTITY_VERSION → $new"
   printf '   %s\n' "$real"
@@ -3343,7 +3349,10 @@ ui_size() {
 
 # Six hex digits -> UI_IDX, the nearest colour of the 256-colour cube. Plain
 # 256-colour codes, because Terminal.app does not draw 24-bit ones.
+# LC_ALL=C: in a UTF-8 locale, fullwidth digits passed the pattern and
+# $((16#…)) then stopped the menu with an error.
 ui_idx256() {
+  local LC_ALL=C
   UI_IDX=""
   case "$1" in
     [0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]) ;;
@@ -5004,8 +5013,6 @@ ${C_BOLD}ENVIRONMENT${C_RESET}
                         ~/Library/Application Support/aidentity/profiles)
   AIDENTITY_APP_DIRS    Folders searched for apps, colon-separated
                         (default: /Applications:~/Applications)
-  AIDENTITY_UPDATE_URL  For tests only: where update looks for releases
-                        instead of GitHub. Must be https.
 
 ${C_BOLD}HOW IT WORKS${C_RESET}
   Chromium and Electron apps keep their single-instance lock inside their data
@@ -5064,8 +5071,8 @@ main() {
   esac
 }
 
-# Never change this line, and keep it last. install.sh and every installed
-# copy's `aidentity update` refuse a download that does not end on it, and
-# copies already out there keep their own fixed copy of it: a new last line
-# would stop all of them from updating. scripts/guards.sh pins the exact text.
+# Never change this line, and keep it last. Installed copies of 1.4.0 refuse
+# an update that does not end on it, with their own fixed copy of the check:
+# a new last line would stop all of them from updating. scripts/guards.sh
+# (check 7) pins the exact text.
 main "$@"
