@@ -111,6 +111,55 @@ Read this before deciding whether a finding is a bug.
 - Someone hand-editing a launcher's `Info.plist` to point at their own paths.
   If a person can write to `~/Applications`, they are already you.
 
+## Verifying a release
+
+Each release on the [releases page](https://github.com/PiniShv/aidentity/releases)
+has four files: `aidentity`, `install.sh`, `uninstall.sh` and `SHA256SUMS`. Each
+has signed build provenance. It is made by the release workflow
+(`.github/workflows/release.yml`) when a release tag is pushed. Releases made
+before that workflow have none.
+
+GitHub also adds two archives to every release page, "Source code (zip)" and
+"Source code (tar.gz)". These are not signed and have no provenance. The
+Homebrew formula installs from the tar.gz.
+
+To check a file you downloaded, use the GitHub CLI. Install it with
+`brew install gh` and sign in once with `gh auth login`, because the check
+reads the provenance from GitHub:
+
+```sh
+gh attestation verify aidentity --repo PiniShv/aidentity
+```
+
+To also name the workflow and the tag, add them:
+
+```sh
+gh attestation verify aidentity --repo PiniShv/aidentity \
+  --signer-workflow PiniShv/aidentity/.github/workflows/release.yml \
+  --source-ref refs/tags/v1.4.0
+```
+
+What a pass proves:
+
+- The file is byte for byte the one that a GitHub Actions run in this
+  repository signed. With the second command, that run was `release.yml`,
+  started by that tag.
+- The signature comes from GitHub's identity for that run, not from a key
+  stored in the repository, and the record is public.
+
+What it does not prove:
+
+- That the code is safe or has been reviewed. It says where a file came from,
+  not what is in it. Whoever can push a release tag to this repository can make
+  a signed release, so read the source if you need more than that.
+- Anything about a file you did not check. This includes the "Source code"
+  archives, which are not signed. The installer and the Homebrew formula do not
+  run this check. The installer compares `bin/aidentity` with
+  `SHA256SUMS` from the same tag, which catches a damaged download but not a
+  bad release, because both files come from the same place. To verify, download
+  `aidentity` from the release page and run the command above.
+- Anything about releases made before provenance was added.
+
 ## Supported versions
 
 The latest tagged release. There are no backported fixes to older versions —

@@ -18,7 +18,7 @@ BINDIR ?= $(PREFIX)/bin
 SCRIPT   := bin/aidentity
 TARGET   := $(BINDIR)/aidentity
 TESTS    := test/run_tests.sh
-SH_FILES := bin/aidentity install.sh uninstall.sh scripts/guards.sh assets/record-demo.sh
+SH_FILES := bin/aidentity install.sh uninstall.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh
 
 # shellcheck findings we accept on purpose. Clear it to see everything:
 #   make lint SHELLCHECK_EXCLUDE=
@@ -138,6 +138,7 @@ release: ## Prepare a release: make release VERSION=1.2.0
 	@printf '\nPrepared $(VERSION). Next:\n'
 	@printf '  1. Commit, open a PR, merge it.\n'
 	@printf '  2. git tag v$(VERSION) <merge commit> && git push origin v$(VERSION)\n'
+	@printf '     The Release workflow then creates the GitHub release. Do not create it by hand.\n'
 	@printf '  3. make formula VERSION=$(VERSION), then copy Formula/aidentity.rb to the tap.\n'
 
 #

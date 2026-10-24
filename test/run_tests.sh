@@ -2178,6 +2178,241 @@ done
 assert_no_file "and the second line never runs" "$FORMULA_SB/pwned"
 
 
+group "release notes, from the changelog"
+
+# scripts/release-notes.sh builds the text of a GitHub release: an install
+# header, then the version's CHANGELOG section. stdout and stderr stay apart,
+# because the release workflow writes stdout into the release.
+RELNOTES="$REPO_DIR/scripts/release-notes.sh"
+relnotes() { # version, optional changelog path
+  RUN_OUT=$(detached "$BASH_BIN" "$RELNOTES" "$@" 2>"$SANDBOX/stderr" </dev/null)
+  RUN_RC=$?
+  RUN_ERR=$(cat "$SANDBOX/stderr")
+  return 0
+}
+
+# The 1.3.0 section, cut from the real changelog a different way (sed between
+# the two headings, blank edges trimmed). The release is old, so it is frozen.
+want_130=$(sed -n '/^## \[1\.3\.0\]/,/^## \[1\.2\.0\]/p' "$REPO_DIR/CHANGELOG.md" | sed '1d;$d' | sed '/./,$!d')
+relnotes 1.3.0
+assert_rc "the 1.3.0 notes are produced" 0 "$RUN_RC" "$RUN_ERR"
+assert_eq "nothing goes to stderr on success" "" "$RUN_ERR"
+want_lines=$(printf '%s\n' "$want_130" | wc -l | tr -d ' ')
+assert_eq "the 1.3.0 section is extracted exactly, to its last line" "$want_130" \
+  "$(printf '%s\n' "$RUN_OUT" | tail -n "$want_lines")"
+assert_eq "it starts with the section's first line, after a blank line" "" \
+  "$(printf '%s\n' "$RUN_OUT" | tail -n "$((want_lines + 1))" | head -n 1)"
+assert_contains "the header has the install line for this tag" "$RUN_OUT" \
+  "curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/v1.3.0/install.sh | bash"
+assert_contains "and the Homebrew line" "$RUN_OUT" "brew install pinishv/tap/aidentity"
+# GitHub lists its own "Source code" archives under the notes. They are not
+# signed, so the header must name the four files that are, not say "each file".
+assert_contains "the header names the four signed files" "$RUN_OUT" \
+  '`aidentity`, `install.sh`, `uninstall.sh` and `SHA256SUMS`, have signed build provenance'
+assert_contains "and says the Source code archives are not signed" "$RUN_OUT" \
+  'The "Source code" archives that GitHub adds to every release are not signed.'
+assert_not_contains "it does not claim every file on the page is signed" "$RUN_OUT" "Each file below"
+assert_eq "the header comes first" "**Install or upgrade**" "$(printf '%s\n' "$RUN_OUT" | head -n 1)"
+assert_not_contains "the heading line is left out" "$RUN_OUT" "## [1.3.0]"
+assert_not_contains "the next version's section is not included" "$RUN_OUT" "## [1.2.0]"
+assert_not_contains "nor is its text" "$RUN_OUT" "aidentity add APP --main"
+assert_not_contains "the link list at the bottom is not included" "$RUN_OUT" "[1.3.0]: https://"
+
+# A tiny changelog for the edges: the first, last and empty sections, a blank
+# line inside a section, and a version that only starts the same.
+CL_FIX="$SB/fixture-changelog.md"
+cat > "$CL_FIX" <<'CL'
+# Changelog
+
+## [Unreleased]
+
+## [2.0.0] - 2030-01-02
+
+
+### Added
+
+- First.
+
+  Still the first.
+
+### Fixed
+
+- Second.
+
+
+## [1.5.0] - 2029-06-01
+
+## [1.0.0] - 2028-01-01
+
+Only text, then the link list.
+
+[Unreleased]: https://example.invalid/compare/v2.0.0...HEAD
+[2.0.0]: https://example.invalid/compare/v1.0.0...v2.0.0
+[1.0.0]: https://example.invalid/releases/tag/v1.0.0
+CL
+relnotes 2.0.0 "$CL_FIX"
+want_fix=$(printf '### Added\n\n- First.\n\n  Still the first.\n\n### Fixed\n\n- Second.')
+assert_eq "a section keeps its inner blank lines and loses the ones at its edges" "$want_fix" \
+  "$(printf '%s\n' "$RUN_OUT" | tail -n 9)"
+assert_not_contains "and stops at the next heading" "$RUN_OUT" "1.5.0"
+relnotes 1.0.0 "$CL_FIX"
+assert_eq "the last section ends where the link list starts" "Only text, then the link list." \
+  "$(printf '%s\n' "$RUN_OUT" | tail -n 1)"
+assert_not_contains "no link line from the bottom is included" "$RUN_OUT" "example.invalid"
+relnotes 1.5.0 "$CL_FIX"
+assert_rc "a section with nothing in it is an error" 1 "$RUN_RC" "$RUN_OUT"
+assert_contains "that says which version" "$RUN_ERR" "No notes for 1.5.0"
+assert_eq "and prints no notes" "" "$RUN_OUT"
+relnotes 2.0 "$CL_FIX"
+assert_rc "a version that is not x.y.z is refused" 2 "$RUN_RC" "$RUN_ERR"
+
+# An unknown version must fail, so a release is never published with blank notes.
+relnotes 9.9.9
+assert_rc "an unknown version fails" 1 "$RUN_RC" "$RUN_OUT"
+assert_contains "and names the version" "$RUN_ERR" "No notes for 9.9.9"
+assert_eq "and prints nothing on stdout" "" "$RUN_OUT"
+relnotes 1.3
+assert_rc "x.y is not a version" 2 "$RUN_RC" "$RUN_ERR"
+relnotes v1.3.0
+assert_rc "a leading v is refused" 2 "$RUN_RC" "$RUN_ERR"
+assert_contains "with the usage line" "$RUN_ERR" "Usage: scripts/release-notes.sh x.y.z"
+relnotes "1.3.0; touch $SB/pwned"
+assert_rc "text after a version is refused" 2 "$RUN_RC" "$RUN_ERR"
+assert_no_file "and runs nothing it was handed" "$SB/pwned"
+relnotes ""
+assert_rc "no version is refused" 2 "$RUN_RC" "$RUN_ERR"
+relnotes 1.3.0 "$SB/no-such-changelog.md"
+assert_rc "a changelog that cannot be read is an error" 1 "$RUN_RC" "$RUN_ERR"
+assert_contains "that names the file" "$RUN_ERR" "no-such-changelog.md"
+
+# The release workflow calls this with the version in bin/aidentity. If a
+# release is prepared without a changelog section, the tag run would fail.
+cur_version=$(sed -n 's/^AIDENTITY_VERSION="\(.*\)"$/\1/p' "$AIDENTITY")
+relnotes "$cur_version"
+assert_rc "the changelog has notes for the version in the script ($cur_version)" 0 "$RUN_RC" "$RUN_ERR"
+
+
+group "release check, before anything is signed"
+
+# scripts/release-check.sh is the release workflow's first step. It runs on a
+# copy of the tree, from another directory, so it is also shown to find the
+# repository by its own path. The copy is made release-ready first: install.sh
+# pointing at this version's tag, as `make release` leaves it.
+RC_DIR="$SB/release-check-repo"
+rc_version=$(sed -n 's/^AIDENTITY_VERSION="\(.*\)"$/\1/p' "$REPO_DIR/bin/aidentity")
+rc_fresh() {
+  rm -rf "$RC_DIR"
+  mkdir -p "$RC_DIR/bin" "$RC_DIR/scripts" "$RC_DIR/test"
+  cp "$REPO_DIR/bin/aidentity" "$RC_DIR/bin/"
+  cp "$REPO_DIR/uninstall.sh" "$REPO_DIR/SHA256SUMS" "$REPO_DIR/CHANGELOG.md" "$RC_DIR/"
+  cp "$REPO_DIR/scripts/"*.sh "$RC_DIR/scripts/"
+  cp "$REPO_DIR/test/run_tests.sh" "$RC_DIR/test/"
+  sed "s|^REF=.*|REF=\"\${AIDENTITY_REF:-v$rc_version}\"|" "$REPO_DIR/install.sh" > "$RC_DIR/install.sh"
+}
+rc_sed() { # file, sed script: edit one file of the copy
+  sed "$2" "$RC_DIR/$1" > "$RC_DIR/$1.new" && mv "$RC_DIR/$1.new" "$RC_DIR/$1"
+}
+rc_run() { # tag
+  RUN_OUT=$(cd "$SB" && detached "$BASH_BIN" "$RC_DIR/scripts/release-check.sh" "$@" 2>"$SANDBOX/stderr" </dev/null)
+  RUN_RC=$?
+  RUN_ERR=$(cat "$SANDBOX/stderr")
+  return 0
+}
+rc_tree() { (cd "$RC_DIR" && find . -type f -exec shasum {} + | sort); }
+
+rc_fresh
+rc_before=$(rc_tree)
+rc_run "v$rc_version"
+assert_rc "a release-ready tree passes with its own tag (v$rc_version)" 0 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "and says so" "$RUN_OUT" "Tag v$rc_version matches version $rc_version."
+assert_contains "after the source guards ran" "$RUN_OUT" "SHA256SUMS matches bin/aidentity"
+assert_eq "nothing goes to stderr on success" "" "$RUN_ERR"
+assert_eq "it changes no file" "$rc_before" "$(rc_tree)"
+
+rc_run
+assert_rc "no tag is a usage error" 2 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "that shows the usage" "$RUN_ERR" "Usage: scripts/release-check.sh vX.Y.Z"
+
+# The tag must be v + the script's version. A pushed tag that is not (a tag on
+# the wrong commit, a pre-release name, a missing v) is not released.
+for bad_tag in v9.9.9 "$rc_version" "v$rc_version-rc1" "V$rc_version" "v$rc_version.0"; do
+  rc_run "$bad_tag"
+  assert_rc "tag '$bad_tag' is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+  assert_contains "with both versions named" "$RUN_ERR" "The tag is $bad_tag but bin/aidentity is version $rc_version"
+done
+
+# SHA256SUMS: stale, in shasum's binary-mode spelling, and missing.
+rc_fresh
+printf '%064d  bin/aidentity\n' 0 > "$RC_DIR/SHA256SUMS"
+rc_run "v$rc_version"
+assert_rc "stale sums are refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "with the reason" "$RUN_ERR" "SHA256SUMS does not match bin/aidentity"
+assert_contains "and the fix" "$RUN_ERR" "make checksums"
+(cd "$RC_DIR" && shasum -a 256 -b bin/aidentity) > "$RC_DIR/SHA256SUMS"
+assert_contains "(the sums line really is '*bin/aidentity')" "$(cat "$RC_DIR/SHA256SUMS")" " *bin/aidentity"
+rc_run "v$rc_version"
+assert_rc "a '*bin/aidentity' sums line is refused, as the installer would not read it" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "as having no usable line" "$RUN_ERR" "expected nothing"
+rm -f "$RC_DIR/SHA256SUMS"
+rc_run "v$rc_version"
+assert_rc "a missing SHA256SUMS is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+
+# A version that is not x.y.z is refused before it is compared or printed.
+for odd in 1.4 1.4.0-rc1 1.2.3.4 1..0 .1.0 1.0. ""; do
+  rc_fresh
+  rc_sed bin/aidentity "s/^AIDENTITY_VERSION=.*/AIDENTITY_VERSION=\"$odd\"/"
+  rc_run "v$odd"
+  assert_rc "version '$odd' is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+  assert_contains "as not a version" "$RUN_ERR" "Could not read a version (x.y.z)"
+done
+rc_fresh
+rc_sed bin/aidentity '/^AIDENTITY_VERSION=/d'
+rc_run "v$rc_version"
+assert_rc "a script with no version line is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+rc_fresh
+rc_sed bin/aidentity 's|^AIDENTITY_VERSION=.*|AIDENTITY_VERSION="1.0.0$(touch pwned)"|'
+rc_run 'v1.0.0$(touch pwned)'
+assert_rc "a version with a command in it is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_no_file "and the command never runs" "$RC_DIR/pwned"
+assert_no_file "wherever it would have landed" "$SB/pwned"
+
+# install.sh must install this tag. scripts/guards.sh accepts main there, so
+# without this check a hand-made release would ship an installer for main.
+rc_fresh
+rc_sed install.sh 's|^REF=.*|REF="${AIDENTITY_REF:-main}"|'
+rc_run "v$rc_version"
+assert_rc "an installer that installs main is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "with what it installs" "$RUN_ERR" "installs 'main' by default"
+assert_contains "and what it must install" "$RUN_ERR" "must install v$rc_version"
+rc_fresh
+rc_sed install.sh 's|^REF=.*|REF="${AIDENTITY_REF:-v0.0.1}"|'
+rc_run "v$rc_version"
+assert_rc "an installer for another tag is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+rc_fresh
+rc_sed install.sh '/^REF=/d'
+rc_run "v$rc_version"
+assert_rc "an installer with no REF line is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "that says there is none" "$RUN_ERR" "installs 'nothing' by default"
+
+# The changelog must have notes for the version.
+rc_fresh
+rc_sed CHANGELOG.md "s/^## \[$rc_version\]/## [0.0.1]/"
+rc_run "v$rc_version"
+assert_rc "a changelog without the version is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "naming the version" "$RUN_ERR" "No notes for $rc_version"
+assert_contains "and the release" "$RUN_ERR" "has no notes for $rc_version"
+assert_not_contains "and it does not say the tag matches" "$RUN_OUT" "matches version"
+
+# The source guards run too, and their failure stops the release.
+rc_fresh
+rc_sed uninstall.sh 's/^running_on_profile() {/running_on_profile() { :;/'
+rc_run "v$rc_version"
+assert_rc "a failing source guard is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "with the guard's own message" "$RUN_ERR" "running_on_profile differs between bin/aidentity and uninstall.sh"
+assert_contains "and the release check's" "$RUN_ERR" "scripts/guards.sh failed"
+assert_not_contains "and it does not say the tag matches" "$RUN_OUT" "matches version"
+
+
 group "uninstall.sh end to end, every search path in the sandbox"
 
 # AIDENTITY_BIN_DIRS keeps it from finding a real installed copy; HOME and
