@@ -3298,11 +3298,12 @@ for w in $WORDS_LISTED; do
   assert_rc "canonical_command accepts $w" 0 "$RUN_RC" "$RUN_OUT"
 done
 
-if grep -q 'generate_completions_from_executable(bin/"aidentity", "completion"' "$REPO_DIR/Formula/aidentity.rb" \
-   && grep -q 'shells: \[:bash, :zsh, :fish\]' "$REPO_DIR/Formula/aidentity.rb"; then
+# Homebrew's default shells are bash, zsh and fish. Naming them is refused by
+# brew audit --strict, so the line must not list them.
+if grep -qxF '    generate_completions_from_executable(bin/"aidentity", "completion")' "$REPO_DIR/Formula/aidentity.rb"; then
   _pass "the Homebrew formula installs bash, zsh and fish completions"
 else
-  _fail "the Homebrew formula installs bash, zsh and fish completions" "no generate_completions_from_executable line"
+  _fail "the Homebrew formula installs bash, zsh and fish completions" "no generate_completions_from_executable line with the default shells"
 fi
 
 group "completion candidates (__complete)"
