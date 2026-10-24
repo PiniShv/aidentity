@@ -95,9 +95,9 @@ Apps built on **Chromium** (the engine inside Google Chrome) or **Electron** (a 
 | Status | Apps |
 |---|---|
 | **Verified**: two accounts signed in at once, checked by hand | Claude Desktop |
-| **Tested**: starts as its own copy with its own data; two sign-ins not checked yet | ChatGPT, Slack, Visual Studio Code, Cursor, Kiro, Antigravity, Notion, Notion Calendar, Obsidian, Podman Desktop, Postman |
+| **Tested**: starts as its own copy with its own data; two sign-ins not checked yet | ChatGPT, Slack, Visual Studio Code, Cursor, Kiro, Antigravity, Notion, Notion Calendar, Podman Desktop, Postman |
 | **Browsers**: detected, but their built-in profiles usually do the job better | Chrome, Edge, Brave, Arc, Vivaldi, Comet |
-| **Does not work** | ChatGPT Classic and other native Mac apps (Swift or AppKit). Microsoft Teams (classic) and MiniMax Design, which ignore the separate folder. |
+| **Does not work** | ChatGPT Classic and other native Mac apps (Swift or AppKit), and the few Electron apps that ignore the separate folder. |
 
 Native apps have no Chromium inside, so they have no `--user-data-dir` option to use. `aidentity add` checks this first and refuses. A few Electron apps ignore that option, and `add` cannot tell, so they are listed above. For VS Code, Cursor and Kiro, keep profile names short. Support for native apps is not planned for version 1. [Full list and notes](docs/guide.md#which-apps-work)
 
