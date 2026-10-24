@@ -1,0 +1,202 @@
+name: Release
+
+# Runs when a release tag is pushed. It publishes the GitHub release and signs
+# a build provenance statement for each release file, so anyone can check that
+# a file came from this repository's workflow, built from that tag:
+#
+#   gh attestation verify aidentity --repo PiniShv/aidentity
+#
+# Two jobs, so no job holds more power than it needs:
+#
+#   attest   checks the tag, assembles the files and signs them. It can sign,
+#            but it cannot write to the repository's releases.
+#   release  checks the signatures, then creates the release and uploads the
+#            files. It can write releases, but it cannot sign.
+#
+# aidentity has no build step: a release file is a copy of a file in the
+# repository at the tag. Both jobs check out the commit by its hash, the one
+# the tag pointed to when it was pushed, so a tag moved while the run is going
+# cannot change the bytes that are signed or uploaded. The release page itself
+# is attached to the tag by name, so the release job also checks, just before
+# it publishes, that the tag still points at the signed commit. A tag moved in
+# the moments after that check is not caught.
+#
+# CI runs on the same tag push, but this workflow does not wait for it. Tag a
+# commit whose CI is already green. See docs/homebrew-tap.md for the order.
+
+# Quoted so YAML does not read "on" as the boolean true.
+"on":
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+# One run per tag. A second run waits instead of cancelling one that is half
+# way through publishing.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  attest:
+    name: Check, assemble and attest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    outputs:
+      sums: ${{ steps.dist.outputs.sums }}
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      # Nothing is signed or published unless the tag names the version in the
+      # script, the checksum file is current, the installer installs this tag,
+      # the changelog has notes for the version and the source guards pass.
+      # The checks are in a script so the test suite can run them.
+      - name: Check the tag, the checksum, the installer and the notes
+        env:
+          TAG: ${{ github.ref_name }}
+        run: bash scripts/release-check.sh "$TAG"
+
+      # The script is released as `aidentity`, the name people run. The sums
+      # are handed to the release job, which checks the files it uploads
+      # against them.
+      - name: Assemble the release files
+        id: dist
+        run: |
+          set -eu
+          mkdir dist
+          cp bin/aidentity dist/aidentity
+          cp install.sh uninstall.sh SHA256SUMS dist/
+          sums=$(cd dist && shasum -a 256 aidentity install.sh uninstall.sh SHA256SUMS)
+          printf '%s\n' "$sums"
+          {
+            echo "sums<<SUMS_END"
+            printf '%s\n' "$sums"
+            echo "SUMS_END"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
+        with:
+          subject-path: |
+            dist/aidentity
+            dist/install.sh
+            dist/uninstall.sh
+            dist/SHA256SUMS
+
+      - name: Keep the files for the release job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release-files
+          path: dist
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish the release
+    needs: attest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      attestations: read
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Fetch the files
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: release-files
+          path: dist
+
+      # What gets uploaded must be what was signed.
+      - name: Check the files are the ones that were signed
+        env:
+          SUMS: ${{ needs.attest.outputs.sums }}
+        run: |
+          set -eu
+          if [ -z "$SUMS" ]; then
+            echo "::error::The attest job passed on no checksums."
+            exit 1
+          fi
+          printf '%s\n' "$SUMS" > "$RUNNER_TEMP/signed.sums"
+          cd dist
+          shasum -a 256 -c "$RUNNER_TEMP/signed.sums"
+
+      # The same check users are told to run, with the workflow and the tag
+      # named. If the signature is missing or is not from this workflow and
+      # this tag, nothing is published. A few tries, because a signature
+      # written seconds ago may not be readable at once.
+      - name: Check the signed provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          for f in aidentity install.sh uninstall.sh SHA256SUMS; do
+            try=1
+            until out=$(gh attestation verify "dist/$f" --repo "$GH_REPO" \
+                  --signer-workflow "$GH_REPO/.github/workflows/release.yml" \
+                  --source-ref "$GITHUB_REF" 2>&1); do
+              if [ "$try" -ge 3 ]; then
+                printf '%s\n' "$out"
+                echo "::error::No valid signed provenance for $f. Nothing was published."
+                exit 1
+              fi
+              try=$((try + 1))
+              sleep 10
+            done
+            echo "Provenance is valid for $f."
+          done
+
+      # The release is attached to the tag by name. If the tag was moved after
+      # this run started, the release and its Source code archives would point
+      # at the new commit while the files come from this one.
+      - name: Check the tag still points at the signed commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          signed=$(git rev-parse HEAD)
+          now=$(gh api "repos/$GH_REPO/commits/refs/tags/$TAG" --jq .sha)
+          if [ "$now" != "$signed" ]; then
+            echo "::error::Tag $TAG now points to $now, but the signed files are from $signed. Nothing was published."
+            exit 1
+          fi
+          echo "Tag $TAG points at $signed."
+
+      # A release that already exists keeps its title and notes; only the files
+      # are replaced. That makes a re-run safe.
+      - name: Create the release, or update its files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          version="${TAG#v}"
+          set -- dist/aidentity dist/install.sh dist/uninstall.sh dist/SHA256SUMS
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            echo "Release $TAG exists. Uploading the files."
+            gh release upload "$TAG" "$@" --clobber
+          else
+            bash scripts/release-notes.sh "$version" > "$RUNNER_TEMP/notes.md"
+            gh release create "$TAG" "$@" \
+              --verify-tag \
+              --title "aidentity $version" \
+              --notes-file "$RUNNER_TEMP/notes.md"
+          fi

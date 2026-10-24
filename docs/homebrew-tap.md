@@ -123,9 +123,50 @@ Homebrew installs and the `curl` installer both pin to it.
    the merge on, `main`'s installer asks for `vX.Y.Z`; until that tag exists,
    `curl | bash` fails with a download error.
 
+   The workflow's first check is a script you can run yourself, in a checkout
+   of the merge commit, before you tag:
+
    ```sh
+   bash scripts/release-check.sh vX.Y.Z
    git tag vX.Y.Z <merge commit> && git push origin vX.Y.Z
    ```
+
+   Pushing the tag starts the **Release** workflow
+   (`.github/workflows/release.yml`). It:
+
+   - fails unless the tag is `v` plus `AIDENTITY_VERSION`, `SHA256SUMS`
+     matches `bin/aidentity`, `install.sh` installs that tag by default (not
+     `main`), `CHANGELOG.md` has notes for the version, and the source guards
+     pass. Nothing is signed or published in that case;
+   - signs build provenance for `aidentity`, `install.sh`, `uninstall.sh` and
+     `SHA256SUMS`;
+   - checks those signatures again, with the workflow and the tag named, and
+     checks that the tag still points at the signed commit. Nothing is
+     published if either check fails;
+   - creates the GitHub release for the tag, with an install header and that
+     version's changelog section as notes, and uploads the four files. If the
+     release exists already, it only uploads the files again (`--clobber`), so
+     re-running the workflow is safe.
+
+   Do not create the release by hand. GitHub adds the "Source code" archives
+   to the release itself; they are not signed. Watch the run, then check the
+   result:
+
+   ```sh
+   gh run watch
+   gh release download vX.Y.Z --pattern aidentity --dir verify-release
+   gh attestation verify verify-release/aidentity --repo PiniShv/aidentity \
+     --signer-workflow PiniShv/aidentity/.github/workflows/release.yml \
+     --source-ref refs/tags/vX.Y.Z
+   rm -r verify-release
+   ```
+
+   If a check fails before the release is created, the tag is on the wrong
+   commit or the commit is not ready. Nothing was published and the formula
+   does not point at the tag yet, so this is the one time a tag may go: delete
+   it (`git push origin :refs/tags/vX.Y.Z`), fix the cause on `main` and tag
+   again. If a later step fails, re-run the failed job. To see the release
+   notes before you tag, run `bash scripts/release-notes.sh X.Y.Z`.
 
 4. **Point the formula at the tag.** The tarball's checksum exists only once
    the tag does.

@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   says whether a newer release is out and installs nothing.
 - `aidentity help` lists the `AIDENTITY_*` environment variables the script
   reads.
+- Releases carry signed build provenance. Pushing a `v*` tag runs a release
+  workflow. It checks the tag against the script's version, `SHA256SUMS` and
+  the installer's default version, and signs `aidentity`, `install.sh`,
+  `uninstall.sh` and `SHA256SUMS`. It then checks the signatures and that the
+  tag still points at the signed commit, and creates the GitHub release with
+  those files and the version's changelog section as notes. The release page
+  says that GitHub's "Source code" archives are not signed.
+  `gh attestation verify aidentity --repo PiniShv/aidentity` checks a
+  downloaded file; it needs `gh auth login` first. `SECURITY.md` says what that
+  proves and what it does not.
 
 ### Security
 
@@ -49,6 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aidentity update` does not read your `~/.curlrc`. A setting there could
   otherwise turn off certificate checks or change where a download is saved.
   A proxy set with `https_proxy` still works.
+
+### Changed (for maintainers and contributors)
+
+- `scripts/release-notes.sh x.y.z` prints a release's notes, the install
+  header and the changelog section, and fails when the version has no notes.
+  `scripts/release-check.sh vX.Y.Z` is the release workflow's first check. It
+  also refuses an installer whose default is not the tag, which the source
+  guards allow. Both scripts are linted and tested, and CI runs them with Linux
+  tools. `docs/homebrew-tap.md` and the hint `make release` prints describe the
+  new release step.
 
 ## [1.3.0] - 2026-10-23
 
