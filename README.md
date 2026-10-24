@@ -48,7 +48,7 @@ brew install pinishv/tap/aidentity
 > [!IMPORTANT]
 > If the app is already open, quit it first. Sign in to the new icon, then open the app again. Some apps sign in through your browser, and macOS hands the result to the window that started first. [Why](docs/guide.md#signing-in-to-a-new-profile)
 
-The installer checks the download, never uses `sudo` and leaves your shell files alone. To read it first or build from source, see [Install and upgrade](docs/guide.md#install-and-upgrade). To upgrade later, run `aidentity update`, or `brew upgrade aidentity` if you used Homebrew.
+The installer checks the download, never uses `sudo` and leaves your shell files alone. To read it first or build from source, see [Install and upgrade](docs/guide.md#install-and-upgrade). To upgrade later, run `aidentity update`, or `brew upgrade aidentity` if you used Homebrew. A copy older than 1.4 has no `update` command, so run the install line again.
 
 Not sure what to type? [Build your recipe](https://aidentity.pinishv.com/recipes/): pick your apps and colours, and copy the commands.
 
@@ -125,7 +125,7 @@ That is [the main trade-off](#how-it-works). The icons you click carry the profi
 
 **Does it break auto-update?**
 
-No. Your app is untouched and updates itself as before. A launcher stores the path to the app, not a copy, so the next launch uses the new version. aidentity itself never checks for updates on its own. To upgrade it, run `aidentity update`, or `brew upgrade aidentity` if you used Homebrew.
+No. Your app is untouched and updates itself as before. A launcher stores the path to the app, not a copy, so the next launch uses the new version. aidentity itself never checks for updates on its own. To upgrade it, run `aidentity update`, or `brew upgrade aidentity` if you used Homebrew. A copy older than 1.4 has no `update` command, so run the install line again.
 
 **Is this against the terms of service?**
 
