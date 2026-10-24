@@ -2236,6 +2236,602 @@ rm -f "$UN_BIN/aidentity"
 mkdir -p "$DATA"
 
 
+group "help for one command"
+
+# Every name main() takes, each with the command it stands for.
+HELP_PAIRS="setup:setup init:setup wizard:setup add:add rename:rename mv:rename
+set:set modify:set edit:set prune:prune restore:restore rebuild:rebuild
+repair:rebuild list:list ls:list open:open rm:rm remove:rm delete:rm apps:apps
+doctor:doctor completion:completion version:version --version:version -v:version
+help:help"
+for pair in $HELP_PAIRS; do
+  w=${pair%%:*}; c=${pair#*:}
+  ai "$w" --help
+  assert_rc "$w --help exits 0" 0 "$RUN_RC" "$RUN_OUT"
+  assert_contains "$w --help names its command" "$RUN_OUT" "aidentity $c"
+  assert_contains "$w --help has a usage section" "$RUN_OUT" "USAGE"
+  assert_contains "$w --help has an example" "$RUN_OUT" "EXAMPLES"
+  HELP_LONG="$RUN_OUT"
+  ai "$w" -h
+  assert_eq "$w -h prints the same as $w --help" "$HELP_LONG" "$RUN_OUT"
+  ai help "$w"
+  assert_eq "help $w prints the same as $w --help" "$HELP_LONG" "$RUN_OUT"
+done
+
+# Every alias is named in the help of the command it stands for.
+for pair in $HELP_PAIRS; do
+  w=${pair%%:*}; c=${pair#*:}
+  [ "$w" = "$c" ] && continue
+  ai "$c" --help
+  assert_contains "help for $c mentions its alias $w" "$RUN_OUT" "$w"
+done
+
+# Every option the completion offers is in that command's help, so the two
+# cannot drift apart unseen.
+for c in add set list rm prune restore rebuild doctor; do
+  libcall command_options "$c"
+  OPTS_OF_C="$RUN_OUT"
+  assert_nonempty "$c has options for completion" "$OPTS_OF_C"
+  ai "$c" --help
+  for o in $OPTS_OF_C; do
+    assert_contains "help for $c documents $o" "$RUN_OUT" "$o"
+  done
+done
+
+ai help
+HELP_ALL="$RUN_OUT"
+assert_rc "help exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the overview points to per-command help" "$HELP_ALL" "aidentity help <command>"
+assert_contains "the overview lists completion" "$HELP_ALL" "completion SHELL"
+ai
+assert_eq "no arguments print the overview, as before" "$HELP_ALL" "$RUN_OUT"
+ai --help
+assert_eq "--help prints the overview" "$HELP_ALL" "$RUN_OUT"
+ai -h rm
+assert_rc "-h before a command is still the overview" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "and ignores what follows, as before" "$HELP_ALL" "$RUN_OUT"
+ai help help
+assert_contains "the help for help says -h on its own shows the overview" "$RUN_OUT" "aidentity -h and aidentity --help show the same overview"
+assert_contains "and that what follows it is ignored" "$RUN_OUT" "ignore what comes after them"
+
+ai_stdout help definitely-not-a-command
+assert_rc_nonzero "help for an unknown command fails" "$RUN_RC" "$RUN_OUT"
+assert_eq "and prints nothing on stdout" "" "$RUN_OUT"
+assert_contains "and says which name has no help" "$RUN_ERR" "definitely-not-a-command"
+ai help --bogus
+assert_rc_nonzero "help for an unknown option fails" "$RUN_RC" "$RUN_OUT"
+ai help __complete
+assert_rc_nonzero "the hidden command has no help" "$RUN_RC" "$RUN_OUT"
+ai help rm add
+assert_rc_nonzero "help takes one command" "$RUN_RC" "$RUN_OUT"
+ai definitely-not-a-command --help
+assert_rc_nonzero "an unknown command with --help still fails" "$RUN_RC" "$RUN_OUT"
+
+group "--help never runs the command"
+
+# A launcher and two folders (one stray, one with a restore record) for
+# the commands to act on if --help ever failed to stop them.
+ai add "$ELECTRON_APP" --profile Safe
+ai add "$ELECTRON_APP" --profile Gone
+ai rm "Fake Gone" -y
+STRAY_DIR="$DATA/stray-profile"
+mkdir -p "$STRAY_DIR"
+printf 'session\n' > "$STRAY_DIR/Cookies"
+printf 'session\n' > "$DATA/fake-safe/Cookies"
+assert_dir "the launcher to protect exists" "$APPS/Fake Safe.app"
+assert_no_dir "the removed launcher is gone" "$APPS/Fake Gone.app"
+
+tree_state() { # directory: names and contents of everything below it
+  fingerprint "$1"
+  ( cd "$1" && find . -type f -exec shasum {} + 2>/dev/null | LC_ALL=C sort | shasum | awk '{print $1}' )
+}
+
+no_action() { # description, then the command line
+  local desc="$1" before after; shift
+  before="$(tree_state "$APPS")|$(tree_state "$DATA")"
+  PATH="$STUB_BIN:$PATH" ai "$@"
+  after="$(tree_state "$APPS")|$(tree_state "$DATA")"
+  assert_rc "$desc exits 0" 0 "$RUN_RC" "$RUN_OUT"
+  assert_contains "$desc shows the help" "$RUN_OUT" "USAGE"
+  assert_not_contains "$desc opens nothing" "$RUN_OUT" "stub open"
+  assert_eq "$desc changes nothing" "$before" "$after"
+}
+
+no_action "rm NAME --help" rm "Fake Safe" --help
+no_action "rm --help first, with --purge and -y" rm --help "Fake Safe" --purge -y
+no_action "rm NAME --purge --yes -h" rm "Fake Safe" --purge --yes -h
+no_action "remove NAME --purge -y --help" remove "Fake Safe" --purge -y --help
+no_action "delete NAME --help" delete "Fake Safe" --help
+no_action "add APP --profile NAME --help" add "$ELECTRON_APP" --profile Other --help
+no_action "add with --help where a value goes" add "$ELECTRON_APP" --profile --help
+no_action "add --main --help" add "$ELECTRON_APP" --main --help
+no_action "rename OLD NEW --help" rename "Fake Safe" Renamed --help
+no_action "mv OLD NEW -h" mv "Fake Safe" Renamed -h
+no_action "set NAME --color red -h" set "Fake Safe" --color red -h
+no_action "set NAME --clear-args --help" set "Fake Safe" --clear-args --help
+no_action "rebuild --all --help" rebuild --all --help
+no_action "rebuild NAME --help" rebuild "Fake Safe" --help
+no_action "prune --yes --help" prune --yes --help
+no_action "restore --all --help" restore --all --help
+no_action "restore NAME --help" restore "Fake Gone" --help
+no_action "doctor --fix --help" doctor --fix --help
+no_action "open NAME --help" open "Fake Safe" --help
+no_action "list --json --help" list --json --help
+no_action "setup --help" setup --help
+no_action "apps --help" apps --help
+no_action "completion bash --help" completion bash --help
+
+ai completion bash --help
+assert_not_contains "completion bash --help prints help, not the script" "$RUN_OUT" "complete -F"
+
+assert_dir "the launcher is still there" "$APPS/Fake Safe.app"
+assert_file "its data is still there" "$DATA/fake-safe/Cookies"
+assert_file "the stray folder is still there" "$STRAY_DIR/Cookies"
+assert_no_dir "restore did not rebuild the removed launcher" "$APPS/Fake Gone.app"
+assert_no_dir "nothing was created by add --help" "$APPS/Fake Other.app"
+assert_no_dir "nothing was renamed" "$APPS/Fake Renamed.app"
+ai rm "Fake Safe" --purge -y
+rm -rf "$STRAY_DIR" "$DATA/fake-gone"
+
+group "shell completion scripts"
+
+for sh in bash zsh fish; do
+  ai_stdout completion "$sh"
+  assert_rc "completion $sh exits 0" 0 "$RUN_RC" "$RUN_ERR"
+  assert_nonempty "completion $sh prints a script" "$RUN_OUT"
+  assert_eq "completion $sh prints nothing on stderr" "" "$RUN_ERR"
+  assert_contains "completion $sh asks aidentity for names" "$RUN_OUT" "aidentity __complete"
+  printf '%s\n' "$RUN_OUT" > "$SANDBOX/completion.$sh"
+  for w in setup init wizard add rename mv set modify edit prune restore rebuild \
+           repair list ls open rm remove delete apps doctor completion version help; do
+    case "$RUN_OUT" in
+      *"$w"*) ;;
+      *) _fail "completion $sh knows the command $w" "no $w in the script" ;;
+    esac
+  done
+  for o in --purge --json --own-extensions --shared-extensions --clear-args --fix --all; do
+    case "$RUN_OUT" in
+      *"${o#--}"*) ;;
+      *) _fail "completion $sh knows the option $o" "no ${o#--} in the script" ;;
+    esac
+  done
+  assert_contains "completion $sh offers colour names" "$RUN_OUT" "graphite"
+done
+
+if "$BASH_BIN" -n "$SANDBOX/completion.bash" 2>/dev/null; then
+  _pass "the bash script is valid bash"
+else
+  _fail "the bash script is valid bash" "$("$BASH_BIN" -n "$SANDBOX/completion.bash" 2>&1)"
+fi
+if command -v bash >/dev/null 2>&1 && bash -n "$SANDBOX/completion.bash" 2>/dev/null; then
+  _pass "and valid for the first bash on PATH"
+else
+  _fail "and valid for the first bash on PATH" "bash -n failed"
+fi
+
+ZSH_BIN=$(command -v zsh 2>/dev/null || true)
+if [ -n "$ZSH_BIN" ]; then
+  if "$ZSH_BIN" -n "$SANDBOX/completion.zsh" 2>/dev/null; then
+    _pass "the zsh script is valid zsh"
+  else
+    _fail "the zsh script is valid zsh" "$("$ZSH_BIN" -n "$SANDBOX/completion.zsh" 2>&1)"
+  fi
+  # Loaded the way the README says, it registers itself for aidentity.
+  ZSH_REG=$(HOME="$SANDBOX/tty-home" "$ZSH_BIN" -f -c '
+    autoload -Uz compinit; compinit -u -d "$1/zcompdump" >/dev/null 2>&1
+    eval "$(cat "$2")"; print -r -- "${_comps[aidentity]}"' zsh "$SANDBOX" "$SANDBOX/completion.zsh" 2>&1)
+  assert_eq "zsh registers the completion function for aidentity" "_aidentity" "$ZSH_REG"
+else
+  _skip "the zsh script is valid zsh" "zsh is not installed"
+  _skip "zsh registers the completion function for aidentity" "zsh is not installed"
+fi
+
+FISH_BIN=$(command -v fish 2>/dev/null || true)
+if [ -n "$FISH_BIN" ]; then
+  if "$FISH_BIN" --no-execute "$SANDBOX/completion.fish" 2>/dev/null; then
+    _pass "the fish script is valid fish"
+  else
+    _fail "the fish script is valid fish" "$("$FISH_BIN" --no-execute "$SANDBOX/completion.fish" 2>&1)"
+  fi
+else
+  _skip "the fish script is valid fish" "fish is not installed; the fish script was not syntax-checked"
+fi
+
+ai_stdout completion tcsh
+assert_rc_nonzero "an unknown shell exits non-zero" "$RUN_RC" "$RUN_ERR"
+assert_eq "and prints no script" "" "$RUN_OUT"
+assert_contains "and names the shell" "$RUN_ERR" "tcsh"
+assert_contains "and says what is supported" "$RUN_ERR" "bash, zsh or fish"
+ai_stdout completion
+assert_rc_nonzero "no shell exits non-zero" "$RUN_RC" "$RUN_ERR"
+assert_contains "and shows the usage" "$RUN_ERR" "Usage: aidentity completion"
+ai completion bash zsh
+assert_rc_nonzero "two shells are refused" "$RUN_RC" "$RUN_OUT"
+ai completion --bogus
+assert_rc_nonzero "an unknown option is refused" "$RUN_RC" "$RUN_OUT"
+
+# The names the scripts complete are the names main() takes.
+libcall eval 'printf "%s\n" $COMMAND_WORDS'
+WORDS_LISTED=$(printf '%s\n' "$RUN_OUT" | LC_ALL=C sort)
+WORDS_DISPATCHED=$(sed -n '/^canonical_command() {/,/^}/p' "$AIDENTITY" \
+  | sed -n 's/^    \([a-z|-]*\)) .*/\1/p' | tr '|' '\n' | grep -v '^-' | LC_ALL=C sort)
+assert_nonempty "the command table can be read from the script" "$WORDS_DISPATCHED"
+assert_eq "COMMAND_WORDS lists exactly the names the dispatch accepts" "$WORDS_DISPATCHED" "$WORDS_LISTED"
+for w in $WORDS_LISTED; do
+  libcall canonical_command "$w"
+  assert_rc "canonical_command accepts $w" 0 "$RUN_RC" "$RUN_OUT"
+done
+
+if grep -q 'generate_completions_from_executable(bin/"aidentity", "completion"' "$REPO_DIR/Formula/aidentity.rb" \
+   && grep -q 'shells: \[:bash, :zsh, :fish\]' "$REPO_DIR/Formula/aidentity.rb"; then
+  _pass "the Homebrew formula installs bash, zsh and fish completions"
+else
+  _fail "the Homebrew formula installs bash, zsh and fish completions" "no generate_completions_from_executable line"
+fi
+
+group "completion candidates (__complete)"
+
+ai add "$ELECTRON_APP" --profile "Home Office"
+ai add "$ELECTRON_APP" --profile Work
+ai add "$ELECTRON_APP" --profile Gone
+ai rm "Fake Gone" -y
+make_decoy_app "$APPS/Decoy.app"
+
+has_line() { # description, text, line: the line is there whole, spaces and all
+  if printf '%s\n' "$2" | grep -Fxq -- "$3"; then _pass "$1"; else _fail "$1" "no line [$3]" "in: [$2]"; fi
+}
+lacks_line() {
+  if printf '%s\n' "$2" | grep -Fxq -- "$3"; then _fail "$1" "unexpected line [$3]" "in: [$2]"; else _pass "$1"; fi
+}
+
+ai_stdout __complete launchers
+assert_rc "__complete launchers exits 0" 0 "$RUN_RC" "$RUN_ERR"
+assert_eq "and prints nothing on stderr" "" "$RUN_ERR"
+has_line "it lists a profile name" "$RUN_OUT" "Fake Work"
+has_line "it lists a profile name with a space in the profile" "$RUN_OUT" "Fake Home Office"
+lacks_line "it leaves out an app that is not a launcher" "$RUN_OUT" "Decoy"
+lacks_line "and a profile whose launcher is gone" "$RUN_OUT" "Fake Gone"
+assert_not_contains "and prints no colour codes or paths" "$RUN_OUT" "/"
+
+make_electron_app "$SRC/Space Case.app"
+ai_stdout __complete apps
+assert_rc "__complete apps exits 0" 0 "$RUN_RC" "$RUN_ERR"
+has_line "it lists an Electron app" "$RUN_OUT" "Fake"
+has_line "and an app whose name has a space" "$RUN_OUT" "Space Case"
+has_line "it lists a Chromium fork" "$RUN_OUT" "Forky"
+lacks_line "it leaves out a native app" "$RUN_OUT" "Nativey"
+lacks_line "and the launchers" "$RUN_OUT" "Fake Work"
+
+# A folder name is not trusted: an escape sequence in one must not reach the
+# terminal through the list Tab prints.
+ESC=$(printf '\033')
+make_electron_app "$SRC/Evil${ESC}[31mApp.app"
+cp -R "$APPS/Fake Work.app" "$APPS/Fake ${ESC}[31mRed.app"
+ai_stdout __complete apps
+assert_not_contains "an app name with an escape character is left out" "$RUN_OUT" "Evil"
+assert_not_contains "and no escape character is printed" "$RUN_OUT" "$ESC"
+ai_stdout __complete launchers
+assert_not_contains "a launcher name with an escape character is left out" "$RUN_OUT" "Red"
+assert_not_contains "and no escape character is printed for launchers" "$RUN_OUT" "$ESC"
+has_line "the other launchers are still listed" "$RUN_OUT" "Fake Work"
+rm -rf "$SRC/Evil${ESC}[31mApp.app" "$APPS/Fake ${ESC}[31mRed.app"
+
+ai_stdout __complete restorable
+assert_rc "__complete restorable exits 0" 0 "$RUN_RC" "$RUN_ERR"
+has_line "it lists a profile whose launcher was removed" "$RUN_OUT" "Fake Gone"
+lacks_line "and not one that still has a launcher" "$RUN_OUT" "Fake Work"
+
+for what in bogus ""; do
+  ai_stdout __complete "$what"
+  assert_rc "__complete [$what] exits 0" 0 "$RUN_RC" "$RUN_ERR"
+  assert_eq "__complete [$what] prints nothing" "" "$RUN_OUT"
+  assert_eq "__complete [$what] says nothing on stderr" "" "$RUN_ERR"
+done
+ai_stdout __complete
+assert_rc "__complete with no argument exits 0" 0 "$RUN_RC" "$RUN_ERR"
+assert_eq "and prints nothing" "$RUN_OUT$RUN_ERR" ""
+
+for what in launchers restorable apps; do
+  RUN_OUT=$(AIDENTITY_APPS_DIR="$SB/no/such/folder" AIDENTITY_DATA_ROOT="$SB/no/such/data" \
+    AIDENTITY_APP_DIRS="$SB/no/such/apps" detached "$BASH_BIN" "$AIDENTITY" __complete "$what" 2>"$SANDBOX/stderr" </dev/null)
+  RUN_RC=$?
+  assert_rc "__complete $what over folders that do not exist exits 0" 0 "$RUN_RC" "$RUN_OUT"
+  assert_eq "and prints nothing" "" "$RUN_OUT$(cat "$SANDBOX/stderr")"
+done
+
+group "bash completion behaviour"
+
+COMP_BIN="$SANDBOX/comp-bin"
+mkdir -p "$COMP_BIN"
+printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$BASH_BIN" "$AIDENTITY" > "$COMP_BIN/aidentity"
+chmod +x "$COMP_BIN/aidentity"
+
+# Run the generated function as bash would, with the words typed so far; the
+# last one is the word under the cursor. RUN_OUT holds what COMPREPLY ends up
+# with, one entry per line.
+bash_complete() {
+  RUN_OUT=$(PATH="$COMP_BIN:$PATH" "$BASH_BIN" -c '
+    . "$1"; shift
+    COMP_WORDS=("$@"); COMP_CWORD=$(( $# - 1 ))
+    _aidentity
+    for r in "${COMPREPLY[@]}"; do printf "%s\n" "$r"; done' aidentity-comp "$SANDBOX/completion.bash" "$@" 2>&1)
+  RUN_RC=$?
+}
+
+bash_complete aidentity ""
+assert_rc "completing the command works" 0 "$RUN_RC" "$RUN_OUT"
+has_line "an empty word offers commands: add" "$RUN_OUT" "add"
+has_line "and aliases: ls" "$RUN_OUT" "ls"
+has_line "and completion itself" "$RUN_OUT" "completion"
+lacks_line "but not options" "$RUN_OUT" "--help"
+bash_complete aidentity re
+assert_eq "a prefix narrows the commands" "rename
+restore
+rebuild
+repair
+remove" "$RUN_OUT"
+bash_complete aidentity -
+assert_eq "a dash offers the global options" "-h
+--help
+-v
+--version" "$RUN_OUT"
+bash_complete aidentity rm --p
+assert_eq "an option prefix completes the option" "--purge" "$RUN_OUT"
+bash_complete aidentity delete --pu
+assert_eq "an alias gets its command's options" "--purge" "$RUN_OUT"
+bash_complete aidentity ls --
+assert_eq "list offers --json and --help" "--json
+--help" "$RUN_OUT"
+bash_complete aidentity add --
+has_line "add offers --profile" "$RUN_OUT" "--profile"
+has_line "add offers --own-extensions" "$RUN_OUT" "--own-extensions"
+bash_complete aidentity add Fake --profile Work --se
+assert_eq "options are still offered after other arguments" "--seed" "$RUN_OUT"
+
+bash_complete aidentity rm ""
+has_line "rm offers a profile name, escaped for the shell" "$RUN_OUT" 'Fake\ Work'
+has_line "and one whose profile name has a space" "$RUN_OUT" 'Fake\ Home\ Office'
+lacks_line "and not an app that is not a launcher" "$RUN_OUT" "Decoy"
+bash_complete aidentity open 'Fake\ H'
+assert_eq "a name already escaped by hand completes" 'Fake\ Home\ Office' "$RUN_OUT"
+bash_complete aidentity open '"Fake H'
+assert_eq "a name inside double quotes completes unescaped" 'Fake Home Office' "$RUN_OUT"
+bash_complete aidentity open "'Fake W"
+assert_eq "a name inside single quotes completes unescaped" 'Fake Work' "$RUN_OUT"
+bash_complete aidentity rm "Fake Work" ""
+assert_eq "rm takes one name, so nothing more is offered" "" "$RUN_OUT"
+bash_complete aidentity rename "Fake Work" ""
+assert_eq "the new name for rename is not completed" "" "$RUN_OUT"
+for c in open set rebuild rename; do
+  bash_complete aidentity "$c" "Fake\\ W"
+  assert_eq "$c completes a profile name" 'Fake\ Work' "$RUN_OUT"
+done
+bash_complete aidentity restore ""
+assert_eq "restore offers only profiles that can be restored" 'Fake\ Gone' "$RUN_OUT"
+bash_complete aidentity add ""
+has_line "add offers an app name" "$RUN_OUT" "Fake"
+has_line "and an app whose name has a space is escaped" "$RUN_OUT" 'Space\ Case'
+lacks_line "and not a launcher" "$RUN_OUT" 'Fake\ Work'
+bash_complete aidentity add Fo
+assert_eq "an app prefix narrows the apps" "Forky" "$RUN_OUT"
+bash_complete aidentity add Spa
+assert_eq "a spaced app name completes with its space escaped" 'Space\ Case' "$RUN_OUT"
+bash_complete aidentity add --color ""
+has_line "--color offers colours" "$RUN_OUT" "blue"
+has_line "including the neutrals" "$RUN_OUT" "graphite"
+bash_complete aidentity set "Fake Work" -c pu
+assert_eq "-c completes a colour too" "purple" "$RUN_OUT"
+bash_complete aidentity set "Fake Work" --colour te
+assert_eq "--colour completes a colour as well" "teal" "$RUN_OUT"
+bash_complete aidentity add --profile ""
+assert_eq "a value that has no list offers nothing" "" "$RUN_OUT"
+bash_complete aidentity completion ""
+assert_eq "completion offers the three shells" "bash
+zsh
+fish" "$RUN_OUT"
+bash_complete aidentity help rest
+assert_eq "help completes a command name" "restore" "$RUN_OUT"
+bash_complete aidentity definitely-not-a-command ""
+assert_eq "an unknown command offers nothing" "" "$RUN_OUT"
+
+# A folder name is not trusted. After an opening quote the name is escaped for
+# that quote, so a $, a backtick or a quote mark in it is never run as code.
+EVAL_DIR="$SANDBOX/comp-eval"
+mkdir -p "$EVAL_DIR"
+HOSTILE_NAMES=(
+  'Fake Dollar $HOME Work'
+  'Fake Sub $(touch pwned-marker) Work'
+  'Fake Tick `touch pwned-marker` Work'
+  "Fake It's Work"
+  'Fake Quote"d Work'
+  'Fake Slash\ed Work'
+  'Fake Bang! Work'
+)
+for n in "${HOSTILE_NAMES[@]}"; do cp -R "$APPS/Fake Work.app" "$APPS/$n.app"; done
+
+shell_reads() { # description, quote mark ("" for none), what is typed, the name it must be
+  local desc="$1" q="$2" typed="$3" want="$4" got
+  bash_complete aidentity open "$q$typed"
+  case "$RUN_OUT" in
+    ""|*$'\n'*) _fail "$desc" "expected exactly one reply" "got: [$RUN_OUT]"; return ;;
+  esac
+  rm -f "$EVAL_DIR/pwned-marker"
+  got=$(cd "$EVAL_DIR" && "$BASH_BIN" -c "printf '%s' $q$RUN_OUT$q" 2>&1)
+  assert_eq "$desc: the shell reads the name back whole" "$want" "$got"
+  assert_no_file "$desc: and runs nothing" "$EVAL_DIR/pwned-marker"
+}
+
+for q in '"' "'" ""; do
+  case "$q" in '"') qn="in double quotes" ;; "'") qn="in single quotes" ;; *) qn="without quotes" ;; esac
+  shell_reads "$qn, a dollar sign"      "$q" "Fake Dollar" 'Fake Dollar $HOME Work'
+  shell_reads "$qn, a command in \$()"  "$q" "Fake Sub"    'Fake Sub $(touch pwned-marker) Work'
+  shell_reads "$qn, a backtick"         "$q" "Fake Tick"   'Fake Tick `touch pwned-marker` Work'
+  shell_reads "$qn, an apostrophe"      "$q" "Fake It"     "Fake It's Work"
+  shell_reads "$qn, a double quote"     "$q" "Fake Quote"  'Fake Quote"d Work'
+  shell_reads "$qn, a backslash"        "$q" "Fake Slash"  'Fake Slash\ed Work'
+done
+shell_reads "in single quotes, an exclamation mark" "'" "Fake Bang" 'Fake Bang! Work'
+shell_reads "without quotes, an exclamation mark" "" "Fake Bang" 'Fake Bang! Work'
+
+bash_complete aidentity open '"Fake Dollar'
+assert_eq 'in double quotes a $ gets a backslash' 'Fake Dollar \$HOME Work' "$RUN_OUT"
+bash_complete aidentity open '"Fake Quote'
+assert_eq 'and a double quote' 'Fake Quote\"d Work' "$RUN_OUT"
+bash_complete aidentity open '"Fake Tick'
+assert_eq 'and a backtick' 'Fake Tick \`touch pwned-marker\` Work' "$RUN_OUT"
+bash_complete aidentity open '"Fake Slash'
+assert_eq 'and a backslash' 'Fake Slash\\ed Work' "$RUN_OUT"
+bash_complete aidentity open "'Fake It"
+assert_eq "in single quotes an apostrophe closes, escapes and reopens" "Fake It'\\''s Work" "$RUN_OUT"
+bash_complete aidentity open "'Fake Dollar"
+assert_eq "in single quotes a \$ needs nothing" 'Fake Dollar $HOME Work' "$RUN_OUT"
+bash_complete aidentity open '"Fake Bang'
+assert_eq "a name with ! is left out inside double quotes, where it cannot be escaped" "" "$RUN_OUT"
+bash_complete aidentity open 'Fake\ Bang'
+assert_eq "and is escaped without quotes" 'Fake\ Bang\!\ Work' "$RUN_OUT"
+
+# What is typed already is read back through the same escapes.
+bash_complete aidentity open '"Fake Dollar \$H'
+assert_eq "an escaped \$ already typed still matches" 'Fake Dollar \$HOME Work' "$RUN_OUT"
+bash_complete aidentity open "\"Fake Dollar \\"
+assert_eq "so does a backslash with nothing after it yet" 'Fake Dollar \$HOME Work' "$RUN_OUT"
+bash_complete aidentity open '"Fake Quote\"'
+assert_eq "an escaped double quote already typed still matches" 'Fake Quote\"d Work' "$RUN_OUT"
+bash_complete aidentity open "\"Fake Slash\\\\"
+assert_eq "an escaped backslash already typed still matches" 'Fake Slash\\ed Work' "$RUN_OUT"
+bash_complete aidentity open "'Fake It'\\''s"
+assert_eq "an escaped apostrophe already typed still matches" "Fake It'\\''s Work" "$RUN_OUT"
+
+group "zsh completion behaviour"
+
+if [ -n "$ZSH_BIN" ]; then
+# The generated function runs under zsh -f. compadd and _describe, which only
+# exist inside zsh's completion system, are replaced by stand-ins that print the
+# candidates starting with the word under the cursor. zsh's own compadd does the
+# quoting of names, so these tests cover what the function decides: which words
+# count as arguments, which list it asks for and which options it offers.
+ZSH_DRIVER="$SANDBOX/zsh-driver.zsh"
+cat > "$ZSH_DRIVER" <<'ZSH_DRIVER_END'
+compdef() { :; }
+compadd() {
+  local arr=0 c
+  while [[ $1 == -* && $1 != -- ]]; do [[ $1 == -a ]] && arr=1; shift; done
+  [[ $1 == -- ]] && shift
+  if (( arr )); then set -- "${(@P)1}"; fi
+  for c in "$@"; do [[ $c == "$words[CURRENT]"* ]] && print -r -- "$c"; done
+  return 0
+}
+_describe() {
+  local c
+  for c in "${(@P)argv[-1]}"; do c=${c%%:*}; [[ $c == "$words[CURRENT]"* ]] && print -r -- "$c"; done
+  return 0
+}
+. "$1"; shift
+words=("$@"); CURRENT=$#
+_aidentity
+ZSH_DRIVER_END
+
+# Like bash_complete: the words typed so far, the last one under the cursor.
+# The output is sorted, since zsh lists its own order.
+zsh_complete() {
+  RUN_OUT=$(cd "$EVAL_DIR" && PATH="$COMP_BIN:$PATH" HOME="$SANDBOX/tty-home" "$ZSH_BIN" -f "$ZSH_DRIVER" "$SANDBOX/completion.zsh" "$@" 2>&1)
+  RUN_RC=$?
+  RUN_OUT=$(printf '%s\n' "$RUN_OUT" | LC_ALL=C sort)
+}
+
+zsh_complete aidentity ""
+assert_rc "zsh: completing the command works" 0 "$RUN_RC" "$RUN_OUT"
+has_line "zsh: an empty word offers commands: add" "$RUN_OUT" "add"
+has_line "zsh: and aliases: ls" "$RUN_OUT" "ls"
+has_line "zsh: and completion itself" "$RUN_OUT" "completion"
+lacks_line "zsh: but not options" "$RUN_OUT" "--help"
+zsh_complete aidentity re
+assert_eq "zsh: a prefix narrows the commands" "rebuild
+remove
+rename
+repair
+restore" "$RUN_OUT"
+zsh_complete aidentity -
+assert_eq "zsh: a dash offers the global options" "--help
+--version
+-h
+-v" "$RUN_OUT"
+zsh_complete aidentity rm --p
+assert_eq "zsh: an option prefix completes the option" "--purge" "$RUN_OUT"
+zsh_complete aidentity delete --pu
+assert_eq "zsh: an alias gets its command's options" "--purge" "$RUN_OUT"
+zsh_complete aidentity ls --
+assert_eq "zsh: list offers --json and --help" "--help
+--json" "$RUN_OUT"
+zsh_complete aidentity add --
+has_line "zsh: add offers --profile" "$RUN_OUT" "--profile"
+has_line "zsh: add offers --own-extensions" "$RUN_OUT" "--own-extensions"
+zsh_complete aidentity add Fake --profile Work --se
+assert_eq "zsh: options are still offered after other arguments" "--seed" "$RUN_OUT"
+
+zsh_complete aidentity rm ""
+has_line "zsh: rm offers a profile name" "$RUN_OUT" "Fake Work"
+has_line "zsh: and one whose profile name has a space" "$RUN_OUT" "Fake Home Office"
+lacks_line "zsh: and not an app that is not a launcher" "$RUN_OUT" "Decoy"
+lacks_line "zsh: and not a profile that can only be restored" "$RUN_OUT" "Fake Gone"
+zsh_complete aidentity open "Fake H"
+assert_eq "zsh: a name with a space completes" "Fake Home Office" "$RUN_OUT"
+zsh_complete aidentity rm "Fake Work" ""
+assert_eq "zsh: rm takes one name, so nothing more is offered" "" "$RUN_OUT"
+zsh_complete aidentity rename "Fake Work" ""
+assert_eq "zsh: the new name for rename is not completed" "" "$RUN_OUT"
+zsh_complete aidentity rm --purge ""
+has_line "zsh: an option before the name does not count as the name" "$RUN_OUT" "Fake Work"
+for c in open set rebuild rename; do
+  zsh_complete aidentity "$c" "Fake W"
+  assert_eq "zsh: $c completes a profile name" "Fake Work" "$RUN_OUT"
+done
+zsh_complete aidentity restore ""
+assert_eq "zsh: restore offers only profiles that can be restored" "Fake Gone" "$RUN_OUT"
+zsh_complete aidentity add ""
+has_line "zsh: add offers an app name" "$RUN_OUT" "Fake"
+has_line "zsh: and an app whose name has a space" "$RUN_OUT" "Space Case"
+lacks_line "zsh: and not a launcher" "$RUN_OUT" "Fake Work"
+zsh_complete aidentity add Fo
+assert_eq "zsh: an app prefix narrows the apps" "Forky" "$RUN_OUT"
+zsh_complete aidentity add --color ""
+has_line "zsh: --color offers colours" "$RUN_OUT" "blue"
+has_line "zsh: including the neutrals" "$RUN_OUT" "graphite"
+zsh_complete aidentity set "Fake Work" -c pu
+assert_eq "zsh: -c completes a colour too" "purple" "$RUN_OUT"
+zsh_complete aidentity set "Fake Work" --colour te
+assert_eq "zsh: --colour completes a colour as well" "teal" "$RUN_OUT"
+zsh_complete aidentity add --profile ""
+assert_eq "zsh: a value that has no list offers nothing" "" "$RUN_OUT"
+zsh_complete aidentity completion ""
+assert_eq "zsh: completion offers the three shells" "bash
+fish
+zsh" "$RUN_OUT"
+zsh_complete aidentity help rest
+assert_eq "zsh: help completes a command name" "restore" "$RUN_OUT"
+zsh_complete aidentity definitely-not-a-command ""
+assert_eq "zsh: an unknown command offers nothing" "" "$RUN_OUT"
+
+# Folder names are handed to zsh as they are. zsh quotes them itself, and
+# nothing in the function reads them as code.
+for want in 'Fake Dollar $HOME Work' 'Fake Sub $(touch pwned-marker) Work' 'Fake Tick `touch pwned-marker` Work' \
+            "Fake It's Work" 'Fake Quote"d Work' 'Fake Slash\ed Work' 'Fake Bang! Work'; do
+  zsh_complete aidentity open "${want% Work}"
+  has_line "zsh: the name [$want] is offered as it is" "$RUN_OUT" "$want"
+done
+assert_no_file "zsh: and no folder name ran as code" "$EVAL_DIR/pwned-marker"
+else
+  _skip "zsh completion behaviour" "zsh is not installed"
+fi
+
+for n in "${HOSTILE_NAMES[@]}"; do rm -rf "$APPS/$n.app"; done
+rm -rf "$EVAL_DIR"
+
+ai rm "Fake Home Office" --purge -y
+ai rm "Fake Work" --purge -y
+rm -rf "$DATA/fake-gone" "$APPS/Decoy.app" "$SRC/Space Case.app"
+
+
 group "sandbox isolation — final check"
 
 assert_eq "the real ~/Applications is unchanged" "$REAL_APPS_BEFORE" "$(snapshot "$REAL_APPS")"
