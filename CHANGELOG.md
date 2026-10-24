@@ -7,12 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `aidentity update` checks a download in three ways: `SHA256SUMS` has a
+  valid line for `bin/aidentity`, the file matches that checksum, and the file
+  says it is the version of the release tag. It no longer also checks that the
+  file starts with `#!`, passes `bash -n` and ends on its last line. The
+  checksum already proves the file is the published one, and those checks now
+  run on every release before it is published.
+
+### Removed
+
+- `install.sh` no longer checks the size, first line, syntax and last line of
+  the download on its own. The checksum covers all of that, and each release
+  is checked before it is published.
+- The test-only setting `AIDENTITY_UPDATE_URL`. `aidentity update` now always
+  reads the release from GitHub, and no setting can point it at another
+  address. `aidentity help`, `SECURITY.md` and the guide no longer list it.
+
 ### Fixed
 
 - `aidentity ui` gives the terminal back when it is ended by SIGTERM or SIGHUP
   while it waits for a key. Before, the terminal was left with echo off. It
   now leaves through its normal path, within two seconds, with the same exit
   status (143 or 129).
+- Profile names, `--arg` and `--env` values and the bundle identifier in a
+  restore record accept only ASCII letters, in every locale. In a UTF-8
+  locale, the default in Terminal, the checks also accepted letters such as
+  `é`, `ß` and fullwidth letters, which the docs say are refused. An `--arg`
+  or `--env` value with any character outside ASCII is refused, and the
+  message does not print it back. A path that `aidentity` prints for you to
+  type is now quoted when it has such a letter.
+- `--color` takes only ASCII hex digits, in every locale. In a UTF-8 locale it
+  also accepted fullwidth digits such as `ｆ`, and the menu could then quit
+  with an error when it showed that profile.
+
+### Security
+
+- The installer refuses to install without a matching checksum. Before, when
+  `SHA256SUMS` was missing or could not be downloaded (a network failure took
+  the same path), it warned and installed anyway. Now it changes nothing and
+  names the ref it tried (`AIDENTITY_REF`). For a release tag, the script must
+  also say it is that version.
+- The installer's own downloads do not read your `~/.curlrc`, as
+  `aidentity update` already did, and stop an answer far bigger than the
+  file. The `curl` that you pipe into `bash` still reads `~/.curlrc`. If your
+  proxy or CA certificate is set there, set `https_proxy` or `CURL_CA_BUNDLE`
+  instead; the installer says so when it cannot download the script. Each
+  download now stops after 60 seconds, as in `aidentity update`, not 120.
+
+### Changed (for maintainers and contributors)
+
+- `install.sh` and `aidentity update` share one block of download code:
+  fetch, verify, read the version and install in one step. `install.sh`
+  carries a pasted copy, because it cannot source the file it checks, and
+  `scripts/guards.sh` fails when the two copies differ, when a shared
+  function is defined again outside the block, or when `install.sh` runs
+  `curl` anywhere but in `https_fetch`. The guard that
+  compared the last line with `install.sh`'s `END_MARKER` is gone; the guard
+  for installed copies pins the same line.
+- `scripts/guards.sh` checks that `bin/aidentity` passes `bash -n` under
+  `/bin/bash` and starts with `#!`. Installed copies of 1.4.0 still check
+  both, as well as the last line and the version line, which the guards
+  already pinned.
+- The menu tests put SIGINT and SIGHUP back to their defaults before they
+  start the menu, as the update tests already did. A suite started with
+  either signal ignored no longer waits out a 90-second timeout in each
+  Ctrl-C test.
 
 ## [1.4.0] - 2026-10-24
 

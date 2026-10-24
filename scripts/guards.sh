@@ -33,18 +33,25 @@ else
   pass "braces before multi-byte characters"
 fi
 
-# 2. install.sh verifies a download by matching this exact final line.
-marker=$(sed -n "s/^END_MARKER='\(.*\)'$/\1/p" install.sh)
-last=$(awk 'NF {l=$0} END {sub(/[ \t\r]+$/,"",l); print l}' bin/aidentity)
-if [ -n "$marker" ] && [ "$last" = "$marker" ]; then
-  pass "bin/aidentity ends on install.sh's END_MARKER"
+# 2. Installed copies check a download by its checksum alone, which proves it
+#    is the published file but not that the file works. So the file is
+#    checked here, before every release: it must parse as shell. On a Mac,
+#    /bin/bash is the 3.2 that installed copies run. CI and the release gate
+#    run this on Linux, where it is bash 5; there the 3.2 check is the macOS
+#    test job, which runs the whole suite under /bin/bash. A script cut short
+#    is often still valid shell; check 7 pins the last line for that.
+if err=$(/bin/bash -n bin/aidentity 2>&1); then
+  pass "bin/aidentity passes bash -n"
 else
-  bad "bin/aidentity must end on [$marker] but ends on [$last]"
+  bad "bin/aidentity is not valid shell (bash -n):"
+  printf '%s\n' "$err" >&2
 fi
 
-# 3. Safety helpers are copied into uninstall.sh and MUST stay in step: a
-#    drifted copy of running_on_profile once shipped a dead guard. Compare
-#    code, not comments, and fail when either copy is missing.
+# 3. Code is pasted into the scripts that cannot source bin/aidentity, and it
+#    MUST stay in step: a drifted copy of running_on_profile once shipped a
+#    dead guard. uninstall.sh carries safety helpers, compared as code without
+#    comments. install.sh carries the download block, compared byte for byte.
+#    Either copy missing fails.
 for fn in running_on_profile data_is_ours is_our_launcher; do
   a=$(sed -n "/^$fn() {/,/^}/p" bin/aidentity | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true)
   b=$(sed -n "/^$fn() {/,/^}/p" uninstall.sh  | grep -v '^[[:space:]]*#' | grep -v '^[[:space:]]*$' || true)
@@ -57,6 +64,26 @@ for fn in running_on_profile data_is_ours is_our_launcher; do
     pass "$fn is the same in both scripts"
   fi
 done
+block() { sed -n '/^# >>> download block/,/^# <<< download block/p' "$1"; }
+a=$(block bin/aidentity); b=$(block install.sh)
+# Each function once, inside the block: a second definition elsewhere in the
+# file would quietly replace the shared one. Any way of writing one counts:
+# name() {, name () { and function name {.
+for fn in is_version is_release_tag https_fetch file_version verify_release_file install_atomic; do
+  def="^[[:space:]]*(function[[:space:]]+${fn}([[:space:]]|\(|$)|${fn}[[:space:]]*\(\))"
+  if ! printf '%s\n' "$a" | grep -q "^$fn() {" \
+     || [ "$(grep -cE "$def" bin/aidentity)" != 1 ] || [ "$(grep -cE "$def" install.sh)" != 1 ]; then
+    bad "$fn must be defined once, inside the download block, in bin/aidentity and install.sh"
+  fi
+done
+if [ -z "$a" ] || [ -z "$b" ]; then
+  bad "the download block is missing from bin/aidentity or install.sh"
+elif [ "$a" != "$b" ]; then
+  bad "the download block differs between bin/aidentity and install.sh"
+  diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") >&2 || true
+else
+  pass "the download block is the same in bin/aidentity and install.sh"
+fi
 
 # 4. A changed bin/aidentity without a new SHA256SUMS fails every piped install.
 want=$(awk '$2 == "bin/aidentity" { print $1; exit }' SHA256SUMS)
@@ -78,30 +105,40 @@ else
   bad "install.sh's default ref is '$ref'; it must be main or v$version. Run: make release VERSION=$version"
 fi
 
-# 6. The script runs curl in one place, update_fetch, which holds it to HTTPS
+# 6. The scripts run curl in one place, https_fetch, which holds it to HTTPS
 #    and keeps the user's .curlrc out. Another call would use the network
 #    without those settings, and SECURITY.md would no longer be true.
-hits=$(perl -ne '
-  $in = 1 if /^update_fetch\(\) \{/;
-  print(($in ? "in" : "out"), " $.: $_") if !/^\s*#/ && /(?<![\w.-])curl\s+(?:-|["\x27\$]|https?:)/;
-  $in = 0 if $in && /^\}/;
-' bin/aidentity)
-outside=$(printf '%s\n' "$hits" | grep '^out ' || true)
-inside=$(printf '%s\n' "$hits" | grep -c '^in ' || true)
-if [ -n "$outside" ]; then
-  bad "curl may run only in update_fetch in bin/aidentity:"
-  printf '%s\n' "$outside" >&2
-elif [ "$inside" != "1" ]; then
-  bad "update_fetch in bin/aidentity should run curl once (found $inside); update this check if it moved"
-else
-  pass "curl runs only in update_fetch"
-fi
+#    install.sh also prints lines that start "curl -fsSL $INSTALL_URL |" for
+#    the user to run: those are text, not calls.
+for f in bin/aidentity install.sh; do
+  hits=$(perl -ne '
+    $in = 1 if /^https_fetch\(\) \{/;
+    print(($in ? "in" : "out"), " $.: $_")
+      if !/^\s*#/ && !/^\s*curl -fsSL \$INSTALL_URL \| / && /(?<![\w.-])curl\s+(?:-|["\x27\$]|https?:)/;
+    $in = 0 if $in && /^\}/;
+  ' "$f")
+  outside=$(printf '%s\n' "$hits" | grep '^out ' || true)
+  inside=$(printf '%s\n' "$hits" | grep -c '^in ' || true)
+  if [ -n "$outside" ]; then
+    bad "curl may run only in https_fetch in $f:"
+    printf '%s\n' "$outside" >&2
+  elif [ "$inside" != "1" ]; then
+    bad "https_fetch in $f should run curl once (found $inside); update this check if it moved"
+  else
+    pass "curl runs only in https_fetch in $f"
+  fi
+done
 
 # 7. Every installed copy's `aidentity update` checks a release with its own
-#    fixed code: the last line, the version line and the SHA256SUMS line
-#    format. Check 2 compares with install.sh, which is downloaded fresh and
-#    could change in step; these fixed values cannot. If one of them changes,
-#    copies already installed can never update again.
+#    fixed code. Copies of 1.4.0 check the first line, the last line, the
+#    version line and the SHA256SUMS line format (and bash -n, check 2). Later
+#    copies check only the last two, but 1.4.0 copies stay installed. If one
+#    of these changes, those copies can never update again.
+case "$(head -n 1 bin/aidentity)" in
+  '#!'*) pass "bin/aidentity starts with #!, which installed copies check" ;;
+  *) bad "bin/aidentity must start with #!; installed copies of update check that" ;;
+esac
+last=$(awk 'NF {l=$0} END {sub(/[ \t\r]+$/,"",l); print l}' bin/aidentity)
 # shellcheck disable=SC2016  # the literal text of the last line
 if [ "$last" = 'main "$@"' ]; then
   pass "bin/aidentity ends on main \"\$@\", the line installed copies check"

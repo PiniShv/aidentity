@@ -102,6 +102,9 @@ cleanup() {
   case "$SANDBOX" in
     */aidentity-tests.*)
       chmod -R u+rwX "$SANDBOX" 2>/dev/null
+      # The install tests lock a file with chflags; one stopped half way
+      # would otherwise stay locked.
+      chflags -R nouchg "$SANDBOX" 2>/dev/null
       rm -rf "$SANDBOX"
       ;;
     *) printf '# refusing to remove an unexpected sandbox path: %s\n' "$SANDBOX" >&2 ;;
@@ -525,6 +528,53 @@ accept_name "a hyphen"                        'Client-2'
 accept_name "an underscore"                   'Client_2'
 accept_name "letters, digits, space, hyphen and underscore together" 'Acme Corp_2-b'
 accept_name "exactly 40 characters"           "$(repeat_char 40 a)"
+
+group "letter checks do not depend on the locale"
+
+# In a UTF-8 locale, the default in Terminal, bash lets [A-Za-z] match letters
+# such as é, ß and fullwidth ａ, and [0-9a-f] fullwidth hex digits. The suite
+# runs under C, so these run the checks under en_US.UTF-8, where each must
+# still refuse them.
+utf8_call() { LC_ALL=en_US.UTF-8 libcall "$@"; }
+for n in 'Café' 'Straße' 'ｗork' 'İstanbul' 'Ⅻ'; do
+  utf8_call validate_profile_name "$n"
+  assert_rc_nonzero "under en_US.UTF-8, the profile name [$n] is refused" "$RUN_RC" "$RUN_OUT"
+done
+utf8_call validate_profile_name 'Acme Corp_2-b'
+assert_rc "and an ASCII name is still accepted there" 0 "$RUN_RC" "$RUN_OUT"
+utf8_call validate_switch '--lang=dé'
+assert_rc_nonzero "a language tag with é is refused" "$RUN_RC" "$RUN_OUT"
+utf8_call validate_switch '--proxy-server=socks5://prøxy:1080'
+assert_rc_nonzero "a proxy with ø is refused" "$RUN_RC" "$RUN_OUT"
+utf8_call validate_env 'TZ=Europe/Zürich'
+assert_rc_nonzero "a time zone with ü is refused" "$RUN_RC" "$RUN_OUT"
+utf8_call validate_env 'LANG=dé_DE.UTF-8'
+assert_rc_nonzero "a locale with é is refused" "$RUN_RC" "$RUN_OUT"
+utf8_call is_bundle_id 'com.exämple.app'
+assert_rc_nonzero "a bundle identifier with ä is not trusted" "$RUN_RC" "$RUN_OUT"
+utf8_call typed_path '/tmp/Café'
+assert_eq "a path with é is quoted for the user to type" "'/tmp/Café'" "$RUN_OUT"
+# U+009B is CSI, a control code under UTF-8 but not under C: it must still be
+# refused, and never printed back to the terminal.
+C1=$'\xc2\x9b'
+utf8_call validate_switch "--a${C1}31mX"
+assert_rc_nonzero "a switch with the control code U+009B is refused" "$RUN_RC" "$RUN_OUT"
+assert_not_contains "and the code is not printed back" "$RUN_OUT" "$C1"
+utf8_call validate_env "LANG=de${C1}31m"
+assert_rc_nonzero "an environment value with U+009B is refused" "$RUN_RC" "$RUN_OUT"
+assert_not_contains "and the code is not printed back" "$RUN_OUT" "$C1"
+utf8_call validate_env "A${C1}=1"
+assert_rc_nonzero "a variable name with U+009B is refused" "$RUN_RC" "$RUN_OUT"
+assert_not_contains "and the code is not printed back" "$RUN_OUT" "$C1"
+utf8_call validate_switch '--proxy-server=socks5://127.0.0.1:1080'
+assert_rc "and an ASCII switch is still accepted there" 0 "$RUN_RC" "$RUN_OUT"
+utf8_call color_hex 'ｆｆｆｆｆｆ'
+assert_rc_nonzero "a colour in fullwidth hex digits is refused" "$RUN_RC" "$RUN_OUT"
+utf8_call color_hex '2e7dF6'
+assert_eq "and ASCII hex digits are still accepted" "2e7dF6" "$RUN_OUT"
+utf8_call ui_idx256 'ｆｆｆｆｆｆ'
+assert_rc "the menu's colour code refuses fullwidth hex digits, without an error" 1 "$RUN_RC" "$RUN_OUT"
+assert_eq "and prints nothing" "" "$RUN_OUT"
 
 group "slugify and shquote"
 
@@ -2127,13 +2177,16 @@ exit "$rc"'
 
 # Run a command on a terminal rows x cols in size, typing $3 at it. RUN_OUT is
 # everything it wrote, RUN_RC its exit status, RUN_FLAGS "same" when the
-# terminal's echo and line settings are back as they were.
+# terminal's echo and line settings are back as they were. The perl wrapper
+# puts SIGINT and SIGHUP back to their defaults first: a suite started with
+# either ignored (by nohup, or as a background job) would pass that on, the
+# menu could not trap it, and each Ctrl-C test would wait out the alarm.
 ui_pty() { # rows, cols, keys, command…
   local rows="$1" cols="$2" keys="$3" f; shift 3
   rm -f "$UI_DONE"; : > "$UI_LOG"
   RUN_OUT=$( { ui_feed "$keys" \
       | HOME="$SANDBOX/tty-home" PATH="$STUB_BIN:$PATH" TERM="${UI_TERM:-xterm-256color}" \
-        /usr/bin/perl -e 'alarm 90; exec @ARGV' script -q /dev/null /bin/sh -c "$UI_WRAP" ui "$rows" "$cols" "$@"
+        /usr/bin/perl -e '$SIG{INT} = $SIG{HUP} = "DEFAULT"; alarm 90; exec @ARGV' script -q /dev/null /bin/sh -c "$UI_WRAP" ui "$rows" "$cols" "$@"
       echo "__rc=${PIPESTATUS[1]}"; } 2>&1 | tee "$UI_LOG" | tr -d '\r')
   RUN_RC=${RUN_OUT##*__rc=}
   RUN_OUT=${RUN_OUT%__rc=*}
@@ -2682,7 +2735,7 @@ out="" url=""
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -o) out="\$2"; shift 2 ;;
-    --proto|--proto-redir|--connect-timeout|--max-time|--retry) shift 2 ;;
+    --proto|--proto-redir|--connect-timeout|--max-time|--retry|--max-filesize) shift 2 ;;
     -*) shift ;;
     *) url="\$1"; shift ;;
   esac
@@ -2701,13 +2754,16 @@ if [ -n "\$out" ]; then cat "\$src" > "\$out"; else cat "\$src"; fi
 STUB
 chmod +x "$CURL_STUB/curl"
 
-inst() { # install dir, then optional VAR=value settings for install.sh
-  local dir="$1"; shift
+# --piped runs it as `curl … | bash` does: the script arrives on stdin.
+inst() { # [--piped] install dir, then optional VAR=value settings for install.sh
+  local args=("$REPO_DIR/install.sh") input=/dev/null dir
+  if [ "$1" = --piped ]; then args=(-s); input="$REPO_DIR/install.sh"; shift; fi
+  dir="$1"; shift
   RUN_OUT=$(env HOME="$SANDBOX/inst-home" PATH="$CURL_STUB:/usr/bin:/bin:/usr/sbin:/sbin" \
     AIDENTITY_INSTALL_DIR="$dir" "$@" /usr/bin/perl -MPOSIX -e '
       my $pid = fork; die "fork: $!\n" unless defined $pid;
       if ($pid) { waitpid($pid, 0); exit($? & 127 ? 128 + ($? & 127) : $? >> 8) }
-      POSIX::setsid(); exec @ARGV or exit 127' -- "$BASH_BIN" "$REPO_DIR/install.sh" 2>&1 </dev/null)
+      POSIX::setsid(); exec @ARGV or exit 127' -- "$BASH_BIN" "${args[@]}" 2>&1 <"$input")
   RUN_RC=$?
   return 0
 }
@@ -2726,9 +2782,14 @@ assert_contains "a second run reports a reinstall" "$RUN_OUT" "Reinstalled"
 inst "$SB/inst b" STUB_SUMS=bad
 assert_rc_nonzero "a checksum mismatch refuses to install" "$RUN_RC" "$RUN_OUT"
 assert_no_file "and writes nothing" "$SB/inst b/aidentity"
-inst "$SB/inst c" STUB_SUMS=missing
-assert_rc "a missing checksum file warns and installs" 0 "$RUN_RC" "$RUN_OUT"
-assert_contains "and says so" "$RUN_OUT" "No published checksum"
+inst "$SB/inst c" STUB_SUMS=missing AIDENTITY_REF=main
+assert_rc_nonzero "a missing checksum file refuses to install" "$RUN_RC" "$RUN_OUT"
+assert_contains "and names the ref it tried" "$RUN_OUT" "SHA256SUMS for AIDENTITY_REF=main"
+assert_no_file "and writes nothing" "$SB/inst c/aidentity"
+inst --piped "$SB/inst p"
+assert_rc "install.sh works piped into bash, as curl | bash runs it" 0 "$RUN_RC" "$RUN_OUT"
+if cmp -s "$SB/inst p/aidentity" "$REPO_DIR/bin/aidentity"; then _pass "and installs this checkout's script"
+else _fail "and installs this checkout's script" "differs or missing"; fi
 inst "$SB/inst d" "AIDENTITY_REF=../../evil/repo/main"
 assert_rc_nonzero "a ref that walks out of the repository is refused" "$RUN_RC" "$RUN_OUT"
 mkdir -p "$SB/inst e/aidentity"
@@ -3006,6 +3067,55 @@ assert_rc "a changelog without the version is refused" 1 "$RUN_RC" "$RUN_OUT$RUN
 assert_contains "naming the version" "$RUN_ERR" "No notes for $rc_version"
 assert_contains "and the release" "$RUN_ERR" "has no notes for $rc_version"
 assert_not_contains "and it does not say the tag matches" "$RUN_OUT" "matches version"
+
+# The published script is checked once, here, so installed copies need not
+# check it: valid shell, #! first, main "$@" last. Each break fails the guards
+# even with a checksum made for the broken file.
+rc_guard() { # description, guard message, sed script for bin/aidentity
+  rc_fresh
+  rc_sed bin/aidentity "$3"
+  (cd "$RC_DIR" && shasum -a 256 bin/aidentity) > "$RC_DIR/SHA256SUMS"
+  rc_run "v$rc_version"
+  assert_rc "$1" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+  assert_contains "with the guard's message" "$RUN_ERR" "$2"
+}
+rc_guard "a script that is not valid shell is refused" "is not valid shell (bash -n)" '$a\
+if then fi'
+rc_guard "a script without #! is refused" "must start with #!" '1d'
+rc_guard "a script that does not end on main \"\$@\" is refused" 'must end on [main "$@"]' '$a\
+echo after'
+
+# install.sh carries a pasted copy of the download code. A copy that drifted,
+# or a function defined again after it, fails the guards.
+rc_fresh
+rc_sed install.sh 's/--max-time 60 /--max-time 600 /'
+rc_run "v$rc_version"
+assert_rc "an installer whose download block differs is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "with the guard's message" "$RUN_ERR" "the download block differs between bin/aidentity and install.sh"
+rc_fresh
+rc_sed install.sh '/^main "\$@"$/i\
+file_version() { echo 9.9.9; }
+'
+rc_run "v$rc_version"
+assert_rc "an installer that defines a shared function again is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "with the guard's message" "$RUN_ERR" "file_version must be defined once, inside the download block"
+for redef in 'function file_version { echo 9.9.9; }' 'file_version () { echo 9.9.9; }'; do
+  rc_fresh
+  rc_sed install.sh "/^main \"\\\$@\"\$/i\\
+$redef
+"
+  rc_run "v$rc_version"
+  assert_rc "so is one written as [$redef]" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+  assert_contains "with the guard's message" "$RUN_ERR" "must be defined once, inside the download block"
+done
+# Every curl call of the installer goes through https_fetch, on error paths too.
+rc_fresh
+rc_sed install.sh '/^verify() {$/a\
+  curl -fsS "$SUMS_URL" >/dev/null || true
+'
+rc_run "v$rc_version"
+assert_rc "an installer with a curl call of its own is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "with the guard's message" "$RUN_ERR" "curl may run only in https_fetch in install.sh"
 
 # The source guards run too, and their failure stops the release.
 rc_fresh
@@ -3703,6 +3813,27 @@ printf '{"message":"Not Found"}' > "$UPD_JSON"
 libcall latest_tag "$UPD_JSON"
 assert_rc_nonzero "an answer with no tag is refused" "$RUN_RC" "$RUN_OUT"
 
+# The caller always names the version to expect: x.y.z, or - for a branch or
+# commit. A missing version is a refusal, never a skipped check.
+VRF_DIR="$SANDBOX/verify"
+mkdir -p "$VRF_DIR/bin"
+sed 's/^AIDENTITY_VERSION=.*/AIDENTITY_VERSION="2.0.0"/' "$AIDENTITY" > "$VRF_DIR/bin/aidentity"
+( cd "$VRF_DIR" && shasum -a 256 bin/aidentity > SHA256SUMS )
+vrf() { # version: check the file against it, and print the checksum kept
+  libcall eval "verify_release_file $(printf '%q ' "$VRF_DIR/bin/aidentity" "$VRF_DIR/SHA256SUMS" "$1")"' && printf "%s" "$VERIFIED_SUM"'
+}
+vrf 2.0.0
+assert_rc "a matching file with its version passes" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "and the checksum it passed is kept for the install" \
+  "$(awk '{print $1}' "$VRF_DIR/SHA256SUMS")" "$RUN_OUT"
+vrf -
+assert_rc "with - for the version, the checksum alone decides" 0 "$RUN_RC" "$RUN_OUT"
+vrf 2.0.1
+assert_rc_nonzero "another version is refused" "$RUN_RC" "$RUN_OUT"
+vrf ""
+assert_rc_nonzero "no version at all is refused" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says so" "$RUN_OUT" "No version was given"
+
 
 group "update end to end, against a stub curl"
 
@@ -3730,7 +3861,6 @@ while [ \$# -gt 0 ]; do
   esac
 done
 case "\$url" in
-  https://upd.test/r/*) rest="\${url#https://upd.test/r/}" ;;
   https://*/PiniShv/aidentity/*) rest="\${url#https://*/PiniShv/aidentity/}" ;;
   *) rest="" ;;
 esac
@@ -3781,7 +3911,7 @@ upd() { # script, [VAR=value …], [update's arguments]
     case "$1" in [A-Z]*=*) envs+=("$1"); shift ;; *) break ;; esac
   done
   : > "$UPD_LOG"
-  RUN_OUT=$(env -u HOMEBREW_PREFIX -u HOMEBREW_CELLAR -u AIDENTITY_UPDATE_URL \
+  RUN_OUT=$(env -u HOMEBREW_PREFIX -u HOMEBREW_CELLAR \
       HOME="$SANDBOX/upd-home" TMPDIR="$UPD_TMP" PATH="$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" \
       ${envs[@]+"${envs[@]}"} /usr/bin/perl -MPOSIX -e '
       my $pid = fork; die "fork: $!\n" unless defined $pid;
@@ -3802,7 +3932,6 @@ only_script_in() { # folder: nothing but the script is left there
 ai help
 assert_contains "help documents update" "$RUN_OUT" "update"
 assert_contains "help documents update --check" "$RUN_OUT" "Only say whether a newer release is out"
-assert_contains "help documents AIDENTITY_UPDATE_URL" "$RUN_OUT" "AIDENTITY_UPDATE_URL"
 
 U_DIR="$SB/upd bin"
 U="$U_DIR/aidentity"
@@ -3876,64 +4005,13 @@ assert_contains "as a file it cannot find" "$RUN_OUT" "Could not find the file"
 assert_eq "before any network call" "0" "$(calls)"
 same_file "and the file is kept" "$SB/upd odd/aidentity" "$SANDBOX/upd-saved-odd"
 
-# Every refusal below must leave the old file exactly as it was.
+# A broken release (checksum, SHA256SUMS, version, network) is refused by one
+# table that runs against update and install.sh alike: see the group "a broken
+# release is refused" below. Whether a release is a complete, valid script is
+# not checked here: the checksum proves the download is the published file,
+# and the release gate (scripts/guards.sh, tested in "release check") checks
+# the published file.
 upd_copy "$U" 1.0.0
-printf '%064d  bin/aidentity\n' 0 > "$UPD_SRV/v2.0.0/SHA256SUMS"
-upd "$U"
-assert_rc_nonzero "a checksum mismatch refuses" "$RUN_RC" "$RUN_OUT"
-assert_contains "and says why" "$RUN_OUT" "Checksum mismatch"
-assert_contains "and that nothing changed" "$RUN_OUT" "Nothing was changed"
-same_file "the old file is kept byte for byte" "$U" "$U_SAVED"
-only_script_in "$U_DIR"
-
-rm -f "$UPD_SRV/v2.0.0/SHA256SUMS"
-upd "$U"
-assert_rc_nonzero "a missing checksum file refuses" "$RUN_RC" "$RUN_OUT"
-assert_contains "and says the download cannot be checked" "$RUN_OUT" "cannot be checked"
-same_file "the old file is kept" "$U" "$U_SAVED"
-
-printf 'abc123  install.sh\n' > "$UPD_SRV/v2.0.0/SHA256SUMS"
-upd "$U"
-assert_rc_nonzero "a checksum file with no line for the script refuses" "$RUN_RC" "$RUN_OUT"
-same_file "the old file is kept" "$U" "$U_SAVED"
-
-# A script whose checksum matches but which says it is another version.
-upd_release v2.0.0 2.0.1
-upd "$U"
-assert_rc_nonzero "a version line that does not match the tag refuses" "$RUN_RC" "$RUN_OUT"
-assert_contains "and says so" "$RUN_OUT" "does not say it is version 2.0.0"
-same_file "the old file is kept" "$U" "$U_SAVED"
-
-# Cut short, with a checksum made for the short file: the checksum passes, so
-# only the structural checks can stop it.
-upd_release v2.0.0
-head -n 200 "$UPD_SRV/v2.0.0/bin/aidentity" > "$SANDBOX/upd-short"
-mv "$SANDBOX/upd-short" "$UPD_SRV/v2.0.0/bin/aidentity"
-( cd "$UPD_SRV/v2.0.0" && shasum -a 256 bin/aidentity > SHA256SUMS )
-upd "$U"
-assert_rc_nonzero "a script cut short refuses, even with its own checksum" "$RUN_RC" "$RUN_OUT"
-same_file "the old file is kept" "$U" "$U_SAVED"
-printf 'AIDENTITY_VERSION="2.0.0"\nmain "$@"\n' > "$UPD_SRV/v2.0.0/bin/aidentity"
-( cd "$UPD_SRV/v2.0.0" && shasum -a 256 bin/aidentity > SHA256SUMS )
-upd "$U"
-assert_rc_nonzero "a download that is not a script refuses" "$RUN_RC" "$RUN_OUT"
-assert_contains "and says so" "$RUN_OUT" "not a script"
-same_file "the old file is kept" "$U" "$U_SAVED"
-# Each structural check on its own: every other check passes in each file.
-printf '#!/bin/bash\nAIDENTITY_VERSION="2.0.0"\nif then fi\nmain "$@"\n' > "$UPD_SRV/v2.0.0/bin/aidentity"
-( cd "$UPD_SRV/v2.0.0" && shasum -a 256 bin/aidentity > SHA256SUMS )
-upd "$U"
-assert_rc_nonzero "a download that is not valid shell refuses" "$RUN_RC" "$RUN_OUT"
-assert_contains "and says so" "$RUN_OUT" "not valid shell"
-same_file "the old file is kept" "$U" "$U_SAVED"
-printf '#!/bin/bash\nAIDENTITY_VERSION="2.0.0"\necho first half\n' > "$UPD_SRV/v2.0.0/bin/aidentity"
-( cd "$UPD_SRV/v2.0.0" && shasum -a 256 bin/aidentity > SHA256SUMS )
-upd "$U"
-assert_rc_nonzero "valid shell that does not end on aidentity's last line refuses" "$RUN_RC" "$RUN_OUT"
-assert_contains "and says it may be cut off" "$RUN_OUT" "may be cut off"
-same_file "the old file is kept" "$U" "$U_SAVED"
-only_script_in "$U_DIR"
-upd_release v2.0.0
 
 for t in 2.0.0 v2.0 v2.0.0-rc1 "v2.0.0/../../../evil/repo/v9.9.9" "v2.0.0\$(touch $SANDBOX/pwned)"; do
   upd_latest "$t"
@@ -3964,9 +4042,6 @@ upd_copy "$U" 1.0.0
 upd "$U" UPD_NET=down --check
 assert_rc_nonzero "--check with no network exits non-zero" "$RUN_RC" "$RUN_OUT"
 assert_contains "with a clear error" "$RUN_OUT" "Could not get the latest release"
-upd "$U" UPD_NET=down
-assert_rc_nonzero "update with no network exits non-zero" "$RUN_RC" "$RUN_OUT"
-same_file "the old file is kept" "$U" "$U_SAVED"
 
 # Homebrew's copy belongs to brew. Refused before any network call.
 upd_copy "$SB/brew/Cellar/aidentity/1.0.0/bin/aidentity" 1.0.0
@@ -4065,21 +4140,12 @@ assert_rc_nonzero "a script read from stdin refuses to update" "$RUN_RC" "$RUN_O
 assert_contains "and says it cannot find its file" "$RUN_OUT" "Could not find the file"
 assert_eq "before any network call" "0" "$(calls)"
 
-upd "$U" AIDENTITY_UPDATE_URL=http://upd.test/r --check
-assert_rc_nonzero "AIDENTITY_UPDATE_URL must be https" "$RUN_RC" "$RUN_OUT"
-assert_eq "and a plain-http one is never contacted" "0" "$(calls)"
-upd "$U" AIDENTITY_UPDATE_URL=https://upd.test/r/ --check
-assert_rc "AIDENTITY_UPDATE_URL replaces GitHub" 0 "$RUN_RC" "$RUN_OUT"
-assert_contains "and says so on every run" "$RUN_OUT" "Using AIDENTITY_UPDATE_URL"
-assert_contains "the release info comes from it" "$(cat "$UPD_LOG")" "https://upd.test/r/releases/latest"
-assert_not_contains "and not from GitHub" "$(cat "$UPD_LOG")" "api.github.com"
-upd "$U" AIDENTITY_UPDATE_URL=https://upd.test/r
-assert_rc "AIDENTITY_UPDATE_URL is used for a full update too" 0 "$RUN_RC" "$RUN_OUT"
-assert_contains "the script comes from it" "$(cat "$UPD_LOG")" "https://upd.test/r/v2.0.0/bin/aidentity"
-assert_contains "and the checksum file" "$(cat "$UPD_LOG")" "https://upd.test/r/v2.0.0/SHA256SUMS"
-assert_not_contains "and nothing from GitHub" "$(cat "$UPD_LOG")" "githubusercontent"
-same_file "the file is the release's script" "$U" "$UPD_SRV/v2.0.0/bin/aidentity"
-upd_copy "$U" 1.0.0
+# No setting points update anywhere but GitHub.
+upd "$U" AIDENTITY_UPDATE_URL=https://example.invalid/r --check
+assert_rc "a leftover AIDENTITY_UPDATE_URL changes nothing" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the release info still comes from GitHub" "$(cat "$UPD_LOG")" \
+  "https://api.github.com/repos/PiniShv/aidentity/releases/latest"
+assert_not_contains "and never from the setting" "$(cat "$UPD_LOG")" "example.invalid"
 
 # No curl on PATH: a clear message, and nothing else happens. uname stays,
 # because the script checks it is on macOS before anything else.
@@ -4113,7 +4179,7 @@ cat > "$UPD_SLOW_SUM/shasum" <<STUB
 #!/bin/sh
 for a in "\$@"; do
   case "\$a" in
-    */.aidentity-update.*) ps -o pgid= -p \$\$ | tr -d ' ' > '$UPD_READY'; sleep 20 ;;
+    */.aidentity.*) ps -o pgid= -p \$\$ | tr -d ' ' > '$UPD_READY'; sleep 20 ;;
   esac
 done
 exec /usr/bin/shasum "\$@"
@@ -4122,7 +4188,7 @@ chmod +x "$UPD_SLOW_NET/curl" "$UPD_SLOW_SUM/shasum"
 upd_signal() { # signal, stub folder, script
   local pid pg="" i=0
   rm -f "$UPD_READY"
-  env -u HOMEBREW_PREFIX -u HOMEBREW_CELLAR -u AIDENTITY_UPDATE_URL \
+  env -u HOMEBREW_PREFIX -u HOMEBREW_CELLAR \
       HOME="$SANDBOX/upd-home" TMPDIR="$UPD_TMP" PATH="$2:$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" \
       /usr/bin/perl -MPOSIX -e '
       my $pid = fork; die "fork: $!\n" unless defined $pid;
@@ -4145,7 +4211,7 @@ assert_rc "TERM during the download exits 143" 143 "$RUN_RC" "$RUN_OUT"
 same_file "and the old file is kept" "$U" "$U_SAVED"
 only_script_in "$U_DIR"
 upd_signal INT "$UPD_SLOW_SUM" "$U"
-assert_contains "a staged copy sat beside the old file" "$UPD_BUSY_DIR" ".aidentity-update."
+assert_contains "a staged copy sat beside the old file" "$UPD_BUSY_DIR" ".aidentity."
 assert_rc "Ctrl-C while the new copy is staged exits 130" 130 "$RUN_RC" "$RUN_OUT"
 same_file "and the old file is kept" "$U" "$U_SAVED"
 only_script_in "$U_DIR"
@@ -4157,6 +4223,147 @@ assert_rc_nonzero "an extra argument for update exits non-zero" "$RUN_RC" "$RUN_
 same_file "and neither touches the file" "$U" "$U_SAVED"
 only_script_in "$U_DIR"
 assert_no_file "update never ran sudo, in any run above" "$UPD_SUDO_LOG"
+
+
+group "a broken release is refused, by install.sh and update alike"
+
+# One table of broken releases, run against both ways a release reaches a
+# Mac: install.sh with AIDENTITY_REF set to the tag, and update with the tag
+# as the latest release. Both use the stub curl above that plays GitHub. Each
+# row publishes v2.0.0 and breaks it in one way. Both must refuse, say why,
+# and leave the copy installed before exactly as it was.
+#   row|text both print
+REFUSALS='bad-sum|Checksum mismatch
+no-line|no valid line for bin/aidentity
+no-sums|cannot be checked
+wrong-version|does not say it is version 2.0.0
+net-down|Check your internet connection'
+break_release() { # row
+  upd_release v2.0.0
+  case "$1" in
+    bad-sum) printf '%064d  bin/aidentity\n' 0 > "$UPD_SRV/v2.0.0/SHA256SUMS" ;;
+    no-line) printf 'abc123  install.sh\n' > "$UPD_SRV/v2.0.0/SHA256SUMS" ;;
+    no-sums) rm -f "$UPD_SRV/v2.0.0/SHA256SUMS" ;;
+    wrong-version) upd_release v2.0.0 2.0.1 ;;
+  esac
+}
+R_DIR="$SB/refusal bin"
+R_ENV=("PATH=$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" "TMPDIR=$UPD_TMP")
+upd_latest v2.0.0
+while IFS='|' read -r row says; do
+  break_release "$row"
+  net=up; [ "$row" = net-down ] && net=down
+  upd_copy "$R_DIR/aidentity" 1.0.0
+  inst "$R_DIR" "${R_ENV[@]}" "UPD_NET=$net" AIDENTITY_REF=v2.0.0
+  assert_rc_nonzero "install.sh refuses: $row" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and says why" "$RUN_OUT" "$says"
+  assert_contains "and names the ref it tried" "$RUN_OUT" "AIDENTITY_REF=v2.0.0"
+  assert_contains "and that nothing was installed" "$RUN_OUT" "Nothing was installed"
+  if [ "$row" = net-down ]; then
+    assert_contains "and how to set a proxy, since ~/.curlrc is not read" "$RUN_OUT" \
+      "https_proxy or CURL_CA_BUNDLE instead"
+  fi
+  same_file "the copy installed before is kept byte for byte" "$R_DIR/aidentity" "$U_SAVED"
+  only_script_in "$R_DIR"
+  upd "$U" "UPD_NET=$net"
+  assert_rc_nonzero "update refuses: $row" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and says why" "$RUN_OUT" "$says"
+  assert_contains "and that nothing changed" "$RUN_OUT" "Nothing was changed"
+  same_file "the old file is kept byte for byte" "$U" "$U_SAVED"
+  only_script_in "$U_DIR"
+done <<ROWS
+$REFUSALS
+ROWS
+
+# The same release unbroken: install.sh installs it, over the old copy.
+upd_release v2.0.0
+: > "$UPD_LOG"
+inst "$R_DIR" "${R_ENV[@]}" AIDENTITY_REF=v2.0.0
+assert_rc "install.sh installs a release that passes every check" 0 "$RUN_RC" "$RUN_OUT"
+same_file "with the release's script" "$R_DIR/aidentity" "$UPD_SRV/v2.0.0/bin/aidentity"
+assert_contains "and says what it upgraded" "$RUN_OUT" "Upgraded aidentity 1.0.0 → 2.0.0"
+only_script_in "$R_DIR"
+assert_eq "install.sh downloads two files" "2" "$(calls)"
+assert_eq "every curl call of install.sh starts with -q, so ~/.curlrc is never read" "0" \
+  "$(grep -vc '^-q ' "$UPD_LOG")"
+# A branch, or a tag that is not a release, names no version, so its checksum
+# alone decides.
+upd_release main 2.0.1
+inst "$SB/refusal branch" "${R_ENV[@]}" AIDENTITY_REF=main
+assert_rc "for a branch, install.sh needs only the checksum" 0 "$RUN_RC" "$RUN_OUT"
+same_file "and installs the branch's script" "$SB/refusal branch/aidentity" "$UPD_SRV/main/bin/aidentity"
+upd_release v2.0.0-rc1 2.0.0
+inst "$SB/refusal rc" "${R_ENV[@]}" AIDENTITY_REF=v2.0.0-rc1
+assert_rc "for a tag that is not a release (v2.0.0-rc1), install.sh needs only the checksum" 0 "$RUN_RC" "$RUN_OUT"
+same_file "and installs that tag's script" "$SB/refusal rc/aidentity" "$UPD_SRV/v2.0.0-rc1/bin/aidentity"
+printf '%064d  bin/aidentity\n' 0 > "$UPD_SRV/v2.0.0-rc1/SHA256SUMS"
+inst "$SB/refusal rc2" "${R_ENV[@]}" AIDENTITY_REF=v2.0.0-rc1
+assert_rc_nonzero "but still refuses it when the checksum does not match" "$RUN_RC" "$RUN_OUT"
+assert_no_file "and writes nothing" "$SB/refusal rc2/aidentity"
+
+# The download passed every check, and installing it fails: no staged file can
+# be made, the staged copy does not match the checksum, mv cannot replace the
+# old file (it is locked with chflags), or the file found after the move does
+# not match. Stub mktemp and shasum fail on cue (AT_FAIL). Both entry points
+# must stop and say why, and leave no staged file. Until the move, the old
+# copy is kept byte for byte.
+#   row|text both print
+ATOMIC='mktemp|Could not write to
+staged|does not match the download
+mv|Could not replace
+installed|did not leave the new copy'
+AT_STUB="$SANDBOX/stub-install-fail"
+mkdir -p "$AT_STUB"
+cat > "$AT_STUB/mktemp" <<STUB
+#!/bin/sh
+case "\${AT_FAIL:-}:\$*" in mktemp:*/.aidentity.*) exit 1 ;; esac
+exec /usr/bin/mktemp "\$@"
+STUB
+# The last argument is the file to hash. Downloads sit in '$UPD_TMP'.
+cat > "$AT_STUB/shasum" <<STUB
+#!/bin/sh
+for f in "\$@"; do :; done
+case "\${AT_FAIL:-}:\$f" in
+  staged:*/.aidentity.*) ;;
+  installed:'$UPD_TMP'/*) exec /usr/bin/shasum "\$@" ;;
+  installed:*/aidentity) ;;
+  *) exec /usr/bin/shasum "\$@" ;;
+esac
+printf '%064d  %s\n' 0 "\$f"
+STUB
+chmod +x "$AT_STUB/mktemp" "$AT_STUB/shasum"
+AT_ENV=("PATH=$AT_STUB:$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" "TMPDIR=$UPD_TMP")
+upd_release v2.0.0
+upd_latest v2.0.0
+while IFS='|' read -r row says; do
+  upd_copy "$R_DIR/aidentity" 1.0.0
+  [ "$row" = mv ] && chflags uchg "$R_DIR/aidentity"
+  inst "$R_DIR" "${AT_ENV[@]}" "AT_FAIL=$row" AIDENTITY_REF=v2.0.0
+  chflags nouchg "$R_DIR/aidentity"
+  assert_rc_nonzero "install.sh stops when installing fails: $row" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and says why" "$RUN_OUT" "$says"
+  assert_not_contains "and does not report an install" "$RUN_OUT" "Upgraded"
+  only_script_in "$R_DIR"
+  [ "$row" = mv ] && chflags uchg "$U"
+  upd "$U" "${AT_ENV[@]}" "AT_FAIL=$row"
+  chflags nouchg "$U"
+  assert_rc_nonzero "update stops when installing fails: $row" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and says why" "$RUN_OUT" "$says"
+  assert_not_contains "and does not report an update" "$RUN_OUT" "Updated"
+  only_script_in "$U_DIR"
+  if [ "$row" = installed ]; then
+    # The move happened; only the check after it failed.
+    same_file "the file found there is the release's" "$R_DIR/aidentity" "$UPD_SRV/v2.0.0/bin/aidentity"
+    same_file "for update too" "$U" "$UPD_SRV/v2.0.0/bin/aidentity"
+    upd_copy "$U" 1.0.0
+  else
+    same_file "install.sh kept the old copy byte for byte" "$R_DIR/aidentity" "$U_SAVED"
+    same_file "update kept the old file byte for byte" "$U" "$U_SAVED"
+  fi
+done <<ROWS
+$ATOMIC
+ROWS
+assert_no_file "neither install.sh nor update ran sudo, in any run in this group" "$UPD_SUDO_LOG"
 
 
 group "sandbox isolation — final check"

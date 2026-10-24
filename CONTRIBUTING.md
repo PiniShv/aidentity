@@ -106,20 +106,27 @@ back regardless of what else it does.
 6. **Icon failures are never fatal.** `build_icon` falling back to the app's
    plain icon is correct behaviour. Keep new cosmetic code on the same footing.
 
-7. **`bin/aidentity` must keep ending on the line `main "$@"`.** That exact line
-   is `install.sh`'s truncated-download guard: after the shebang, version and
-   `bash -n` checks, it compares the last non-blank line of the download against
-   `END_MARKER='main "$@"'` and refuses to install anything that does not match.
-   A script cut in half is very often still valid shell, so this is the only
-   check that proves the transfer finished. Nothing with content may follow it —
-   not another call, not even a trailing comment (blank lines are ignored). If
-   the entry point is ever renamed, `END_MARKER` in `install.sh` has to change
-   in the same commit.
+7. **Keep the shape installed copies check.** `install.sh` and
+   `aidentity update` check a download by its checksum, and a release by its
+   version line. Copies of 1.4.0 already installed also check, with their own
+   fixed code, that the script starts with `#!`, passes `bash -n` and ends on
+   the line `main "$@"`. So `bin/aidentity` must keep all of these: one
+   `AIDENTITY_VERSION="x.y.z"` line, `#!` first, valid shell, and `main "$@"`
+   as the last line with content (blank lines are ignored, a trailing comment
+   is not). `scripts/guards.sh` checks each of them before every release.
+
+   The download checks (`https_fetch`, `verify_release_file`, `install_atomic`
+   and the helpers between the `download block` markers) are pasted into
+   `install.sh`, which cannot source the file it checks. Change both copies in
+   the same commit; `scripts/guards.sh` fails when they differ. The block uses
+   each script's own `warn` and `die`, each script's EXIT trap removes
+   `INSTALL_STAGED`, and every command substitution in it that can fail has a
+   fallback, because `install.sh` runs under `set -e`.
 
 8. **Regenerate `SHA256SUMS` in the same commit that changes `bin/aidentity`.**
    `install.sh` fetches that file and refuses to install a script whose hash
-   does not match, so a stale checksum breaks every `curl` install. CI fails the
-   build when the two disagree.
+   does not match, or that has no checksum, so a stale checksum breaks every
+   `curl` install. CI fails the build when the two disagree.
 
    ```sh
    make checksums

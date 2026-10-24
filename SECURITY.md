@@ -40,18 +40,21 @@ Read this before deciding whether a finding is a bug.
   - `raw.githubusercontent.com`, to download that release's `bin/aidentity`
     and `SHA256SUMS` (not with `--check`).
 
-  The test-only setting `AIDENTITY_UPDATE_URL` can point `update` at another
-  `https://` address. It prints a warning on every run.
-
   It sends nothing about your profiles or apps — only what any HTTPS download
   sends, such as your IP address and curl's user agent.
 
   Before it replaces anything, it checks that the tag is a plain version
   number (`v1.2.3`), that the script matches the published checksum (no
-  checksum, no update), that it is a complete shell script, and that it says
-  it is the version of the tag. It never downgrades and never runs `sudo`. A
-  copy managed by Homebrew, or run from a git checkout, is left to
-  `brew upgrade` or `git pull`. A failed check leaves the old file untouched.
+  checksum, no update), and that it says it is the version of the tag. It
+  never downgrades and never runs `sudo`. A copy managed by Homebrew, or run
+  from a git checkout, is left to `brew upgrade` or `git pull`. A failed
+  check leaves the old file untouched.
+
+  The installer (`install.sh`) checks its download with the same code. It
+  refuses to install unless the script matches the checksum published at the
+  same ref (no checksum, no install), and for a release tag the script must
+  say it is that version. Its own downloads do not read `~/.curlrc`; the
+  `curl` that you pipe into `bash` still does.
 
   The checksum is published in the same repository as the script. It catches
   a damaged, cut-off or swapped download, but not a compromise of the
