@@ -164,14 +164,11 @@ An app can take extra accounts if it is built on **Chromium** or **Electron**. C
 | Antigravity | Tested | |
 | Notion | Tested | |
 | Notion Calendar | Tested | |
-| Obsidian | Tested | |
 | Podman Desktop | Tested | |
 | Postman | Tested | |
 | Google Chrome | Detected | Chrome has built-in profiles. Use those first. |
 | Microsoft Edge | Detected | Built-in profiles are the better tool here too. |
 | Brave / Arc / Vivaldi / Comet | Detected | Browsers. Built-in profiles usually do the job better. |
-| Microsoft Teams (classic) | **No** | It does not keep its data in the profile folder, so profiles would share one account. |
-| MiniMax Design | **No** | It does not keep its data in the profile folder, so profiles would share one account. |
 | ChatGPT Classic | **No** | `com.openai.chat`. A native Swift app. See below. |
 
 - **Verified** means two accounts were signed in at once, checked by hand.

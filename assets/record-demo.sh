@@ -65,13 +65,18 @@ ffmpeg -y -loglevel error -i aidentity-demo.gif -i palette.png \
 # GIF cannot, and it is half the size. Same frames, made from the GIF above.
 # Metadata is stripped, including x264's settings note, which names the
 # encoder options used on this machine. The poster is the frame at 20 s.
+# Keyframes sit exactly at the chapter times in site/index.html (data-t), so a
+# browser that seeks only to keyframes still lands on each chapter. Keep the
+# two lists the same when the tape changes.
+chapters="0,32,41,49,57"
 vf="scale=trunc(iw/2)*2:trunc(ih/2)*2,setsar=1"
 clean=(-map_metadata -1 -fflags +bitexact -flags:v +bitexact)
 ffmpeg -y -loglevel error -i "$REPO/assets/demo.gif" "${clean[@]}" -movflags +faststart \
   -pix_fmt yuv420p -c:v libx264 -preset veryslow -tune animation -crf 24 \
+  -force_key_frames "$chapters" \
   -bsf:v filter_units=remove_types=6 -vf "$vf" "$REPO/site/assets/demo.mp4"
 ffmpeg -y -loglevel error -i "$REPO/assets/demo.gif" "${clean[@]}" -pix_fmt yuv420p \
-  -c:v libvpx-vp9 -b:v 0 -crf 36 -row-mt 1 -vf "$vf" "$REPO/site/assets/demo.webm"
+  -c:v libvpx-vp9 -b:v 0 -crf 36 -row-mt 1 -force_key_frames "$chapters" -vf "$vf" "$REPO/site/assets/demo.webm"
 ffmpeg -y -loglevel error -ss 20 -i "$REPO/site/assets/demo.mp4" "${clean[@]}" \
   -frames:v 1 -q:v 4 "$REPO/site/assets/demo-poster.jpg"
 
