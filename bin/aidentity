@@ -3239,6 +3239,7 @@ UI_BUSY=0       # 1 while a command runs for the menu
 UI_HOLD=0       # 1 while rows or a frame are built: a resize must not draw then
 UI_RESIZED=0
 UI_STOPPED=0    # 1 after Ctrl-Z took the terminal back: it is entered again on resume
+UI_SIG=""       # 143 or 129 once TERM or HUP arrived: the loop then ends
 UI_DIRTY=1
 UI_STTY=""      # the terminal settings to put back
 UI_ROWS=24
@@ -3975,11 +3976,13 @@ EOF
 
 ui_loop() {
   while :; do
+    [ -z "$UI_SIG" ] || return 0
     if [ "$UI_RESIZED" -eq 1 ]; then UI_RESIZED=0; ui_resize; fi
     if [ $((SECONDS - UI_LAST)) -ge 2 ]; then UI_LAST=$SECONDS; ui_sync; fi
     if [ -n "$UI_MSG" ] && [ $((SECONDS - UI_FLASH_AT)) -ge 6 ]; then ui_msg_clear; UI_DIRTY=1; fi
     if [ "$UI_DIRTY" -eq 1 ]; then UI_DIRTY=0; ui_draw; fi
     ui_key
+    [ -z "$UI_SIG" ] || return 0
     if [ "$UI_KEY" != "TICK" ] && [ -n "$UI_MSG" ]; then ui_msg_clear; UI_DIRTY=1; fi
     case "$UI_KEY" in
       TICK) ;;
@@ -4009,11 +4012,18 @@ cmd_ui() {
 
   ui_caps
   UI_STTY=$(stty -g 2>/dev/null) || UI_STTY=""
-  # Whatever ends us, the terminal is given back first.
+  # Whatever ends us, the terminal is given back first. TERM and HUP only
+  # note the signal: the menu waits in `read -s`, and bash puts back the
+  # terminal mode it saved when that read began AFTER a trap that exits from
+  # inside it, so exiting there left the terminal with echo off. bash 3.2 does
+  # not cut the read short for these signals either, so the loop sees UI_SIG
+  # within the 2 seconds of one read and leaves through the normal path below.
+  # (INT is different: bash restores the terminal before the INT trap runs.)
+  UI_SIG=""
   trap 'ui_leave; _on_exit' EXIT
   trap 'ui_on_int' INT
-  trap 'ui_leave; _on_exit; exit 143' TERM
-  trap 'ui_leave; _on_exit; exit 129' HUP
+  trap 'UI_SIG=143' TERM
+  trap 'UI_SIG=129' HUP
   trap 'ui_on_winch' WINCH
 
   ui_enter
@@ -4030,6 +4040,8 @@ cmd_ui() {
   trap '_on_exit; exit 130' INT
   trap '_on_exit; exit 143' TERM
   trap '_on_exit; exit 129' HUP
+  # Ended by TERM or HUP: same exit status as before, terminal already back.
+  [ -z "$UI_SIG" ] || exit "$UI_SIG"
   return 0
 }
 

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `aidentity ui` gives the terminal back when it is ended by SIGTERM or SIGHUP
+  while it waits for a key. Before, the terminal was left with echo off. It
+  now leaves through its normal path, within two seconds, with the same exit
+  status (143 or 129).
+
 ## [1.4.0] - 2026-10-24
 
 ### Added
