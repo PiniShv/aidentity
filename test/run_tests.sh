@@ -1176,44 +1176,65 @@ STUB_SIZE=$(PATH="$PGREP_STUB:$PATH" pgrep -fl x | wc -c | tr -d ' ')
 if [ "$STUB_SIZE" -gt 65536 ]; then _pass "the stub list is bigger than a pipe buffer ($STUB_SIZE bytes)"
 else _fail "the stub list is bigger than a pipe buffer" "only $STUB_SIZE bytes"; fi
 
-probe_running() { # data dir -> RUNNING / STOPPED
-  PATH="$PGREP_STUB:$PATH" "$BASH_BIN" -c \
-    '. "$1" >/dev/null 2>&1; running_on_profile "$2" && echo RUNNING || echo STOPPED' x "$LIB" "$1"
+# One running check, asked three ways with the same stub and the same cases:
+# running_on_profile, as rm, rename and prune ask it; uninstall.sh's copy; and
+# running_in_snapshot under one snapshot, as list and the menu ask it. All
+# three must give the answers a fresh look gives.
+UNINST_LIB="$SANDBOX/uninstall-lib.sh"
+grep -v '^main "\$@"$' "$REPO_DIR/uninstall.sh" > "$UNINST_LIB"
+probe_running() { # fresh, uninstall or snapshot; data dir -> RUNNING / STOPPED
+  local lib=$LIB snap="" fn=running_on_profile
+  case "$1" in uninstall) lib=$UNINST_LIB ;; snapshot) snap=proc_snapshot fn=running_in_snapshot ;; esac
+  # `set --` first: a sourced file sees the caller's arguments, and
+  # uninstall.sh reads $1 as an option.
+  PATH="$PGREP_STUB:$PATH" "$BASH_BIN" -c 'lib=$1 snap=$2 fn=$3 d=$4; set --; . "$lib" >/dev/null 2>&1
+    $snap; $fn "$d" && echo RUNNING || echo STOPPED' x "$lib" "$snap" "$fn" "$2"
 }
-assert_eq "a profile listed first in a 120 KB process list reads as running" "RUNNING" "$(probe_running "$BUSY_DATA")"
-assert_eq "a prefix of a running profile does not match" "STOPPED" "$(probe_running "$DATA/fake-bus")"
-assert_eq "a longer name than a running profile does not match" "STOPPED" "$(probe_running "$BUSY_DATA-2")"
-# The same folder under another spelling is the same running profile: a
-# symlinked root, a doubled slash, a trailing slash.
-mkdir -p "$BUSY_DATA"
+mkdir -p "$BUSY_DATA" "$DATA/fake-other"
 ln -sfn "$DATA" "$SB/data-alias"
-assert_eq "a running profile reached through a symlinked root reads as running" "RUNNING" \
-  "$(probe_running "$SB/data-alias/fake-busy")"
-assert_eq "a doubled slash does not hide a running profile" "RUNNING" "$(probe_running "$DATA//fake-busy")"
-mkdir -p "$DATA/fake-other"
-assert_eq "a different folder through the same symlink does not match" "STOPPED" \
-  "$(probe_running "$SB/data-alias/fake-other")"
+for how in fresh uninstall snapshot; do
+  assert_eq "$how: a profile listed first in a 120 KB process list reads as running" "RUNNING" \
+    "$(probe_running $how "$BUSY_DATA")"
+  assert_eq "$how: a prefix of a running profile does not match" "STOPPED" "$(probe_running $how "$DATA/fake-bus")"
+  assert_eq "$how: a longer name than a running profile does not match" "STOPPED" \
+    "$(probe_running $how "$BUSY_DATA-2")"
+  # The same folder under another spelling is the same running profile.
+  assert_eq "$how: a running profile reached through a symlinked root reads as running" "RUNNING" \
+    "$(probe_running $how "$SB/data-alias/fake-busy")"
+  assert_eq "$how: a doubled slash does not hide a running profile" "RUNNING" \
+    "$(probe_running $how "$DATA//fake-busy")"
+  assert_eq "$how: a different folder through the same symlink does not match" "STOPPED" \
+    "$(probe_running $how "$SB/data-alias/fake-other")"
+done
+# A variable of the snapshot's name in the environment is not a snapshot:
+# PS_RC=0 with an empty list would read as "nothing is running".
+for how in fresh uninstall; do
+  assert_eq "$how: an inherited PS_RC does not switch the check off" "RUNNING" \
+    "$(PS_RC=0 PS_LIST="" PS_IDS="" probe_running $how "$BUSY_DATA")"
+done
 
-# The menu reads the list once and asks about every profile against it. The
-# answers must be the ones a fresh read gives: same stub, same cases.
-probe_listed() { # data dir -> RUNNING / STOPPED
-  PATH="$PGREP_STUB:$PATH" "$BASH_BIN" -c \
-    '. "$1" >/dev/null 2>&1; l=$(pgrep -afl "user-data-dir="); r=$?; ids=$(proc_dir_ids "$l")
-     running_in_list "$2" "$r" "$l" "$ids" && echo RUNNING || echo STOPPED' x "$LIB" "$1"
+# A snapshot answers as a fresh look does, including "running" when pgrep
+# failed.
+probe_snapshot() { # pgrep status, its list, data dir -> RUNNING / STOPPED
+  "$BASH_BIN" -c '. "$1" >/dev/null 2>&1; PS_RC=$2 PS_LIST=$3 PS_IDS="" PS_ALL=""
+    running_in_snapshot "$4" && echo RUNNING || echo STOPPED' x "$LIB" "$@"
 }
-assert_eq "a list read once: the profile listed first reads as running" "RUNNING" "$(probe_listed "$BUSY_DATA")"
-assert_eq "a list read once: a prefix does not match" "STOPPED" "$(probe_listed "$DATA/fake-bus")"
-assert_eq "a list read once: a longer name does not match" "STOPPED" "$(probe_listed "$BUSY_DATA-2")"
-assert_eq "a list read once: a symlinked root reads as running" "RUNNING" "$(probe_listed "$SB/data-alias/fake-busy")"
-assert_eq "a list read once: a doubled slash reads as running" "RUNNING" "$(probe_listed "$DATA//fake-busy")"
-assert_eq "a list read once: a different folder through the symlink does not match" "STOPPED" \
-  "$(probe_listed "$SB/data-alias/fake-other")"
-libcall running_in_list "$DATA/fake-busy" 2 "" "|"
-assert_rc "a list read once: a pgrep that failed counts as running, as it does for rm" 0 "$RUN_RC" "$RUN_OUT"
-libcall running_in_list "$DATA/fake-busy" 1 "" "|"
-assert_rc_nonzero "a list read once: no match is not running" "$RUN_RC" "$RUN_OUT"
-libcall running_in_list "" 0 "101 x --user-data-dir=/p" "|"
-assert_rc_nonzero "a list read once: an empty data dir is never running" "$RUN_RC" "$RUN_OUT"
+assert_eq "snapshot: a pgrep that failed counts as running, as it does for rm" "RUNNING" \
+  "$(probe_snapshot 2 "" "$BUSY_DATA")"
+assert_eq "snapshot: no match is not running" "STOPPED" "$(probe_snapshot 1 "" "$BUSY_DATA")"
+assert_eq "snapshot: an empty data dir is never running" "STOPPED" \
+  "$(probe_snapshot 0 "101 x --user-data-dir=/p" "")"
+
+# The folder identities are worked out only when the anchored match misses,
+# and then once, for every question after it.
+RUN_OUT=$(PATH="$PGREP_STUB:$PATH" "$BASH_BIN" -c '. "$1" >/dev/null 2>&1; proc_snapshot
+  running_in_snapshot "$2"; echo "after a match: [$PS_IDS]"
+  running_in_snapshot "$3"; [ -n "$PS_IDS" ] && echo "after a miss: filled"
+  PS_IDS="|kept|"; running_in_snapshot "$3"; echo "after another: [$PS_IDS]"' \
+  x "$LIB" "$BUSY_DATA" "$SB/data-alias/fake-other" 2>&1)
+assert_contains "an anchored match looks at no path" "$RUN_OUT" "after a match: []"
+assert_contains "a miss works the identities out" "$RUN_OUT" "after a miss: filled"
+assert_contains "and the next question uses them again" "$RUN_OUT" "after another: [|kept|]"
 rm -f "$SB/data-alias"
 rmdir "$BUSY_DATA" "$DATA/fake-other" 2>/dev/null
 
@@ -1222,6 +1243,19 @@ printf 'session\n' > "$BUSY_DATA/Cookies"
 PATH="$PGREP_STUB:$PATH" ai rm "Fake Busy" --purge -y
 assert_rc_nonzero "rm --purge refuses a profile that is running" "$RUN_RC" "$RUN_OUT"
 assert_file "the running profile's session survives" "$BUSY_DATA/Cookies"
+# An inherited PS_RC=0 and an empty list, end to end.
+PS_RC=0 PS_LIST="" PATH="$PGREP_STUB:$PATH" ai rm "Fake Busy" --purge -y
+assert_rc_nonzero "an inherited PS_RC does not switch the check off" "$RUN_RC" "$RUN_OUT"
+assert_file "and the session survives" "$BUSY_DATA/Cookies"
+# A pgrep that fails is not "nothing is running".
+FAIL_PGREP="$SANDBOX/stub-pgrep-fails"
+mkdir -p "$FAIL_PGREP"
+printf '#!/bin/sh\nexit 3\n' > "$FAIL_PGREP/pgrep"
+chmod +x "$FAIL_PGREP/pgrep"
+PATH="$FAIL_PGREP:$PATH" ai rm "Fake Busy" --purge -y
+assert_rc_nonzero "rm --purge refuses when pgrep fails" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says it could not check" "$RUN_OUT" "Could not check which profiles are running (pgrep exited 3)"
+assert_file "the session survives a failed check" "$BUSY_DATA/Cookies"
 PATH="$PGREP_STUB:$PATH" ai prune -y
 assert_file "prune leaves a running, claimed profile alone" "$BUSY_DATA/Cookies"
 ai rm "Fake Busy" --purge -y
@@ -1465,8 +1499,6 @@ rm -f "$SB/apps-link"
 # uninstall.sh must find the same launchers, or it calls their data orphaned
 # and deletes it while the launcher stays. Only scan_launchers runs here; the
 # removal functions are never called by the suite.
-UNINST_LIB="$SANDBOX/uninstall-lib.sh"
-grep -v '^main "\$@"$' "$REPO_DIR/uninstall.sh" > "$UNINST_LIB"
 mv "$APPS/Fake Linkapps.app" "$APPS/Filed/"
 mkdir -p "$DATA/left-behind"
 # `set --` first: a sourced file sees the caller's arguments, and uninstall.sh
@@ -2063,13 +2095,11 @@ assert_contains "the plain list still says how to fix a missing app" "$RUN_OUT" 
   'app missing — run: aidentity rebuild "Gone Lost"'
 
 # Warnings go to stderr, so stdout still parses when the running check fails.
-FAIL_PGREP="$SANDBOX/stub-pgrep-fails"
-mkdir -p "$FAIL_PGREP"
-printf '#!/bin/sh\nexit 3\n' > "$FAIL_PGREP/pgrep"
-chmod +x "$FAIL_PGREP/pgrep"
 PATH="$FAIL_PGREP:$PATH" ai_stdout list --json
 assert_eq "stdout parses even when a warning is printed" "5" "$(json_get "$RUN_OUT" 'd.length')"
 assert_contains "the warning goes to stderr" "$RUN_ERR" "Could not check which profiles are running"
+assert_eq "once, not once for each of the five launchers" "1" \
+  "$(printf '%s\n' "$RUN_ERR" | grep -c 'Could not check which profiles are running')"
 
 ai_tty '' list --json
 assert_not_contains "no colour codes, even on a terminal" "$RUN_OUT" $'\033'
@@ -2085,6 +2115,69 @@ assert_rc_nonzero "list refuses an option it does not know" "$RUN_RC" "$RUN_OUT"
 assert_contains "and names it" "$RUN_OUT" "--jsn"
 ai list extra
 assert_rc_nonzero "list refuses an extra argument" "$RUN_RC" "$RUN_OUT"
+
+# One look at the processes for all the rows: one pgrep, and one ps however
+# many main launchers there are. Once per row took seconds with a dozen
+# profiles.
+ai add "$EXT_APP" --main
+COUNT_BIN="$SANDBOX/stub-count"
+COUNT_LOG="$SANDBOX/count-log"
+mkdir -p "$COUNT_BIN"
+printf '#!/bin/sh\necho pgrep >> "%s"\nexit 1\n' "$COUNT_LOG" > "$COUNT_BIN/pgrep"
+printf '#!/bin/sh\necho ps >> "%s"\nexec /bin/ps "$@"\n' "$COUNT_LOG" > "$COUNT_BIN/ps"
+chmod +x "$COUNT_BIN/pgrep" "$COUNT_BIN/ps"
+count_calls() { rm -f "$COUNT_LOG"; PATH="$COUNT_BIN:$PATH" ai "$@"; sort "$COUNT_LOG" | tr '\n' ' '; }
+assert_eq "list looks once for six launchers, two of them main" "pgrep ps " "$(count_calls list)"
+assert_eq "list --json too" "pgrep ps " "$(count_calls list --json)"
+# A snapshot ends with the command that took it. rm asks again after its
+# prompt, in the same process, so a later check must look again.
+RUN_OUT=$(PATH="$COUNT_BIN:$PATH" "$BASH_BIN" -c '. "$1" >/dev/null 2>&1; rm -f "$2"
+  cmd_list >/dev/null; list_json >/dev/null; ui_load; echo "held after: [${PS_RC-unset}]"
+  running_on_profile "$3"; running_on_profile "$3"; echo "pgrep: $(grep -c pgrep "$2")"' \
+  x "$LIB" "$COUNT_LOG" "$BUSY_DATA" 2>&1)
+assert_contains "no snapshot is held after list, list --json and the menu" "$RUN_OUT" "held after: [unset]"
+assert_contains "so each later check looks again" "$RUN_OUT" "pgrep: 5"
+# A ps that fails is asked once as well, not again for each main launcher.
+printf '#!/bin/sh\necho ps >> "%s"\nexit 1\n' "$COUNT_LOG" > "$COUNT_BIN/ps"
+assert_eq "a ps that fails is asked once too" "pgrep ps " "$(count_calls list)"
+ai rm "Codey Main" -y
+
+# A launcher name is whatever is on disk. Spaces, quotes, an escape and a line
+# break must not split a row or reach the terminal: list --json prints the name
+# exactly, list shows "?" for each control character, completion leaves it out,
+# and rm still takes the real name.
+CTRL_NAME="Ctl \"Q\" 'S' "$'\033'"[31m line"$'\n'"two"
+cp -R "$APPS/Fake Busy.app" "$APPS/$CTRL_NAME.app"
+ai_stdout list --json
+assert_eq "list --json still has one object per launcher" "6" "$(json_get "$RUN_OUT" 'd.length')"
+assert_eq "and the name with control characters in it is exact" "true" \
+  "$(json_get "$RUN_OUT" 'byName(arg) !== undefined' "$CTRL_NAME")"
+ai list
+assert_contains "list shows each control character as ?" "$RUN_OUT" "Ctl \"Q\" 'S' ?[31m line?two"
+assert_not_contains "so no escape reaches the terminal" "$RUN_OUT" $'\033'
+assert_contains "the tab in an app's name too" "$RUN_OUT" 'Wëird "Q" \ Tab?App Work'
+ai_stdout __complete launchers
+assert_not_contains "completion leaves the name out" "$RUN_OUT" "Ctl "
+assert_contains "and offers the others" "$RUN_OUT" "Fake Busy"
+# The menu acts on the real launcher: it reads the name exactly.
+RUN_OUT=$("$BASH_BIN" -c '. "$1" >/dev/null 2>&1; ui_load; echo "N=$UI_N"
+  i=0; while [ "$i" -lt "$UI_N" ]; do
+    [ "${UI_L_APP[$i]}" = "$2/$3.app" ] && [ "${UI_L_NAME[$i]}" = "$3" ] && echo "found it"
+    i=$((i + 1)); done' x "$LIB" "$APPS" "$CTRL_NAME" 2>&1)
+assert_contains "the menu reads all six launchers" "$RUN_OUT" "N=6"
+assert_contains "and the name exactly, with its own launcher" "$RUN_OUT" "found it"
+ai rm "$CTRL_NAME" -y
+assert_rc "rm takes the real name" 0 "$RUN_RC" "$RUN_OUT"
+assert_no_dir "and removes it" "$APPS/$CTRL_NAME.app"
+# In a UTF-8 locale a C1 control counts too: some terminals start an escape
+# sequence at one.
+C1_NAME="Csi "$'\xc2\x9b'"31m red"
+cp -R "$APPS/Fake Busy.app" "$APPS/$C1_NAME.app"
+LC_ALL=en_US.UTF-8 ai list
+assert_contains "under UTF-8, list shows a C1 control as ?" "$RUN_OUT" "Csi ?31m red"
+assert_not_contains "so it does not reach the terminal" "$RUN_OUT" $'\xc2\x9b'
+ai rm "$C1_NAME" -y
+assert_no_dir "rm takes that name too" "$APPS/$C1_NAME.app"
 
 for l in "$ODD" "Fake Busy" "Gone Lost"; do ai rm "$l" --purge -y; done
 AIDENTITY_DATA_ROOT="$VSC_DATA" ai rm "Codey Ext" --purge -y
@@ -2520,8 +2613,8 @@ rm -f "$UI_COUNT"
 RUN_OUT=$(PATH="$UI_COUNT_BIN:$PATH" "$BASH_BIN" -c '. "$1" >/dev/null 2>&1; ui_load; echo "N=$UI_N RUNNING=$UI_RUNNING"
   i=0; while [ "$i" -lt "$UI_N" ]; do echo "S $i ${UI_L_STATUS[$i]}"; i=$((i + 1)); done
   echo "CALLS=$(wc -l < "$2" | tr -d " ")"
-  i=0; while [ "$i" -lt "$UI_N" ]; do
-    echo "L $i $(launcher_status "${UI_L_APP[$i]}" "${UI_L_TARGET[$i]}" "${UI_L_DATA[$i]}")"; i=$((i + 1)); done' x "$LIB" "$UI_COUNT" 2>&1)
+  proc_snapshot; i=0; while [ "$i" -lt "$UI_N" ]; do
+    launcher_status "${UI_L_TARGET[$i]}" "${UI_L_DATA[$i]}" "${UI_L_MAIN[$i]}"; echo "L $i $STATUS"; i=$((i + 1)); done' x "$LIB" "$UI_COUNT" 2>&1)
 assert_contains "the menu counts what runs" "$RUN_OUT" "N=3 RUNNING=1"
 assert_contains "pgrep was called once for three rows" "$RUN_OUT" "CALLS=1"
 for i in 0 1 2; do
@@ -3117,6 +3210,15 @@ assert_rc "a failing source guard is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
 assert_contains "with the guard's own message" "$RUN_ERR" "running_on_profile differs between bin/aidentity and uninstall.sh"
 assert_contains "and the release check's" "$RUN_ERR" "scripts/guards.sh failed"
 assert_not_contains "and it does not say the tag matches" "$RUN_OUT" "matches version"
+# The running check is four functions, and a drift in any of them in
+# uninstall.sh is a dead guard too.
+for fn in proc_snapshot running_in_snapshot proc_dir_ids; do
+  rc_fresh
+  rc_sed uninstall.sh "s/^$fn() {/$fn() { :;/"
+  RUN_OUT=$(cd "$SB" && "$BASH_BIN" "$RC_DIR/scripts/guards.sh" 2>&1); RUN_RC=$?
+  assert_rc "the guards refuse a changed $fn in uninstall.sh" 1 "$RUN_RC" "$RUN_OUT"
+  assert_contains "and name it" "$RUN_OUT" "$fn differs between bin/aidentity and uninstall.sh"
+done
 
 
 group "uninstall.sh end to end, every search path in the sandbox"

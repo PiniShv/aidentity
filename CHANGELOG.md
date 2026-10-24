@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checksum already proves the file is the published one, and those checks now
   run on every release before it is published.
 
+- `aidentity list` and `aidentity list --json` look at the running processes
+  once for all profiles, not once per profile, so they are much faster with
+  many profiles. If that look fails, the warning is printed once. The
+  commands that change or delete a profile still look afresh every time they
+  check.
+- `aidentity list` shows each control character in a name, a path or a launch
+  setting as `?`, as the menu does, so a launcher's name cannot send escape
+  sequences to the terminal. In a UTF-8 locale this also covers some invisible
+  characters, such as the joiner inside some emoji. `list --json` still prints
+  every name exactly.
+
 ### Removed
 
 - `install.sh` no longer checks the size, first line, syntax and last line of
@@ -87,6 +98,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   start the menu, as the update tests already did. A suite started with
   either signal ignored no longer waits out a 90-second timeout in each
   Ctrl-C test.
+
+- One body for the running check, `running_in_snapshot`, answers the delete
+  guards and the views that ask about many profiles. The delete guards ask
+  `running_on_profile`, which always takes a fresh `proc_snapshot`; the views
+  take one snapshot for all their rows. The menu's own copy of the check is
+  gone. `uninstall.sh` carries the same four functions, and
+  `scripts/guards.sh` compares all four. One reader, `launcher_rows`, gives
+  `list`, `list --json`, the menu and completion the same launchers, with the
+  same rule for a main launcher's data folder, and `shown` is the one rule
+  for showing text from the disk.
 
 ## [1.4.0] - 2026-10-24
 
