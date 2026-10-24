@@ -10,12 +10,12 @@
 # script does, and here is the order it does it in:
 #
 #   1. Refuses to run anywhere but macOS.
-#   2. Downloads bin/aidentity from the repository to a temp file. The temp file
-#      is deleted on exit, whether this succeeds or fails.
-#   3. Checks the download: non-empty, starts with a shebang, carries the
-#      version marker every real copy has, parses as shell, and ends on the
-#      final line every real copy ends on. A truncated or wrong file never
-#      reaches your PATH.
+#   2. Downloads bin/aidentity and SHA256SUMS from the same ref to a temp
+#      folder. The folder is deleted on exit, whether this succeeds or fails.
+#   3. Checks the download against SHA256SUMS. No checksum, a checksum that
+#      does not match, or a SHA256SUMS it cannot download, and nothing is
+#      installed. For a release tag (vX.Y.Z), the file must also say it is
+#      version X.Y.Z. A damaged or wrong file never reaches your PATH.
 #   4. Installs to /usr/local/bin if you can write there, otherwise to
 #      ~/.local/bin. It never calls sudo. If it cannot write anywhere it prints
 #      the exact sudo command and stops, so the decision stays yours.
@@ -59,20 +59,6 @@ BIN_NAME="aidentity"
 PRIMARY_DIR="/usr/local/bin"
 FALLBACK_DIR="$HOME/.local/bin"
 
-# Smallest plausible copy of the script. Guards against a proxy or captive
-# portal handing back a short page that happens to start with "#!".
-MIN_BYTES=2000
-
-# The last line of bin/aidentity. Checked because everything else a truncated
-# file can still satisfy: it can be over MIN_BYTES, start with "#!", carry the
-# version marker near the top, and — since a shell script cut at the wrong point
-# is often still valid shell — pass "bash -n" too. Only the tail proves the whole
-# file arrived. bin/aidentity must keep ending on this line.
-# Never change it: every installed copy's `aidentity update` checks the same
-# line with its own fixed copy, so a new value here would not reach them and
-# they could no longer update. scripts/guards.sh pins the exact text.
-END_MARKER='main "$@"'
-
 # ---------------------------------------------------------------- output --
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -90,9 +76,11 @@ die()  { printf '%s✗%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; exit 1; }
 
 # --------------------------------------------------------------- cleanup --
 
-# Set before use; the trap tolerates them being empty.
-TMP_FILE=""
-STAGED_FILE=""
+# Set before use; the trap tolerates them being empty. The download block
+# below sets INSTALL_STAGED (its staged copy) and VERIFIED_SUM.
+TMP_DIR=""
+INSTALL_STAGED=""
+VERIFIED_SUM=""
 
 # Filled in as we go. Declared here so 'set -u' has nothing to trip over.
 INSTALL_DIR=""
@@ -101,8 +89,9 @@ INSTALLED_VERSION=""
 PREVIOUS_VERSION=""
 
 cleanup() {
-  [ -n "$TMP_FILE" ] && rm -f "$TMP_FILE"
-  [ -n "$STAGED_FILE" ] && rm -f "$STAGED_FILE"
+  [ -n "$INSTALL_STAGED" ] && rm -f "$INSTALL_STAGED"
+  # Only ever a folder this script made with mktemp.
+  case "$TMP_DIR" in */aidentity-install.?*) rm -rf "$TMP_DIR" ;; esac
   return 0
 }
 trap cleanup EXIT
@@ -180,67 +169,142 @@ path_set_line() {
   esac
 }
 
-# Version of an aidentity script. Read out of the file rather than by running
-# it — reporting a version is no reason to execute anything.
-read_version() {
-  local file="$1" v=""
-  v=$(sed -n 's/^AIDENTITY_VERSION="\([^"]*\)".*/\1/p' "$file" 2>/dev/null | head -n 1) || v=""
-  [ -n "$v" ] || v="unknown"
-  printf '%s' "$v"
+# ------------------------------------------------- download and checks --
+
+# >>> download block: identical in bin/aidentity and install.sh
+# scripts/guards.sh fails when the two copies differ (see CONTRIBUTING.md).
+
+# x.y.z, each part 1 to 9 digits. The cap keeps a version compare inside
+# bash's 64-bit arithmetic, where a longer part wraps round to a small number.
+# The case test goes first: it refuses a newline, which a regex might not.
+is_version() {
+  local re='^[0-9]{1,9}\.[0-9]{1,9}\.[0-9]{1,9}$'
+  case "$1" in ''|*[!0-9.]*) return 1 ;; esac
+  [[ $1 =~ $re ]]
 }
 
-# ------------------------------------------------------------- download --
+# A release tag: v, then x.y.z, and nothing else. A tag that arrives from the
+# network is checked before it goes into a URL or onto the screen: a "/" or
+# ".." could steer the download elsewhere, and an escape sequence could
+# rewrite the terminal.
+is_release_tag() {
+  case "$1" in v*) is_version "${1#v}" ;; *) return 1 ;; esac
+}
 
+# One HTTPS download into a file. -q must stay the FIRST argument: it stops
+# curl from reading the user's .curlrc, where a line like "insecure" would turn
+# off certificate checks and "output" would send the file somewhere else.
+# --proto and --proto-redir hold every transfer, redirects included, to HTTPS.
+# --max-filesize stops an answer far bigger than the file asked for. Into a
+# file, never a pipe, so curl's own exit status is what gets checked.
+https_fetch() { # url, output file, max bytes, [extra curl options]
+  local url="$1" out="$2" max="$3"
+  shift 3
+  curl -q -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
+       --connect-timeout 10 --max-time 60 --retry 2 --max-filesize "$max" \
+       "$@" -o "$out" "$url"
+}
+
+# The version a copy of the script says it is: its first AIDENTITY_VERSION
+# line, read from the file and never by running it. Empty when there is none.
+file_version() { # file
+  sed -n '/^AIDENTITY_VERSION="\([^"]*\)"$/{s//\1/p;q;}' "$1" 2>/dev/null || true
+}
+
+# Check a download against the SHA256SUMS published beside it, or say why not
+# and return 1: a line for bin/aidentity with 64 hex digits (no checksum, no
+# install), a matching SHA-256 and, unless the version is "-", the file's own
+# version line. Sets VERIFIED_SUM, which install_atomic installs against.
+verify_release_file() { # file, checksum file, version (x.y.z, or - for none)
+  local LC_ALL=C want got
+  VERIFIED_SUM=""
+  [ -n "${3:-}" ] || { warn "No version was given to check the download against."; return 1; }
+  want=$(awk '$2 == "bin/aidentity" { print $1; exit }' "$2" 2>/dev/null) || want=""
+  case "$want" in *[!0-9a-f]*) want="" ;; esac
+  if [ "${#want}" -ne 64 ]; then
+    warn "The checksum file has no valid line for bin/aidentity, so the download cannot be checked."
+    return 1
+  fi
+  got=$(shasum -a 256 "$1" 2>/dev/null | awk '{print $1}') || got=""
+  if [ "$got" != "$want" ]; then
+    warn "Checksum mismatch: the download is not the published file.
+    expected ${want}
+    got      ${got:-(none)}"
+    return 1
+  fi
+  if [ "$3" != - ] && [ "$(file_version "$1")" != "$3" ]; then
+    warn "The download does not say it is version $3."
+    return 1
+  fi
+  VERIFIED_SUM="$want"
+}
+
+# Put a checked file in place of the destination in one step: write it beside
+# the destination, check it against the verified checksum, then mv it over. A
+# half-written file is never seen under the real name, and a copy running now
+# keeps reading its old file. mktemp, not a fixed name: in a folder others can
+# write to, as /usr/local/bin often is, a fixed name can be planted as a
+# symlink and the file written through it. Any failure dies; the EXIT trap
+# removes INSTALL_STAGED.
+install_atomic() { # checked file, destination, its VERIFIED_SUM
+  local src="$1" dest="$2" sum="$3" dir
+  dir=$(dirname "$dest")
+  [ "${#sum}" -eq 64 ] || die "The download was not checked. Nothing was changed."
+  INSTALL_STAGED=$(mktemp "$dir/.aidentity.XXXXXX" 2>/dev/null) \
+    || { INSTALL_STAGED=""; die "Could not write to $dir. Nothing was changed."; }
+  cat "$src" > "$INSTALL_STAGED" && chmod 755 "$INSTALL_STAGED" \
+    || die "Could not write the new copy to $dir. Nothing was changed."
+  [ "$(shasum -a 256 "$INSTALL_STAGED" 2>/dev/null | awk '{print $1}')" = "$sum" ] \
+    || die "The copy written to $dir does not match the download. Nothing was changed."
+  # -h replaces a link at the destination instead of following it into a
+  # folder. /bin/mv: -h is BSD-only, and a GNU mv first on PATH rejects it.
+  /bin/mv -fh "$INSTALL_STAGED" "$dest" \
+    || die "Could not replace $dest. Nothing was changed."
+  INSTALL_STAGED=""
+  [ -f "$dest" ] && [ ! -L "$dest" ] \
+    && [ "$(shasum -a 256 "$dest" 2>/dev/null | awk '{print $1}')" = "$sum" ] \
+    || die "Installing did not leave the new copy at $dest.
+    Check what is at that path, then run the installer again."
+}
+
+# <<< download block
+
+
+# Download the script and its checksum file from the same ref.
 download() {
-  TMP_FILE=$(mktemp "${TMPDIR:-/tmp}/aidentity-install.XXXXXX") \
-    || die "Could not create a temporary file."
+  local tmp="${TMPDIR:-/tmp}"
+  TMP_DIR=$(mktemp -d "${tmp%/}/aidentity-install.XXXXXX") \
+    || die "Could not create a temporary folder."
 
   info "Downloading aidentity (${REF}) …"
   dim "  $SOURCE_URL"
-
-  # --proto/--tlsv1.2 pin the transport; -f turns an HTTP error into a failure
-  # instead of a downloaded error page. --proto-redir matters as much as --proto:
-  # --proto only constrains the first request, and curl's default still permits a
-  # redirect to plain http, which would hand the download to anyone on the wire.
-  curl --fail --silent --show-error --location \
-       --proto '=https' --proto-redir '=https' --tlsv1.2 \
-       --connect-timeout 10 --max-time 120 --retry 2 \
-       -o "$TMP_FILE" "$SOURCE_URL" \
-    || die "Download failed.
-    Check your connection, or that '$REF' exists in $REPO_URL"
+  https_fetch "$SOURCE_URL" "$TMP_DIR/aidentity" 4194304 \
+    || die "Could not download aidentity from AIDENTITY_REF=$REF (curl's reason is above).
+    Check your internet connection, or that '$REF' exists in $REPO_URL
+    A proxy or CA certificate set in ~/.curlrc is not used here: set
+    https_proxy or CURL_CA_BUNDLE instead.
+    Nothing was installed."
+  https_fetch "$SUMS_URL" "$TMP_DIR/SHA256SUMS" 65536 \
+    || die "Could not download SHA256SUMS for AIDENTITY_REF=$REF, so the download cannot be checked.
+    Nothing was installed."
 }
 
+# The checksum is required: no line for bin/aidentity, or a mismatch, and
+# nothing is installed. For a release tag the file must also say it is that
+# version, so a tag cannot hand out another version's file. A branch or a
+# commit names no version, so its checksum alone decides.
+#
+# Be honest about what this buys: it catches corruption, truncation, a proxy
+# swapping the body, and a partial CDN object. It does NOT defend against a
+# compromise of the repository itself, because the checksum is served from the
+# same origin as the file. Homebrew is the stronger channel — its formula pins
+# a sha256 reviewed at release time.
 verify() {
-  local size first_line last_line
-
-  size=$(wc -c < "$TMP_FILE" | tr -d ' ')
-  [ "${size:-0}" -gt 0 ] || die "The downloaded file is empty. Nothing was installed."
-  [ "${size:-0}" -ge "$MIN_BYTES" ] || die "The downloaded file is only ${size} bytes, which is far
-    too small to be aidentity. Something answered instead of GitHub. Nothing was installed."
-
-  first_line=$(head -n 1 "$TMP_FILE")
-  case "$first_line" in
-    '#!'*) ;;
-    *) die "The downloaded file does not start with a shebang, so it is not a
-    script. Nothing was installed." ;;
-  esac
-
-  grep -q '^AIDENTITY_VERSION=' "$TMP_FILE" \
-    || die "The downloaded file does not look like aidentity (no version marker).
-    Nothing was installed."
-
-  bash -n "$TMP_FILE" 2>/dev/null \
-    || die "The downloaded file is not valid shell — it is probably truncated.
-    Nothing was installed."
-
-  # The check that actually catches truncation. A script cut in half is very
-  # often still valid shell, so 'bash -n' alone lets a half file through; the
-  # last line is the only thing that proves the transfer finished.
-  last_line=$(awk 'NF { line = $0 } END { sub(/[ \t\r]+$/, "", line); print line }' "$TMP_FILE")
-  [ "$last_line" = "$END_MARKER" ] \
-    || die "The downloaded file is cut off — it does not end where aidentity ends.
-    Nothing was installed. Try again; if it keeps happening, download it by hand
-    from $REPO_URL"
+  local version=-
+  is_release_tag "$REF" && version="${REF#v}"
+  verify_release_file "$TMP_DIR/aidentity" "$TMP_DIR/SHA256SUMS" "$version" \
+    || die "Refusing to install aidentity from AIDENTITY_REF=$REF. Nothing was installed."
+  dim "  checksum verified"
 }
 
 # -------------------------------------------------------------- install --
@@ -297,33 +361,15 @@ install_binary() {
     Nothing was installed."
   fi
   if [ -e "$dest" ]; then
-    previous=$(read_version "$dest")
+    previous=$(file_version "$dest")
+    [ -n "$previous" ] || previous="unknown"
   fi
 
-  # Write beside the target, then move into place. A half-written file is never
-  # visible as 'aidentity', and replacing the inode leaves a running copy alone.
-  #
-  # mktemp, not "$dest.new.$$": /usr/local/bin is group-writable on plenty of
-  # Macs, and a predictable staging name is a symlink waiting to happen. Anyone
-  # who can write to the directory could plant that name pointing anywhere, and
-  # we would faithfully write the script through it, chmod 755 it, and then move
-  # the symlink into place as 'aidentity'. mktemp creates the file itself, with
-  # an unguessable name and O_EXCL, so there is nothing to pre-empt.
-  STAGED_FILE=$(mktemp "$INSTALL_DIR/.aidentity.XXXXXX") \
-    || die "Could not write to $INSTALL_DIR"
-  cat "$TMP_FILE" > "$STAGED_FILE" || die "Could not write to $INSTALL_DIR"
-  chmod 755 "$STAGED_FILE" || die "Could not set permissions on $STAGED_FILE"
-  # -h: if $dest is a symlink, replace the link itself. Plain `mv -f` follows a
-  # symlink to a directory and drops the file inside it, so the install
-  # "succeeded" while nothing usable reached PATH. /bin/mv by full path: -h is
-  # BSD-only, and GNU coreutils first on PATH (common with Homebrew) rejects it.
-  /bin/mv -fh "$STAGED_FILE" "$dest" || die "Could not install to $dest"
-  STAGED_FILE=""
-  [ -f "$dest" ] && [ ! -L "$dest" ] || die "Installing to $dest did not leave a file there.
-    Check what is at that path, then run this again."
+  install_atomic "$TMP_DIR/aidentity" "$dest" "$VERIFIED_SUM"
 
   INSTALLED_PATH="$dest"
-  INSTALLED_VERSION=$(read_version "$dest")
+  INSTALLED_VERSION=$(file_version "$dest")
+  [ -n "$INSTALLED_VERSION" ] || INSTALLED_VERSION="unknown"
   PREVIOUS_VERSION="$previous"
 }
 
@@ -418,36 +464,6 @@ offer_setup() {
 }
 
 
-# Verify the download against the checksum published at the same ref.
-#
-# Be honest about what this buys: it catches corruption, truncation, a proxy
-# swapping the body, and a partial CDN object. It does NOT defend against a
-# compromise of the repository itself, because the checksum is served from the
-# same origin as the file. Homebrew is the stronger channel — its formula pins
-# a sha256 reviewed at release time.
-verify_checksum() {
-  local want got
-  want=$(curl -fsSL --proto '=https' --proto-redir '=https' --tlsv1.2 \
-              --connect-timeout 10 --max-time 30 --retry 2 "$SUMS_URL" 2>/dev/null \
-         | awk '$2 == "bin/aidentity" { print $1; exit }') || want=""
-  if [ -z "$want" ]; then
-    warn "No published checksum found for '$REF'; continuing on the structural checks alone."
-    return 0
-  fi
-  got=$(shasum -a 256 "$TMP_FILE" 2>/dev/null | awk '{print $1}')
-  if [ -z "$got" ]; then
-    warn "Could not compute a checksum locally; continuing on the structural checks alone."
-    return 0
-  fi
-  if [ "$want" != "$got" ]; then
-    die "Checksum mismatch — refusing to install.
-    expected $want
-    got      $got
-    Nothing was written. If this repeats, download it by hand from $REPO_URL"
-  fi
-  dim "  checksum verified"
-}
-
 # ----------------------------------------------------------------- main --
 
 main() {
@@ -455,7 +471,6 @@ main() {
   info ""
   download
   verify
-  verify_checksum
   choose_install_dir
   install_binary
   report
