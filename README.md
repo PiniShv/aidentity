@@ -66,7 +66,11 @@ aidentity help rm                                  # options for one command (al
 
 Prefer a menu? `aidentity ui` shows every profile on one screen; pick one with the arrow keys, then one key recolours, renames or removes it.
 
-<img src="assets/demo-ui.gif" alt="Terminal recording of aidentity ui: picking a profile, changing its colour, renaming it, and showing the key list" width="720">
+<div align="center">
+
+<img src="assets/demo-ui.gif" alt="Terminal demo: aidentity ui shows the profiles in a menu, then recolours and renames one and lists every key" width="800">
+
+</div>
 
 Tab completion for bash, zsh and fish is built in. Homebrew installs it for you; for other installs it takes [one line](docs/guide.md#aidentity-completion).
 
