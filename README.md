@@ -48,17 +48,23 @@ brew install pinishv/tap/aidentity
 > [!IMPORTANT]
 > If the app is already open, quit it first. Sign in to the new icon, then open the app again. Some apps sign in through your browser, and macOS hands the result to the window that started first. [Why](docs/guide.md#signing-in-to-a-new-profile)
 
-The installer checks the download, never uses `sudo` and leaves your shell files alone. To read it first or build from source, see [Install and upgrade](docs/guide.md#install-and-upgrade).
+The installer checks the download, never uses `sudo` and leaves your shell files alone. To read it first or build from source, see [Install and upgrade](docs/guide.md#install-and-upgrade). To upgrade later, run `aidentity update`, or `brew upgrade aidentity` if you used Homebrew.
+
+Not sure what to type? [Build your recipe](https://aidentity.pinishv.com/recipes/): pick your apps and colours, and copy the commands.
 
 Day to day:
 
 ```bash
+aidentity ui                                       # a menu in your terminal
 aidentity add Claude --profile Work --color blue   # one more account, no questions
 aidentity list                                     # every profile, and which are running
 aidentity rename "Claude Work" Client              # stays signed in
 aidentity restore "Claude Client"                  # bring back a deleted icon
 aidentity doctor --fix                             # check and repair
+aidentity help rm                                  # options for one command (also: rm --help)
 ```
+
+Tab completion for bash, zsh and fish is built in. Homebrew installs it for you; for other installs it takes [one line](docs/guide.md#aidentity-completion).
 
 [All commands](docs/guide.md#commands)
 
@@ -82,7 +88,7 @@ There is still one `Claude.app`. [The full picture](docs/guide.md#how-it-works)
 ## Why aidentity
 
 - **Your app stays untouched.** It is never copied, changed or signed again, so it keeps its signature, its keychain access and its own updates.
-- **One script you can read.** About 3,000 lines of bash. [Read it](bin/aidentity) before you run it. It needs nothing extra; the Xcode Command Line Tools are optional. After install it makes no network calls, never uses `sudo` and runs nothing in the background.
+- **One script you can read.** About 5,000 lines of bash. [Read it](bin/aidentity) before you run it. It needs nothing extra; the Xcode Command Line Tools are optional. It makes no network calls except when you run `aidentity update`, never uses `sudo` and runs nothing in the background.
 - **Easy to undo.** Deleted an icon? `aidentity restore` brings it back, still signed in. Something looks wrong? `aidentity doctor --fix`. `rm` keeps your data unless you add `--purge`. The [uninstaller](docs/guide.md#uninstall) asks before it deletes any profile.
 - **Your original account stays one click away.** While a profile runs, clicking `Claude.app` takes you to that profile. `aidentity add Claude --main` builds a Main launcher that opens your original account instead. [Why](docs/guide.md#opening-your-original-account-while-a-profile-runs)
 
@@ -119,7 +125,7 @@ That is [the main trade-off](#how-it-works). The icons you click carry the profi
 
 **Does it break auto-update?**
 
-No. Your app is untouched and updates itself as before. A launcher stores the path to the app, not a copy, so the next launch uses the new version. aidentity itself never checks for updates. Upgrade it with `brew upgrade aidentity`, or run the install line again.
+No. Your app is untouched and updates itself as before. A launcher stores the path to the app, not a copy, so the next launch uses the new version. aidentity itself never checks for updates on its own. To upgrade it, run `aidentity update`, or `brew upgrade aidentity` if you used Homebrew.
 
 **Is this against the terms of service?**
 
