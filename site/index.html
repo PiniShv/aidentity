@@ -653,7 +653,7 @@ html:not(.js) .chapters{display:none}
 <summary>Read the menu demo as text <svg class="i" aria-hidden="true"><use href="#i-down"/></svg></summary>
 <ol>
 <li><code>aidentity ui</code> opens a menu with four profiles: <code>ChatGPT Work</code>, <code>Claude Main</code>, <code>Claude Personal</code> and <code>Claude Work</code>.</li>
-<li>The Down arrow moves to <code>Claude Personal</code>.</li>
+<li>The Down arrow, pressed twice, moves to <code>Claude Personal</code>.</li>
 <li><code>c</code> opens the colour picker. The Right arrow steps through the colours and Enter picks teal. Only the icon changes.</li>
 <li><code>r</code> renames it. Typing <code>Client</code> and pressing Enter gives it the new name. The account stays signed in.</li>
 <li><code>?</code> shows every key. Any key goes back to the menu.</li>
@@ -1110,7 +1110,9 @@ function initPlayer(root){
     if(v.paused){userPaused=false;go()}else{userPaused=true;v.pause()}
   }
   function fail(){failed=true;ui()}
-  var me={yieldToOther:function(){if(!v.paused){userPaused=true;autoPaused=false;v.pause()}}};
+  /* The other player starting is not the visitor's choice, so this counts as an automatic pause: the
+     demo carries on when it is on screen again, as after scrolling away. */
+  var me={yieldToOther:function(){if(!v.paused){autoPaused=true;v.pause()}}};
   players.push(me);
   v.addEventListener('play',function(){
     started=true;autoPaused=false;ui();if(!raf)raf=requestAnimationFrame(loop);
