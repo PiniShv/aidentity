@@ -100,6 +100,9 @@ lint: ## shellcheck every shell file, or syntax-check them if shellcheck is abse
 		printf 'Syntax check passed — shellcheck was not run, so this is NOT a full lint.\n'; exit 0; \
 	fi
 
+# Keep this exact line format, "<64 hex>  bin/aidentity", and the file at the
+# top of the repository: install.sh and every installed copy's
+# `aidentity update` read it from there. scripts/guards.sh checks both.
 .PHONY: checksums
 checksums: ## Regenerate SHA256SUMS after changing bin/aidentity
 	@shasum -a 256 bin/aidentity | awk '{print $$1"  bin/aidentity"}' > SHA256SUMS
