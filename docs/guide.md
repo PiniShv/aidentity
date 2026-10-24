@@ -249,7 +249,7 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 
 ## Is this safe?
 
-`aidentity` is one shell script, about 2,700 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it.
+`aidentity` is one shell script, about 3,000 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it.
 
 ### What it touches
 
