@@ -824,9 +824,9 @@ For fish, add this to `~/.config/fish/config.fish`:
 aidentity completion fish | source
 ```
 
-- Names are looked up each time you press Tab, so a new profile shows up at once.
+- Each Tab runs `aidentity` to find what fits, so a new profile shows up at once.
 - It offers the long spellings of options (`--profile`, not `-p`). Short ones still work when you type them. Values for `--profile`, `--badge`, `--arg` and `--env` are not completed.
-- The line above runs `aidentity` each time a new shell starts, which takes about a tenth of a second. You can instead save the output once as a file your shell reads, for example `aidentity completion fish > ~/.config/fish/completions/aidentity.fish`. Then make the file again after each upgrade.
+- The line above runs `aidentity` each time a new shell starts, which takes about a tenth of a second. You can instead save the output once as a file your shell reads, for example `aidentity completion fish > ~/.config/fish/completions/aidentity.fish`. The file holds no list of commands, so it stays right after an upgrade. Only a file saved from 1.4.0 must be made once more to show newer commands.
 - It needs `aidentity` on your `PATH`.
 
 ### `aidentity version` / `aidentity help`
