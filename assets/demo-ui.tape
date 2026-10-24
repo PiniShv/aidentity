@@ -1,4 +1,5 @@
-# aidentity ui demo — recorded inside the same sandbox as demo.tape.
+# aidentity ui demo — recorded inside the same sandbox as demo.tape, with the
+# same terminal size, font, theme and typing speed, so both clips look alike.
 #
 # Regenerate with:  bash assets/record-demo.sh ui
 #
@@ -13,7 +14,7 @@ Require aidentity
 Set Shell bash
 Set FontSize 17
 Set Width 1180
-Set Height 620
+Set Height 760
 Set Padding 24
 Set Theme { "name": "aidentity", "background": "#0D1117", "foreground": "#C9D1D9", "cursor": "#38BDF8", "black": "#0D1117", "red": "#E5484D", "green": "#2FB344", "yellow": "#F5B400", "blue": "#2E7DF6", "magenta": "#8E4EC6", "cyan": "#22D3EE", "white": "#C9D1D9", "brightBlack": "#6B7280", "brightRed": "#E5484D", "brightGreen": "#2FB344", "brightYellow": "#F5B400", "brightBlue": "#38BDF8", "brightMagenta": "#8E4EC6", "brightCyan": "#67E8F9", "brightWhite": "#F0F6FC" }
 Set TypingSpeed 55ms

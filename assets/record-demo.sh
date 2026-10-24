@@ -104,11 +104,17 @@ ffmpeg -y -loglevel error -i aidentity-ui-demo.gif \
 ffmpeg -y -loglevel error -i aidentity-ui-demo.gif -i palette-ui.png \
   -lavfi "fps=11,scale=920:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=4" \
   "$REPO/assets/demo-ui.gif"
+# As with the main video, keyframes sit exactly at the chapter times in
+# site/index.html (data-t of the menu player), so a browser that seeks only to
+# keyframes still lands on each chapter. Keep the two lists the same when the
+# tape changes.
+ui_chapters="0,5,13,20,24"
 ffmpeg -y -loglevel error -i "$REPO/assets/demo-ui.gif" "${clean[@]}" -movflags +faststart \
   -pix_fmt yuv420p -c:v libx264 -preset veryslow -tune animation -crf 24 \
+  -force_key_frames "$ui_chapters" \
   -bsf:v filter_units=remove_types=6 -vf "$vf" "$REPO/site/assets/demo-ui.mp4"
 ffmpeg -y -loglevel error -i "$REPO/assets/demo-ui.gif" "${clean[@]}" -pix_fmt yuv420p \
-  -c:v libvpx-vp9 -b:v 0 -crf 36 -row-mt 1 -vf "$vf" "$REPO/site/assets/demo-ui.webm"
+  -c:v libvpx-vp9 -b:v 0 -crf 36 -row-mt 1 -force_key_frames "$ui_chapters" -vf "$vf" "$REPO/site/assets/demo-ui.webm"
 # The poster shows the menu with every profile, before the first key.
 ffmpeg -y -loglevel error -ss 4 -i "$REPO/site/assets/demo-ui.mp4" "${clean[@]}" \
   -frames:v 1 -q:v 4 "$REPO/site/assets/demo-ui-poster.jpg"
