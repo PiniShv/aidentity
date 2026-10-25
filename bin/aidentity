@@ -1437,6 +1437,117 @@ PLIST
   return 0
 }
 
+# ----------------------------------------------------------------- trash --
+
+# Profile data is never deleted outright. rm --purge, prune and uninstall.sh
+# move it to the Trash, so a mistake can be undone. The move is a plain mv, not
+# a request to Finder: asking Finder needs a permission prompt first, and a
+# script stuck on that prompt helps nobody.
+#
+# trash_path PATH moves PATH into the Trash of the volume it is on and prints
+# where it went. If it cannot, it says why and returns non-zero, and PATH stays
+# exactly where it was. uninstall.sh carries a copy, because it cannot source
+# this file; scripts/guards.sh fails when the two differ.
+#
+# Each volume has its own Trash: ~/.Trash on the volume that holds the home
+# folder, <volume>/.Trashes/<uid> on any other. The Trash must be on the same
+# volume as PATH. Then mv is a rename, which happens whole or not at all. Across
+# volumes mv copies every file and then deletes the original, and stopped half
+# way it leaves half of each.
+trash_path() { # path -> prints where it went
+  local src="$1" base parent dev uid trash mount up dest n id err moved
+  base=${src##*/}
+  case "$src" in /?*) ;; *) base="" ;; esac
+  if [ -z "$base" ] || [ "$base" = "." ] || [ "$base" = ".." ]; then
+    warn "Could not move '$src' to the Trash: it is not a full path to a folder. Nothing was deleted."
+    return 1
+  fi
+  if [ ! -e "$src" ] && [ ! -L "$src" ]; then
+    warn "Could not move $src to the Trash: it does not exist."
+    return 1
+  fi
+  parent=${src%/*}; [ -n "$parent" ] || parent="/"
+  # Without -L: the device of the entry that mv renames, even when it is a
+  # symlink.
+  dev=$(/usr/bin/stat -f %d "$src" 2>/dev/null) || dev=""
+  if [ -z "$dev" ]; then
+    warn "Could not move $src to the Trash: it cannot be read. Nothing was deleted."
+    return 1
+  fi
+
+  if [ -n "${HOME:-}" ] && [ "$(/usr/bin/stat -L -f %d "$HOME" 2>/dev/null)" = "$dev" ]; then
+    trash="$HOME/.Trash"
+    if [ ! -d "$trash" ] && ! mkdir -m 700 "$trash" 2>/dev/null; then
+      warn "Could not move $src to the Trash: $trash is missing and could not be created. Nothing was deleted."
+      return 1
+    fi
+  else
+    # Another volume. Its top folder is where the device changes, walking up
+    # from the folder PATH is in. A PATH that is itself a volume (its folder
+    # is on another device) cannot be moved anywhere.
+    up=$(command cd -P "$parent" 2>/dev/null && pwd -P) || up=""
+    if [ -z "$up" ] || [ "$(/usr/bin/stat -f %d "$up" 2>/dev/null)" != "$dev" ]; then
+      warn "Could not move $src to the Trash: it is a volume of its own, or its folder cannot be read. Nothing was deleted."
+      return 1
+    fi
+    mount=$up
+    while [ "$mount" != "/" ]; do
+      up=${mount%/*}; [ -n "$up" ] || up="/"
+      [ "$(/usr/bin/stat -f %d "$up" 2>/dev/null)" = "$dev" ] || break
+      mount=$up
+    done
+    # Finder makes .Trashes on a volume it has put things in the Trash on. A
+    # volume without one may not want one (a backup disk, a network share), so
+    # it is not made here.
+    if [ ! -d "$mount/.Trashes" ]; then
+      warn "Could not move $src to the Trash: its volume, $mount, has no Trash folder (.Trashes). Nothing was deleted."
+      return 1
+    fi
+    uid=$(id -u 2>/dev/null) || uid=""
+    trash="$mount/.Trashes/$uid"
+    if [ -z "$uid" ] || { [ ! -d "$trash" ] && ! mkdir -m 700 "$trash" 2>/dev/null; }; then
+      warn "Could not move $src to the Trash: $trash is missing and could not be created. Nothing was deleted."
+      return 1
+    fi
+  fi
+  # A symlinked Trash could lead to another volume, and then mv would copy.
+  if [ "$(/usr/bin/stat -L -f %d "$trash" 2>/dev/null)" != "$dev" ]; then
+    warn "Could not move $src to the Trash: $trash is on another volume. Nothing was deleted."
+    return 1
+  fi
+
+  # mv onto a folder that exists moves INTO it, so the name must be free:
+  # "name", then "name 2", "name 3", and so on, as Finder names them.
+  dest="$trash/$base"; n=2
+  while [ -e "$dest" ] || [ -L "$dest" ]; do
+    if [ "$n" -gt 9999 ]; then
+      warn "Could not move $src to the Trash: too many items named '$base' there already. Nothing was deleted."
+      return 1
+    fi
+    dest="$trash/$base $n"; n=$((n + 1))
+  done
+  id=$(/usr/bin/stat -f %d:%i "$src" 2>/dev/null) || id=""
+  # -n: never replace an item that took the name since the check above.
+  err=$(mv -n "$src" "$dest" 2>&1) || err=${err:-mv failed}
+  err=${err#mv: }
+  if [ -e "$src" ] || [ -L "$src" ]; then
+    warn "Could not move $src to the Trash: ${err:-$dest was taken just before the move}. Nothing was deleted."
+    return 1
+  fi
+  # Gone from where it was, so a rename put it in the Trash, whole. The return
+  # status says only that: whether PATH is still where it was.
+  moved=$dest
+  if [ -n "$id" ] && [ "$(/usr/bin/stat -f %d:%i "$dest" 2>/dev/null)" != "$id" ] \
+     && [ "$(/usr/bin/stat -f %d:%i "$dest/$base" 2>/dev/null)" = "$id" ]; then
+    # A folder made at that name in the moment before the move holds it.
+    moved="$dest/$base"
+  elif [ -n "$err" ] || { [ ! -e "$dest" ] && [ ! -L "$dest" ]; }; then
+    # The system may keep a Trash private even from its owner's programs.
+    warn "Moved $src to the Trash, but could not check it there${err:+ ($err)}. Look in: $trash"
+  fi
+  printf '%s\n' "$moved"
+}
+
 # -------------------------------------------------------------- commands --
 
 cmd_apps() {
@@ -1684,7 +1795,7 @@ cmd_rm() {
 
   if [ "$yes" -eq 0 ]; then
     if [ "$purge" -eq 1 ]; then
-      printf 'Remove launcher "%s" AND permanently delete its data?\n  %s\n' "$want" "$data"
+      printf 'Remove launcher "%s" AND move its data to the Trash?\n  %s\n' "$want" "$data"
     elif [ "$main" -eq 1 ]; then
       printf 'Remove launcher "%s"? Your original account is not affected.\n' "$want"
     else
@@ -1695,8 +1806,10 @@ cmd_rm() {
   fi
 
   # Launchers built before restore records existed get one now, while the
-  # launcher still says what it was — so the hint below always works.
-  if [ "$main" -eq 0 ] && [ "$purge" -eq 0 ] && [ -d "$data" ] && data_is_ours "$data" \
+  # launcher still says what it was — so the hint below always works. With
+  # --purge too: the data goes to the Trash, and once it is moved back,
+  # restore needs the record.
+  if [ "$main" -eq 0 ] && [ -d "$data" ] && data_is_ours "$data" \
      && [ ! -f "$data/$RESTORE_RECORD" ]; then
     write_restore_record "$data" "$profile" "$target" \
       "$(launcher_badge "$app" "$target" "$profile")" "$(launcher_color "$app" "$want")" \
@@ -1721,15 +1834,26 @@ cmd_rm() {
   ok "Removed launcher '$want'."
   [ "$main" -eq 1 ] && return 0
 
+  # How to get the account back. Worked out now: the record cannot be read
+  # once the folder is in the Trash, which the system may keep private.
+  local again
+  if [ -f "$data/$RESTORE_RECORD" ]; then
+    again="aidentity restore \"$want\""
+  else
+    local app_ref; app_ref=$(bundle_name "$target")
+    [ "$(resolve_app "$app_ref" 2>/dev/null)" = "$target" ] || app_ref="$target"
+    again="aidentity add \"$app_ref\" --profile \"$profile\""
+  fi
+
   if [ "$purge" -eq 1 ]; then
-    # Only delete inside our own data root — never an arbitrary recorded path.
+    # Only move data out of our own data root — never an arbitrary recorded path.
     if ! data_is_ours "$data"; then
       warn "Profile data is outside the aidentity data directory; left in place:"
       dim "  $data"
       return 0
     fi
-    # Launchers from 1.0.0 could share one directory. Deleting it would sign
-    # the other launcher out too.
+    # Launchers from 1.0.0 could share one directory. Moving it away would
+    # sign the other launcher out too.
     local others; others=$(launchers_sharing "$data")
     if [ -n "$others" ]; then
       warn "Profile data kept — another launcher uses the same directory: $others"
@@ -1742,21 +1866,25 @@ cmd_rm() {
       die "The profile was opened while waiting for confirmation. The launcher is
     gone, but its data was kept: $data"
     fi
-    rm -rf "$data" 2>/dev/null
-    if [ -e "$data" ]; then warn "Could not delete all of $data"; return 1; fi
-    ok "Deleted profile data."
+    if [ ! -e "$data" ] && [ ! -L "$data" ]; then
+      dim "  It had no profile data to move: $data is gone already."
+      return 0
+    fi
+    local moved
+    if ! moved=$(trash_path "$data"); then
+      dim "  The launcher is gone; its data is still at: $data"
+      return 1
+    fi
+    ok "Moved the profile data to the Trash."
+    dim "  It is now at: $moved"
+    dim "  To undo, move it back to: $data"
+    dim "  then run:  $again"
   else
     # `aidentity rm NAME --purge` cannot work any more — that launcher is gone,
     # which is what this used to suggest. These two do.
     dim "  Profile data kept at: $data"
-    if [ -f "$data/$RESTORE_RECORD" ]; then
-      dim "  To use this account again:  aidentity restore \"$want\""
-    else
-      local app_ref; app_ref=$(bundle_name "$target")
-      [ "$(resolve_app "$app_ref" 2>/dev/null)" = "$target" ] || app_ref="$target"
-      dim "  To use this account again:  aidentity add \"$app_ref\" --profile \"$profile\""
-    fi
-    dim "  To delete the data:         aidentity prune"
+    dim "  To use this account again:     $again"
+    dim "  To move the data to the Trash: aidentity prune"
   fi
 }
 
@@ -2396,9 +2524,9 @@ launcher_for() {
 
 # Every aidentity launcher that can be found, one path per line: the launcher
 # directory and folders inside it, the app search path, and whatever Spotlight
-# knows. `prune` deletes data that no launcher claims, so a launcher it cannot
-# see is a signed-in session it would delete. Looking only in the launcher
-# directory deleted the data of any launcher moved somewhere else.
+# knows. `prune` moves data that no launcher claims to the Trash, so a launcher
+# it cannot see is a signed-in session it would throw out. Looking only in the
+# launcher directory deleted the data of any launcher moved somewhere else.
 #
 # find runs with -H so a symlinked launcher directory is followed, as the old
 # "$APPS_DIR"/*.app glob was; without it a symlinked ~/Applications looked
@@ -2831,16 +2959,16 @@ EOF
   dim "  This is what is left when a launcher is deleted in Finder, or removed with"
   dim "  'aidentity rm' without --purge. Launchers were looked for in $APPS_DIR"
   dim "  (and folders inside it), in the app folders and through Spotlight. If you"
-  dim "  keep a launcher anywhere else, its account is listed here: do not delete it."
+  dim "  keep a launcher anywhere else, its account is listed here: do not remove it."
   info ""
 
   if [ "$yes" -eq 0 ]; then
-    local reply; reply=$(ask "Delete $n orphaned profile(s)? Type yes to confirm: ") \
+    local reply; reply=$(ask "Move $n orphaned profile(s) to the Trash? Type yes to confirm: ") \
       || die "Nothing to confirm with."
-    [ "$reply" = "yes" ] || die "Cancelled. Nothing was deleted."
+    [ "$reply" = "yes" ] || die "Cancelled. Nothing was moved."
   fi
 
-  local removed=0
+  local moved=0 dest
   for d in "${orphans[@]}"; do
     if running_on_profile "$d"; then
       warn "Skipping $(basename "$d") — something is running on it."
@@ -2850,9 +2978,14 @@ EOF
       warn "Skipping $(basename "$d") — outside the aidentity data root."
       continue
     fi
-    if rm -rf "$d"; then removed=$((removed+1)); else warn "Could not remove $d"; fi
+    # trash_path says why when it cannot; the folder then stays where it is.
+    if dest=$(trash_path "$d"); then
+      moved=$((moved+1))
+      dim "  $(basename "$d") is now at: $dest"
+    fi
   done
-  ok "Removed $removed orphaned profile(s)."
+  ok "Moved $moved orphaned profile(s) to the Trash."
+  [ "$moved" -eq 0 ] || dim "  To undo, move a folder back into $DATA_ROOT, then run: aidentity restore"
 }
 
 # Rebuild one launcher from what its Info.plist records. Profile data is never
@@ -3922,7 +4055,7 @@ ui_do_remove() {
   if [ "$main" = "1" ]; then
     opts="k  remove the launcher only   Esc  cancel"
   else
-    opts="k  keep the data   p  delete the data too   Esc  cancel"
+    opts="k  keep the data   p  move data to Trash   Esc  cancel"
   fi
   if [ "$UI_COLS" -ge 80 ]; then UI_MSG="Remove ${short}?   $opts"; else UI_MSG="$opts   ($short)"; fi
   ui_draw
@@ -4245,9 +4378,10 @@ USAGE
   aidentity prune [options]
 
 Finds profile folders that no launcher points at. They are left when a launcher
-is deleted in Finder, or removed with 'rm' without --purge. It lists them and
-asks before it deletes anything. Deleting cannot be undone. To get a launcher
-back instead, use 'aidentity restore'.
+is deleted in Finder, or removed with 'rm' without --purge. It lists them, asks
+first, then moves them to the Trash. To keep an account instead, rebuild its
+launcher with 'aidentity restore'. A folder moved back from the Trash can be
+restored the same way.
 
 OPTIONS
   -y, --yes            Skip the confirmation prompt
@@ -4326,9 +4460,9 @@ back. It asks you to type yes first. It stops if the profile is running, and it
 only removes launchers that aidentity built.
 
 OPTIONS
-  --purge              Also delete the profile's data. This cannot be undone.
-                       A main launcher has no profile data, so nothing more is
-                       deleted for it.
+  --purge              Also move the profile's data to the Trash. To undo, move
+                       it back and run 'aidentity restore'. A main launcher
+                       has no profile data, so nothing more is moved for it.
   -y, --yes            Skip the confirmation prompt
 
 EXAMPLES

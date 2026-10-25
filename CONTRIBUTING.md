@@ -160,19 +160,22 @@ back regardless of what else it does.
    `build_launcher` does) where the caller has a recovery path. Do not add a
    "force" flag that skips it.
 
-2. **Never delete outside the data root, or while a profile runs.** `rm --purge`,
-   `prune` and `uninstall.sh` delete only paths that `data_is_ours()` accepts:
-   absolute, no dot segments, resolved with `cd -P`, strictly below the root.
-   The path recorded in a bundle's plist is untrusted input — a bundle can be
-   edited by hand. Keep the check on the destination, not on the source of the
-   string. Every delete is also gated on `running_on_profile()`, which must
-   fail closed: if it cannot tell, it says "running". Never pipe its process
-   list into `grep -q` — under `pipefail` an early exit reads as "no match".
-   `running_on_profile()` takes a fresh look every time. Views that ask about
-   many profiles hold one `proc_snapshot()` in their own `local` variables and
-   ask `running_in_snapshot()`; a delete never does. Both helpers, and the
-   other three functions of the running check, are copied into `uninstall.sh`,
-   and CI fails if the copies differ.
+2. **Never remove profile data outside the data root, or while a profile
+   runs.** `rm --purge`, `prune` and `uninstall.sh` never delete profile data:
+   they move it to the Trash with `trash_path()`, which renames it on its own
+   volume and leaves it where it was when it cannot. They move only paths that
+   `data_is_ours()` accepts: absolute, no dot segments, resolved with `cd -P`,
+   strictly below the root. The path recorded in a bundle's plist is untrusted
+   input — a bundle can be edited by hand. Keep the check on the destination,
+   not on the source of the string. Every move is also gated on
+   `running_on_profile()`, which must fail closed: if it cannot tell, it says
+   "running". Never pipe its process list into `grep -q` — under `pipefail` an
+   early exit reads as "no match". `running_on_profile()` takes a fresh look
+   every time. Views that ask about many profiles hold one `proc_snapshot()`
+   in their own `local` variables and ask `running_in_snapshot()`; a move to
+   the Trash never does. Both helpers, the other
+   three functions of the running check and `trash_path()` are copied into
+   `uninstall.sh`, and CI fails if the copies differ.
 
 3. **Never widen profile-name validation without an escaping review.** A profile
    name becomes a directory name, a bundle name, a slug and a string embedded in

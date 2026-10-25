@@ -72,6 +72,66 @@ SRC="$SB/src"
 VSC_DATA="$SANDBOX/v"
 mkdir -p "$APPS" "$DATA" "$SRC" "$VSC_DATA"
 
+# rm --purge, prune and uninstall.sh move profile data to the Trash in the home
+# folder. So every command here runs with a home folder in the sandbox, and
+# that is where the data lands. The real Trash is checked at the end, like the
+# real folders above. The sandbox is on the same volume as this home folder,
+# so the Trash used is always this one.
+REAL_TRASH="$HOME/.Trash"
+export HOME="$SANDBOX/home"
+SB_TRASH="$HOME/.Trash"
+# tty-home is the home folder of the runs on a terminal (ai_tty, the menu,
+# uninstall.sh). It must exist too: a Trash is only made in a home folder that
+# is there.
+mkdir -p "$HOME" "$SANDBOX/tty-home"
+
+# The names in a Trash that start with "fake-", the prefix of every profile
+# folder the suite makes. Only those: other changes to a user's Trash while
+# the suite runs are not the suite's. A Trash that cannot be listed (macOS
+# keeps the real one private from some programs) reads as that, both times.
+trash_names() { # trash folder
+  local list
+  list=$(ls -A "$1" 2>/dev/null) || { printf '<unreadable>'; return 0; }
+  printf '%s\n' "$list" | grep '^fake-' | LC_ALL=C sort
+  return 0
+}
+
+# Empty the sandbox's two Trash folders, so a test knows the names it finds
+# there. Only ever these two, inside this run's sandbox.
+trash_reset() {
+  case "$SB_TRASH" in
+    "$SANDBOX"/?*) ;;
+    *) printf '# refusing to empty a Trash outside the sandbox: %s\n' "$SB_TRASH" >&2; return 1 ;;
+  esac
+  chmod -R u+rwX "$SB_TRASH" "$SANDBOX/tty-home/.Trash" 2>/dev/null
+  rm -rf "$SB_TRASH" "$SANDBOX/tty-home/.Trash"
+}
+
+# A small disk image attached as a second volume, hidden from Finder, at a
+# mount point in the sandbox. VOL_MNT is set before the attach, so cleanup
+# detaches it however the run ends. Returns non-zero when hdiutil cannot do
+# it here.
+VOL_MNT=""
+vol_attach() { # mount point inside the sandbox
+  local img="$SANDBOX/volume.dmg"
+  rm -f "$img"
+  mkdir -p "$1" || return 1
+  hdiutil create -size 8m -fs HFS+ -volname aidentity-test -layout NONE "$img" >/dev/null 2>&1 || return 1
+  VOL_MNT="$1"
+  if ! hdiutil attach -nobrowse -noverify -noautoopen -mountpoint "$1" "$img" >/dev/null 2>&1; then
+    vol_detach; return 1
+  fi
+  [ "$(/usr/bin/stat -f %d "$1")" != "$(/usr/bin/stat -f %d "$SANDBOX")" ] || { vol_detach; return 1; }
+}
+
+vol_detach() {
+  [ -n "${VOL_MNT:-}" ] || return 0
+  hdiutil detach "$VOL_MNT" >/dev/null 2>&1 || hdiutil detach -force "$VOL_MNT" >/dev/null 2>&1
+  VOL_MNT=""
+  rm -f "$SANDBOX/volume.dmg"
+  return 0
+}
+
 export AIDENTITY_APPS_DIR="$APPS"
 export AIDENTITY_DATA_ROOT="$DATA"
 # Without this the suite scans the real /Applications, which makes `apps`,
@@ -81,6 +141,9 @@ export AIDENTITY_APP_DIRS="$SRC:$APPS"
 
 # Reached only through the EXIT/INT/TERM trap installed below.
 cleanup() {
+  # A disk image attached as a second volume is detached first, kept sandbox
+  # or not: a mounted volume would outlive the run.
+  vol_detach
   if [ -n "${AIDENTITY_TEST_KEEP:-}" ]; then
     printf '%s# sandbox kept: %s%s\n' "$P_DIM" "$SANDBOX" "$P_OFF"
     return 0

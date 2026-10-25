@@ -37,7 +37,7 @@ cmd_rm() {
 
   if [ "$yes" -eq 0 ]; then
     if [ "$purge" -eq 1 ]; then
-      printf 'Remove launcher "%s" AND permanently delete its data?\n  %s\n' "$want" "$data"
+      printf 'Remove launcher "%s" AND move its data to the Trash?\n  %s\n' "$want" "$data"
     elif [ "$main" -eq 1 ]; then
       printf 'Remove launcher "%s"? Your original account is not affected.\n' "$want"
     else
@@ -48,8 +48,10 @@ cmd_rm() {
   fi
 
   # Launchers built before restore records existed get one now, while the
-  # launcher still says what it was — so the hint below always works.
-  if [ "$main" -eq 0 ] && [ "$purge" -eq 0 ] && [ -d "$data" ] && data_is_ours "$data" \
+  # launcher still says what it was — so the hint below always works. With
+  # --purge too: the data goes to the Trash, and once it is moved back,
+  # restore needs the record.
+  if [ "$main" -eq 0 ] && [ -d "$data" ] && data_is_ours "$data" \
      && [ ! -f "$data/$RESTORE_RECORD" ]; then
     write_restore_record "$data" "$profile" "$target" \
       "$(launcher_badge "$app" "$target" "$profile")" "$(launcher_color "$app" "$want")" \
@@ -74,15 +76,26 @@ cmd_rm() {
   ok "Removed launcher '$want'."
   [ "$main" -eq 1 ] && return 0
 
+  # How to get the account back. Worked out now: the record cannot be read
+  # once the folder is in the Trash, which the system may keep private.
+  local again
+  if [ -f "$data/$RESTORE_RECORD" ]; then
+    again="aidentity restore \"$want\""
+  else
+    local app_ref; app_ref=$(bundle_name "$target")
+    [ "$(resolve_app "$app_ref" 2>/dev/null)" = "$target" ] || app_ref="$target"
+    again="aidentity add \"$app_ref\" --profile \"$profile\""
+  fi
+
   if [ "$purge" -eq 1 ]; then
-    # Only delete inside our own data root — never an arbitrary recorded path.
+    # Only move data out of our own data root — never an arbitrary recorded path.
     if ! data_is_ours "$data"; then
       warn "Profile data is outside the aidentity data directory; left in place:"
       dim "  $data"
       return 0
     fi
-    # Launchers from 1.0.0 could share one directory. Deleting it would sign
-    # the other launcher out too.
+    # Launchers from 1.0.0 could share one directory. Moving it away would
+    # sign the other launcher out too.
     local others; others=$(launchers_sharing "$data")
     if [ -n "$others" ]; then
       warn "Profile data kept — another launcher uses the same directory: $others"
@@ -95,21 +108,25 @@ cmd_rm() {
       die "The profile was opened while waiting for confirmation. The launcher is
     gone, but its data was kept: $data"
     fi
-    rm -rf "$data" 2>/dev/null
-    if [ -e "$data" ]; then warn "Could not delete all of $data"; return 1; fi
-    ok "Deleted profile data."
+    if [ ! -e "$data" ] && [ ! -L "$data" ]; then
+      dim "  It had no profile data to move: $data is gone already."
+      return 0
+    fi
+    local moved
+    if ! moved=$(trash_path "$data"); then
+      dim "  The launcher is gone; its data is still at: $data"
+      return 1
+    fi
+    ok "Moved the profile data to the Trash."
+    dim "  It is now at: $moved"
+    dim "  To undo, move it back to: $data"
+    dim "  then run:  $again"
   else
     # `aidentity rm NAME --purge` cannot work any more — that launcher is gone,
     # which is what this used to suggest. These two do.
     dim "  Profile data kept at: $data"
-    if [ -f "$data/$RESTORE_RECORD" ]; then
-      dim "  To use this account again:  aidentity restore \"$want\""
-    else
-      local app_ref; app_ref=$(bundle_name "$target")
-      [ "$(resolve_app "$app_ref" 2>/dev/null)" = "$target" ] || app_ref="$target"
-      dim "  To use this account again:  aidentity add \"$app_ref\" --profile \"$profile\""
-    fi
-    dim "  To delete the data:         aidentity prune"
+    dim "  To use this account again:     $again"
+    dim "  To move the data to the Trash: aidentity prune"
   fi
 }
 

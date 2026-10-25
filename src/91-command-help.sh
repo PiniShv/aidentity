@@ -115,9 +115,10 @@ USAGE
   aidentity prune [options]
 
 Finds profile folders that no launcher points at. They are left when a launcher
-is deleted in Finder, or removed with 'rm' without --purge. It lists them and
-asks before it deletes anything. Deleting cannot be undone. To get a launcher
-back instead, use 'aidentity restore'.
+is deleted in Finder, or removed with 'rm' without --purge. It lists them, asks
+first, then moves them to the Trash. To keep an account instead, rebuild its
+launcher with 'aidentity restore'. A folder moved back from the Trash can be
+restored the same way.
 
 OPTIONS
   -y, --yes            Skip the confirmation prompt
@@ -196,9 +197,9 @@ back. It asks you to type yes first. It stops if the profile is running, and it
 only removes launchers that aidentity built.
 
 OPTIONS
-  --purge              Also delete the profile's data. This cannot be undone.
-                       A main launcher has no profile data, so nothing more is
-                       deleted for it.
+  --purge              Also move the profile's data to the Trash. To undo, move
+                       it back and run 'aidentity restore'. A main launcher
+                       has no profile data, so nothing more is moved for it.
   -y, --yes            Skip the confirmation prompt
 
 EXAMPLES

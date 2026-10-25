@@ -220,7 +220,7 @@ ui_do_remove() {
   if [ "$main" = "1" ]; then
     opts="k  remove the launcher only   Esc  cancel"
   else
-    opts="k  keep the data   p  delete the data too   Esc  cancel"
+    opts="k  keep the data   p  move data to Trash   Esc  cancel"
   fi
   if [ "$UI_COLS" -ge 80 ]; then UI_MSG="Remove ${short}?   $opts"; else UI_MSG="$opts   ($short)"; fi
   ui_draw

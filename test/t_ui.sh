@@ -328,6 +328,9 @@ ALPHA_FP=$(fingerprint "$ALPHA")
 ui_run_menu 24 100 'dXq'
 assert_eq "any other key after d cancels" "$ALPHA_FP" "$(fingerprint "$ALPHA")"
 assert_contains "d asks what to remove" "$RUN_OUT" "k  keep the data"
+assert_contains "p says the data goes to the Trash" "$RUN_OUT" "p  move data to Trash"
+ui_run_menu 24 80 'dXq'
+assert_contains "the whole question fits 80 columns" "$RUN_OUT" "Remove Fake Alpha?   k  keep the data   p  move data to Trash   Esc  cancel"
 if ui_has_sgr; then _fail "the remove question has no style escapes under NO_COLOR"; else _pass "the remove question has no style escapes under NO_COLOR"; fi
 ui_run_menu 24 100 'jd\033kq'
 assert_contains "a key typed right after Esc is kept: Esc cancels d, then k moves up" "$(ui_frame)" "▸ ○ Fake Alpha"
@@ -350,7 +353,8 @@ assert_contains "it asks like rm does" "$RUN_OUT" "Type yes to confirm"
 
 ui_run_menu 24 100 'jdpyes\n qq'
 assert_no_dir "typing yes removes the launcher" "$BETA"
-assert_no_dir "and deletes its data" "$DATA/fake-beta"
+assert_no_dir "and takes its data away" "$DATA/fake-beta"
+assert_contains "to the Trash, through rm's own message" "$RUN_OUT" "Moved the profile data to the Trash."
 ai add "$ELECTRON_APP" --profile Beta --color teal
 printf 'session\n' > "$DATA/fake-beta/Cookies"
 
@@ -373,7 +377,7 @@ rm -f "$UI_FLAG"
 DATA_BEFORE=$(snapshot "$DATA")
 ui_run_menu 24 100 'jjdXq'
 assert_contains "a main launcher offers only k" "$RUN_OUT" "remove the launcher only"
-assert_not_contains "and not p" "$RUN_OUT" "delete the data too"
+assert_not_contains "and not p" "$RUN_OUT" "move data to Trash"
 ui_run_menu 24 100 'jjdpq'
 assert_dir "p on a main launcher removes nothing" "$MAINL"
 assert_contains "and says the app's data is never deleted" "$(ui_frame)" "never deletes the app's data"
