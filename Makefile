@@ -7,6 +7,7 @@
 #   make               show this help
 #   make build         rebuild bin/aidentity (and SHA256SUMS) after editing src/
 #   make check         everything CI checks: lint, the test suite, the guards
+#   make test AREA=ui  one area of the test suite (names: bash test/run_tests.sh --list)
 #   make install       copy bin/aidentity to $(PREFIX)/bin
 #   sudo make install  same, when /usr/local/bin needs root
 #   make install PREFIX=$$HOME/.local
@@ -19,6 +20,7 @@ BINDIR ?= $(PREFIX)/bin
 SCRIPT   := bin/aidentity
 TARGET   := $(BINDIR)/aidentity
 TESTS    := test/run_tests.sh
+TEST_SH  := $(TESTS) test/lib.sh $(sort $(wildcard test/t_*.sh))
 SH_FILES := bin/aidentity install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh
 
 # shellcheck findings we accept on purpose. Clear it to see everything:
@@ -79,13 +81,13 @@ build: ## Rebuild bin/aidentity from src/, and SHA256SUMS with it
 # The suite, the lint, install and release read bin/aidentity, so a src/
 # change that was not built yet would be used as the old code. They stop
 # first and say so.
-test: ## Run the test suite (test/run_tests.sh)
+test: ## Run the test suite (test/run_tests.sh); AREA=ui runs one area
 	@bash scripts/build.sh --check
 	@if [ ! -f "$(TESTS)" ]; then \
 		printf 'No test suite at %s\n' "$(TESTS)" >&2; \
 		exit 1; \
 	fi
-	@/bin/bash "$(TESTS)"
+	@/bin/bash "$(TESTS)" $$AREA
 
 guards: ## Run the source guards CI runs (scripts/guards.sh)
 	@bash scripts/guards.sh
@@ -96,7 +98,7 @@ lint: ## shellcheck every shell file, or syntax-check them if shellcheck is abse
 	@bash scripts/build.sh --check
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		printf 'shellcheck\n'; \
-		for f in $(SH_FILES) $(TESTS); do \
+		for f in $(SH_FILES) $(TEST_SH); do \
 			[ -f "$$f" ] || { printf 'Missing: %s\n' "$$f" >&2; exit 1; }; \
 			printf '  %s\n' "$$f"; \
 			shellcheck -s bash $(if $(SHELLCHECK_EXCLUDE),-e $(SHELLCHECK_EXCLUDE),) "$$f" || exit 1; \
@@ -105,7 +107,7 @@ lint: ## shellcheck every shell file, or syntax-check them if shellcheck is abse
 	else \
 		printf 'shellcheck not installed — falling back to bash -n\n'; \
 		printf '  (brew install shellcheck for the real thing)\n'; \
-		for f in $(SH_FILES) $(TESTS); do \
+		for f in $(SH_FILES) $(TEST_SH); do \
 			[ -f "$$f" ] || { printf 'Missing: %s\n' "$$f" >&2; exit 1; }; \
 			printf '  %s\n' "$$f"; \
 			bash -n "$$f" || exit 1; \

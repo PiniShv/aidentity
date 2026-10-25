@@ -11,7 +11,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
 
-FILES="bin/aidentity install.sh uninstall.sh test/run_tests.sh"
+# The test files are the runner, the shared part and one file for each area.
+# The pattern stays as it is when no area file exists, and then it is reported
+# as missing, like any other file.
+FILES="bin/aidentity install.sh uninstall.sh test/run_tests.sh test/lib.sh test/t_*.sh"
 fail=0
 pass() { printf 'ok    %s\n' "$1"; }
 bad()  { printf '::error::%s\n' "$1" >&2; fail=1; }
@@ -24,7 +27,7 @@ done
 # 1. "$var…" expands as ${var…} in bash and dies under `set -u`. perl, not
 #    `grep -P`: BSD grep rejects -P, which once made this check pass
 #    unconditionally on macOS.
-# shellcheck disable=SC2086  # FILES is a fixed list of known names
+# shellcheck disable=SC2086  # FILES is a fixed list of known names, and a glob
 hits=$(perl -ne 'print "$ARGV:$.: $&\n" if /(?<!\{)\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/; close ARGV if eof' $FILES)
 if [ -n "$hits" ]; then
   bad "Use \${var} when a non-ASCII character follows the name:"

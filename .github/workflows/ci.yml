@@ -48,7 +48,7 @@ jobs:
         run: |
           set -eu
           files=""
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
+          for f in bin/aidentity test/run_tests.sh test/lib.sh test/t_*.sh install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
             [ -f "$f" ] && files="$files $f"
           done
           [ -n "$files" ] || { echo "No shell files found." >&2; exit 1; }
@@ -130,7 +130,7 @@ jobs:
       - name: Syntax check (bash -n)
         run: |
           set -eu
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
+          for f in bin/aidentity test/run_tests.sh test/lib.sh test/t_*.sh install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
             [ -f "$f" ] || continue
             printf '  bash -n %s\n' "$f"
             bash -n "$f"
@@ -165,7 +165,7 @@ jobs:
         run: |
           set -eu
           files=""
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
+          for f in bin/aidentity test/run_tests.sh test/lib.sh test/t_*.sh install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
             [ -f "$f" ] && files="$files $f"
           done
           # shellcheck disable=SC2086
@@ -175,7 +175,7 @@ jobs:
         continue-on-error: true
         run: |
           files=""
-          for f in bin/aidentity test/run_tests.sh install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
+          for f in bin/aidentity test/run_tests.sh test/lib.sh test/t_*.sh install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh; do
             [ -f "$f" ] && files="$files $f"
           done
           # shellcheck disable=SC2086
@@ -188,8 +188,18 @@ jobs:
 
       # The suite runs the script under /bin/bash unless told otherwise; this
       # step points it at the bash first on PATH, so both shells are covered.
-      - name: Test suite — default bash on PATH
-        run: AIDENTITY_TEST_BASH="$(command -v bash)" bash test/run_tests.sh
+      # It runs the areas one at a time, which also shows that each passes
+      # alone, as CONTRIBUTING.md promises.
+      - name: Test suite — default bash on PATH, one area at a time
+        run: |
+          set -u
+          rc=0
+          for area in $(bash test/run_tests.sh --list); do
+            printf '::group::%s\n' "$area"
+            AIDENTITY_TEST_BASH="$(command -v bash)" bash test/run_tests.sh "$area" || rc=1
+            printf '::endgroup::\n'
+          done
+          exit "$rc"
 
       # A last check that the script is usable as installed, not just testable.
       - name: Smoke test the CLI
