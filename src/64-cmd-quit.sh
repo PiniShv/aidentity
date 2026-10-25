@@ -43,8 +43,9 @@ EOF
 
 # Ask one app to quit, the same as its Quit menu item, so it can still ask
 # about unsaved work. It needs no permission. Prints "sent" when the request
-# went to an app; anything else means no app has that PID. osascript is called
-# through PATH, as the icon code calls it.
+# went to an app, "none" when no app has that PID or the app refused it, and
+# nothing when osascript itself could not run. osascript is called through
+# PATH, as the icon code calls it.
 quit_event() { # pid
   osascript -l JavaScript - "$1" 2>/dev/null <<'JXA'
 ObjC.import("AppKit");
@@ -92,9 +93,9 @@ cmd_quit() {
     # be given to another one.
     [ "$(quit_scan "$(ps -ww -o uid=,pid=,command= -p "$pid" 2>/dev/null)" \
         "$me" "$exe" "$data" "$ident")" = "$pid" ] || continue
-    # The quit event first. A process that is not an app, or an app that did
-    # not take the request, gets SIGTERM, which Electron and Chromium apps
-    # also treat as quit.
+    # The quit event first. Any answer but "sent" (no app for the PID, an app
+    # that refused the request, or an osascript that could not run) means
+    # SIGTERM, which Electron and Chromium apps also treat as quit.
     if [ "$(quit_event "$pid")" != sent ]; then
       kill -TERM "$pid" 2>/dev/null || continue
     fi

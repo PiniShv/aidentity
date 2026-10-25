@@ -284,6 +284,32 @@ while [ "$i" -lt 100 ]; do
   case "$(/bin/ps -ww -o command= -p "$UI_QPID" 2>/dev/null)" in "$UI_QEXE "*) break ;; esac
   sleep 0.05; i=$((i + 1))
 done
+# Ctrl-C while quit waits for an app that does not quit. The osascript stub
+# says the request was sent and does nothing, as an app asking about unsaved
+# work; it notes the PID last, so Ctrl-C is typed only once quit is waiting.
+# The footer must not claim the profile was quit: it still runs.
+UI_QDEAF="$SANDBOX/ui-quit-deaf"
+UI_QASKED="$SANDBOX/ui-quit-asked"
+mkdir -p "$UI_QDEAF"
+printf '#!/bin/sh\ncat >/dev/null\necho sent\nfor a; do p=$a; done\nprintf "%%s\\n" "$p" >> "%s"\n' \
+  "$UI_QASKED" > "$UI_QDEAF/osascript"
+chmod +x "$UI_QDEAF/osascript"
+ui_quit_asked() {
+  local i=0
+  while [ ! -s "$UI_QASKED" ] && [ "$i" -lt 800 ]; do sleep 0.05; i=$((i + 1)); done
+}
+rm -f "$UI_QASKED"
+NO_COLOR='' ui_pty 24 200 '<4 profiles · 1 running>jjjs;!ui_quit_asked;\003;<Did not finish>q' \
+  /bin/sh -c 'PATH="$1:$PATH"; exec "$2" "$3" ui' x "$UI_QDEAF" "$BASH_BIN" "$AIDENTITY"
+assert_rc "Ctrl-C while s waits only stops the quit, and q quits the menu" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "the quit event went to the profile's process" "$UI_QPID" "$(cat "$UI_QASKED" 2>/dev/null)"
+assert_contains "the footer says the quit did not finish, in red" "$(ui_frame)" \
+  "${ESC}[31mDid not finish quitting Quitty Work."
+assert_not_contains "and no frame claims it quit" "$RUN_OUT" "Quit Quitty Work."
+assert_contains "the row still counts as running" "$(ui_frame)" "4 profiles · 1 running"
+if kill -0 "$UI_QPID" 2>/dev/null; then _pass "the profile's process still runs"; else _fail "the profile's process still runs"; fi
+assert_eq "and the terminal is intact" "same" "$RUN_FLAGS"
+
 # An osascript that finds no app for the PID, so quit sends SIGTERM.
 UI_QNOAPP="$SANDBOX/ui-quit-no-app"
 mkdir -p "$UI_QNOAPP"

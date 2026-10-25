@@ -215,6 +215,28 @@ assert_contains "and the profile is not running" "$RUN_OUT" "'$QW' is not runnin
 assert_eq "that process is not sent the quit event" "" "$QUIT_ASKED"
 if quit_alive "$P_O"; then _pass "nor SIGTERM: it still runs"; else _fail "nor SIGTERM: it still runs"; fi
 
+# --- another user's copy of the app is never ours to quit
+
+# Two real copies on the profile's folder. The stub ps lists the second one
+# under another user (root), as if someone else had the same profile open.
+# The look right before acting is the real ps, which shows both as ours, so
+# only the first scan's user check keeps the second one safe.
+quit_start "$QEXE" "$QUIT_WAIT" "--user-data-dir=$QDATA"; P_MINE=$QPID
+quit_start "$QEXE" "$QUIT_WAIT" "--user-data-dir=$QDATA"; P_THEIRS=$QPID
+QUIT_PSU="$SANDBOX/quit-ps-users"
+mkdir -p "$QUIT_PSU"
+cat > "$QUIT_PSU/ps" <<STUB
+#!/bin/sh
+case " \$* " in *" -p "*) exec /bin/ps "\$@" ;; esac
+printf '%s\n' '$(id -u) $P_MINE $QEXE --user-data-dir=$QDATA' '0 $P_THEIRS $QEXE --user-data-dir=$QDATA'
+STUB
+chmod +x "$QUIT_PSU/ps"
+quit_run "$QUIT_PSU:$QUIT_NOAPP" "$QW"
+assert_rc "with another user's copy listed, quit still quits ours" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "only this user's copy is sent the quit event" "$P_MINE " "$QUIT_ASKED"
+if quit_alive "$P_MINE"; then _fail "this user's copy is gone"; else _pass "this user's copy is gone"; fi
+if quit_alive "$P_THEIRS"; then _pass "the copy listed under another user still runs"; else _fail "the copy listed under another user still runs"; fi
+
 # A ps that fails is not "nothing is running".
 QUIT_BADPS="$SANDBOX/quit-bad-ps"
 mkdir -p "$QUIT_BADPS"
@@ -289,6 +311,10 @@ assert_eq "a longer folder name does not match" no "$(quit_match "$X" /d "" "$X 
 assert_eq "the executable must come first" no "$(quit_match "$X" /d "" "/usr/bin/env $X --user-data-dir=/d")"
 assert_eq "a helper never matches" no \
   "$(quit_match "$X" /d "" "/A.app/Contents/Frameworks/A Helper.app/Contents/MacOS/A Helper --user-data-dir=/d")"
+
+# libcall quit_scan listing, uid, executable, data folder, its id.
+libcall quit_scan "$(printf '%s\n' "501 11 $X" "0 12 $X" "501 13 $X --user-data-dir=/d")" 501 "$X" "" ""
+assert_eq "the scan keeps only the given user's matching lines" "11" "$RUN_OUT"
 
 # --- cleanup
 

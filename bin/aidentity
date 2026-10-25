@@ -3118,8 +3118,9 @@ EOF
 
 # Ask one app to quit, the same as its Quit menu item, so it can still ask
 # about unsaved work. It needs no permission. Prints "sent" when the request
-# went to an app; anything else means no app has that PID. osascript is called
-# through PATH, as the icon code calls it.
+# went to an app, "none" when no app has that PID or the app refused it, and
+# nothing when osascript itself could not run. osascript is called through
+# PATH, as the icon code calls it.
 quit_event() { # pid
   osascript -l JavaScript - "$1" 2>/dev/null <<'JXA'
 ObjC.import("AppKit");
@@ -3167,9 +3168,9 @@ cmd_quit() {
     # be given to another one.
     [ "$(quit_scan "$(ps -ww -o uid=,pid=,command= -p "$pid" 2>/dev/null)" \
         "$me" "$exe" "$data" "$ident")" = "$pid" ] || continue
-    # The quit event first. A process that is not an app, or an app that did
-    # not take the request, gets SIGTERM, which Electron and Chromium apps
-    # also treat as quit.
+    # The quit event first. Any answer but "sent" (no app for the PID, an app
+    # that refused the request, or an osascript that could not run) means
+    # SIGTERM, which Electron and Chromium apps also treat as quit.
     if [ "$(quit_event "$pid")" != sent ]; then
       kill -TERM "$pid" 2>/dev/null || continue
     fi
@@ -4077,23 +4078,26 @@ ui_have_row() {
 }
 
 # Run a command whose result is one line, and show that line in the footer
-# instead of a screen: as a success, or in red when the command failed.
-ui_footer_run() { # what to say if it printed nothing, command and its arguments
-  local out rc said="$1"
-  shift
+# instead of a screen: as a success, or in red when the command failed. A
+# command that printed nothing gets the caller's line for how it ended. A
+# failure with no output is nearly always Ctrl-C, which stops a command before
+# it says anything, so the success line must never stand in for it.
+ui_footer_run() { # line if it worked, line if it failed, command and its arguments
+  local out rc worked="$1" failed="$2"
+  shift 2
   UI_BUSY=1
   out=$(ui_run "$@" 2>&1); rc=$?
   UI_BUSY=0
   out=$(printf '%s' "$out" | sed "s/${UI_ESC}\[[0-9;]*m//g")
   out=${out//$'\n'/ }
-  if [ -z "$out" ]; then out=$said; fi
-  if [ "$rc" -eq 0 ]; then ui_flash ok "$out"; else ui_flash err "$out"; fi
+  if [ "$rc" -eq 0 ]; then ui_flash ok "${out:-$worked}"; else ui_flash err "${out:-$failed}"; fi
 }
 
 # Enter.
 ui_do_open() {
   ui_have_row || return 0
-  ui_footer_run "Opened ${UI_L_NAME[$UI_SEL]}." cmd_open "${UI_L_NAME[$UI_SEL]}"
+  ui_footer_run "Opened ${UI_L_NAME[$UI_SEL]}." "Did not finish opening ${UI_L_NAME[$UI_SEL]}." \
+    cmd_open "${UI_L_NAME[$UI_SEL]}"
 }
 
 # s: quit the selected profile's copy of the app; every other copy keeps
@@ -4105,7 +4109,7 @@ ui_do_stop() {
   name=${UI_L_NAME[$UI_SEL]}
   UI_MSG="Quitting ${name}…"; UI_MSG_STYLE=$C_DIM; UI_SWATCH=""
   ui_draw
-  ui_footer_run "Quit ${name}." cmd_quit "$name"
+  ui_footer_run "Quit ${name}." "Did not finish quitting ${name}." cmd_quit "$name"
   ui_sync
 }
 

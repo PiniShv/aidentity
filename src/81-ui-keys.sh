@@ -116,23 +116,26 @@ ui_have_row() {
 }
 
 # Run a command whose result is one line, and show that line in the footer
-# instead of a screen: as a success, or in red when the command failed.
-ui_footer_run() { # what to say if it printed nothing, command and its arguments
-  local out rc said="$1"
-  shift
+# instead of a screen: as a success, or in red when the command failed. A
+# command that printed nothing gets the caller's line for how it ended. A
+# failure with no output is nearly always Ctrl-C, which stops a command before
+# it says anything, so the success line must never stand in for it.
+ui_footer_run() { # line if it worked, line if it failed, command and its arguments
+  local out rc worked="$1" failed="$2"
+  shift 2
   UI_BUSY=1
   out=$(ui_run "$@" 2>&1); rc=$?
   UI_BUSY=0
   out=$(printf '%s' "$out" | sed "s/${UI_ESC}\[[0-9;]*m//g")
   out=${out//$'\n'/ }
-  if [ -z "$out" ]; then out=$said; fi
-  if [ "$rc" -eq 0 ]; then ui_flash ok "$out"; else ui_flash err "$out"; fi
+  if [ "$rc" -eq 0 ]; then ui_flash ok "${out:-$worked}"; else ui_flash err "${out:-$failed}"; fi
 }
 
 # Enter.
 ui_do_open() {
   ui_have_row || return 0
-  ui_footer_run "Opened ${UI_L_NAME[$UI_SEL]}." cmd_open "${UI_L_NAME[$UI_SEL]}"
+  ui_footer_run "Opened ${UI_L_NAME[$UI_SEL]}." "Did not finish opening ${UI_L_NAME[$UI_SEL]}." \
+    cmd_open "${UI_L_NAME[$UI_SEL]}"
 }
 
 # s: quit the selected profile's copy of the app; every other copy keeps
@@ -144,7 +147,7 @@ ui_do_stop() {
   name=${UI_L_NAME[$UI_SEL]}
   UI_MSG="Quitting ${name}…"; UI_MSG_STYLE=$C_DIM; UI_SWATCH=""
   ui_draw
-  ui_footer_run "Quit ${name}." cmd_quit "$name"
+  ui_footer_run "Quit ${name}." "Did not finish quitting ${name}." cmd_quit "$name"
   ui_sync
 }
 
