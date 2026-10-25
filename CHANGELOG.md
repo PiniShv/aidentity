@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   folder paths, so no account goes with it. It does hold the values of launch
   variables, and a proxy setting can carry a password. So `export` warns on
   standard error, to keep the file private, when the file holds variable
-  values or a switch with a password in it (`user:password@`). It warns too
+  values or a switch with `@` in it, as in `user:password@`. It warns too
   when a launcher's app is gone and no bundle ID is recorded for it: `import`
   will skip that launcher.
 - `aidentity import FILE` builds the launchers in a file that `export` made,
@@ -37,8 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   installed here, and checks every value as `add` checks it. A launcher that
   exists already is skipped, never changed. Anything it cannot use is skipped
   with a reason, and the rest go on. It shows what it will create and what it
-  skips, with each new launcher's switches and its variables by name (the
-  values stay in the file), and asks you to type `yes` first. `-y` skips the
+  skips, with each new launcher's switches, its variables by name, and the
+  server of each proxy variable (never a user name or password), and asks you to type `yes` first. `-y` skips the
   question; with no terminal and no `-y`, it refuses. A new profile starts
   signed out, unless its profile folder is still here: then it uses that
   folder, as `add` does, and the plan says so. The file is treated as
