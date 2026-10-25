@@ -18,6 +18,7 @@ ui||-||Full-screen menu over your profiles
 add||apps|--profile/-p= --badge/-b= --color/--colour/-c= --no-badge --seed --main --arg= --env= --own-extensions|Create a profile for an app
 list|ls|-|--json|Show every profile and what is running
 open||launchers||Open a profile
+quit||launchers||Quit one profile; other copies of the app keep running
 rename|mv|launchers||Rename a profile and keep it signed in
 set|modify edit|launchers|--badge/-b= --color/--colour/-c= --no-badge --arg= --env= --clear-args --clear-env --own-extensions --shared-extensions|Change how a profile looks or starts
 prune||-|--yes/-y|Remove profile data that no launcher uses

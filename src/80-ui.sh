@@ -172,8 +172,8 @@ ui_pack_hints() {
   if [ "$UI_COLS" -lt 60 ]; then
     set -- "↑↓" 2 move Enter 5 open "?" 1 help q 1 quit
   else
-    set -- "↑↓" 2 move Enter 5 open a 1 add r 1 rename c 1 colour b 1 badge \
-      d 1 remove x 1 doctor "?" 1 help q 1 quit
+    set -- "↑↓" 2 move Enter 5 open s 1 stop a 1 add r 1 rename c 1 colour \
+      b 1 badge d 1 remove x 1 doctor "?" 1 help q 1 quit
   fi
   while [ $# -ge 3 ]; do
     key=$1; kw=$2; label=$3; shift 3
