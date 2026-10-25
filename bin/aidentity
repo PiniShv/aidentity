@@ -26,6 +26,9 @@
 # https://github.com/PiniShv/aidentity
 #
 # MIT licensed. Requires macOS. No dependencies beyond what ships with the OS.
+#
+# This file is built from the src/ folder of the repository by
+# scripts/build.sh. To change it, edit those files and run `make build`.
 
 set -uo pipefail
 
@@ -1241,6 +1244,8 @@ EOF
   printf '%s' "$out" | /usr/bin/grep -v '^$' || true
 }
 
+# ----------------------------------------------------- launcher assembly --
+
 # Move a finished bundle into place. The old one is set aside, not deleted, and
 # put back if the new one cannot be moved in. Both moves are renames inside one
 # directory, so nothing is copied and nothing is half-written.
@@ -1638,6 +1643,10 @@ cmd_open() {
   ok "Opening ${want}…"
 }
 
+cmd_version() { printf 'aidentity %s\n' "$AIDENTITY_VERSION"; }
+
+# -------------------------------------------------- commands: rm, doctor --
+
 cmd_rm() {
   local want="" purge=0 yes=0
   while [ $# -gt 0 ]; do
@@ -1955,6 +1964,8 @@ EOF
   [ "$fix" -eq 1 ] && [ "${failed:-0}" -gt 0 ] && return 1
   return 0
 }
+
+# -------------------------------------------------- commands: add, setup --
 
 cmd_add() {
   local app_arg="" profile="" badge="" color="" seed=0 no_badge=0 main=0 extras=""
@@ -2354,6 +2365,8 @@ offer_main_launcher() {
   fi
   return 0
 }
+
+# ------------------------ commands: rename, set, restore, prune, rebuild --
 
 # Resolve a profile label to the launcher bundle that carries it, or explain.
 # The path comes back spelled as it is on disk: the disk ignores case, and
@@ -3687,6 +3700,8 @@ ui_resume() {
   ui_redraw_now
 }
 
+# -------------------------------------------------- ui: keys and actions --
+
 # Wait up to 2 seconds for a key. UI_KEY becomes UP, DOWN, LEFT, RIGHT, ENTER,
 # ESC, EOF or TICK (nothing typed), or the character typed. An arrow key starts
 # with the same byte as Esc, so after one the next two bytes are read too, one
@@ -4041,8 +4056,6 @@ cmd_ui() {
   [ -z "$UI_SIG" ] || exit "$UI_SIG"
   return 0
 }
-
-cmd_version() { printf 'aidentity %s\n' "$AIDENTITY_VERSION"; }
 
 # ---------------------------------------------------------- command table --
 

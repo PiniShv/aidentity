@@ -1,0 +1,3 @@
+# bin/aidentity is built from src/ by scripts/build.sh, and CI checks the two
+# agree. GitHub folds it in diffs so a change is reviewed once, in src/.
+bin/aidentity linguist-generated=true
