@@ -237,8 +237,10 @@ Prints every launcher as JSON: its app (by bundle ID), profile name, badge,
 colour and launch settings. Save it to a file and give that file to
 'aidentity import', on this Mac or another, to build the launchers again. The
 file holds no account data and no folder paths, so no account goes with it.
-It does hold the values of launch variables, and a proxy setting can carry a
-password: keep the file private.
+It does hold the launch settings in full. A proxy setting can carry a user
+name and password, in a variable or in a switch such as --proxy-server, so
+export warns when the file holds a variable's value or a switch with a user
+name in it. Keep the file private.
 
 EXAMPLES
   aidentity export > profiles.json
@@ -257,9 +259,10 @@ uses that folder, as add does, and the plan says so. A file may list up to 200
 launchers.
 
 The launch settings, such as a proxy, come from the file. The plan shows each
-new launcher's switches, and its variables by name. Check them when the file
-is from someone else: a proxy setting sends that profile's traffic through
-the server it names.
+new launcher's switches, the server each proxy variable names (never a
+password), and its other variables by name. Check them when the file is from
+someone else: a proxy setting sends that profile's traffic through the server
+it names. A launcher that lists a setting twice is skipped.
 
 OPTIONS
   -y, --yes            Skip the confirmation prompt

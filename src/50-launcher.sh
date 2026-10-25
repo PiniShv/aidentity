@@ -329,7 +329,7 @@ _cleanup_update() {
   return 0
 }
 
-# Set by import while it holds the folder it converts its file in.
+# Set by import while it holds the folder it reads its file in.
 IMPORT_TMP=""
 
 _cleanup_import() {
@@ -439,4 +439,10 @@ PLIST
   return 1
 }
 
-record_get() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/$RESTORE_RECORD" 2>/dev/null; }
+# A value from a profile folder's restore record. Nothing, and status 1, when
+# the folder has no record: PlistBuddy would print "File Doesn't Exist" and
+# the record's path on stdout, where the caller takes it for the value.
+record_get() {
+  [ -f "$1/$RESTORE_RECORD" ] || return 1
+  /usr/libexec/PlistBuddy -c "Print :$2" "$1/$RESTORE_RECORD" 2>/dev/null
+}

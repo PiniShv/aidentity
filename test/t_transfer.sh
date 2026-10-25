@@ -71,6 +71,20 @@ ai export --json
 assert_rc_nonzero "and no option" "$RUN_RC" "$RUN_OUT"
 assert_contains "and names it" "$RUN_OUT" "--json"
 
+# A switch can carry a user name and password too: export warns about it, as
+# it does about a variable's value. A switch without one is not warned about.
+tx add "$ELECTRON_APP" --profile Creds --arg "--proxy-server=http://user:secret@proxy.example:8080"
+tx_stdout export
+assert_contains "a switch with a user name and password: export warns" "$RUN_ERR" \
+  "The file holds a launch switch with a user name or password in it."
+assert_contains "and says to keep the file private" "$RUN_ERR" "keep the file private"
+assert_not_contains "the warning is not in the file" "$RUN_OUT" "private"
+tx rm "Fake Creds" --purge -y
+tx add "$ELECTRON_APP" --profile Nocreds --arg "--proxy-server=http://proxy.example:8080"
+tx_stdout export
+assert_eq "a switch with no user name in it: no warning" "" "$RUN_ERR"
+tx rm "Fake Nocreds" --purge -y
+
 CODEY="$SRC/Codey.app"
 make_electron_app "$CODEY"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.codey" "$CODEY/Contents/Info.plist"
@@ -178,6 +192,40 @@ assert_contains "and a warning that import will skip it" "$RUN_ERR" "'Gone Main'
 tx rm "Gone Lost" --purge -y
 tx rm "Gone Main" -y
 
+# A profile whose app is gone and whose folder has no restore record (made
+# before records existed, or the record was deleted): no bundle ID is known.
+# The same for an app folder with no Info.plist. PlistBuddy prints its error,
+# with the path, on stdout: none of it reaches the file.
+NOREC="$SRC/Norec.app"
+make_electron_app "$NOREC"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.norec" "$NOREC/Contents/Info.plist"
+tx add "$NOREC" --profile Old
+rm -f "$VSC_DATA/norec-old/.aidentity-profile.plist"
+rm -rf "$NOREC"
+HALF="$SRC/Half.app"
+make_electron_app "$HALF"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.example.half" "$HALF/Contents/Info.plist"
+tx add "$HALF" --profile Broken
+rm -f "$VSC_DATA/half-broken/.aidentity-profile.plist" "$HALF/Contents/Info.plist"
+tx_stdout export
+J=$RUN_OUT
+assert_eq "no app and no restore record: an empty bundle ID" "" \
+  "$(json_get "$J" 'd.launchers.filter(function (o) { return o.name === "Norec Old"; })[0].bundle_id')"
+assert_contains "and a warning that import will skip it" "$RUN_ERR" "'Norec Old': its app is missing"
+assert_eq "an app with no Info.plist and no restore record: an empty bundle ID" "" \
+  "$(json_get "$J" 'd.launchers.filter(function (o) { return o.name === "Half Broken"; })[0].bundle_id')"
+assert_contains "and a warning for it too" "$RUN_ERR" "'Half Broken': its app is missing"
+assert_not_contains "no path of a profile folder reaches the file" "$J" "$VSC_DATA"
+assert_not_contains "nor of an app" "$J" "$SRC"
+assert_not_contains "nor PlistBuddy's error" "$J" "Doesn't Exist"
+assert_not_contains "nor the name of a plist file" "$J" ".plist"
+libcall record_get "$VSC_DATA/norec-old" AIdentityTargetBundleID
+assert_rc_nonzero "record_get fails for a folder with no restore record" "$RUN_RC" "$RUN_OUT"
+assert_eq "and prints nothing" "" "$RUN_OUT"
+tx rm "Norec Old" --purge -y
+tx rm "Half Broken" --purge -y
+rm -rf "$HALF"
+
 
 group "import: a round trip"
 
@@ -199,14 +247,14 @@ assert_contains "and a count" "$RUN_OUT" "6 created, 0 skipped, 0 failed."
 assert_contains "and how to sign in to them" "$RUN_OUT" "Open each new profile to sign in, e.g.:  aidentity open \"Codey Ext\""
 assert_contains "the plan shows the launch settings each launcher brings" "$RUN_OUT" "  create  Fake Work
           flags  --lang=de
-          env    HTTPS_PROXY (values hidden)"
-assert_contains "every switch, and every variable by name" "$RUN_OUT" "  create  Forky Home
+          proxy  HTTPS_PROXY=http://proxy.example:8080"
+assert_contains "every switch, and every other variable by name" "$RUN_OUT" "  create  Forky Home
           flags  --disable-gpu --force-device-scale-factor=1.25
           env    TZ LANG (values hidden)"
 assert_contains "and its own extensions folder" "$RUN_OUT" "  create  Codey Ext
           ext    its own extensions folder"
-assert_not_contains "never a variable's value" "$RUN_OUT" "proxy.example"
-assert_not_contains "nor this one's" "$RUN_OUT" "Europe/Berlin"
+assert_not_contains "never the value of a variable that is not a proxy" "$RUN_OUT" "Europe/Berlin"
+assert_not_contains "nor this one's" "$RUN_OUT" "de_DE"
 i=0
 for l in "${TR_LIST[@]}"; do
   assert_eq "$l is the same launcher again: app, look, settings, folder" "${TR_BEFORE[$i]}" \
@@ -280,6 +328,16 @@ assert_no_dir "an unknown app gets no launcher" "$APPS/Fake Nowhere.app"
 for l in "Fake Second" "Fake Pathy" "Fake Named" "Fake Built"; do tx rm "$l" --purge -y; done
 rm -rf "$SANDBOX/elsewhere" "$DECOY"
 tr_tmp_gone "an import with skips"
+
+# Not even the path of an app that is installed: the app is the one the
+# bundle ID names.
+tr_file "$TR_F" "$(tr_entry profile='"Pathed"' "app=$(js "$FORK_APP")" "path=$(js "$FORK_APP")" \
+  "app_path=$(js "$FORK_APP")")"
+tx import "$TR_F" -y
+assert_eq "an installed app's path in the file is not used" "$ELECTRON_APP" \
+  "$(plist_key "$APPS/Fake Pathed.app" AIdentityTargetApp)"
+assert_no_dir "and no launcher is built for that app" "$APPS/Forky Pathed.app"
+tx rm "Fake Pathed" --purge -y
 
 
 group "import: every value is checked as add checks it"
@@ -426,6 +484,24 @@ assert_contains "a switch" "$RUN_OUT" "skip    Fake Argnl — A switch cannot co
 assert_contains "a variable" "$RUN_OUT" "skip    Fake Envnl — An environment value cannot contain a tab, a line break"
 assert_eq "and nothing is built" "$before" "$(fingerprint "$APPS")"
 
+# A setting listed twice: add keeps only the last, so the plan would show one
+# that is not built. The entry is skipped.
+tr_file "$TR_F" \
+  "$(tr_entry profile='"Twoarg"' args='["--lang=de","--disable-gpu","--lang=fr"]')" \
+  "$(tr_entry profile='"Twoflag"' args='["--disable-gpu","--disable-gpu"]')" \
+  "$(tr_entry profile='"Twoenv"' env='["TZ=UTC","LANG=de_DE.UTF-8","TZ=Europe/Berlin"]')" \
+  "$(tr_entry profile='"Twocase"' env='["HTTPS_PROXY=http://a.example:1","https_proxy=http://a.example:1"]')"
+before=$(fingerprint "$APPS")
+tx import "$TR_F" -y
+assert_contains "a switch listed twice: the entry is skipped" "$RUN_OUT" "skip    Fake Twoarg — args lists --lang twice"
+assert_contains "a switch with no value too" "$RUN_OUT" "skip    Fake Twoflag — args lists --disable-gpu twice"
+assert_contains "a variable listed twice too" "$RUN_OUT" "skip    Fake Twoenv — env lists TZ twice"
+assert_contains "two variables whose names differ in case are two variables" "$RUN_OUT" "create  Fake Twocase"
+assert_contains "so only that one is built" "$RUN_OUT" "1 created, 3 skipped, 0 failed."
+assert_not_contains "a value is never printed" "$RUN_OUT" "Europe/Berlin"
+tx rm "Fake Twocase" --purge -y
+assert_eq "and nothing else is built" "$before" "$(fingerprint "$APPS")"
+
 # A badge is one character, add's rule: the first of what is given. One that
 # cannot be drawn (a control character, a line break) is refused.
 tr_file "$TR_F" \
@@ -434,7 +510,9 @@ tr_file "$TR_F" \
   "$(tr_entry profile='"Tick"' badge="$(js '`touch '"$TR_PWN"'`')")" \
   "$(tr_entry profile='"Esc"' badge="$(js $'\033[31m')")" \
   "$(tr_entry profile='"Csi"' badge="$(js $'\xc2\x9b31m')")" \
-  "$(tr_entry profile='"Newline"' badge="$(js $'\nX')")"
+  "$(tr_entry profile='"Newline"' badge="$(js $'\nX')")" \
+  "$(tr_entry profile='"Linesep"' badge="$(js $'\xe2\x80\xa8')")" \
+  "$(tr_entry profile='"Parasep"' badge="$(js $'\xe2\x80\xa9X')")"
 tx import "$TR_F" -y
 assert_eq "a badge of \$( ) is just the character \$" '$' "$(plist_key "$APPS/Fake Dollar.app" AIdentityBadge)"
 assert_eq "a badge of XML is just a quote" '"' "$(plist_key "$APPS/Fake Quote.app" AIdentityBadge)"
@@ -446,8 +524,9 @@ for l in "Fake Dollar" "Fake Quote" "Fake Tick"; do
     _fail "$l: the Info.plist is well formed" "plutil rejected it"
   fi
 done
-assert_eq "a control character, a C1 control or a line break is refused" "3" \
+assert_eq "a control character, a C1 control, a line break or a line or paragraph separator is refused" "5" \
   "$(lines_with "$RUN_OUT" "the badge is not a character that can be drawn")"
+assert_no_dir "a separator, which draws nothing, gets no launcher" "$APPS/Fake Linesep.app"
 assert_no_file "no injected command ran" "$TR_PWN"
 for l in "Fake Dollar" "Fake Quote" "Fake Tick"; do tx rm "$l" --purge -y; done
 
@@ -460,18 +539,19 @@ assert_not_contains "so no escape reaches the terminal" "$RUN_OUT" $'\033'
 # The same for an escape and a C1 control, U+009B, which some terminals read
 # as the start of an escape sequence, in a name and in a colour. Under C,
 # [[:cntrl:]] misses U+009B, so this runs under C and under UTF-8.
-TR_ESC=$'\033'; TR_CSI=$'\xc2\x9b'
+TR_ESC=$'\033'; TR_CSI=$'\xc2\x9b'; TR_RLO=$'\xe2\x80\xae'
 tr_file "$TR_F" \
-  "$(tr_entry name="$(js "Red ${TR_ESC}[31m ${TR_CSI}31m name")" bundle_id='"com.example.nothere"')" \
+  "$(tr_entry name="$(js "Red ${TR_ESC}[31m ${TR_CSI}31m ${TR_RLO}eman name")" bundle_id='"com.example.nothere"')" \
   "$(tr_entry profile='"Paint"' color="$(js "re${TR_ESC}[31md${TR_CSI}31m")")"
 for loc in C en_US.UTF-8; do
   LC_ALL=$loc tx import "$TR_F" -y
-  assert_contains "$loc: a name with ESC and U+009B is shown with ? for each" "$RUN_OUT" \
-    "skip    Red ?[31m ?31m name"
+  assert_contains "$loc: a name with ESC, U+009B and a right-to-left override is shown with ? for each" "$RUN_OUT" \
+    "skip    Red ?[31m ?31m ?eman name"
   assert_contains "$loc: and so is such a colour" "$RUN_OUT" \
     "skip    Fake Paint — unknown colour 're?[31md?31m'"
   assert_not_contains "$loc: no ESC reaches the terminal" "$RUN_OUT" "$TR_ESC"
   assert_not_contains "$loc: and no U+009B" "$RUN_OUT" "$TR_CSI"
+  assert_not_contains "$loc: and no override that turns the text around" "$RUN_OUT" "$TR_RLO"
 done
 assert_no_dir "and nothing is built" "$APPS/Fake Paint.app"
 
@@ -527,6 +607,16 @@ assert_contains "two main launchers for one app: the second is skipped" "$RUN_OU
   "skip    Codey Orig — another entry opens the original account"
 assert_contains "the first ones are built" "$RUN_OUT" "3 created, 3 skipped, 0 failed."
 for l in "Fake Twice" "Fake Same 2" "Codey Main"; do tx rm "$l" --purge -y; done
+
+# The launcher folder ignores case, so two names that differ only in case
+# are one launcher: the plan skips the second, here a main launcher, which
+# has no profile folder to compare.
+tr_file "$TR_F" "$(tr_entry profile='"Case"')" "$(tr_entry profile='"case"' main=true)"
+tx import "$TR_F" -y
+assert_contains "two names that differ only in case: the second is skipped in the plan" "$RUN_OUT" \
+  "skip    Fake case — listed twice in the file"
+assert_contains "and the first is built" "$RUN_OUT" "1 created, 1 skipped, 0 failed."
+tx rm "Fake Case" --purge -y
 
 # A launcher here whose profile folder the entry would share: create_profile
 # would refuse it, so the plan skips it, and the rest are built.
@@ -612,7 +702,7 @@ tr_refused_file "a null in an entry" "it holds a null" "$TR_F" -y
 tr_refused_file "an empty file" "is not valid JSON" "$TR_F" -y
 printf '{"aidentity_export": 2, "launchers": [%s]}\n' "$(tr_entry profile='"Two"')" > "$TR_F"
 tr_refused_file "format 2" "is in export format 2, and this aidentity reads format 1" "$TR_F" -y
-for fmt in '"1"' '1.0' 'true' '[1]'; do
+for fmt in '"1"' '1.5' 'true' '[1]'; do
   printf '{"aidentity_export": %s, "launchers": [%s]}\n' "$fmt" "$(tr_entry profile='"Fmt"')" > "$TR_F"
   tr_refused_file "a format number of $fmt" "is not a file made by 'aidentity export'" "$TR_F" -y
 done
@@ -622,6 +712,26 @@ printf '[%s]\n' "$(tr_entry profile='"Arr"')" > "$TR_F"
 tr_refused_file "a list instead of an export" "is not a file made by 'aidentity export'" "$TR_F" -y
 printf '{"aidentity_export": 1, "launchers": %s}\n' "$(tr_entry profile='"Obj"')" > "$TR_F"
 tr_refused_file "launchers that are not a list" "has no list of launchers" "$TR_F" -y
+# The shell cannot hold a NUL: a text with one in it would end there.
+printf '{"aidentity_export": 1, "launchers": [%s]}\n' "$(tr_entry profile='"Nul\u0000char"')" > "$TR_F"
+tr_refused_file "a NUL character in a text" "is not valid JSON" "$TR_F" -y
+
+# The file is JSON and nothing else. plutil reads binary and XML property
+# lists too, and expands a binary one that shares its parts without bound, so
+# a property list is refused before anything reads it, even one that holds
+# an export.
+TR_SRC="$SB/plist-src.json"
+tr_file "$TR_SRC" "$(tr_entry profile='"Plist"')"
+/usr/bin/plutil -convert binary1 -o "$TR_F" "$TR_SRC"
+tr_refused_file "a binary property list" "is not valid JSON" "$TR_F" -y
+/usr/bin/plutil -convert xml1 -o "$TR_F" "$TR_SRC"
+tr_refused_file "an XML property list" "is not valid JSON" "$TR_F" -y
+printf '{ aidentity_export = 1; launchers = ( { bundle_id = com.aidentity.test.electron; profile = Plist; } ); }\n' > "$TR_F"
+tr_refused_file "an OpenStep property list" "is not valid JSON" "$TR_F" -y
+tx import "$TR_SRC" -y
+assert_contains "the same export as JSON is read" "$RUN_OUT" "1 created, 0 skipped, 0 failed."
+tx rm "Fake Plist" --purge -y
+rm -f "$TR_SRC"
 printf '{"aidentity_export": 1}\n' > "$TR_F"
 tr_refused_file "no launchers at all" "has no list of launchers" "$TR_F" -y
 
@@ -641,6 +751,46 @@ assert_eq "every one of them" "200" "$(lines_with "$RUN_OUT" "— not a launcher
 tr_refused_file "a file over 4 MB" "is bigger than 4 MB" "$TR_F" -y
 rm -f "$TR_F"
 
+# Only the first 4 MB are ever read: a file that does not end is refused, and
+# what feeds it is stopped by the closed pipe, long before it is done.
+TR_FIFO="$SB/endless.json"
+mkfifo "$TR_FIFO"
+{ head -c 67108864 /dev/zero; printf '%s' "$?" > "$SB/writer.rc"; } > "$TR_FIFO" 2>/dev/null &
+TR_WRITER=$!
+tx import "$TR_FIFO" -y
+w=0
+while kill -0 "$TR_WRITER" 2>/dev/null && [ "$w" -lt 100 ]; do sleep 0.1; w=$((w + 1)); done
+# Still there only if the import never opened the file: stop that writer.
+kill "$TR_WRITER" 2>/dev/null
+wait "$TR_WRITER" 2>/dev/null
+assert_contains "a file that does not end is refused" "$RUN_OUT" "is bigger than 4 MB"
+assert_eq "and read no further than the limit" "stopped" \
+  "$(rc=$(cat "$SB/writer.rc" 2>/dev/null); if [ -n "$rc" ] && [ "$rc" -ne 0 ]; then echo stopped; else echo "writer rc '$rc'"; fi)"
+rm -f "$TR_FIFO" "$SB/writer.rc"
+tr_tmp_gone "a file that does not end"
+
+# The file is read once. A file near the size limit, its entries full of
+# settings, takes seconds: read a value at a time, it took minutes.
+TR_ARGS='["--lang=de","--locale=de-DE","--disable-gpu","--disable-lcd-text","--force-device-scale-factor=1.25","--proxy-server=http://p.example:8080","--proxy-bypass-list=localhost"]'
+TR_ENV='["HTTP_PROXY=http://p.example:1","HTTPS_PROXY=http://p.example:2","ALL_PROXY=socks5://p.example:3","NO_PROXY=localhost","http_proxy=http://p.example:1","https_proxy=http://p.example:2","all_proxy=socks5://p.example:3","no_proxy=localhost","LANG=de_DE.UTF-8","LC_ALL=de_DE.UTF-8","LC_CTYPE=de_DE.UTF-8","LC_MESSAGES=de_DE.UTF-8","TZ=Europe/Berlin"]'
+TR_ENTRIES=()
+i=0
+while [ "$i" -lt 20 ]; do
+  TR_ENTRIES+=("$(tr_entry profile="\"Full $i\"" args="$TR_ARGS" env="$TR_ENV")")
+  i=$((i + 1))
+done
+{ printf '{"aidentity_export": 1, "launchers": [%s], "pad": [' "$(IFS=,; printf '%s' "${TR_ENTRIES[*]}")"
+  yes 1 | head -n 1700000 | paste -sd, -
+  printf ']}\n'; } > "$TR_F"
+TR_T0=$SECONDS
+tx import "$TR_F"
+TR_DT=$((SECONDS - TR_T0))
+assert_eq "a full file near the size limit: every entry is planned" "20" "$(lines_with "$RUN_OUT" "^  create  Fake Full")"
+assert_eq "in seconds" "quick" \
+  "$(if [ "$TR_DT" -le 20 ]; then echo quick; else echo "took $TR_DT s"; fi)"
+rm -f "$TR_F"
+tr_tmp_gone "a full file"
+
 tr_refused_file "a file that is not there" "Cannot read" "$SB/no-such.json" -y
 tr_refused_file "a folder" "Cannot read" "$SB" -y
 tr_refused_file "no file" "Usage: aidentity import FILE" -y
@@ -651,6 +801,33 @@ tr_file "$TR_F"
 tx import "$TR_F" -y
 assert_rc "an export with no launchers is fine" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "and says there is nothing to do" "$RUN_OUT" "lists no launchers"
+
+
+group "import: the plan shows the proxy server"
+
+# A proxy variable sends the profile's traffic through the server it names,
+# so the plan shows that server: the scheme, host and port a client would
+# use. Never a user name or password, nor a path. Other variables by name.
+tr_file "$TR_F" \
+  "$(tr_entry profile='"Px"' env='["HTTPS_PROXY=http://user:hunter2@attacker.example:8080/x","ALL_PROXY=socks5://attacker.example:1080","NO_PROXY=localhost,.example.com","LANG=de_DE.UTF-8"]')" \
+  "$(tr_entry profile='"Px2"' env='["http_proxy=user:hunter2@attacker.example:3128"]')" \
+  "$(tr_entry profile='"Px3"' env='["HTTP_PROXY=http://attacker.example:8080/@innocent.example"]')" \
+  "$(tr_entry profile='"Px4"' env='["HTTP_PROXY=user:hunter2@x://innocent.example"]')"
+before=$(fingerprint "$APPS")
+tx import "$TR_F"
+assert_contains "each proxy variable's server is shown: scheme, host and port" "$RUN_OUT" "  create  Fake Px
+          proxy  HTTPS_PROXY=http://***@attacker.example:8080 ALL_PROXY=socks5://attacker.example:1080
+          env    NO_PROXY LANG (values hidden)"
+assert_contains "a server with no scheme" "$RUN_OUT" "proxy  http_proxy=***@attacker.example:3128"
+assert_contains "the host a client connects to, not one after an @ in the path" "$RUN_OUT" \
+  "proxy  HTTP_PROXY=http://attacker.example:8080"
+assert_contains "a value that is not a URL: what comes before the @ is hidden all the same" "$RUN_OUT" \
+  "proxy  HTTP_PROXY=***@x:"
+assert_not_contains "never a password" "$RUN_OUT" "hunter2"
+assert_not_contains "nor a path" "$RUN_OUT" "innocent"
+assert_not_contains "nor the value of a variable that is not a proxy" "$RUN_OUT" "de_DE"
+assert_eq "nothing is built before the question" "$before" "$(fingerprint "$APPS")"
+tr_tmp_gone "a plan with proxy servers"
 
 
 group "import: the confirmation"
