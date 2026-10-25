@@ -80,7 +80,7 @@ make test AREA=ui                     # the same, through make
 | `basics` | help, version, exit codes, `apps`, name rules, quoting, colours |
 | `lifecycle` | app detection, the marker key, `add`, `list`, `rm`, `--purge`, `--seed`, icons, refusals, `rename`, `set` |
 | `running` | the check for a profile that is running |
-| `quit` | `quit`, against real processes: finding one profile's copy of an app, the quit request, `SIGTERM`, and the other copies left running |
+| `quit` | `quit`, against real processes: finding one profile's copy of an app, the quit request, what it never touches, and the other copies left running |
 | `accounts` | the account-name prompt, `setup`, `--main`, a failed build, status and permissions |
 | `maintenance` | `rm` hints, `prune`, rename and rebuild edge cases, finding launchers, interrupts, symlinks |
 | `restore` | restore records, `doctor --fix`, adding a profile again |

@@ -66,7 +66,7 @@ aidentity doctor --fix                             # check and repair
 aidentity help rm                                  # options for one command (also: rm --help)
 ```
 
-Moving to another Mac? `aidentity export > profiles.json` saves how each launcher looks and starts, and `aidentity import profiles.json` builds them there. The file holds no account data, so each profile starts signed out. It does hold launch settings such as proxy values, so keep it private. [More](docs/guide.md#aidentity-export)
+Moving to another Mac? `aidentity export > profiles.json` saves how each launcher looks and starts, and `aidentity import profiles.json` builds them there. The file holds no account data, so each profile starts signed out. It does hold launch settings such as proxy values, so keep it private. `export` warns on standard error when it finds variable values, or a password in a switch. [More](docs/guide.md#aidentity-export)
 
 Prefer a menu? `aidentity ui` shows every profile on one screen; pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it.
 

@@ -5031,7 +5031,7 @@ open||launchers||Open a profile
 quit||launchers||Quit one profile; other copies of the app keep running
 rename|mv|launchers||Rename a profile and keep it signed in
 set|modify edit|launchers|--badge/-b= --color/--colour/-c= --no-badge --arg= --env= --clear-args --clear-env --own-extensions --shared-extensions|Change how a profile looks or starts
-prune||-|--yes/-y|Remove profile data that no launcher uses
+prune||-|--yes/-y|Move profile data that no launcher uses to the Trash
 restore||restorable|--all/-a|Rebuild a launcher that was deleted
 rebuild|repair|launchers|--all/-a|Rebuild launchers after an app moved or updated
 rm|remove delete|launchers|--purge --yes/-y|Remove a launcher
