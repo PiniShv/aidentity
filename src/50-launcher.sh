@@ -181,8 +181,9 @@ EOF
 }
 
 # A recorded data directory is ours only if it sits genuinely inside the data
-# root. This is the last thing standing between a hand-edited Info.plist and
-# `rm -rf`, so it resolves the path rather than pattern-matching the string.
+# root. This is the last thing standing between a hand-edited Info.plist and a
+# move to the Trash, so it resolves the path rather than pattern-matching the
+# string.
 #
 # Three ways a string test alone was shown to fail:
 #   "$DATA_ROOT/../elsewhere"  — traversal
@@ -366,9 +367,10 @@ build_launcher() {
 # profile name, target app, badge, colour. The directory outlives the launcher —
 # a launcher deleted in Finder, or removed with `rm` without --purge — and with
 # this record `aidentity restore` can rebuild the launcher instead of `prune`
-# only offering to delete a signed-in session. Chromium and Electron ignore a
-# file they do not know in their data directory. Written to a temporary name
-# and moved into place, owner-only like the rest of the directory.
+# only offering to move a signed-in session to the Trash. Chromium and
+# Electron ignore a file they do not know in their data directory. Written to a
+# temporary name and moved into place, owner-only like the rest of the
+# directory.
 RESTORE_RECORD=".aidentity-profile.plist"
 
 write_restore_record() { # data_dir, profile, target app, badge, colour, [extras]

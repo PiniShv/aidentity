@@ -335,6 +335,34 @@ if vol_attach "$VOL"; then
   VOL_REAL=$(cd -P "$VOL" && pwd -P)
   assert_contains "it says where it is" "$RUN_OUT" "It is now at: $VOL_REAL/.Trashes/$VOL_UID/fake-away"
   assert_no_dir "and the home folder's Trash is not used" "$SB_TRASH/fake-away"
+
+  # A Trash that is a symlink to another volume is refused. mv into it would
+  # copy every file and then delete the original, not rename it.
+  trash_reset
+  mkdir -p "$VOL/elsewhere" "$SB/tv/fake-linked"
+  printf 'session\n' > "$SB/tv/fake-linked/Cookies"
+  ln -s "$VOL/elsewhere" "$SB_TRASH"
+  libcall trash_path "$SB/tv/fake-linked"
+  assert_rc_nonzero "a home Trash linked to another volume is refused" "$RUN_RC" "$RUN_OUT"
+  assert_contains "it says why" "$RUN_OUT" "is on another volume"
+  assert_contains "and that nothing was deleted" "$RUN_OUT" "Nothing was deleted."
+  assert_file "the data stays where it was" "$SB/tv/fake-linked/Cookies"
+  assert_no_dir "and nothing was copied across" "$VOL/elsewhere/fake-linked"
+  rm -f "$SB_TRASH"
+
+  # The same for a volume's .Trashes/<uid> linked off that volume.
+  mkdir -p "$VOL/fake-there" "$SB/tv/away"
+  printf 'session\n' > "$VOL/fake-there/Cookies"
+  mv "$VOL/.Trashes/$VOL_UID" "$VOL/.Trashes/kept"
+  ln -s "$SB/tv/away" "$VOL/.Trashes/$VOL_UID"
+  libcall trash_path "$VOL/fake-there"
+  assert_rc_nonzero "a volume's Trash linked off the volume is refused" "$RUN_RC" "$RUN_OUT"
+  assert_contains "it says why" "$RUN_OUT" "is on another volume"
+  assert_file "the data stays where it was" "$VOL/fake-there/Cookies"
+  assert_no_dir "and nothing was copied across" "$SB/tv/away/fake-there"
+  rm -f "$VOL/.Trashes/$VOL_UID"
+  mv "$VOL/.Trashes/kept" "$VOL/.Trashes/$VOL_UID"
+  rm -rf "$SB/tv"
   vol_detach
   assert_eq "the disk image is detached" "$(/usr/bin/stat -f %d "$SANDBOX")" "$(/usr/bin/stat -f %d "$VOL")"
 else

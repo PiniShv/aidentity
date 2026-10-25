@@ -145,7 +145,7 @@ create_profile() {
 
   # Never turn a separate profile into a main launcher or back by re-adding
   # under the same name. The profile's data would be left with nothing pointing
-  # at it — and that is exactly what `prune` deletes.
+  # at it — and that is exactly what `prune` moves to the Trash.
   if [ -e "$dst" ] && is_our_launcher "$dst"; then
     local was=""
     is_main_launcher "$dst" && was="main"
