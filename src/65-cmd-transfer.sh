@@ -16,18 +16,21 @@ EXPORT_FORMAT=1
 # at most 512), and 4 MiB in all: 200 launchers with every proxy setting at
 # its longest take less than half of that. The file is copied up to that size
 # before anything parses it. The per-value cap keeps the checks quick: they
-# take longer than linear time on a long value.
+# take longer than linear time on a long value. The file is read once, as
+# JSON only, so the whole import takes seconds even at these limits.
 IMPORT_MAX_LAUNCHERS=200
 IMPORT_MAX_SETTINGS=32
 IMPORT_MAX_VALUE=1024
 IMPORT_MAX_BYTES=4194304
 
 # The bundle ID of the app a launcher opens. When the app is gone, the one the
-# profile folder's restore record kept. Empty when neither is known.
+# profile folder's restore record kept. Empty when neither is known. A read
+# that fails gives nothing: PlistBuddy prints its error, with the file's path,
+# on stdout, and that must never reach the file.
 export_bundle_id() { # app, data dir
   local bid=""
-  [ -d "$1" ] && bid=$(bundle_id "$1")
-  [ -z "$bid" ] && [ -n "$2" ] && bid=$(record_get "$2" AIdentityTargetBundleID)
+  [ -d "$1" ] && { bid=$(bundle_id "$1") || bid=""; }
+  [ -z "$bid" ] && [ -n "$2" ] && { bid=$(record_get "$2" AIdentityTargetBundleID) || bid=""; }
   printf '%s' "$bid"
 }
 
@@ -40,12 +43,14 @@ export_bundle_id() { # app, data dir
 #   main            true for a launcher that opens the app's own account
 #   badge           badge character; "" for the app's own icon
 #   color           badge colour, six hex digits
-#   args            launch switches
+#   args            launch switches, in full
 #   env             launch variables, as NAME=value: values included
 #   own_extensions  true when a VS Code-style app has its own extensions folder
 # Every value is a string, a boolean or a list of strings, never null:
-# plutil, which import reads the file with, refuses null. Warnings go to
-# stderr, so stdout is always the file.
+# import refuses a file with a null in it. Warnings go to stderr, so stdout is
+# always the file. A proxy setting can carry a user name and password, in a
+# variable's value or in a switch (user:password@host), so export warns when
+# the file holds either.
 cmd_export() {
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -53,7 +58,7 @@ cmd_export() {
       *) die "Unexpected argument: $1" ;;
     esac
   done
-  local i=0 app target ex bid obj flag v secrets=0
+  local i=0 app target ex bid obj flag v secrets=0 creds=0 held=""
   launcher_rows
   printf '{"aidentity_export": %s, "exported_by": %s, "launchers": [' \
     "$EXPORT_FORMAT" "$(json_str "$AIDENTITY_VERSION")"
@@ -67,6 +72,9 @@ cmd_export() {
     fi
     while IFS= read -r v; do [ -n "$v" ] && secrets=$((secrets + 1)); done <<EOF
 $(extras_lines env "$ex")
+EOF
+    while IFS= read -r v; do case "$v" in *@*) creds=$((creds + 1)) ;; esac; done <<EOF
+$(extras_lines arg "$ex")
 EOF
     obj="{\"name\":$(json_str "${LR_NAME[$i]}")"
     v=""
@@ -90,44 +98,145 @@ EOF
   done
   [ "$LR_N" -eq 0 ] || printf '\n'
   printf ']}\n'
-  if [ "$secrets" -gt 0 ]; then
-    warn "The file holds the values of $(count "$secrets" "launch variable"). A proxy setting can
+  [ "$secrets" -gt 0 ] && held="the values of $(count "$secrets" "launch variable")"
+  if [ "$creds" -eq 1 ]; then
+    held="${held:+$held, and }a launch switch with a user name or password in it"
+  elif [ "$creds" -gt 1 ]; then
+    held="${held:+$held, and }$creds launch switches with a user name or password in them"
+  fi
+  if [ -n "$held" ]; then
+    warn "The file holds $held. A proxy setting can
     carry a password: keep the file private."
   fi
   return 0
 }
 
-# The value at a key path of the converted file, into IV, when it has the
-# type asked for. Returns 1 when there is nothing at that path, and 2 when
-# there is something of another type. plutil ends its raw output with a line
-# break of its own; the x keeps a line break that belongs to the value, so the
-# checks see it.
+# Read the copied file in one go, with the JavaScript engine that ships with
+# macOS. JSON.parse reads JSON and nothing else: a binary or XML property
+# list is refused at its first byte, and nothing is converted (plutil reads
+# both, and can expand a small binary one without bound). A null is refused,
+# as export never writes one, and so is a NUL character in a text, which the
+# shell cannot hold, or a text that is not valid Unicode, which cannot be
+# written out. The keys import reads are written out as records, one file
+# for the top of the file (top) and one per entry (e0, e1 ...), each record
+# "key path<TAB>type<TAB>value" and a NUL. The value is the text, true or
+# false, the number, or a list's length. Only the keys below are written, in
+# the order import reads them, and the items of a list only when there are
+# few enough, so what is written is never much bigger than the file. Prints
+# ok, or json for a file that is not one.
+import_read() { # file, folder for the records
+  /usr/bin/osascript -l JavaScript - "$1" "$2" "$IMPORT_MAX_LAUNCHERS" "$IMPORT_MAX_SETTINGS" \
+    2>/dev/null <<'JXA'
+ObjC.import("Foundation");
+function run(argv) {
+  var text = $.NSString.stringWithContentsOfFileEncodingError(argv[0], $.NSUTF8StringEncoding, null);
+  if (text.isNil()) return "json";
+  var d, todo, v, i;
+  try { d = JSON.parse(text.js); } catch (e) { return "json"; }
+  function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+  // Every value, without recursion, which a deep file could exhaust. A
+  // reviver function in JSON.parse would do the same with four times the
+  // memory.
+  todo = [d];
+  while (todo.length > 0) {
+    v = todo.pop();
+    if (v === null || (typeof v === "string" && v.indexOf("\0") !== -1)) return "json";
+    if (Array.isArray(v)) { for (i = 0; i < v.length; i++) todo.push(v[i]); }
+    else if (typeof v === "object") { for (i in v) if (has(v, i)) todo.push(v[i]); }
+  }
+  var recs = [], keys = ["name", "profile", "bundle_id", "main", "badge", "color", "args", "env", "own_extensions"];
+  function isDict(v) { return typeof v === "object" && v !== null && !Array.isArray(v); }
+  function put(path, v) {
+    var t = "dictionary", s = "";
+    if (typeof v === "string") { t = "string"; s = v; }
+    else if (typeof v === "boolean") { t = "bool"; s = String(v); }
+    else if (typeof v === "number") { t = Number.isSafeInteger(v) ? "integer" : "real"; s = String(v); }
+    else if (Array.isArray(v)) { t = "array"; s = String(v.length); }
+    recs.push(path + "\t" + t + "\t" + s + "\0");
+  }
+  function save(name) {
+    var ok = $(recs.join("")).writeToFileAtomicallyEncodingError(argv[1] + "/" + name, false, $.NSUTF8StringEncoding, null);
+    recs = [];
+    return ok;
+  }
+  var list = [];
+  if (isDict(d)) {
+    if (has(d, "aidentity_export")) put("aidentity_export", d.aidentity_export);
+    if (has(d, "launchers")) put("launchers", d.launchers);
+    if (Array.isArray(d.launchers) && d.launchers.length <= Number(argv[2])) list = d.launchers;
+  }
+  if (!save("top")) return "json";
+  for (i = 0; i < list.length; i++) {
+    var e = list[i], k = "launchers." + i;
+    put(k, e);
+    if (isDict(e)) {
+      keys.forEach(function (key) {
+        if (!has(e, key)) return;
+        put(k + "." + key, e[key]);
+        if ((key === "args" || key === "env") && Array.isArray(e[key]) && e[key].length <= Number(argv[3])) {
+          e[key].forEach(function (v, j) { put(k + "." + key + "." + j, v); });
+        }
+      });
+    }
+    if (!save("e" + i)) return "json";
+  }
+  return "ok";
+}
+JXA
+}
+
+# The records import_read wrote for the top of the file or for one entry,
+# into IMPORT_KEYS, IMPORT_TYPES and IMPORT_VALS, for import_value.
+import_records() { # records file
+  local rec rest
+  IMPORT_KEYS=(); IMPORT_TYPES=(); IMPORT_VALS=(); IMPORT_NEXT=0
+  while IFS= read -r -d '' rec; do
+    IMPORT_KEYS[${#IMPORT_KEYS[@]}]=${rec%%"$TAB"*}
+    rest=${rec#*"$TAB"}
+    IMPORT_TYPES[${#IMPORT_TYPES[@]}]=${rest%%"$TAB"*}
+    IMPORT_VALS[${#IMPORT_VALS[@]}]=${rest#*"$TAB"}
+  done < "$1"
+  return 0
+}
+
+# The value at a key path, into IV, when it has the type asked for. Returns 1
+# when there is nothing at that path, and 2 when there is something of
+# another type. The records are in the order import asks for them, so the
+# search starts after the last one found, and goes round once.
 import_value() { # key path, type
-  local f="$IMPORT_TMP/export.plist" nl=$'\n'
-  if IV=$(/usr/bin/plutil -extract "$1" raw -expect "$2" -o - "$f" 2>/dev/null && printf x); then
-    IV=${IV%x}; IV=${IV%"$nl"}
-    return 0
-  fi
+  local i=$IMPORT_NEXT left=${#IMPORT_KEYS[@]}
   IV=""
-  /usr/bin/plutil -extract "$1" xml1 -o /dev/null "$f" >/dev/null 2>&1 && return 2
+  while [ "$left" -gt 0 ]; do
+    [ "$i" -lt "${#IMPORT_KEYS[@]}" ] || i=0
+    if [ "${IMPORT_KEYS[$i]}" = "$1" ]; then
+      IMPORT_NEXT=$((i + 1))
+      [ "${IMPORT_TYPES[$i]}" = "$2" ] || return 2
+      IV=${IMPORT_VALS[$i]}
+      return 0
+    fi
+    i=$((i + 1)); left=$((left - 1))
+  done
   return 1
 }
 
 # Run a check quietly. When it refuses, its first line goes into E_WHY, made
 # safe to print. Only the first line: the lines after it can repeat the value,
-# and the value came from the file. A list of allowed values is left out.
+# and the value came from the file. A list of allowed values is left out. The
+# check runs in this shell, not a subshell, as it runs for every value: each
+# one only warns and returns, and never exits.
 import_check() { # check, then its arguments
-  local out nl=$'\n'
-  out=$("$@" 2>&1 >/dev/null) && return 0
-  out=${out%%"$nl"*}
+  local out=""
+  "$@" 2>"$IMPORT_TMP/why" >/dev/null && return 0
+  IFS= read -r out < "$IMPORT_TMP/why"
   out=${out#*"!$C_RESET "}
   shown E_WHY "${out%%. Allowed:*}"
   return 1
 }
 
-# The installed app with this bundle ID, into IMPORT_FOUND. Only the apps that
-# `apps` lists are looked at: a path in the file is never used. They are read
-# once, into cmd_import's own variables.
+# The installed app with this bundle ID, into IMPORT_FOUND, and its name into
+# IMPORT_FOUND_NAME. Only the apps that `apps` lists are looked at: a path in
+# the file is never used. They are read once, into cmd_import's own
+# variables.
 import_find_app() { # bundle id
   local a i=0
   if [ "$IMPORT_SCANNED" -eq 0 ]; then
@@ -141,7 +250,11 @@ $(list_compatible_apps)
 EOF
   fi
   while [ "$i" -lt "${#IMPORT_APPS[@]}" ]; do
-    if [ "${IMPORT_IDS[$i]}" = "$1" ]; then IMPORT_FOUND=${IMPORT_APPS[$i]}; return 0; fi
+    if [ "${IMPORT_IDS[$i]}" = "$1" ]; then
+      [ -n "${IMPORT_NAMES[$i]:-}" ] || IMPORT_NAMES[i]=$(bundle_name "${IMPORT_APPS[$i]}")
+      IMPORT_FOUND=${IMPORT_APPS[$i]}; IMPORT_FOUND_NAME=${IMPORT_NAMES[$i]}
+      return 0
+    fi
     i=$((i + 1))
   done
   return 1
@@ -153,7 +266,7 @@ EOF
 # The launchers' folders are read once, into cmd_import's own variables;
 # nothing is built while the plan is made.
 import_folder_owner() { # launcher name, data dir
-  local a d i=0 id
+  local a d i=0 id=""
   if [ "$IMPORT_OWNERS_READ" -eq 0 ]; then
     IMPORT_OWNERS_READ=1
     for a in "$APPS_DIR"/*.app; do
@@ -166,7 +279,7 @@ import_folder_owner() { # launcher name, data dir
       IMPORT_DIR_IDS[${#IMPORT_DIR_IDS[@]}]=$(dir_id "$d")
     done
   fi
-  id=$(dir_id "$2")
+  [ -d "$2" ] && id=$(dir_id "$2")
   while [ "$i" -lt "${#IMPORT_OWNERS[@]}" ]; do
     if [ "${IMPORT_OWNERS[$i]}" != "$1" ] && { [ "${IMPORT_DIRS[$i]}" = "$2" ] ||
          { [ -n "$id" ] && [ "${IMPORT_DIR_IDS[$i]}" = "$id" ]; }; }; then
@@ -179,17 +292,22 @@ import_folder_owner() { # launcher name, data dir
 
 # A badge character that can be drawn: one that prints, in any locale. Under
 # C, [[:cntrl:]] misses the C1 controls, which some terminals and fonts treat
-# as the start of an escape sequence.
+# as the start of an escape sequence. The line and paragraph separators,
+# U+2028 and U+2029, count as printing characters but draw nothing.
 badge_drawable() {
   local LC_ALL=en_US.UTF-8
-  case "$1" in ''|*[![:print:]]*) return 1 ;; esac
+  case "$1" in ''|*[![:print:]]*|*$'\xe2\x80\xa8'*|*$'\xe2\x80\xa9'*) return 1 ;; esac
   return 0
 }
 
 # The switches (arg) or variables (env) an entry lists, each checked as add
-# checks it, added to E_EXTRAS. A list that is not there is an empty one.
+# checks it, added to E_EXTRAS. A list that is not there is an empty one. A
+# setting listed twice is refused: add keeps only the last of the two, so an
+# export never holds one twice, and the plan would show one that is not
+# built. It also caps the work: each check runs at most twice for each
+# setting the allowlists hold, and some checks start other programs.
 import_list() { # entry key path, key, kind, check
-  local n i=0 rc=0
+  local n i=0 rc=0 name names=" "
   import_value "$1.$2" array || rc=$?
   [ "$rc" -ne 1 ] || return 0
   [ "$rc" -eq 0 ] || { E_WHY="$2 is not a list"; return 1; }
@@ -206,6 +324,10 @@ import_list() { # entry key path, key, kind, check
       fi
       return 1
     fi
+    # The check passed, so the name is one from the allowlist.
+    name=${IV%%=*}
+    case "$names" in *" $name "*) E_WHY="$2 lists $name twice"; return 1 ;; esac
+    names="$names$name "
     E_EXTRAS="${E_EXTRAS:+$E_EXTRAS
 }$3$TAB$IV"
     i=$((i + 1))
@@ -215,12 +337,13 @@ import_list() { # entry key path, key, kind, check
 
 # Read entry $1 of the file and check each value as add checks it on the
 # command line. Sets the E_ variables of cmd_import for create_profile, and
-# E_SHOW, the entry's name as it is printed. Returns 1, with the reason in
-# E_WHY, for an entry to skip.
+# E_SHOW, the entry's name as it is printed, and E_SLUG, the name of a
+# profile's folder. Returns 1, with the reason in E_WHY, for an entry to skip.
 import_entry() { # index
   local k="launchers.$1" rc kind="" other dir
-  E_SHOW="entry $(($1 + 1))"; E_WHY=""; E_APP=""; E_PROFILE=""; E_LABEL=""
+  E_SHOW="entry $(($1 + 1))"; E_WHY=""; E_APP=""; E_PROFILE=""; E_LABEL=""; E_SLUG=""
   E_MAIN=0; E_BADGE=""; E_NOBADGE=0; E_HEX=""; E_EXTRAS=""
+  import_records "$IMPORT_TMP/e$1"
   import_value "$k" dictionary || { E_WHY="not a launcher"; return 1; }
   # The name in the file only says which entry this is, until the app is found.
   if import_value "$k.name" string && [ -n "$IV" ]; then shown E_SHOW "${IV:0:60}"; fi
@@ -234,7 +357,7 @@ import_entry() { # index
   import_find_app "$IV" || { E_WHY="no app with the bundle ID $IV is installed"; return 1; }
   E_APP=$IMPORT_FOUND
   # The name add would give it, whatever the file calls it.
-  E_LABEL="$(bundle_name "$E_APP") $E_PROFILE"
+  E_LABEL="$IMPORT_FOUND_NAME $E_PROFILE"
   shown E_SHOW "$E_LABEL"
 
   rc=0; import_value "$k.main" bool || rc=$?
@@ -285,7 +408,8 @@ import_entry() { # index
       E_WHY="'$other' already opens the original account"; return 1
     fi
   else
-    dir="$DATA_ROOT/$(slugify "$E_LABEL")"
+    E_SLUG=$(slugify "$E_LABEL")
+    dir="$DATA_ROOT/$E_SLUG"
     if import_folder_owner "$E_LABEL" "$dir"; then
       shown other "$IMPORT_OWNER"
       E_WHY="would share a profile folder with '$other'"; return 1
@@ -298,12 +422,14 @@ import_entry() { # index
 # Whether the entry in the E_ variables clashes with one already planned: the
 # same launcher twice, two launchers for one app's original account, or two
 # profiles that would share a folder. create_profile would refuse the second;
-# this says so in the plan, before anything is built.
-import_clash() { # slug of the entry's profile folder
+# this says so in the plan, before anything is built. Launcher names are
+# compared lower-cased, as the launcher folder ignores case: "Fake Work" and
+# "Fake work" are one launcher there.
+import_clash() { # slug of the entry's profile folder, lower-cased launcher name
   local j=0
   while [ "$j" -lt "${#P_ACT[@]}" ]; do
     if [ "${P_ACT[$j]}" = create ]; then
-      if [ "${P_LABEL[$j]}" = "$E_LABEL" ]; then
+      if [ "${P_LOWER[$j]}" = "$2" ]; then
         E_WHY="listed twice in the file"; return 0
       fi
       if [ "$E_MAIN" -eq 1 ] && [ "${P_MAIN[$j]}" -eq 1 ] && [ "${P_APP[$j]}" = "$E_APP" ]; then
@@ -318,26 +444,57 @@ import_clash() { # slug of the entry's profile folder
   return 1
 }
 
-# The launch settings an entry brings, under its line in the plan, as list
-# shows them: switches in full, variables by name only, as a value may be a
-# password. They come from the file, and a proxy among them sends the
-# profile's traffic through a server the file names, so they are shown before
-# the question.
+# The launch settings an entry brings, under its line in the plan. They come
+# from the file, and a proxy among them sends the profile's traffic through a
+# server the file names, so every server is shown before the question: a
+# switch in full, as list shows it, and a proxy variable by its scheme, host
+# and port. Other variables by name only, as a value may be a password.
 import_show_settings() { # extras
-  local sw envs
-  shown sw "$(extras_lines arg "$1" | tr '\n' ' ')"
-  shown envs "$(extras_lines env "$1" | sed 's/=.*//' | tr '\n' ' ')"
-  [ -n "$sw" ] && printf '          flags  %s\n' "${sw% }"
-  [ -n "$envs" ] && printf '          env    %s\n' "$(dim "${envs% } (values hidden)")"
-  [ -n "$(extras_lines ext "$1")" ] && printf '          ext    %s\n' "$(dim "its own extensions folder")"
+  local line v px sw="" proxies="" envs="" ext=0
+  while IFS= read -r line; do
+    v=${line#*"$TAB"}
+    case "$line" in
+      "arg$TAB"*) sw="$sw $v" ;;
+      "env$TAB"*)
+        case "${v%%=*}" in
+          NO_PROXY|no_proxy) envs="$envs ${v%%=*}" ;;
+          *_PROXY|*_proxy) import_proxy_shown px "${v#*=}"; proxies="$proxies ${v%%=*}=$px" ;;
+          *) envs="$envs ${v%%=*}" ;;
+        esac ;;
+      "ext$TAB"*) ext=1 ;;
+    esac
+  done <<EOF
+$1
+EOF
+  shown sw "${sw# }"; shown proxies "${proxies# }"; shown envs "${envs# }"
+  [ -n "$sw" ] && printf '          flags  %s\n' "$sw"
+  [ -n "$proxies" ] && printf '          proxy  %s\n' "$proxies"
+  [ -n "$envs" ] && printf '          env    %s%s (values hidden)%s\n' "$C_DIM" "$envs" "$C_RESET"
+  [ "$ext" -eq 0 ] || printf '          ext    %sits own extensions folder%s\n' "$C_DIM" "$C_RESET"
   return 0
 }
 
-# Copy the file, up to the size limit, and convert it with plutil. Dies,
-# having changed nothing, unless it is an export in this format. Sets
-# IMPORT_N, the number of launchers it lists.
+# A proxy variable's server as the plan shows it, into the variable named $1:
+# the scheme, host and port, read as a client reads them. A user name and
+# password before the host become ***, and a path is left out.
+import_proxy_shown() { # variable, proxy value
+  local rest="$2" scheme="" host
+  case "$rest" in
+    *://*) case "${rest%%://*}" in
+             ''|*[!A-Za-z0-9+.-]*) ;;
+             *) scheme="${rest%%://*}://"; rest=${rest#*://} ;;
+           esac ;;
+  esac
+  host=${rest%%/*}
+  case "$host" in *@*) host="***@${host##*@}" ;; esac
+  printf -v "$1" '%s%s' "$scheme" "$host"
+}
+
+# Copy the file, up to the size limit, and read it. Dies, having changed
+# nothing, unless it is an export in this format. Sets IMPORT_N, the number
+# of launchers it lists.
 import_load() { # file, its name as printed
-  local tmp="${TMPDIR:-/tmp}" size
+  local tmp="${TMPDIR:-/tmp}" size status
   IMPORT_TMP=$(mktemp -d "${tmp%/}/aidentity-import.XXXXXX" 2>/dev/null) \
     || { IMPORT_TMP=""; die "Could not create a temporary folder."; }
   head -c $((IMPORT_MAX_BYTES + 1)) < "$1" > "$IMPORT_TMP/file" 2>/dev/null \
@@ -345,9 +502,14 @@ import_load() { # file, its name as printed
   size=$(wc -c < "$IMPORT_TMP/file" | tr -d ' ')
   [ "$size" -le "$IMPORT_MAX_BYTES" ] \
     || die "$2 is bigger than 4 MB, so it is not a file made by 'aidentity export'. Nothing was changed."
-  /usr/bin/plutil -convert xml1 -o "$IMPORT_TMP/export.plist" "$IMPORT_TMP/file" >/dev/null 2>&1 \
-    || die "$2 is not valid JSON, or it holds a null, so it is not a file made by
-    'aidentity export'. Nothing was changed."
+  status=$(import_read "$IMPORT_TMP/file" "$IMPORT_TMP")
+  case "$status" in
+    ok) ;;
+    json) die "$2 is not valid JSON, or it holds a null, so it is not a file made by
+    'aidentity export'. Nothing was changed." ;;
+    *) die "Could not read $2: osascript did not run. Nothing was changed." ;;
+  esac
+  import_records "$IMPORT_TMP/top"
   import_value aidentity_export integer \
     || die "$2 is not a file made by 'aidentity export'. Nothing was changed."
   [ "$IV" = "$EXPORT_FORMAT" ] \
@@ -376,15 +538,17 @@ cmd_import() {
   shown name "$file"
   { [ -r "$file" ] && [ ! -d "$file" ]; } || die "Cannot read $name"
 
-  local IV="" IMPORT_N=0 IMPORT_SCANNED=0 IMPORT_FOUND="" IMPORT_APPS=() IMPORT_IDS=()
+  local IV="" IMPORT_N=0 IMPORT_SCANNED=0 IMPORT_FOUND="" IMPORT_FOUND_NAME=""
+  local IMPORT_APPS=() IMPORT_IDS=() IMPORT_NAMES=()
+  local IMPORT_KEYS=() IMPORT_TYPES=() IMPORT_VALS=() IMPORT_NEXT=0
   local IMPORT_OWNERS_READ=0 IMPORT_OWNER="" IMPORT_OWNERS=() IMPORT_DIRS=() IMPORT_DIR_IDS=()
   import_load "$file" "$name"
 
   # The plan, an entry each: create or skip, and what create_profile needs.
   local P_ACT=() P_SHOW=() P_WHY=() P_APP=() P_PROFILE=() P_LABEL=() P_SLUG=() P_MAIN=()
-  local P_BADGE=() P_NOBADGE=() P_HEX=() P_EXTRAS=()
-  local E_SHOW E_WHY E_APP E_PROFILE E_LABEL E_MAIN E_BADGE E_NOBADGE E_HEX E_EXTRAS
-  local i=0 slug act note n_new=0 n_skip=0
+  local P_BADGE=() P_NOBADGE=() P_HEX=() P_EXTRAS=() P_LOWER=()
+  local E_SHOW E_WHY E_APP E_PROFILE E_LABEL E_SLUG E_MAIN E_BADGE E_NOBADGE E_HEX E_EXTRAS
+  local i=0 slug low act note n_new=0 n_skip=0
   if [ "$IMPORT_N" -eq 0 ]; then
     info "$name lists no launchers. Nothing to do."
     return 0
@@ -392,12 +556,12 @@ cmd_import() {
   info "${C_BOLD}The launchers in $name:${C_RESET}"
   info ""
   while [ "$i" -lt "$IMPORT_N" ]; do
-    act=skip; slug=""
+    act=skip; slug=""; low=""
     if import_entry "$i"; then
-      [ "$E_MAIN" -eq 1 ] || slug=$(slugify "$E_LABEL")
-      import_clash "$slug" || act=create
+      slug=$E_SLUG; low=$(lower "$E_LABEL")
+      import_clash "$slug" "$low" || act=create
     fi
-    P_ACT[i]=$act; P_SHOW[i]=$E_SHOW; P_WHY[i]=$E_WHY; P_APP[i]=$E_APP
+    P_ACT[i]=$act; P_SHOW[i]=$E_SHOW; P_WHY[i]=$E_WHY; P_APP[i]=$E_APP; P_LOWER[i]=$low
     P_PROFILE[i]=$E_PROFILE; P_LABEL[i]=$E_LABEL; P_SLUG[i]=$slug; P_MAIN[i]=$E_MAIN
     P_BADGE[i]=$E_BADGE; P_NOBADGE[i]=$E_NOBADGE; P_HEX[i]=$E_HEX; P_EXTRAS[i]=$E_EXTRAS
     if [ "$act" = create ]; then
