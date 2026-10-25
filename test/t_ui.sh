@@ -271,6 +271,8 @@ ui_run_menu 24 80 '?aq'
 assert_rc "the help screen returns to the menu" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "the help screen lists the keys" "$RUN_OUT" "this help"
 assert_contains "and how to remove" "$RUN_OUT" "k keeps the data"
+assert_contains "p moves the data to the Trash, as the remove question says" "$RUN_OUT" "remove: k keeps the data, p moves it to the Trash"
+assert_not_contains "and nothing says it deletes" "$RUN_OUT" "delete"
 
 # --- rename
 

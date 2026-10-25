@@ -206,7 +206,7 @@ ui_do_color() {
   ui_screen cmd_set "$name" --color "$pick"
 }
 
-# d: k removes the launcher and keeps the data, p deletes the data as well.
+# d: k removes the launcher and keeps the data, p moves the data to the Trash.
 # Both end in `rm`, which refuses a running profile and, for p, asks for yes.
 # k needs no yes: the data stays, and `restore` brings the launcher back.
 ui_do_remove() {
@@ -272,7 +272,7 @@ a|add a profile: pick an app, then name the account
 r|rename the account name (it stays signed in)
 c|colour: arrows choose, Enter applies, Esc cancels
 b|badge: one character on the icon
-d|remove: k keeps the data, p deletes it too
+d|remove: k keeps the data, p moves it to the Trash
 x|doctor report; f then repairs what it can
 ?|this help
 q, Esc|quit
