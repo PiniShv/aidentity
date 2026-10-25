@@ -7,12 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `aidentity quit NAME` quits the copy of the app that runs on one profile
+  and leaves every other copy running. The Dock shows those copies as
+  identical icons, so it was hard to tell which one to quit. It asks the app
+  to quit the way its Quit menu item does, so the app can still ask about
+  unsaved work. If the app cannot be asked, `quit` sends its process SIGTERM,
+  which Electron and Chromium apps also treat as quit. For a Main launcher, it
+  quits the copy on your original account. It looks only at your own
+  processes, and never at an app's helper processes. It waits up to 10
+  seconds. If the app is still running then, it says so and exits 1; there is
+  no option to force it. A profile that is not running gives a message and
+  exits 0. Tab completion offers your profile names after `quit`.
+- In `aidentity ui`, the `s` key (stop) runs `quit` for the selected profile.
+  The footer says `Quitting NAME…` while it waits, and the row shows the new
+  status afterwards.
+- `aidentity export` prints every launcher as JSON: its app (by bundle ID),
+  profile name, badge, colour and launch settings. Save it with
+  `aidentity export > profiles.json`. The file holds no account data and no
+  folder paths, so no account goes with it. It does hold the values of launch
+  variables, and a proxy setting can carry a password, so `export` warns on
+  standard error to keep the file private.
+- `aidentity import FILE` builds the launchers in a file that `export` made,
+  on this Mac or another. It finds each app by its bundle ID among the apps
+  installed here, and checks every value as `add` checks it. A launcher that
+  exists already is skipped, never changed. Anything it cannot use is skipped
+  with a reason, and the rest go on. It shows what it will create and what it
+  skips, with each new launcher's switches and its variables by name, and asks
+  you to type `yes` first. `-y` skips the question; with no terminal and no
+  `-y`, it refuses. A new profile starts signed out, unless its profile folder
+  is still here: then it uses that folder, as `add` does, and the plan says
+  so. The file is treated as untrusted: it may come from someone else. A file
+  over 4 MB, or one that lists more than 200 launchers, is refused, and so is
+  one that is not valid JSON, holds a `null`, or has another format number.
+  `import` exits 1 if a launcher could not be built.
+
 ### Changed
 
+- `rm --purge`, `aidentity prune` and `uninstall.sh` move profile data to the
+  Trash instead of deleting it, so a wrong name or a hasty `yes` can be
+  undone. Move the folder back into the profiles folder and run
+  `aidentity restore`. `rm --purge` now writes the restore record first when
+  the profile has none, so that works for profiles made before 1.2.0 too.
+  Each command says where the data went and how to undo it. The move is a
+  plain rename, not a request to Finder, so macOS shows no permission prompt,
+  and the folder moves whole or not at all. It goes to `~/.Trash`. On a
+  volume that is not the home folder's, it goes to that volume's
+  `.Trashes/<your user ID>` folder, which Finder makes the first time you put
+  something in the Trash from that volume. If the volume has none, or the
+  Trash cannot be written, nothing is moved: the data stays where it was and
+  the message says why. The prompts and help texts say Trash, as does the `p`
+  key of the menu's remove question. The uninstaller still deletes the
+  launchers and still asks you to type `delete`. Emptying the Trash is what
+  deletes the data for good.
 - The code is written in `src/`, split by subject, and built into
   `bin/aidentity`, which still ships as one file. Installs and updates fetch
-  it as before. The file differs from 1.5.0 only in comments, and in where one
-  function sits.
+  it as before. On its own, the split changed no behaviour: the built file
+  differed from 1.5.0 only in comments, and in where one function sits.
+
+### Fixed
+
+- In `aidentity ui`, a key whose command failed was shown in the style of a
+  success. For example, Enter on a profile that could not be opened looked
+  like it worked. A failure now shows in red. A failure that printed nothing,
+  such as Ctrl-C while `s` waits for an app, shows a line of its own, for
+  example `Did not finish quitting NAME.`
+
+### Changed (for maintainers and contributors)
+
+- The test suite is split into areas: `test/lib.sh` holds what they share, and
+  each `test/t_<area>.sh` holds the groups for one part of the tool. Run some
+  of them with `make test AREA=ui` or `bash test/run_tests.sh ui completion`.
+  Each area starts from an empty work space, and gives the same results alone
+  as in the full run.
+- The suite sets `HOME` to a folder in its sandbox, so every command that
+  moves data to the Trash uses a sandbox Trash, and the final check proves
+  that none of the suite's profile folders reached the real Trash. A small
+  disk image stands in for a second volume when `hdiutil` works, and those
+  tests are skipped, with a note, when it does not.
+- `trash_path` is in `src/53-trash.sh`. `uninstall.sh` carries a copy, and
+  `scripts/guards.sh` fails when the two differ.
+- `scripts/build.sh` refuses an empty file in `src/`. It had put a blank line
+  before it, which made `--where` name the wrong line for every line after it.
 
 ## [1.5.0] - 2026-10-25
 

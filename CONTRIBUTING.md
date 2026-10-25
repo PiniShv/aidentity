@@ -26,10 +26,13 @@ make build    # after every change in src/
 | `50-launcher.sh` | what counts as our launcher, the running check, safe deletes, clean-up on exit, building a launcher, restore records |
 | `51-launch-settings.sh` | per-profile launch settings |
 | `52-launcher-assembly.sh` | putting a launcher together and moving it into place |
+| `53-trash.sh` | `trash_path`, which moves profile data into the Trash |
 | `60-cmd-list.sh` | `apps`, `list`, `open`, `version` |
 | `61-cmd-rm-doctor.sh` | `rm`, `doctor` |
 | `62-cmd-add.sh` | `add`, `setup` |
 | `63-cmd-manage.sh` | `rename`, `set`, `restore`, `prune`, `rebuild` |
+| `64-cmd-quit.sh` | `quit` |
+| `65-cmd-transfer.sh` | `export`, `import` |
 | `70-update.sh` | `update`, and the download checks `install.sh` shares |
 | `80-ui.sh` | the menu: drawing and the terminal |
 | `81-ui-keys.sh` | the menu: keys and actions |
@@ -56,8 +59,10 @@ Every assertion runs against the real script — not a mock of it. `make test` r
 it under `/bin/bash`, the 3.2 that ships with macOS, and detaches it from your
 terminal, so a prompt can never sit waiting for you. The suite points `AIDENTITY_APPS_DIR` and `AIDENTITY_DATA_ROOT` at throwaway
 directories, so it builds and deletes launchers without touching `~/Applications`
-or your real profile data. If a test ever writes outside those two variables,
-that is a bug in the test, and a serious one — say so in the PR.
+or your real profile data. It also points `HOME` at the sandbox, so `rm --purge`,
+`prune` and `uninstall.sh` move data to a sandbox Trash and never to your real
+one. If a test ever writes outside the sandbox, that is a bug in the test, and a
+serious one — say so in the PR.
 
 The suite is split by area. `test/run_tests.sh` is the entry point. `test/lib.sh`
 holds what every area shares: the sandbox, the assertions, the runners (`ai`,
@@ -75,11 +80,13 @@ make test AREA=ui                     # the same, through make
 | `basics` | help, version, exit codes, `apps`, name rules, quoting, colours |
 | `lifecycle` | app detection, the marker key, `add`, `list`, `rm`, `--purge`, `--seed`, icons, refusals, `rename`, `set` |
 | `running` | the check for a profile that is running |
+| `quit` | `quit`, against real processes: finding one profile's copy of an app, the quit request, `SIGTERM`, and the other copies left running |
 | `accounts` | the account-name prompt, `setup`, `--main`, a failed build, status and permissions |
 | `maintenance` | `rm` hints, `prune`, rename and rebuild edge cases, finding launchers, interrupts, symlinks |
 | `restore` | restore records, `doctor --fix`, adding a profile again |
 | `settings` | per-profile launch settings, the VS Code socket limit |
 | `json` | `list --json` |
+| `transfer` | `export` and `import`: the file's contents, a round trip, and every refusal of a file or an entry |
 | `ui` | the menu |
 | `launcher` | the generated launcher's sign-in guard |
 | `install` | `install.sh`, `make formula` and `make release` input checks |
@@ -119,6 +126,9 @@ AIDENTITY_APPS_DIR=/tmp/ai-apps \
 AIDENTITY_DATA_ROOT=/tmp/ai-data \
   ./bin/aidentity add Claude --profile Scratch
 ```
+
+Set `HOME` to a throwaway folder as well if you try `rm --purge` or `prune`:
+they move data to your real Trash.
 
 ## bash 3.2 — not optional
 

@@ -62,10 +62,13 @@ Not sure what to type? [Build your recipe](https://aidentity.pinishv.com/recipes
 | Use a menu instead of typing commands | [`aidentity ui`](#aidentity-ui) |
 | Open my original account while another one runs | [Opening your original account](#opening-your-original-account-while-a-profile-runs) |
 | Tell the running windows apart | [The rough edge: Dock tiles](#the-rough-edge-dock-tiles-show-the-original-app) |
+| Quit one account and leave the others open | [`aidentity quit`](#aidentity-quit) |
 | Change a name or a colour | [`aidentity rename`](#aidentity-rename), [`aidentity set`](#aidentity-set) |
 | Bring back an icon I deleted | [`aidentity restore`](#aidentity-restore) |
+| Move my setup to another Mac | [`aidentity export`](#aidentity-export), [`aidentity import`](#aidentity-import) |
 | Fix something that looks wrong | [`aidentity doctor`](#aidentity-doctor) |
 | Remove one account, or everything | [`aidentity rm`](#aidentity-rm), [Uninstall](#uninstall) |
+| Get data back that I removed | [Data in the Trash](#data-in-the-trash) |
 | Upgrade aidentity | [`aidentity update`](#aidentity-update), [Install and upgrade](#install-and-upgrade) |
 | See the options of one command | [`aidentity help`](#aidentity-version--aidentity-help) |
 | Get tab completion | [`aidentity completion`](#aidentity-completion) |
@@ -107,7 +110,7 @@ Homebrew does not start the walkthrough, so run it yourself:
 aidentity setup
 ```
 
-Homebrew installs the latest release in the tap. It also installs [tab completion](#aidentity-completion) for bash, zsh and fish. Run `aidentity version` to see which release you have. Before 1.2.0, `restore`, `--main`, `--arg`, `--env`, `--own-extensions` and `doctor --fix` did not exist. `list --json` came in 1.3.0. `ui`, `update`, `completion` and the help for one command came in 1.4.0. If you see an older version, upgrade.
+Homebrew installs the latest release in the tap. It also installs [tab completion](#aidentity-completion) for bash, zsh and fish. Run `aidentity version` to see which release you have. Before 1.2.0, `restore`, `--main`, `--arg`, `--env`, `--own-extensions` and `doctor --fix` did not exist. `list --json` came in 1.3.0. `ui`, `update`, `completion` and the help for one command came in 1.4.0. `quit`, `export` and `import` came in 1.6.0. Before 1.6.0, `rm --purge`, `prune` and the uninstaller deleted profile data instead of moving it to the Trash. If you see an older version, upgrade.
 
 <details>
 <summary>Install from source</summary>
@@ -263,7 +266,7 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 
 ## Is this safe?
 
-`aidentity` is one shell script, about 5,000 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The repository also keeps it in [`src/`](../src), split by subject into smaller files that are joined to make that one.
+`aidentity` is one shell script, about 5,600 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The repository also keeps it in [`src/`](../src), split by subject into smaller files that are joined to make that one.
 
 ### What it touches
 
@@ -271,7 +274,10 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 |---|---|---|
 | The `aidentity` command | Puts one file on your Mac: in `/usr/local/bin` or `~/.local/bin` with the install script, or where Homebrew keeps its commands. `aidentity update` replaces that file with a newer release, when you run it. | [Uninstall](#uninstall) |
 | One launcher per profile | Builds a small app in `~/Applications`, for example `Claude Work.app`. It holds a script, an `Info.plist` with an `AIdentityProfile` marker, and an icon. It tells macOS about the new app so the icon shows at once. | `aidentity rm "Claude Work"` |
-| One data folder per profile | Makes a folder under `~/Library/Application Support/aidentity/profiles/` that only you can open. The app keeps that account's sign-in there. `aidentity` adds one small restore record. | `aidentity rm "Claude Work" --purge`, or `aidentity prune` |
+| One data folder per profile | Makes a folder under `~/Library/Application Support/aidentity/profiles/` that only you can open. The app keeps that account's sign-in there. `aidentity` adds one small restore record. | `aidentity rm "Claude Work" --purge`, or `aidentity prune`. Both move the folder to the Trash. |
+| The Trash | `rm --purge`, `prune` and the uninstaller move a profile's data folder into the Trash, with a plain rename. They never empty the Trash, and never delete anything from it. | Move the folder back, then run `aidentity restore`. [How](#data-in-the-trash) |
+| A running app | `aidentity quit` asks one profile's copy of the app to quit, the way the app's Quit menu item does. If that cannot be done, it sends that process `SIGTERM`. It acts only on your own processes. | Open the profile again. |
+| A file for `import` | `aidentity import` reads the file you name and builds launchers from it, like `add`. It never changes a launcher that exists. | `aidentity rm "Claude Work"` for each one |
 | Your real app | Read only. It looks at the app's `Info.plist`, its icon and its files, to check that it is a Chromium or Electron app. | Nothing to undo |
 | Your original account | Never moved or changed. One exception: `--seed` reads Claude Desktop's `claude_desktop_config.json` and copies it into the new profile. | Nothing to undo |
 
@@ -281,12 +287,14 @@ One thing does change. While a profile is running, clicking the app itself switc
 
 - **Copy, patch or re-sign your app.** The app keeps its original signature, so its keychain access and its own updater keep working.
 - **Touch a launcher it did not build.** Every launcher carries the `AIdentityProfile` marker. `open`, `rm`, `rename`, `set` and `rebuild` refuse an app without it. `add` and `restore` refuse to overwrite one.
-- **Delete profile data outside its profiles folder.** `--purge`, `prune` and the uninstaller delete a data folder only if it is inside `~/Library/Application Support/aidentity/profiles`, or the folder set by `AIDENTITY_DATA_ROOT`.
-- **Delete or rename a profile's data while the profile is running.** If it cannot tell, it treats the profile as running and stops.
+- **Delete profile data.** `--purge`, `prune` and the uninstaller move a data folder to the Trash, where you can still get it back. Emptying the Trash is what deletes it. If the folder cannot be moved there, it stays where it was.
+- **Touch profile data outside its profiles folder.** `--purge`, `prune` and the uninstaller move a data folder only if it is inside `~/Library/Application Support/aidentity/profiles`, or the folder set by `AIDENTITY_DATA_ROOT`.
+- **Move or rename a profile's data while the profile is running.** If it cannot tell, it treats the profile as running and stops.
 - **Use the network, except when you run `aidentity update`.** No telemetry, no analytics, no automatic update check, no crash reports. `aidentity update` (and `update --check`) is the only code in the script that connects anywhere, and only to GitHub. Apart from it, only the installer downloads anything, and only when you run it. [What `update` does](#aidentity-update).
 - **Use `sudo` or run in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
 - **Edit your shell files.** If you need a `PATH` line, the installer prints it, and you add it.
-- **Control other apps.** It does not use System Events, so it needs no Accessibility permission.
+- **Control other apps.** It does not use System Events, so it needs no Accessibility permission. The one thing it does to a running app is `aidentity quit`, which asks that one app to quit, as its Quit menu item does. That needs no permission either.
+- **Trust an import file.** `import` checks every value as `add` does, finds each app by its bundle ID among the apps installed here, ignores any path in the file, and shows what it will build and asks before it builds anything. A launcher that exists is skipped, never changed.
 - **Handle your passwords.** You sign in inside the app, with that account's own details.
 
 <details>
@@ -300,7 +308,7 @@ One thing does change. While a profile is running, clicking the app itself switc
 | Clean start | Before it opens the app, the launcher drops `DYLD_*`, `LD_*`, `ELECTRON_*`, `NODE_*`, `VSCODE_*`, `CHROME_*`, `CHROMIUM_*` and `SSLKEYLOGFILE`. |
 | Safe names | Profile names allow only ASCII letters, digits, spaces, hyphens and underscores. Every value in the launcher is quoted. The `Info.plist` must pass `plutil -lint`. |
 | Restore record is checked | `restore` checks the record as if you had typed it: the name, the folder, the app and the settings. |
-| Asks first | `rm` and `prune` ask you to type `yes` (`-y` skips this). The uninstaller asks you to type `delete`. |
+| Asks first | `rm`, `prune` and `import` ask you to type `yes` (`-y` skips this). The uninstaller asks you to type `delete`. |
 
 </details>
 
@@ -401,7 +409,7 @@ This builds `~/Applications/Claude Main.app`. It starts Claude with no profile f
 
 From Terminal, `open -na /Applications/Claude.app` does the same thing.
 
-A Main launcher never touches the app's data. `rm --purge` does not delete it, and `rename` only renames the launcher. Each app can have one Main launcher.
+A Main launcher never touches the app's data. `rm --purge` leaves it alone, and `rename` only renames the launcher. Each app can have one Main launcher.
 
 ---
 
@@ -417,6 +425,7 @@ How to tell them apart:
 - **Give each profile a different badge colour.** The launcher icons in Finder, and the ones you pin to the Dock, stay different. So you always open the right one.
 - **Use Mission Control** (swipe up, or press `Ctrl` + `Up`). It shows all windows at once, with their content.
 - **Run `aidentity list`.** It shows which profiles are running.
+- **Quit by name, not by tile.** `aidentity quit "Claude Work"` quits that profile's copy of the app, and no other. [More on `quit`](#aidentity-quit).
 
 Changing the tile would mean copying the app and signing it again. That does not work. A copy signed on your Mac cannot match the maker's signature, so it loses keychain access and often will not start. Renaming a running instance from outside the app does not work either, because macOS ignores the change. So `aidentity` leaves your app alone and accepts an unclear Dock label.
 
@@ -429,16 +438,19 @@ Type `aidentity` and a command. Put a name that has a space in quotes, like `"Cl
 | Command | Also spelled | What it does |
 |---|---|---|
 | [`setup`](#aidentity-setup) | `init`, `wizard` | Guided walkthrough. Start here. |
-| [`ui`](#aidentity-ui) | | A menu in your terminal: open, add, rename, recolour or remove profiles with one key. |
+| [`ui`](#aidentity-ui) | | A menu in your terminal: open, quit, add, rename, recolour or remove profiles with one key. |
 | [`add [app]`](#aidentity-add) | | Create one profile directly. |
 | [`list`](#aidentity-list) | `ls` | Show every profile and whether it is running. `--json` prints it for scripts. |
 | [`open NAME`](#aidentity-open) | | Open a profile from Terminal. |
+| [`quit NAME`](#aidentity-quit) | | Quit one profile's copy of the app. The other copies keep running. |
 | [`rename OLD NEW`](#aidentity-rename) | `mv` | Rename a profile. It stays signed in. |
 | [`set NAME`](#aidentity-set) | `modify`, `edit` | Change a profile's look or launch settings. |
-| [`prune`](#aidentity-prune) | | Find data that no launcher uses, and offer to delete it. |
+| [`prune`](#aidentity-prune) | | Find data that no launcher uses, and offer to move it to the Trash. |
 | [`restore [NAME]`](#aidentity-restore) | | Bring back a launcher that was deleted. |
 | [`rebuild NAME`](#aidentity-rebuild) | `repair` | Rebuild launchers after an app moved or updated. |
-| [`rm NAME`](#aidentity-rm) | `remove`, `delete` | Remove a launcher. The data stays unless you add `--purge`. |
+| [`rm NAME`](#aidentity-rm) | `remove`, `delete` | Remove a launcher. The data stays unless you add `--purge`, which moves it to the Trash. |
+| [`export`](#aidentity-export) | | Print every launcher as JSON, to build them again with `import`. |
+| [`import FILE`](#aidentity-import) | | Build the launchers in a file that `export` made. |
 | [`apps`](#aidentity-apps) | | List apps that can take extra accounts. |
 | [`doctor`](#aidentity-doctor) | | Check the setup and every profile. `--fix` repairs what it can. |
 | [`update`](#aidentity-update) | | Install the latest release. `--check` only looks. |
@@ -468,7 +480,7 @@ It needs a terminal. In a script, use `add` with its options instead.
 
 ### `aidentity ui`
 
-A menu in your terminal. It lists your profiles and whether each one is running. One key opens, adds, renames, recolours, badges or removes the profile you select.
+A menu in your terminal. It lists your profiles and whether each one is running. One key opens, quits, adds, renames, recolours, badges or removes the profile you select.
 
 ```bash
 aidentity ui
@@ -482,8 +494,8 @@ aidentity ui
    ○ Claude Main     original  not running
    ○ Slack Client    [S]       signed out / new
 
- ↑↓ move  Enter open  a add  r rename  c colour  b badge  d remove  x doctor
- ? help  q quit
+ ↑↓ move  Enter open  s stop  a add  r rename  c colour  b badge
+ d remove  x doctor  ? help  q quit
 ```
 
 Each row is one launcher, the same ones `aidentity list` shows, with the same status words. `▸` marks the selected row, and a green `●` marks a profile that is running. The screen checks again every 2 seconds, so a profile that starts or stops shows up without a key press.
@@ -491,22 +503,23 @@ Each row is one launcher, the same ones `aidentity list` shows, with the same st
 | Key | What it does |
 |---|---|
 | Up, Down (or `k`, `j`) | Move the selection. |
-| Enter | Open the profile, like `aidentity open`. The result shows at the bottom of the screen. |
+| Enter | Open the profile, like `aidentity open`. The result shows at the bottom of the screen: green when it worked, red when it failed. |
+| `s` | Stop: quit this profile's copy of the app, like `aidentity quit`. The other copies keep running. The bottom of the screen says `Quitting NAME…` while it waits, which can take up to 10 seconds, and then shows the result. |
 | `a` | Add a profile, like `aidentity add` with no options. You pick the app, then name the account. |
 | `r` | Rename the account, like `aidentity rename`. It stays signed in. An empty answer cancels. |
 | `c` | Change the colour, like `aidentity set --color`. Left and Right choose, Enter applies, Esc cancels. |
 | `b` | Change the badge, like `aidentity set --badge`. It asks for one character. An empty answer cancels. |
-| `d` | Remove, like `aidentity rm`. Then press `k` to remove the launcher and keep the data, or `p` to delete the data too. `p` asks you to type `yes` first. Any other key cancels. |
+| `d` | Remove, like `aidentity rm`. Then press `k` to remove the launcher and keep the data, or `p` to move the data to the Trash too. `p` asks you to type `yes` first. Any other key cancels. |
 | `x` | Run `aidentity doctor` and show the report. Press `f` afterwards to run `doctor --fix`. |
 | `?` | Show these keys. |
 | `q`, Esc | Quit. Ctrl-D also quits. |
 
-- **The keys run the normal commands.** The menu has no rules of its own, so every check is the one the command has. For example, a running profile cannot be renamed or removed. Questions and messages look as they do on the command line. Except for Enter, the menu steps aside while the command runs, asks you to press a key, and then draws itself again.
+- **The keys run the normal commands.** The menu has no rules of its own, so every check is the one the command has. For example, a running profile cannot be renamed or removed. Questions and messages look as they do on the command line. Except for Enter and `s`, the menu steps aside while the command runs, asks you to press a key, and then draws itself again. When a command fails, its message shows in red, not green.
 - **A Main launcher** (your original account) can be removed with `d` then `k`. `p` only tells you that `aidentity` never deletes the app's own data.
 - **It needs a terminal.** Both input and output must be a terminal, and it must be able to move the cursor. If not, `aidentity ui` changes nothing and exits with an error. In a script, use [`list --json`](#for-scripts-list---json). It takes no options other than `--help`.
 - **`aidentity` on its own still shows the help.** It does not open the menu.
 - **It leaves your terminal as it found it.** The menu draws on a separate screen, like the one `less` uses, so your scrollback stays as it was. Quit with `q`. Ctrl-C and closing the window also put the terminal back. While a command waits for an answer, Ctrl-C only cancels that command and returns to the menu. Ctrl-Z puts the menu aside like any program, and `fg` brings it back and draws it again. Only a forced stop (`kill -9`) can leave the terminal in the menu's state; `reset` fixes that.
-- **Limits.** The menu manages launchers only, like `list`. It does not show data folders or launch settings, and it has no keys for `rebuild`, `restore`, `prune` or `set --arg`. Use the commands for those. There is no mouse support. Esc takes about a second to register, because an arrow key starts with the same key code. `q` is instant. A narrow window gets a shorter layout, and colour is off when `NO_COLOR` is set.
+- **Limits.** The menu manages launchers only, like `list`. It does not show data folders or launch settings, and it has no keys for `rebuild`, `restore`, `prune`, `export`, `import` or `set --arg`. Use the commands for those. `s` has no way to force an app to quit: if the app is still running after 10 seconds, the menu says so, and you look at its window. There is no mouse support. Esc takes about a second to register, because an arrow key starts with the same key code. `q` is instant. A narrow window gets a shorter layout, and colour is off when `NO_COLOR` is set.
 
 ### `aidentity add`
 
@@ -613,6 +626,24 @@ Opens a profile from Terminal, instead of double-clicking it in Finder.
 aidentity open "Claude Work"
 ```
 
+### `aidentity quit`
+
+Quits one profile's copy of the app. Every other copy keeps running.
+
+```bash
+aidentity quit "Claude Work"
+```
+
+While several profiles run, the Dock shows them as identical tiles, so it is hard to tell which one to quit. `quit` takes the launcher name that `aidentity list` shows. It finds the copy of the app that runs on that profile and asks only that copy to quit.
+
+- **The app is asked the way its Quit menu item asks,** so it can still ask about unsaved work. This needs no permission.
+- **If the app cannot be asked,** `quit` sends its process `SIGTERM`, the standard signal that asks a program to stop. Electron and Chromium apps treat it as quit.
+- **It waits up to 10 seconds.** When the copy has quit, it prints `Quit Claude Work.` and exits with 0. If the app is still running by then, it says so and exits with 1. The app may be asking you something, so look at its window. There is no option to force a quit.
+- **A profile that is not running** gives the message `'Claude Work' is not running.` and exit status 0.
+- **A Main launcher** quits the copy on your original account.
+- **It touches only that copy.** It looks at your own processes, and at the app's main process only: a helper process of the app, or a copy that runs on another profile, is never matched. It checks each process again right before it acts, because a process number can be reused once a process ends.
+- It takes one name. In [`aidentity ui`](#aidentity-ui), the `s` key does the same.
+
 ### `aidentity rename`
 
 Renames a profile. Its data moves with it, so the account stays signed in.
@@ -644,13 +675,15 @@ aidentity set "Claude Work" --no-badge
 
 ### `aidentity prune`
 
-Finds profile data that no launcher points at, and offers to delete it.
+Finds profile data that no launcher points at, and offers to move it to the Trash.
 
 ```bash
 aidentity prune
 ```
 
-This data is left behind when you delete a launcher in Finder, or run `rm` without `--purge`. The folder stays, and it still holds a signed-in session. `prune` lists each folder with its size and full path, and marks the ones `restore` can bring back. Then it asks you to type `yes`. `-y` or `--yes` skips the question. It skips anything that is running.
+This data is left behind when you delete a launcher in Finder, or run `rm` without `--purge`. The folder stays, and it still holds a signed-in session. `prune` lists each folder with its size and full path, and marks the ones `restore` can bring back. Then it asks `Move N orphaned profile(s) to the Trash?` and waits for you to type `yes`. `-y` or `--yes` skips the question. With no terminal and no `-y`, it refuses and moves nothing. It skips anything that is running, and anything outside the profiles folder.
+
+Each folder goes to the Trash, and `prune` prints where each one went. To undo, move a folder back into the profiles folder and run `aidentity restore`. [More on the Trash](#data-in-the-trash).
 
 Before it calls a folder an orphan, `prune` looks for launchers in your launcher folder, in the app folders and through Spotlight. If you keep a launcher somewhere else, its data shows up in the list. Read the list before you type `yes`.
 
@@ -668,7 +701,7 @@ aidentity restore --all            # restore all of them
 - If the app moved, it finds it again: first by name, then by bundle ID (the name macOS uses for an app, such as `com.anthropic.claudefordesktop`).
 - It builds the launcher with the same look and settings. It checks everything in the record as if you had typed it.
 - Profiles made before version 1.2.0 have no record yet. They get one the next time their launcher is rebuilt, and `aidentity doctor --fix` does that for you.
-- A profile removed with `--purge` cannot be restored.
+- A profile removed with `--purge`, or moved by `prune` or the uninstaller, is in the Trash. Move its folder back into the profiles folder first, and `restore` lists it again. [How](#data-in-the-trash). Once the Trash is emptied, the data and its record are gone.
 
 ### `aidentity rebuild`
 
@@ -693,18 +726,112 @@ Removes a launcher. The data is kept by default.
 aidentity rm "Claude Work"
 ```
 
-It then prints how to bring the profile back (`aidentity restore "Claude Work"`) and how to delete its data (`aidentity prune`). If it cannot write a restore record, it prints the matching `aidentity add` line instead.
+It then prints how to bring the profile back (`aidentity restore "Claude Work"`) and how to move its data to the Trash (`aidentity prune`). If it cannot write a restore record, it prints the matching `aidentity add` line instead.
 
-To remove the launcher and delete the profile's data:
+To remove the launcher and move the profile's data to the Trash:
 
 ```bash
 aidentity rm "Claude Work" --purge
 ```
 
-> [!CAUTION]
-> `--purge` deletes the account's cookies, sign-in and settings from this Mac. It cannot be undone, and `restore` cannot bring them back.
+```text
+✓ Removed launcher 'Claude Work'.
+✓ Moved the profile data to the Trash.
+  It is now at: /Users/you/.Trash/claude-work
+  To undo, move it back to: /Users/you/Library/Application Support/aidentity/profiles/claude-work
+  then run:  aidentity restore "Claude Work"
+```
 
-`rm` takes one name and asks you to type `yes`. Add `-y` or `--yes` to skip the question. It refuses while that profile is running. A Main launcher has no data of its own, so `rm` removes it even while the app runs. On a Main launcher, `--purge` does nothing, because `aidentity` never deletes the app's own data.
+> [!NOTE]
+> `--purge` takes the account's cookies, sign-in and settings out of the profiles folder, so that account is signed out. Nothing is deleted yet: the data waits in the Trash. Move it back and run `aidentity restore` to undo this. Once you empty the Trash, the data is gone for good.
+
+`rm` takes one name and asks you to type `yes`. Add `-y` or `--yes` to skip the question. It refuses while that profile is running. A Main launcher has no data of its own, so `rm` removes it even while the app runs. On a Main launcher, `--purge` does nothing, because `aidentity` never touches the app's own data.
+
+#### Data in the Trash
+
+`rm --purge`, `prune` and the uninstaller never delete profile data. They move the folder into the Trash, and tell you where it went.
+
+- **To undo, move the folder back.** Put it in the profiles folder, at the path after `To undo, move it back to:`. Then run the `aidentity restore` line the command printed. Open the Trash in Finder and drag the folder out. In Finder, **Go > Go to Folder** lets you paste a path. Use Finder because macOS may not let Terminal read the Trash.
+- **The restore record is written first.** If the profile has no restore record yet (profiles made before 1.2.0 have none), `rm --purge` writes one before it moves the folder, so `restore` works after you move the folder back. `prune` and the uninstaller write none. [More on this](#i-deleted-an-icon-by-mistake)
+- **The name.** The folder keeps its name, for example `claude-work`. If the Trash holds a folder with that name already, the new one is called `claude-work 2`, then `claude-work 3`, and so on.
+- **One volume.** Each volume (a disk or a partition) has its own Trash. If the profiles folder is on your home volume, which is the default, the data goes to `~/.Trash`. If you moved it to another volume with `AIDENTITY_DATA_ROOT`, the data goes to a folder named with your user number (often `501`) inside the `.Trashes` folder of that volume. `.Trashes` must exist already: Finder makes `.Trashes` the first time you put something in the Trash from that volume. If it is not there, nothing is moved. The data stays where it was, and the message says why.
+- **No copying.** `aidentity` renames the folder into the Trash, and never copies it across volumes. A rename happens whole or not at all. A copy that stops half way would leave half of the data in each place.
+- **If it cannot move the data,** it says why and leaves the folder exactly where it was. `rm --purge` has already removed the launcher by then, so it prints where the data stayed and exits with 1. Run `aidentity restore` to bring the launcher back.
+- **No Finder request.** `aidentity` moves the folder itself. It does not ask Finder to do it, which would need a permission prompt.
+- **Emptying the Trash** is what deletes the data for good. `aidentity` never does that.
+
+### `aidentity export`
+
+Prints every launcher as JSON, so that `aidentity import` can build them again, on this Mac or another.
+
+```bash
+aidentity export > profiles.json
+```
+
+```json
+{"aidentity_export": 1, "exported_by": "1.6.0", "launchers": [
+  {"name":"Claude Work","app":"Claude","bundle_id":"com.anthropic.claudefordesktop","profile":"Work","main":false,"badge":"W","color":"2E7DF6","args":["--lang=de"],"env":["HTTPS_PROXY=http://proxy.example:8080"],"own_extensions":false}
+]}
+```
+
+There is one object for each launcher, in the order that `aidentity list` shows them. Every object has every key, in this order:
+
+| Key | Value |
+|---|---|
+| `name` | The launcher's name. It is there for the person who reads the file. |
+| `app` | The app's name. Also only for reading. |
+| `bundle_id` | The app's bundle ID. `import` finds the app by this alone. |
+| `profile` | The profile name. |
+| `main` | `true` for a Main launcher, otherwise `false`. |
+| `badge` | The badge character. An empty string when the launcher uses the app's own icon. |
+| `color` | The badge colour: six hex digits, without `#`. |
+| `args` | The launch switches, in full. |
+| `env` | The launch variables, each as `NAME=value`. The values are in the file. |
+| `own_extensions` | `true` when the profile has its own extensions folder. |
+
+- **No account goes with the file.** It holds no cookies, no sign-in and no app data. It holds no data folder and no other path. A profile you import starts signed out.
+- **Keep the file private.** It holds the launch settings in full, and the values of the variables. A proxy setting can carry a password. When the file holds variable values, `export` says so on standard error.
+- Only the JSON goes to standard output, so `> profiles.json` saves just the file. Warnings go to standard error.
+- In a launcher's object, a value is text, `true` or `false`, or a list of text. It is never `null`.
+- With no launchers, it prints the same object with an empty `launchers` list, and exits with 0.
+- If a launcher's app is gone, `export` takes the bundle ID from the profile's restore record. With no record, it warns that `import` will skip that launcher.
+- `exported_by` is the version of `aidentity` that made the file. `aidentity_export` is the format number. `import` reads format 1.
+- It takes no options other than `--help`.
+
+### `aidentity import`
+
+Builds the launchers in a file that `aidentity export` made.
+
+```bash
+aidentity import profiles.json
+aidentity import profiles.json --yes   # no question
+```
+
+Before it builds anything, it shows the plan and asks you to type `yes`:
+
+```text
+The launchers in profiles.json:
+
+  create  Claude Work
+          flags  --lang=de
+          env    HTTPS_PROXY (values hidden)
+  skip    Claude Client — already exists
+  skip    Slack Client — no app with the bundle ID com.tinyspeck.slackmacgap is installed
+
+Create 1 launcher? Type yes to confirm:
+```
+
+Then it builds each launcher as `add` would, says what it made, and prints a count: `1 created, 2 skipped, 0 failed.` It exits with 1 if a build failed.
+
+- **The file is not trusted.** It may come from someone else. `import` converts it with `plutil`, and refuses, with nothing changed, a file that is not valid JSON, holds a `null`, is bigger than 4 MB, lists more than 200 launchers, or is not a format 1 file from `export`.
+- **Every value is checked as `add` checks it:** the profile name, the colour, the badge, each switch and each variable (the [allowlist](#per-profile-settings) applies), and the bundle ID.
+- **The app is found by its bundle ID,** among the apps installed here: the ones `aidentity apps` lists. A path in the file is never used. Install your apps first.
+- **A bad or unknown entry is skipped,** with a one-line reason. The other entries go on. An entry is also skipped when its launcher exists already (it is never changed), when two entries would build the same launcher, and when its profile would share a folder with another launcher or a second Main launcher would be made for one app.
+- **The name is built, not copied.** The launcher is named `<App> <Profile>`, as `add` names it, whatever the file calls it.
+- **Profiles start signed out.** The one exception: if the data folder for that name is still here, `import` uses it, as `add` does, and the plan says so. That account may be signed in.
+- **Check the launch settings.** They come from the file. The plan shows each new launcher's switches in full, and its variables by name only. A proxy setting sends that profile's traffic through the server it names, so read the plan when the file is from someone else.
+- `-y` or `--yes` skips the question. With no terminal and no `-y`, `import` refuses with `Nothing to confirm with.` and builds nothing. If you answer anything but `yes`, nothing is built.
+- A file with no launchers in it prints `Nothing to do.` and exits with 0.
 
 ### `aidentity apps`
 
@@ -800,7 +927,7 @@ Prints a tab-completion script for bash, zsh or fish. It writes the script to st
 aidentity completion zsh
 ```
 
-Press Tab to complete command names, each command's options, the names of your profiles for `open`, `rename`, `set`, `rebuild` and `rm`, the profiles whose launcher is gone for `restore`, app names for `add`, and colour names after `--color`. A name with a space is escaped for you.
+Press Tab to complete command names, each command's options, the names of your profiles for `open`, `quit`, `rename`, `set`, `rebuild` and `rm`, the profiles whose launcher is gone for `restore`, app names for `add`, and colour names after `--color`. A name with a space is escaped for you.
 
 **Homebrew** installs the scripts for all three shells. If completion does not work yet, follow [Homebrew's shell completion steps](https://docs.brew.sh/Shell-Completion) once.
 
@@ -952,9 +1079,15 @@ macOS sees every profile as Claude itself, so it switches to whichever one is ru
 
 ### I deleted an icon by mistake
 
-Run `aidentity restore`. It lists the profiles whose launcher is gone. Their data is still there, so the restored icon opens the same account, signed in. This does not work for a profile you removed with `--purge`.
+Run `aidentity restore`. It lists the profiles whose launcher is gone. Their data is still there, so the restored icon opens the same account, signed in.
 
 If a profile you expect is not in the list, it may be older than version 1.2.0 and have no restore record. Run `aidentity add` again with the same app and the same account name. It uses the same folder again.
+
+If you removed the profile with `--purge`, its data is in the Trash, not in the list. See the next question.
+
+### I used `--purge` by mistake. Can I undo it?
+
+Yes, as long as you have not emptied the Trash. `rm --purge`, `prune` and the uninstaller move the data to the Trash. They do not delete it. The command printed where the folder went, and where to move it back. Move it back into the profiles folder, then run `aidentity restore "Claude Work"`, with your own profile's name. The account opens again, still signed in. [The steps](#data-in-the-trash). Before version 1.6.0, these commands deleted the data. If you ran one with an older version, the data is gone.
 
 ### Does it work with Claude Code or other command-line tools?
 
@@ -970,9 +1103,27 @@ One related point. Claude Desktop keeps its MCP server list inside the data fold
 
 That is between you and the vendor. It depends on whether you have two separate accounts, which usually pay separately, or one account used twice. `aidentity` does not change what you may use. It changes how many windows you can have open.
 
+### How do I move my profiles to a new Mac?
+
+`aidentity` moves the setup, not the accounts. On the old Mac, save every launcher's recipe in a file:
+
+```bash
+aidentity export > profiles.json
+```
+
+Copy `profiles.json` to the new Mac. Install `aidentity` and the same apps there, then run:
+
+```bash
+aidentity import profiles.json
+```
+
+It shows what it will build and asks you to type `yes`. Each launcher comes back with the same app, profile name, badge, colour and launch settings. Open each one and sign in again: the file holds no account data and no folder paths, so every profile starts signed out.
+
+The file holds your launch settings in full, and a proxy setting can carry a password. Keep the file private, and delete it when you are done. [More on `export`](#aidentity-export) and [`import`](#aidentity-import).
+
 ### How do I remove everything?
 
-Use the uninstaller. See [Uninstall](#uninstall).
+Use the uninstaller. It removes the launchers and moves the profile data to the Trash. See [Uninstall](#uninstall).
 
 ---
 
@@ -993,9 +1144,11 @@ What it does:
 1. **Removes the command, without asking.** It looks in the usual install folders and wherever your `PATH` finds it. It leaves a Homebrew install and a repository checkout alone, and tells you so. If it cannot delete the file, it prints a `sudo rm -f` line for you to run. It never runs `sudo` itself.
 2. **Lists everything else, with sizes.** That means every launcher that carries the marker, and every data folder, including data that no launcher points at any more.
 3. **Stops if any listed profile is running.** Quit it, then run the script again.
-4. **Deletes only after you type `delete`.** Any other answer keeps your launchers and data. They keep working without the command.
+4. **Removes only after you type `delete`.** It deletes the launchers and moves the profile data to the Trash. Any other answer keeps your launchers and data. They keep working without the command.
 
-It removes launchers only if they carry the marker, and data only inside the profiles folder. For a Main launcher, it removes the launcher and keeps the app's own data. macOS keeps Dock tiles after an app is gone, so drag the old ones out yourself.
+The data waits in the Trash, so a mistake can be undone: move a folder back into the profiles folder, install `aidentity` again, and run `aidentity restore`. [More on the Trash](#data-in-the-trash). Once you empty the Trash, the data is gone for good.
+
+It removes launchers only if they carry the marker, and moves data only from inside the profiles folder. For a Main launcher, it removes the launcher and keeps the app's own data. macOS keeps Dock tiles after an app is gone, so drag the old ones out yourself.
 
 <details>
 <summary>Remove everything by hand</summary>
@@ -1008,13 +1161,13 @@ Do these steps in order, one block at a time. Quit every profile first.
    aidentity list
    ```
 
-2. Remove each launcher that `list` shows, Main launchers too. Run this once for each one, with its own name. `--purge` also deletes the profile's data:
+2. Remove each launcher that `list` shows, Main launchers too. Run this once for each one, with its own name. `--purge` also moves the profile's data to the Trash:
 
    ```bash
    aidentity rm "Claude Work" --purge
    ```
 
-3. Delete data that no launcher points at:
+3. Move data that no launcher points at to the Trash:
 
    ```bash
    aidentity prune
@@ -1039,6 +1192,8 @@ Do these steps in order, one block at a time. Quit every profile first.
    ```
 
    If you set `AIDENTITY_DATA_ROOT`, use that folder instead.
+
+Nothing here deletes profile data: it all goes to the Trash. Empty the Trash when you are sure you do not need it.
 
 `command -v` finds the command wherever the installer put it. `brew uninstall aidentity` leaves launchers and profiles alone. `make uninstall` removes only the command. Nothing else was installed, so nothing else needs removing, and your real apps are as they were.
 
@@ -1066,7 +1221,7 @@ If you change code, read [CONTRIBUTING.md](../CONTRIBUTING.md) first. In short:
 
 - The script targets bash 3.2, so no associative arrays, no `${var^^}` and no `mapfile`.
 - It has no third-party dependencies. It uses only tools that come with macOS, plus the optional Xcode Command Line Tools.
-- Tests set `AIDENTITY_APPS_DIR`, `AIDENTITY_DATA_ROOT` and `AIDENTITY_APP_DIRS`, so they never touch a real setup.
+- Tests set `AIDENTITY_APPS_DIR`, `AIDENTITY_DATA_ROOT` and `AIDENTITY_APP_DIRS`, and point `HOME` at their sandbox, so they never touch a real setup or the real Trash.
 - `make check` runs the lint, the tests and the source checks.
 - The code is written in `src/`. After a change there, run `make build`: it rebuilds `bin/aidentity` and `SHA256SUMS`. Commit all three.
 
