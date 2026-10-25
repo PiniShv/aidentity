@@ -59,6 +59,51 @@ directories, so it builds and deletes launchers without touching `~/Applications
 or your real profile data. If a test ever writes outside those two variables,
 that is a bug in the test, and a serious one — say so in the PR.
 
+The suite is split by area. `test/run_tests.sh` is the entry point. `test/lib.sh`
+holds what every area shares: the sandbox, the assertions, the runners (`ai`,
+`libcall` and the others) and the fake apps. Each `test/t_<area>.sh` holds the
+groups for one part of the tool. To run only some areas:
+
+```sh
+bash test/run_tests.sh --list         # print the area names
+bash test/run_tests.sh ui completion  # run only those areas
+make test AREA=ui                     # the same, through make
+```
+
+| Area | What it tests |
+|---|---|
+| `basics` | help, version, exit codes, `apps`, name rules, quoting, colours |
+| `lifecycle` | app detection, the marker key, `add`, `list`, `rm`, `--purge`, `--seed`, icons, refusals, `rename`, `set` |
+| `running` | the check for a profile that is running |
+| `accounts` | the account-name prompt, `setup`, `--main`, a failed build, status and permissions |
+| `maintenance` | `rm` hints, `prune`, rename and rebuild edge cases, finding launchers, interrupts, symlinks |
+| `restore` | restore records, `doctor --fix`, adding a profile again |
+| `settings` | per-profile launch settings, the VS Code socket limit |
+| `json` | `list --json` |
+| `ui` | the menu |
+| `launcher` | the generated launcher's sign-in guard |
+| `install` | `install.sh`, `make formula` and `make release` input checks |
+| `release` | release notes, the release check, the build from `src/` |
+| `uninstall` | `uninstall.sh` |
+| `help` | help for each command, and `--help` never running one |
+| `completion` | shell completion |
+| `update` | `aidentity update` |
+
+An area gives the same results alone as in the full suite, and CI runs each
+one alone to show it. Before each area, the runner empties the work space
+(the launcher folder, the data root and the fake apps' folder) and builds the
+fake apps again. Files kept directly in the sandbox are not reset, so an area
+must make what it reads and must not rely on what another area left. After
+each area, the runner checks it left no launcher or profile data behind. If two
+areas need the same helper or stub, put it in `test/lib.sh`.
+
+To add a test, find the group it belongs to in the area file for that part of
+the tool, or start a new `group "…"` there. To add an area, create
+`test/t_<name>.sh` and add the name to `TEST_AREAS` in `test/run_tests.sh`, in
+the place where it should run. The suite stops with a message when a file is
+missing from that list. `make lint`, the source guards and CI find a new file
+by themselves.
+
 Run the suite before you open a PR and again after review changes. It is fast.
 `make check` runs the lint, the suite and the source guards in
 `scripts/guards.sh` — the checks CI blocks on. CI also repeats the suite under a
