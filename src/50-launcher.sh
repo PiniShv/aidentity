@@ -161,19 +161,48 @@ EOF
   return 1
 }
 
+# A file's own identity (device:inode). No -L: an executable that is a
+# symlink is told apart from the file it points to. Symlinks earlier in the
+# path are followed, as for any path.
+exe_id() { /usr/bin/stat -f '%d:%i' "$1" 2>/dev/null; }
+
+# Whether a command line starts with the app's main executable $1, then a
+# space or the end. First by the path as recorded, then by the file itself:
+# Launch Services starts an app by its real path, symlinks resolved and each
+# name in its real case, so a launcher that records ".../claude.app" or a path
+# through a symlink sees a copy started as ".../Claude.app/...". The path may
+# hold spaces, so each place where "/<executable name>" ends at a space or at
+# the end of the line is tried, and compared by exe_id with $2.
+starts_with_exe() { # executable, its exe_id or "", command line
+  local exe="$1" want="$2" cmd="$3" base pre="" rest
+  case "$cmd" in "$exe"|"$exe "*) return 0 ;; /*) ;; *) return 1 ;; esac
+  [ -n "$want" ] || return 1
+  base=${exe##*/}; rest=$cmd
+  while :; do
+    case "$rest" in
+      *"/$base "*) pre="$pre${rest%%"/$base "*}/$base"; rest=${rest#*"/$base "} ;;
+      *"/$base") pre="$pre$rest"; rest="" ;;
+      *) return 1 ;;
+    esac
+    [ "$(exe_id "$pre")" = "$want" ] && return 0
+    [ -n "$rest" ] || return 1
+    pre="$pre "
+  done
+}
+
 # Whether the app is running on its own account, with no --user-data-dir: the
 # instance a --main launcher opens. Matched in the shell for the same reason as
 # above — a pipe into grep -q fails open on a long process list. ps runs once
-# per snapshot; " " stands for a ps that failed.
+# per snapshot, in UTF-8: in the C locale it writes a non-ASCII byte as
+# "M-CM-)", and a path with "é" never matched. " " stands for a ps that failed.
 main_running() { # app
-  local exe line
+  local exe id line
   exe=$(app_exe "$1") || return 1
-  [ -n "$PS_ALL" ] || PS_ALL=$(ps -axww -o command= 2>/dev/null) || PS_ALL=" "
+  id=$(exe_id "$exe") || id=""
+  [ -n "$PS_ALL" ] || PS_ALL=$(LC_ALL=en_US.UTF-8 ps -axww -o command= 2>/dev/null) || PS_ALL=" "
   while IFS= read -r line; do
-    case "$line" in
-      *--user-data-dir=*) ;;
-      "$exe"|"$exe "*) return 0 ;;
-    esac
+    case "$line" in *--user-data-dir=*) continue ;; esac
+    starts_with_exe "$exe" "$id" "$line" && return 0
   done <<EOF
 $PS_ALL
 EOF
