@@ -222,6 +222,41 @@ EXAMPLES
   aidentity rm "Claude Work" --purge
 EOF
     ;;
+    export) cat <<'EOF'
+USAGE
+  aidentity export
+
+Prints every launcher as JSON: its app (by bundle ID), profile name, badge,
+colour and launch settings. Save it to a file and give that file to
+'aidentity import', on this Mac or another, to build the launchers again. The
+file holds no account data and no folder paths, so no account goes with it.
+It does hold the values of launch variables, and a proxy setting can carry a
+password: keep the file private.
+
+EXAMPLES
+  aidentity export > profiles.json
+EOF
+    ;;
+    import) cat <<'EOF'
+USAGE
+  aidentity import FILE [options]
+
+FILE is a file made by 'aidentity export'. import finds each launcher's app by
+its bundle ID among the apps installed here, and checks every value as add
+does. It shows what it will create and what it skips and why, then asks you
+to type yes. A launcher that exists already is skipped, never changed. A new
+profile starts signed out, unless its profile folder is still here: then it
+uses that folder, as add does, and the plan says so. A file may list up to 200
+launchers.
+
+OPTIONS
+  -y, --yes            Skip the confirmation prompt
+
+EXAMPLES
+  aidentity import profiles.json
+  aidentity import profiles.json --yes
+EOF
+    ;;
     apps) cat <<'EOF'
 USAGE
   aidentity apps

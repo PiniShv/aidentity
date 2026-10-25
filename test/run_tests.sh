@@ -43,7 +43,7 @@ TEST_DIR=$(cd "$(dirname "$0")" && pwd)
 
 # The areas, in the order they run. Each one is the file test/t_<area>.sh. A
 # new file has to be added here, or the suite stops and says so.
-TEST_AREAS="basics lifecycle running quit accounts maintenance restore settings json ui launcher install release uninstall help completion update"
+TEST_AREAS="basics lifecycle running quit accounts maintenance restore settings json transfer ui launcher install release uninstall help completion update"
 
 print_areas() {
   local area_name

@@ -25,6 +25,8 @@ prune||-|--yes/-y|Remove profile data that no launcher uses
 restore||restorable|--all/-a|Rebuild a launcher that was deleted
 rebuild|repair|launchers|--all/-a|Rebuild launchers after an app moved or updated
 rm|remove delete|launchers|--purge --yes/-y|Remove a launcher
+export||-||Print every launcher as JSON, for import
+import||-|--yes/-y|Build launchers from a file made by export
 apps||-||List apps that can have extra accounts
 doctor||-|--fix|Check the setup and every profile
 update||-|--check|Install the latest release
