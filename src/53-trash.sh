@@ -27,9 +27,14 @@ trash_path() { # path -> prints where it went
     warn "Could not move $src to the Trash: it does not exist."
     return 1
   fi
+  # A symlink would move on its own and leave the data it points to where it
+  # is, while the caller says the data is in the Trash.
+  if [ -L "$src" ]; then
+    warn "Could not move $src to the Trash: it is a symbolic link, and the data it points to would stay where it is. Nothing was deleted."
+    return 1
+  fi
   parent=${src%/*}; [ -n "$parent" ] || parent="/"
-  # Without -L: the device of the entry that mv renames, even when it is a
-  # symlink.
+  # Without -L: the device of the entry itself, which is what mv renames.
   dev=$(/usr/bin/stat -f %d "$src" 2>/dev/null) || dev=""
   if [ -z "$dev" ]; then
     warn "Could not move $src to the Trash: it cannot be read. Nothing was deleted."

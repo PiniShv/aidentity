@@ -224,6 +224,76 @@ assert_dir "rm --purge never deletes the data root itself" "$DATA"
 assert_dir "unrelated profile data survives" "$DATA/keep-me"
 rm -rf "$DATA/keep-me"
 
+group "--purge keeps a folder another launcher uses"
+
+# Two launchers on one profile folder: 1.0.0 made them, and a second add or an
+# import makes them again. Moving the folder for one signs the other out, so
+# the other is looked for everywhere prune looks.
+trash_reset
+ai add "$ELECTRON_APP" --profile Shared
+printf 'session\n' > "$DATA/fake-shared/Cookies"
+cp -R "$APPS/Fake Shared.app" "$APPS/Fake Shared Copy.app"
+ai rm "Fake Shared" --purge -y
+assert_rc "with a second launcher beside it, rm --purge exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "it names the other launcher" "$RUN_OUT" \
+  "Profile data kept — another launcher uses the same directory: Fake Shared Copy"
+assert_file "and the data stays" "$DATA/fake-shared/Cookies"
+assert_no_dir "the launcher asked for is removed" "$APPS/Fake Shared.app"
+
+# Filed into a folder, then added again: the new launcher uses the same
+# folder, as an import would.
+mkdir -p "$APPS/Filed"
+mv "$APPS/Fake Shared Copy.app" "$APPS/Filed/"
+ai add "$ELECTRON_APP" --profile Shared
+assert_eq "a second add uses the same folder" "$DATA/fake-shared" \
+  "$(plist_key "$APPS/Fake Shared.app" AIdentityDataDir)"
+ai doctor
+assert_contains "doctor sees the filed launcher on the same folder" "$RUN_OUT" \
+  "shares its profile folder with: $APPS/Filed/Fake Shared Copy.app"
+ai rm "Fake Shared" --purge -y
+assert_rc "with the other launcher in a folder, rm --purge exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "it names that launcher by its path" "$RUN_OUT" \
+  "another launcher uses the same directory: $APPS/Filed/Fake Shared Copy.app"
+assert_file "and the data stays" "$DATA/fake-shared/Cookies"
+assert_no_dir "nothing went to the Trash" "$SB_TRASH/fake-shared"
+
+# In an app folder, outside the launcher directory.
+mv "$APPS/Filed/Fake Shared Copy.app" "$SRC/"
+cp -R "$SRC/Fake Shared Copy.app" "$APPS/Fake Shared.app"
+ai rm "Fake Shared" --purge -y
+assert_contains "a launcher in an app folder counts too" "$RUN_OUT" \
+  "another launcher uses the same directory: $SRC/Fake Shared Copy.app"
+assert_file "and the data stays" "$DATA/fake-shared/Cookies"
+
+# A symlink at the top of the launcher directory, to the launcher in a folder:
+# rm removes the symlink, and the launcher it pointed at still uses the data.
+mv "$SRC/Fake Shared Copy.app" "$APPS/Filed/"
+ln -s "$APPS/Filed/Fake Shared Copy.app" "$APPS/Fake Shared Copy.app"
+ai rm "Fake Shared Copy" --purge -y
+assert_contains "removing a symlinked launcher keeps the data of the real one" "$RUN_OUT" \
+  "another launcher uses the same directory: $APPS/Filed/Fake Shared Copy.app"
+assert_file "and the data stays" "$DATA/fake-shared/Cookies"
+assert_dir "the launcher in the folder is still there" "$APPS/Filed/Fake Shared Copy.app"
+
+# A folder in the launcher directory that cannot be read could hold the
+# other launcher. Not knowing is not "no other launcher": the data is kept.
+mv "$APPS/Filed/Fake Shared Copy.app" "$APPS/"
+mkdir -p "$APPS/Private"
+chmod 000 "$APPS/Private"
+ai rm "Fake Shared Copy" --purge -y
+chmod 755 "$APPS/Private"
+assert_rc_nonzero "a search that fails stops the move" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "could not search all of $APPS for another launcher that uses it"
+assert_contains "and where the data is" "$RUN_OUT" "its data is still at: $DATA/fake-shared"
+assert_file "the data stays" "$DATA/fake-shared/Cookies"
+assert_not_contains "and is never said to be moved" "$RUN_OUT" "Moved the profile data"
+rmdir "$APPS/Private" "$APPS/Filed"
+ai restore "Fake Shared"
+ai rm "Fake Shared" --purge -y
+assert_contains "once nothing else uses it, the data goes" "$RUN_OUT" "Moved the profile data to the Trash."
+assert_no_dir "out of the data root" "$DATA/fake-shared"
+trash_reset
+
 group "--purge moves the data to the Trash"
 
 trash_reset
@@ -323,6 +393,11 @@ if vol_attach "$VOL"; then
   assert_contains "and that nothing was deleted" "$RUN_OUT" "Nothing was deleted."
   assert_no_dir "no .Trashes is made for it" "$VOL/.Trashes"
   assert_no_dir "and nothing went to the home folder's Trash" "$SB_TRASH/fake-away"
+  # The volume's own folder cannot go into any Trash.
+  libcall trash_path "$VOL"
+  assert_rc_nonzero "a volume's own folder is refused" "$RUN_RC" "$RUN_OUT"
+  assert_contains "as a volume of its own" "$RUN_OUT" "it is a volume of its own"
+  assert_file "and all on it stays" "$VOL/profiles/fake-away/Cookies"
 
   mkdir "$VOL/.Trashes"
   AIDENTITY_DATA_ROOT="$VOL/profiles" ai restore "Fake Away"
@@ -375,21 +450,79 @@ rm -rf "$VOL"
 group "trash_path on its own, and uninstall.sh's copy"
 
 trash_reset
-mkdir -p "$SB/tp/target"
+mkdir -p "$SB/tp/target" "$SB/tp/plain"
 printf 'keep\n' > "$SB/tp/target/keep.txt"
+libcall trash_path "$SB/tp/plain"
+assert_rc "a folder is moved" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "it prints where it went, and nothing else" "$SB_TRASH/plain" "$RUN_OUT"
+# A symlink would move on its own, and the data it points to would stay.
 ln -s "$SB/tp/target" "$SB/tp/link"
 libcall trash_path "$SB/tp/link"
-assert_rc "a symlink can be moved" 0 "$RUN_RC" "$RUN_OUT"
-assert_eq "it prints where it went, and nothing else" "$SB_TRASH/link" "$RUN_OUT"
-if [ -L "$SB_TRASH/link" ]; then _pass "the link itself is moved"; else _fail "the link itself is moved" "no symlink at $SB_TRASH/link"; fi
-assert_file "never what it points to" "$SB/tp/target/keep.txt"
-libcall trash_path "tp/target"
-assert_rc_nonzero "a relative path is refused" "$RUN_RC" "$RUN_OUT"
+assert_rc_nonzero "a symlink is refused" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "it is a symbolic link, and the data it points to would stay where it is"
+if [ -L "$SB/tp/link" ]; then _pass "the link stays"; else _fail "the link stays" "no symlink at $SB/tp/link"; fi
+assert_file "and so does what it points to" "$SB/tp/target/keep.txt"
+if [ -e "$SB_TRASH/link" ] || [ -L "$SB_TRASH/link" ]; then _fail "nothing goes to the Trash" "found $SB_TRASH/link"; else _pass "nothing goes to the Trash"; fi
+rm -f "$SB/tp/link"
+# Relative to the folder it runs in, tp/target exists: still refused.
+TP_CWD=$PWD
+RUN_RC=0
+cd "$SB" && libcall trash_path "tp/target"
+cd "$TP_CWD" || true
+assert_rc_nonzero "a relative path is refused, even one that exists" "$RUN_RC" "$RUN_OUT"
+assert_contains "as not a full path" "$RUN_OUT" "it is not a full path to a folder"
 libcall trash_path "$SB/tp/target/"
 assert_rc_nonzero "so is a path ending in /" "$RUN_RC" "$RUN_OUT"
+libcall trash_path "$SB/tp/target/.."
+assert_rc_nonzero "and one ending in .." "$RUN_RC" "$RUN_OUT"
+assert_contains "for the same reason" "$RUN_OUT" "it is not a full path to a folder"
 libcall trash_path "$SB/tp/missing"
 assert_rc_nonzero "and one that does not exist" "$RUN_RC" "$RUN_OUT"
-assert_file "the folder is still there after all three" "$SB/tp/target/keep.txt"
+assert_contains "which it says" "$RUN_OUT" "it does not exist"
+assert_file "the folder is still there after all of them" "$SB/tp/target/keep.txt"
+
+# A symlink in the Trash that leads nowhere still takes the name.
+mkdir -p "$SB/tp/fake-dangle"
+ln -s "$SB/tp/nowhere" "$SB_TRASH/fake-dangle"
+libcall trash_path "$SB/tp/fake-dangle"
+assert_eq "a name held by a broken symlink is skipped" "$SB_TRASH/fake-dangle 2" "$RUN_OUT"
+if [ -L "$SB_TRASH/fake-dangle" ]; then _pass "and the symlink is left as it was"; else _fail "and the symlink is left as it was" "it is gone"; fi
+
+# Something takes the free name in the moment before the move. A stub mv
+# makes a folder there first, then runs the real one.
+RACE_BIN="$SANDBOX/stub-race"
+mkdir -p "$RACE_BIN"
+printf '%s\n' '#!/bin/sh' 'prev=""; last=""' 'for a in "$@"; do prev=$last; last=$a; done' \
+  'mkdir "$last"' '[ -z "${RACE_INNER:-}" ] || mkdir "$last/${prev##*/}"' 'exec /bin/mv "$@"' > "$RACE_BIN/mv"
+chmod +x "$RACE_BIN/mv"
+mkdir -p "$SB/tp/fake-raced"
+printf 'keep\n' > "$SB/tp/fake-raced/keep.txt"
+PATH="$RACE_BIN:$PATH" libcall trash_path "$SB/tp/fake-raced"
+assert_eq "an empty folder made at the name holds it, and that is where it says" \
+  "$SB_TRASH/fake-raced/fake-raced" "$RUN_OUT"
+assert_file "it is there" "$SB_TRASH/fake-raced/fake-raced/keep.txt"
+mkdir -p "$SB/tp/fake-raced"
+printf 'keep\n' > "$SB/tp/fake-raced/keep.txt"
+RACE_INNER=1 PATH="$RACE_BIN:$PATH" libcall trash_path "$SB/tp/fake-raced"
+assert_rc_nonzero "with that name inside it taken too, nothing is replaced" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "was taken just before the move"
+assert_file "and the data stays where it was" "$SB/tp/fake-raced/keep.txt"
+rm -rf "$SB/tp/fake-raced" "$SB/tp/fake-dangle"
+
+# A profile folder that is a symlink inside the data root: rm --purge moves
+# nothing and says where the data is.
+ai add "$ELECTRON_APP" --profile Linkdata
+printf 'session\n' > "$DATA/fake-linkdata/Cookies"
+mv "$DATA/fake-linkdata" "$DATA/fake-linkdata-real"
+ln -s "$DATA/fake-linkdata-real" "$DATA/fake-linkdata"
+ai rm "Fake Linkdata" --purge -y
+assert_rc_nonzero "rm --purge of a symlinked profile folder exits non-zero" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "$DATA/fake-linkdata to the Trash: it is a symbolic link"
+assert_not_contains "and never that the data moved" "$RUN_OUT" "Moved the profile data"
+assert_file "the data stays" "$DATA/fake-linkdata-real/Cookies"
+if [ -L "$DATA/fake-linkdata" ]; then _pass "and so does the link"; else _fail "and so does the link" "it is gone"; fi
+rm -f "$DATA/fake-linkdata"
+rm -rf "$DATA/fake-linkdata-real"
 # uninstall.sh runs under set -e; its copy must work there too.
 RUN_OUT=$("$BASH_BIN" -c 'lib=$1; dir=$2; set --; . "$lib" >/dev/null 2>&1; trash_path "$dir"; echo "rc=$?"' \
   x "$UNINST_LIB" "$SB/tp/target" 2>&1 </dev/null)

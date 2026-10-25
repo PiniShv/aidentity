@@ -94,9 +94,17 @@ cmd_rm() {
       dim "  $data"
       return 0
     fi
-    # Launchers from 1.0.0 could share one directory. Moving it away would
-    # sign the other launcher out too.
-    local others; others=$(launchers_sharing "$data")
+    # Launchers from 1.0.0 could share one directory, and a second add or an
+    # import can make one share it again. Moving it away would sign the other
+    # launcher out too. When the launchers cannot all be looked for, the data
+    # is kept: one that was missed would be signed out.
+    local others
+    if ! others=$(launchers_sharing "$data"); then
+      warn "Profile data kept — could not search all of $APPS_DIR for another launcher that uses it."
+      dim "  The launcher is gone; its data is still at: $data"
+      dim "  To use this account again:  $again"
+      return 1
+    fi
     if [ -n "$others" ]; then
       warn "Profile data kept — another launcher uses the same directory: $others"
       dim "  $data"
@@ -131,18 +139,34 @@ cmd_rm() {
   fi
 }
 
-# Other launchers in the launcher directory that point at the same data
-# directory as $1, however it is spelled. Prints their names, comma-separated.
-launchers_sharing() { # data dir, [a launcher to leave out]
-  local id app d names=""
+# Other launchers that point at the same data directory as $1, however it is
+# spelled. Prints them comma-separated: by name when they sit in the launcher
+# directory, by path anywhere else. They are found the way prune finds them
+# (all_launchers), in folders and app folders too: looking only at the top of
+# the launcher directory missed a launcher filed into a folder, and rm --purge
+# moved the data it was signed in with. Returns non-zero when that search
+# fails, so a caller about to move the data keeps it. A view that asks about
+# many launchers passes the list from one all_launchers as $3.
+launchers_sharing() { # data dir, [a launcher to leave out], [launcher list]
+  local id app d list names="" seen=" " app_id
+  # Not a directory: no launcher can be using it.
   id=$(dir_id "$1") || return 0
-  for app in "$APPS_DIR"/*.app; do
-    [ -d "$app" ] || continue
+  if [ $# -ge 3 ]; then list=$3; else list=$(all_launchers) || return 1; fi
+  while IFS= read -r app; do
+    [ -n "$app" ] || continue
     [ -n "${2:-}" ] && [ "$app" -ef "$2" ] && continue
-    is_our_launcher "$app" || continue
+    # One launcher can be found under two spellings (Spotlight resolves the
+    # path); name it once.
+    app_id=$(dir_id "$app") || continue
+    case "$seen" in *" $app_id "*) continue ;; esac
+    seen="$seen$app_id "
     d=$(plist_get "$app" "AIdentityDataDir")
-    [ "$(dir_id "$d")" = "$id" ] && names="${names:+$names, }$(bundle_name "$app")"
-  done
+    [ "$(dir_id "$d")" = "$id" ] || continue
+    [ "${app%/*}" = "$APPS_DIR" ] && app=$(bundle_name "$app")
+    names="${names:+$names, }$app"
+  done <<EOF
+$list
+EOF
   printf '%s' "$names"
 }
 
@@ -164,7 +188,8 @@ refind_app() {
 
 # What is wrong with one launcher: one finding per line, "fix<TAB>message" for
 # what `doctor --fix` repairs and "warn<TAB>message" for what needs a person.
-launcher_findings() {
+# $2 is every launcher, from one all_launchers, for the shared-folder check.
+launcher_findings() { # launcher, launcher list
   local app="$1" label src data ver perms others tab n room fix
   tab=$(printf '\t')
   label=$(bundle_name "$app")
@@ -215,7 +240,7 @@ launcher_findings() {
   [ -f "$data/$RESTORE_RECORD" ] || printf 'fix%sno restore record yet (made by an older aidentity)\n' "$tab"
   perms=$(/usr/bin/stat -f '%Lp' "$data" 2>/dev/null)
   [ "$perms" = "700" ] || printf 'fix%sother users can read its profile folder (mode %s)\n' "$tab" "$perms"
-  others=$(launchers_sharing "$data" "$app")
+  others=$(launchers_sharing "$data" "$app" "$2")
   [ -z "$others" ] || printf 'warn%sshares its profile folder with: %s\n' "$tab" "$others"
   return 0
 }
@@ -223,9 +248,9 @@ launcher_findings() {
 # Repair what launcher_findings marks "fix": a rebuild for anything about the
 # launcher itself, chmod 700 for the profile folder's mode. Profile data inside
 # the folder is never read or changed.
-fix_launcher() {
+fix_launcher() { # launcher, launcher list
   local app="$1" findings data rebuild=0 rc=0
-  findings=$(launcher_findings "$app")
+  findings=$(launcher_findings "$app" "$2")
   case "$findings" in
     *"fix"$'\t'"its app moved"*|*"fix"$'\t'"built by"*|*"fix"$'\t'"its launcher script"*|*"fix"$'\t'"no restore record"*) rebuild=1 ;;
   esac
@@ -288,16 +313,19 @@ cmd_doctor() {
   if [ "${#launchers[@]}" -gt 0 ]; then
     info ""
     info "${C_BOLD}Profiles${C_RESET}"
-    local findings kind msg failed=0
+    local findings kind msg failed=0 found
+    # Every launcher, looked for once, for the shared-folder check of each
+    # row. A report uses what it found, even when part of the search failed.
+    found=$(all_launchers) || true
     for app in "${launchers[@]}"; do
-      findings=$(launcher_findings "$app")
+      findings=$(launcher_findings "$app" "$found")
       if [ "$fix" -eq 1 ] && [ -n "$findings" ] && printf '%s\n' "$findings" | grep -q '^fix'; then
-        if fix_launcher "$app"; then
+        if fix_launcher "$app" "$found"; then
           printf '  %s✓%s %s %s\n' "$C_GREEN" "$C_RESET" "$(bundle_name "$app")" "$(dim "— fixed")"
         else
           failed=$((failed+1))
         fi
-        findings=$(launcher_findings "$app")
+        findings=$(launcher_findings "$app" "$found")
       fi
       if [ -z "$findings" ]; then
         [ "$fix" -eq 1 ] || printf '  %s✓%s %s\n' "$C_GREEN" "$C_RESET" "$(bundle_name "$app")"

@@ -101,6 +101,104 @@ rm -rf "$DATA/fake-orphan-c"
 trash_reset
 
 
+group "prune and rm --purge check again before each move"
+
+# Answer the question only once it is on screen, after running a command:
+# what a user can do in another window while the question waits.
+# SC2094: the loop reads the output file while the command writes it, on
+# purpose: that is how it sees the question.
+# shellcheck disable=SC2094
+answer_late() { # command to run first, answer, then aidentity's arguments
+  local act="$1" answer="$2" out="$SANDBOX/late.out" n=0
+  shift 2
+  : > "$out"
+  { while ! grep -q 'Type yes to confirm' "$out" && [ "$n" -lt 100 ]; do sleep 0.1; n=$((n + 1)); done
+    eval "$act"; printf '%s\n' "$answer"; } \
+    | detached "$BASH_BIN" "$AIDENTITY" "$@" > "$out" 2>&1
+  RUN_RC=${PIPESTATUS[1]}
+  RUN_OUT=$(cat "$out")
+  return 0
+}
+
+# A launcher made for a listed folder while prune waits — the list says to
+# restore an account first — keeps that folder out of the Trash.
+trash_reset
+ai add "$ELECTRON_APP" --profile Back
+printf 'session\n' > "$DATA/fake-back/Cookies"
+ai rm "Fake Back" -y
+mkdir -p "$DATA/fake-orphan-e"
+answer_late 'ai restore "Fake Back"' yes prune
+assert_rc "prune exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the folder was listed" "$RUN_OUT" 'can be restored: aidentity restore "Fake Back"'
+assert_contains "and is skipped, with the reason" "$RUN_OUT" "Skipping fake-back — a launcher uses it now: Fake Back"
+assert_file "its data stays" "$DATA/fake-back/Cookies"
+assert_eq "for the launcher made while prune waited" "$DATA/fake-back" \
+  "$(plist_key "$APPS/Fake Back.app" AIdentityDataDir)"
+assert_contains "the other folder is still moved" "$RUN_OUT" "Moved 1 orphaned profile(s) to the Trash."
+assert_dir "to the Trash" "$SB_TRASH/fake-orphan-e"
+ai rm "Fake Back" --purge -y
+trash_reset
+
+# Not knowing is not "no launcher": a folder in the launcher directory that
+# cannot be read could hold one.
+mkdir -p "$DATA/fake-unsure" "$APPS/Private"
+chmod 000 "$APPS/Private"
+ai prune -y
+chmod 755 "$APPS/Private"
+assert_rc_nonzero "a search that fails makes prune exit non-zero" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "Skipping fake-unsure — could not search all of $APPS for a launcher that uses it."
+assert_dir "and keeps the folder" "$DATA/fake-unsure"
+rmdir "$APPS/Private" "$DATA/fake-unsure"
+
+# Opened while the question waits: a pgrep that reports the profile only once
+# the flag file is there.
+LATE_BIN="$SANDBOX/stub-late"
+LATE_FLAG="$SANDBOX/late-opened"
+mkdir -p "$LATE_BIN"
+printf '%s\n' '#!/bin/sh' "[ -f \"$LATE_FLAG\" ] || exit 1" \
+  "printf '%s\\n' '101 /Apps/Fake.app/Contents/MacOS/Fake --user-data-dir=$DATA/fake-late'" > "$LATE_BIN/pgrep"
+chmod +x "$LATE_BIN/pgrep"
+ai add "$ELECTRON_APP" --profile Late
+printf 'session\n' > "$DATA/fake-late/Cookies"
+rm -f "$LATE_FLAG"
+PATH="$LATE_BIN:$PATH" answer_late 'touch "$LATE_FLAG"' yes rm "Fake Late" --purge
+rm -f "$LATE_FLAG"
+assert_rc_nonzero "rm --purge of a profile opened while it asked exits non-zero" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "The profile was opened while waiting for confirmation"
+assert_file "and keeps the data" "$DATA/fake-late/Cookies"
+assert_no_dir "nothing went to the Trash" "$SB_TRASH/fake-late"
+ai restore "Fake Late"
+ai rm "Fake Late" --purge -y
+# prune asks too, before each folder.
+make_pgrep_stubs
+mkdir -p "$BUSY_DATA"
+PATH="$PGREP_STUB:$PATH" ai prune -y
+assert_contains "prune skips a folder something runs on" "$RUN_OUT" "Skipping fake-busy — something is running on it."
+assert_dir "and keeps it" "$BUSY_DATA"
+rmdir "$BUSY_DATA"
+
+# With no terminal to answer on, prune moves nothing.
+mkdir -p "$DATA/fake-noterm"
+ai prune
+assert_rc_nonzero "prune with no terminal exits non-zero" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "Nothing to confirm with."
+assert_dir "and moves nothing" "$DATA/fake-noterm"
+rmdir "$DATA/fake-noterm"
+
+# A symlink in the data root that leads out of it is never followed out.
+mkdir -p "$SB/outside-prune"
+printf 'keep\n' > "$SB/outside-prune/keep.txt"
+ln -s "$SB/outside-prune" "$DATA/fake-pointer"
+ai prune -y
+assert_rc "prune with a symlink out of the data root exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "it skips it, and says why" "$RUN_OUT" "Skipping fake-pointer — outside the aidentity data root."
+assert_file "what it points to stays" "$SB/outside-prune/keep.txt"
+if [ -L "$DATA/fake-pointer" ]; then _pass "and so does the link"; else _fail "and so does the link" "it is gone"; fi
+rm -f "$DATA/fake-pointer"
+rm -rf "$SB/outside-prune"
+trash_reset
+
+
 group "rename and rebuild edge cases"
 
 ai add "$ELECTRON_APP" --profile lower

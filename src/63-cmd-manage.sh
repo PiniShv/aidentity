@@ -37,12 +37,20 @@ launcher_for() {
 # empty and prune deleted every profile behind it. Our own hidden .aidentity-*
 # staging folders, and the Trash, hold launchers on their way out: they claim
 # nothing, or a launcher deleted in Finder would keep its data from prune.
+#
+# Returns non-zero, after printing what it did find, when part of the launcher
+# directory could not be searched (a folder in it that cannot be read): a
+# launcher there would go unseen. rm --purge and prune then keep the data. The
+# app folders and Spotlight are extra places, searched as far as they can be.
 all_launchers() {
-  local dir app
+  local dir app rc=0 filed=""
+  if [ -d "$APPS_DIR" ]; then
+    filed=$(find -H "$APPS_DIR" -maxdepth 3 -type d -name '.aidentity-*' -prune \
+      -o -type d -name '*.app' -print -prune 2>/dev/null) || rc=1
+  fi
   {
     for app in "$APPS_DIR"/*.app; do [ -d "$app" ] && printf '%s\n' "$app"; done
-    find -H "$APPS_DIR" -maxdepth 3 -type d -name '.aidentity-*' -prune \
-      -o -type d -name '*.app' -print -prune 2>/dev/null
+    [ -z "$filed" ] || printf '%s\n' "$filed"
     while IFS= read -r dir; do
       [ -d "$dir" ] && find -H "$dir" -maxdepth 2 -type d -name '.aidentity-*' -prune \
         -o -type d -name '*.app' -print -prune 2>/dev/null
@@ -56,6 +64,7 @@ EOF
     case "$dir" in */.aidentity-*|*/.Trash/*|*/.Trashes/*) continue ;; esac
     is_our_launcher "$dir" && printf '%s\n' "$dir"
   done
+  return "$rc"
 }
 
 # The identity of every data directory a launcher points at, space-separated.
@@ -476,9 +485,21 @@ EOF
     [ "$reply" = "yes" ] || die "Cancelled. Nothing was moved."
   fi
 
-  local moved=0 failed=0 by_restore=0 by_add=0 dest i=-1
+  local moved=0 failed=0 by_restore=0 by_add=0 dest users i=-1
   for d in "${orphans[@]}"; do
     i=$((i+1))
+    # Asked again, as the running check below is: the list above is as old as
+    # the question, and a launcher may have been made for this folder since —
+    # the list itself says to restore an account first.
+    if ! users=$(launchers_sharing "$d"); then
+      warn "Skipping $(basename "$d") — could not search all of $APPS_DIR for a launcher that uses it."
+      failed=$((failed+1))
+      continue
+    fi
+    if [ -n "$users" ]; then
+      warn "Skipping $(basename "$d") — a launcher uses it now: $users"
+      continue
+    fi
     if running_on_profile "$d"; then
       warn "Skipping $(basename "$d") — something is running on it."
       continue
