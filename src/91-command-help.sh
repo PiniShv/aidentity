@@ -188,6 +188,21 @@ EXAMPLES
   aidentity open "Claude Work"
 EOF
     ;;
+    quit) cat <<'EOF'
+USAGE
+  aidentity quit NAME
+
+NAME is the launcher name that 'aidentity list' shows. It quits the copy of the
+app that runs on that profile, and every other copy keeps running. For a main
+launcher, that is the copy on your original account. The app is asked to quit
+the way its Quit menu item does, so it can still ask about unsaved work. If it
+cannot be asked, its process is sent SIGTERM, which these apps also treat as
+quit. It waits up to 10 seconds, and exits 1 if the app is still running then.
+
+EXAMPLES
+  aidentity quit "Claude Work"
+EOF
+    ;;
     rm) cat <<'EOF'
 USAGE
   aidentity rm NAME [options]
@@ -257,9 +272,9 @@ USAGE
   aidentity ui
 
 A full-screen menu in Terminal: every profile, what is running, and keys to
-open, add, rename, recolour, change the badge, remove, and run doctor. Each key
-runs the same command you would type, with the same checks. It needs a
-terminal; in a script, use the commands themselves or aidentity list --json.
+open, quit, add, rename, recolour, change the badge, remove, and run doctor.
+Each key runs the same command you would type, with the same checks. It needs
+a terminal; in a script, use the commands themselves or aidentity list --json.
 Press ? in the menu for its keys, and q to leave.
 
 EXAMPLES

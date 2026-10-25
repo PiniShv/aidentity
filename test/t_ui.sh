@@ -174,6 +174,7 @@ assert_contains "a main launcher is not running" "$FRAME" "not running"
 assert_contains "a profile with no data is new" "$FRAME" "signed out / new"
 assert_contains "the footer lists the keys" "$FRAME" "q quit"
 assert_contains "the footer lists the remove key" "$FRAME" "d remove"
+assert_contains "and the stop key" "$FRAME" "s stop"
 assert_not_contains "no foreground colour under NO_COLOR" "$RUN_OUT" "${ESC}[38;5"
 assert_not_contains "no background colour under NO_COLOR" "$RUN_OUT" "${ESC}[48;5"
 if ui_has_sgr; then _fail "NO_COLOR output has no style escapes at all"; else _pass "NO_COLOR output has no style escapes at all"; fi
@@ -241,6 +242,78 @@ assert_contains "the footer says what failed" "$(ui_frame)" "Could not open 'Fak
 assert_not_contains "and does not claim it opened" "$(ui_frame)" "Opening Fake Alpha"
 assert_eq "and the terminal is intact" "same" "$RUN_FLAGS"
 
+# Success and failure differ only in colour, so these run with colour on.
+NO_COLOR='' ui_pty 24 200 '\nq' /bin/sh -c 'PATH="$1:$PATH"; exec "$2" "$3" ui' x "$UI_FAILOPEN" "$BASH_BIN" "$AIDENTITY"
+assert_contains "with colour on, an open that fails is shown in red" "$(ui_frame)" "${ESC}[31m✗ Could not open 'Fake Alpha'"
+assert_not_contains "not in the green of a success" "$(ui_frame)" "${ESC}[32m✗ Could not open"
+NO_COLOR='' ui_run_menu 24 200 '\nq'
+# The stub open prints a line of its own first; the footer joins the lines.
+assert_contains "and an open that works is shown in green" "$(ui_frame)" "${ESC}[32mstub open: $ALPHA ✓ Opening Fake Alpha"
+
+# --- s quits the selected profile
+
+ui_run_menu 24 200 'sq'
+assert_contains "s on a profile that is not running says so" "$(ui_frame)" "'Fake Alpha' is not running."
+assert_contains "after saying what it was doing" "$RUN_OUT" "Quitting Fake Alpha"
+assert_eq "and the terminal is intact" "same" "$RUN_FLAGS"
+
+# A profile that really runs: its app's executable is a symlink to /bin/bash
+# (macOS stops a copy of a system binary as it starts), run as a launcher
+# starts it. It is started from a subshell that ends at once, so launchd reaps
+# it the moment it ends. It waits on a FIFO for at most 60 seconds.
+UI_QAPP="$SRC/Quitty.app"
+make_electron_app "$UI_QAPP"
+rm -f "$UI_QAPP/Contents/MacOS/stub"
+ln -s /bin/bash "$UI_QAPP/Contents/MacOS/stub"
+ai add "$UI_QAPP" --profile Work
+UI_QEXE="$(plist_key "$APPS/Quitty Work.app" AIdentityTargetApp)/Contents/MacOS/stub"
+UI_QFIFO="$SANDBOX/ui-quit-fifo"
+rm -f "$UI_QFIFO"
+mkfifo "$UI_QFIFO"
+UI_QPID=$("$UI_QEXE" -c 'read -t 60 x <> "$0"' "$UI_QFIFO" \
+  "--user-data-dir=$(plist_key "$APPS/Quitty Work.app" AIdentityDataDir)" </dev/null >/dev/null 2>&1 & echo $!)
+# Ended by its PID, and only while its command line still names the FIFO.
+ui_quit_kill() {
+  case "$(/bin/ps -ww -o command= -p "$UI_QPID" 2>/dev/null)" in
+    *"$UI_QFIFO"*) kill -KILL "$UI_QPID" 2>/dev/null ;;
+  esac
+}
+trap 'ui_quit_kill; cleanup' EXIT INT TERM
+i=0
+while [ "$i" -lt 100 ]; do
+  case "$(/bin/ps -ww -o command= -p "$UI_QPID" 2>/dev/null)" in "$UI_QEXE "*) break ;; esac
+  sleep 0.05; i=$((i + 1))
+done
+# An osascript that finds no app for the PID, so quit sends SIGTERM.
+UI_QNOAPP="$SANDBOX/ui-quit-no-app"
+mkdir -p "$UI_QNOAPP"
+printf '#!/bin/sh\ncat >/dev/null\necho none\n' > "$UI_QNOAPP/osascript"
+chmod +x "$UI_QNOAPP/osascript"
+
+NO_COLOR='' ui_pty 24 200 '<4 profiles · 1 running>jjjs;<Quit Quitty Work.>q' \
+  /bin/sh -c 'PATH="$1:$PATH"; exec "$2" "$3" ui' x "$UI_QNOAPP" "$BASH_BIN" "$AIDENTITY"
+assert_rc "s on a running profile, then q, exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the footer says it is quitting first" "$RUN_OUT" "Quitting Quitty Work"
+assert_contains "then shows quit's own message, in green" "$(ui_frame)" "${ESC}[32m✓ Quit Quitty Work."
+assert_contains "and the row's status is read again" "$(ui_frame)" "4 profiles · 0 running"
+if kill -0 "$UI_QPID" 2>/dev/null; then _fail "the profile's process is gone"; else _pass "the profile's process is gone"; fi
+assert_eq "and the terminal is intact" "same" "$RUN_FLAGS"
+
+UI_QBADPS="$SANDBOX/ui-quit-bad-ps"
+mkdir -p "$UI_QBADPS"
+printf '#!/bin/sh\nexit 1\n' > "$UI_QBADPS/ps"
+chmod +x "$UI_QBADPS/ps"
+NO_COLOR='' ui_pty 24 200 'jjjs;<Could not list>q' \
+  /bin/sh -c 'PATH="$1:$PATH"; exec "$2" "$3" ui' x "$UI_QBADPS" "$BASH_BIN" "$AIDENTITY"
+assert_contains "a quit that fails is shown in red" "$(ui_frame)" "${ESC}[31m✗ Could not list the running processes"
+assert_rc "and the menu is still there to quit from" 0 "$RUN_RC" "$RUN_OUT"
+
+ui_quit_kill
+trap cleanup EXIT INT TERM
+ai rm "Quitty Work" --purge -y
+rm -f "$UI_QFIFO"
+assert_eq "the quit group's launcher is gone" "3" "$(count_launchers)"
+
 # --- narrow windows, long lists
 
 ui_run_menu 20 40 'q'
@@ -251,6 +324,7 @@ assert_contains "and every launcher" "$FRAME" "Fake Beta"
 assert_not_contains "but leaves out the badge column" "$FRAME" "[A]"
 assert_contains "and keeps the main keys" "$FRAME" "q quit"
 assert_not_contains "and leaves the rest to the help screen" "$FRAME" "d remove"
+assert_not_contains "stop among them" "$FRAME" "s stop"
 
 ui_run_menu 7 80 'q'
 FRAME=$(ui_frame)
@@ -273,6 +347,7 @@ assert_contains "the help screen lists the keys" "$RUN_OUT" "this help"
 assert_contains "and how to remove" "$RUN_OUT" "k keeps the data"
 assert_contains "p moves the data to the Trash, as the remove question says" "$RUN_OUT" "remove: k keeps the data, p moves it to the Trash"
 assert_not_contains "and nothing says it deletes" "$RUN_OUT" "delete"
+assert_contains "and that s quits one profile" "$RUN_OUT" "stop: quit the profile; other copies of the app keep running"
 
 # --- rename
 

@@ -56,8 +56,10 @@ ui_pause() {
 # Run a command function for the menu, as the command line would. In a
 # subshell, so a `die` ends the command and not the menu; the script's own
 # traps are set again inside it, so an interrupted rename still moves its data
-# back and an unfinished build still removes its staging folder.
+# back and an unfinished build still removes its staging folder. Returns the
+# command's own exit status, so a caller can tell a failure from a success.
 ui_run() {
+  local rc=0
   UI_BUSY=1
   (
     trap '_on_exit' EXIT
@@ -65,9 +67,9 @@ ui_run() {
     trap '_on_exit; exit 143' TERM
     trap '_on_exit; exit 129' HUP
     "$@"
-  )
+  ) || rc=$?
   UI_BUSY=0
-  return 0
+  return "$rc"
 }
 
 # Leave the menu, run a command with its output and questions on the normal
@@ -82,7 +84,9 @@ ui_screen() { # command and its arguments
 
 # Ask a question on the normal screen. The answer is in UI_ANS, empty when
 # nothing was typed, at end of input, or after Ctrl-C, which only cancels the
-# question: it is asked in a subshell, like a command.
+# question: it is asked in a subshell, like a command. ask prints the answer
+# only when it returns 0, so a failed ask (end of input, or 130 after Ctrl-C)
+# has printed nothing, and its answer is empty either way.
 ui_ask() { # prompt
   UI_BUSY=1
   UI_ANS=$(ui_run ask "$1") || UI_ANS=""
@@ -111,17 +115,37 @@ ui_have_row() {
   return 1
 }
 
-# Enter. One line of result, so it goes in the footer instead of a screen.
-ui_do_open() {
-  local out rc
-  ui_have_row || return 0
+# Run a command whose result is one line, and show that line in the footer
+# instead of a screen: as a success, or in red when the command failed.
+ui_footer_run() { # what to say if it printed nothing, command and its arguments
+  local out rc said="$1"
+  shift
   UI_BUSY=1
-  out=$(ui_run cmd_open "${UI_L_NAME[$UI_SEL]}" 2>&1); rc=$?
+  out=$(ui_run "$@" 2>&1); rc=$?
   UI_BUSY=0
   out=$(printf '%s' "$out" | sed "s/${UI_ESC}\[[0-9;]*m//g")
   out=${out//$'\n'/ }
-  if [ -z "$out" ]; then out="Opened ${UI_L_NAME[$UI_SEL]}."; fi
+  if [ -z "$out" ]; then out=$said; fi
   if [ "$rc" -eq 0 ]; then ui_flash ok "$out"; else ui_flash err "$out"; fi
+}
+
+# Enter.
+ui_do_open() {
+  ui_have_row || return 0
+  ui_footer_run "Opened ${UI_L_NAME[$UI_SEL]}." cmd_open "${UI_L_NAME[$UI_SEL]}"
+}
+
+# s: quit the selected profile's copy of the app; every other copy keeps
+# running. quit can wait up to 10 seconds for the app, so the footer says what
+# is going on first. The row's status is read again after.
+ui_do_stop() {
+  local name
+  ui_have_row || return 0
+  name=${UI_L_NAME[$UI_SEL]}
+  UI_MSG="Quitting ${name}…"; UI_MSG_STYLE=$C_DIM; UI_SWATCH=""
+  ui_draw
+  ui_footer_run "Quit ${name}." cmd_quit "$name"
+  ui_sync
 }
 
 ui_do_add() {
@@ -268,6 +292,7 @@ ui_help() {
   done <<EOF
 Up, Down, k, j|move
 Enter|open the profile
+s|stop: quit the profile; other copies of the app keep running
 a|add a profile: pick an app, then name the account
 r|rename the account name (it stays signed in)
 c|colour: arrows choose, Enter applies, Esc cancels
@@ -300,6 +325,7 @@ ui_loop() {
       UP|k)   ui_move -1 ;;
       DOWN|j) ui_move 1 ;;
       ENTER)  ui_do_open ;;
+      s)      ui_do_stop ;;
       a)      ui_do_add ;;
       r)      ui_do_rename ;;
       c)      ui_do_color ;;
