@@ -636,8 +636,8 @@ aidentity quit "Claude Work"
 
 While several profiles run, the Dock shows them as identical tiles, so it is hard to tell which one to quit. `quit` takes the launcher name that `aidentity list` shows. It finds the copy of the app that runs on that profile and asks only that copy to quit.
 
-- **The app is asked the way its Quit menu item asks,** so it can still ask about unsaved work. This needs no permission.
-- **It acts only on a copy that macOS knows as a running app.** It never stops a command-line tool, even one that runs the app's own program.
+- **The app is asked the way its Quit menu item asks,** so it can still ask about unsaved work. This needs no permission. If the app turns the request down, it is sent SIGTERM, which these apps also treat as quit.
+- **It acts only on a copy that macOS knows as a running app.** It never stops a command-line tool, even one that runs the app's own program, such as `code --wait`. If only such tools, or the app's helper processes, still use the profile, `quit` names them and exits with 1. `aidentity list` still shows the profile as running then.
 - **It waits up to 10 seconds.** When the copy has quit, it prints `Quit Claude Work.` and exits with 0. If the app is still running by then, it says so and exits with 1. The app may be asking you something, so look at its window. There is no option to force a quit.
 - **A profile that is not running** gives the message `'Claude Work' is not running.` and exit status 0.
 - **A Main launcher** quits the copy on your original account.
