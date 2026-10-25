@@ -106,3 +106,67 @@ assert_dir "the launcher stays" "$APPS/Fake Busy.app"
 assert_file "and so does its data" "$BUSY_DATA/Cookies"
 ai rm "Fake Busy" --purge -y
 trash_reset
+
+# Data outside the data root is never moved: not a launcher's that records a
+# folder elsewhere, and not one a symlink in the data root leads to.
+un_prepare
+mkdir -p "$SB/outside-un" "$SB/outside-link"
+printf 'keep\n' > "$SB/outside-un/keep.txt"
+printf 'keep\n' > "$SB/outside-link/keep.txt"
+ai add "$ELECTRON_APP" --profile Away
+rm -rf "$DATA/fake-away"
+/usr/libexec/PlistBuddy -c "Set :AIdentityDataDir $SB/outside-un" \
+  "$APPS/Fake Away.app/Contents/Info.plist" >/dev/null 2>&1
+ln -s "$SB/outside-link" "$DATA/fake-pointer"
+un_tty 'delete\n'
+assert_contains "a launcher's data outside the data root is kept" "$RUN_OUT" \
+  "Left profile data in place (outside the aidentity data directory)"
+assert_file "where it is" "$SB/outside-un/keep.txt"
+assert_no_dir "the launcher is still removed" "$APPS/Fake Away.app"
+assert_not_contains "a symlink out of the data root is not data to move" "$RUN_OUT" "$DATA/fake-pointer"
+assert_file "and what it points to stays" "$SB/outside-link/keep.txt"
+rm -f "$DATA/fake-pointer"
+rm -rf "$SB/outside-un" "$SB/outside-link"
+mkdir -p "$DATA"
+trash_reset
+
+# Asked again after the question, which can wait for minutes: a launcher that
+# lost its marker meanwhile is not removed, and a profile opened meanwhile
+# keeps its data. The pgrep stub reports the profile once the flag is there.
+# SC2094: the loop reads the output file while the run writes it, on purpose:
+# that is how it sees the question.
+# shellcheck disable=SC2094
+un_tty_late() { # command to run once the question is on screen, typed input
+  local out="$SANDBOX/un-late.out" n=0
+  : > "$out"
+  { while ! grep -q 'to remove them, or anything else' "$out" && [ "$n" -lt 100 ]; do sleep 0.1; n=$((n + 1)); done
+    eval "$1"; printf '%b' "$2"; sleep 1; } \
+    | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$PATH" \
+      script -q /dev/null "$BASH_BIN" "$REPO_DIR/uninstall.sh" > "$out" 2>&1
+  RUN_RC=${PIPESTATUS[1]}
+  RUN_OUT=$(tr -d '\r' < "$out")
+  return 0
+}
+UN_LATE_BIN="$SANDBOX/stub-un-late"
+UN_LATE_FLAG="$SANDBOX/un-late-opened"
+mkdir -p "$UN_LATE_BIN"
+printf '%s\n' '#!/bin/sh' "[ -f \"$UN_LATE_FLAG\" ] || exit 1" \
+  "printf '%s\\n' '101 /Apps/Fake.app/Contents/MacOS/Fake --user-data-dir=$DATA/fake-bye'" > "$UN_LATE_BIN/pgrep"
+chmod +x "$UN_LATE_BIN/pgrep"
+rm -f "$UN_LATE_FLAG"
+un_prepare
+ai add "$ELECTRON_APP" --profile Marked
+PATH="$UN_LATE_BIN:$PATH" un_tty_late 'touch "$UN_LATE_FLAG"
+  /usr/libexec/PlistBuddy -c "Delete :AIdentityProfile" "$APPS/Fake Marked.app/Contents/Info.plist" >/dev/null 2>&1' \
+  'delete\n'
+rm -f "$UN_LATE_FLAG"
+assert_contains "a launcher that lost its marker while it waited is skipped" "$RUN_OUT" \
+  "Skipped $APPS/Fake Marked.app — it no longer carries the AIdentityProfile key."
+assert_file "and left whole" "$APPS/Fake Marked.app/Contents/Info.plist"
+assert_contains "a profile opened while it waited keeps its data" "$RUN_OUT" \
+  "Kept the data for Fake Bye — it was opened while waiting for confirmation."
+assert_file "where it was" "$DATA/fake-bye/Cookies"
+assert_no_dir "and none of it went to the Trash" "$UN_TRASH/fake-bye"
+rm -rf "$APPS/Fake Marked.app" "$DATA/fake-bye" "$DATA/fake-marked"
+mkdir -p "$DATA"
+trash_reset
