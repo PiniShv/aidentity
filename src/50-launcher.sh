@@ -300,7 +300,17 @@ _cleanup_update() {
   return 0
 }
 
-_on_exit() { _cleanup_stage; _undo_rename; _cleanup_update; return 0; }
+# Set by import while it holds the folder it converts its file in.
+IMPORT_TMP=""
+
+_cleanup_import() {
+  # Only ever a folder import made itself with mktemp.
+  case "$IMPORT_TMP" in */aidentity-import.?*) rm -rf "$IMPORT_TMP" 2>/dev/null ;; esac
+  IMPORT_TMP=""
+  return 0
+}
+
+_on_exit() { _cleanup_stage; _undo_rename; _cleanup_update; _cleanup_import; return 0; }
 trap '_on_exit' EXIT
 trap '_on_exit; exit 130' INT
 trap '_on_exit; exit 143' TERM
