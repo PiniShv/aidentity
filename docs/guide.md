@@ -801,7 +801,7 @@ There is one object for each launcher, in the order that `aidentity list` shows 
 | `own_extensions` | `true` when the profile has its own extensions folder. |
 
 - **No account goes with the file.** It holds no cookies, no sign-in and no app data. It holds no data folder and no other path. A profile you import starts signed out.
-- **Keep the file private.** It holds the launch settings in full, and the values of the variables. A proxy setting can carry a password. `export` says so on standard error when the file holds variable values, or a switch with a password in it (`user:password@`). No warning does not make the file safe to share, so read it first.
+- **Keep the file private.** It holds the launch settings in full, and the values of the variables. A proxy setting can carry a password. `export` says so on standard error when the file holds variable values, or a switch with `@` in it, as in `user:password@`. No warning does not make the file safe to share, so read it first.
 - Only the JSON goes to standard output, so `> profiles.json` saves just the file. Warnings go to standard error.
 - In a launcher's object, a value is text, `true` or `false`, or a list of text. It is never `null`.
 - With no launchers, it prints the same object with an empty `launchers` list, and exits with 0.
@@ -825,7 +825,7 @@ The launchers in profiles.json:
 
   create  Claude Work
           flags  --lang=de
-          env    HTTPS_PROXY (values hidden)
+          proxy  HTTPS_PROXY=http://proxy.example:8080
   skip    Claude Client — already exists
   skip    Slack Client — no app with the bundle ID com.tinyspeck.slackmacgap is installed
 
@@ -834,13 +834,13 @@ Create 1 launcher? Type yes to confirm:
 
 Then it builds each launcher as `add` would, says what it made, and prints a count: `1 created, 2 skipped, 0 failed.` It exits with 1 if a build failed.
 
-- **The file is not trusted.** It may come from someone else. `import` converts it with `plutil`, and refuses, with nothing changed, a file that is not valid JSON, holds a `null`, is bigger than 4 MB, lists more than 200 launchers, or is not a format 1 file from `export`.
+- **The file is not trusted.** It may come from someone else. `import` reads it once as JSON, with the JavaScript engine that comes with macOS. It refuses, with nothing changed, a file that is not valid JSON (a property list in any form is refused too), holds a `null`, is bigger than 4 MB, lists more than 200 launchers, or is not a format 1 file from `export`.
 - **Every value is checked as `add` checks it:** the profile name, the colour, the badge, each switch and each variable (the [allowlist](#per-profile-settings) applies), and the bundle ID.
 - **The app is found by its bundle ID,** among the apps installed here: the ones `aidentity apps` lists. A path in the file is never used. Install your apps first.
 - **A bad or unknown entry is skipped,** with a one-line reason. The other entries go on. An entry is also skipped when its launcher exists already (it is never changed), when two entries would build the same launcher, and when its profile would share a folder with another launcher or a second Main launcher would be made for one app.
 - **The name is built, not copied.** The launcher is named `<App> <Profile>`, as `add` names it, whatever the file calls it.
 - **Profiles start signed out.** The one exception: if the data folder for that name is still here, `import` uses it, as `add` does, and the plan says so. That account may be signed in.
-- **Check the launch settings.** They come from the file. The plan shows each new launcher's switches in full, but its variables by name only: it does not show their values. A proxy setting sends that profile's traffic through the server it names. When the file is from someone else, read the plan, and also open the file in a text editor to read the values of the variables.
+- **Check the launch settings.** They come from the file. The plan shows each new launcher's switches in full. For a variable it shows the name only, except a proxy variable such as `HTTPS_PROXY`: for that it shows the server, without any user name or password. A proxy setting sends that profile's traffic through the server it names. When the file is from someone else, read the plan, and also open the file in a text editor to read the values of the variables.
 - `-y` or `--yes` skips the question. With no terminal and no `-y`, `import` refuses with `Nothing to confirm with.` and builds nothing. If you answer anything but `yes`, nothing is built.
 - A file with no launchers in it prints `Nothing to do.` and exits with 0.
 
