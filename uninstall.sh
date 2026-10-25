@@ -590,7 +590,7 @@ confirm_removal() {
 
   if [ "$running" -gt 0 ]; then
     die "$running profile(s) are running right now. Quit them, then re-run this script.
-    Deleting a profile's data while its app is open loses whatever it has not saved."
+    Moving a profile's data while its app is open loses whatever it has not saved."
   fi
 
   info "Removing them deletes ${C_BOLD}${#LAUNCHERS[@]}${C_RESET} launcher(s) and moves the profile data listed above to the Trash."
@@ -689,9 +689,15 @@ remove_launchers() {
   rmdir "$(dirname "$DATA_ROOT")" 2>/dev/null || true
 
   info ""
+  # The data root may be gone by now (rmdir above), so the hint says to create
+  # it first. A folder with no restore record comes back through add instead.
   if [ "$MOVED_DATA" -gt 0 ]; then
-    dim "  To get an account back: move its folder from the Trash back into"
-    dim "  $DATA_ROOT, install aidentity again, then run: aidentity restore"
+    dim "  To get an account back, install aidentity again and create the data folder:"
+    dim "    mkdir -p \"$DATA_ROOT\""
+    dim "  Then move the profile's folder from the Trash into it, and run:"
+    dim "    aidentity restore"
+    dim "  If restore does not list it, add the profile again with the same app and"
+    dim "  profile name, and it uses the folder."
   fi
   dim "  If a launcher was pinned to your Dock, drag the tile out — macOS keeps it"
   dim "  until you do, even though the app is gone."

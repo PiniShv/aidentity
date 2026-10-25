@@ -457,6 +457,24 @@ tx import "$TR_F" -y
 assert_contains "a name with an escape in it is shown with ? for it" "$RUN_OUT" "skip    Red ?[31m name"
 assert_not_contains "so no escape reaches the terminal" "$RUN_OUT" $'\033'
 
+# The same for an escape and a C1 control, U+009B, which some terminals read
+# as the start of an escape sequence, in a name and in a colour. Under C,
+# [[:cntrl:]] misses U+009B, so this runs under C and under UTF-8.
+TR_ESC=$'\033'; TR_CSI=$'\xc2\x9b'
+tr_file "$TR_F" \
+  "$(tr_entry name="$(js "Red ${TR_ESC}[31m ${TR_CSI}31m name")" bundle_id='"com.example.nothere"')" \
+  "$(tr_entry profile='"Paint"' color="$(js "re${TR_ESC}[31md${TR_CSI}31m")")"
+for loc in C en_US.UTF-8; do
+  LC_ALL=$loc tx import "$TR_F" -y
+  assert_contains "$loc: a name with ESC and U+009B is shown with ? for each" "$RUN_OUT" \
+    "skip    Red ?[31m ?31m name"
+  assert_contains "$loc: and so is such a colour" "$RUN_OUT" \
+    "skip    Fake Paint — unknown colour 're?[31md?31m'"
+  assert_not_contains "$loc: no ESC reaches the terminal" "$RUN_OUT" "$TR_ESC"
+  assert_not_contains "$loc: and no U+009B" "$RUN_OUT" "$TR_CSI"
+done
+assert_no_dir "and nothing is built" "$APPS/Fake Paint.app"
+
 # name, app and exported_by are only for the person reading the file: each
 # injection attempt in them, and a printf format, is only text.
 TR_ENTRIES=()

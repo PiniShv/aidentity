@@ -117,8 +117,10 @@ USAGE
 Finds profile folders that no launcher points at. They are left when a launcher
 is deleted in Finder, or removed with 'rm' without --purge. It lists them, asks
 first, then moves them to the Trash. To keep an account instead, rebuild its
-launcher with 'aidentity restore'. A folder moved back from the Trash can be
-restored the same way.
+launcher with 'aidentity restore': this works for the folders the list marks
+"can be restored". For one without that mark, add the profile again with the
+same app and profile name, and add uses the folder. A folder moved back from
+the Trash comes back in the same way.
 
 OPTIONS
   -y, --yes            Skip the confirmation prompt
@@ -401,6 +403,7 @@ ${C_BOLD}EXAMPLES${C_RESET}
   aidentity add ChatGPT --profile Personal
   aidentity add Claude --main
   aidentity list
+  aidentity quit "Claude Work"
   aidentity rename "Claude Work" Client
   aidentity set "Claude Work" --color purple
   aidentity rebuild --all
@@ -408,6 +411,7 @@ ${C_BOLD}EXAMPLES${C_RESET}
   aidentity restore "Claude Work"
   aidentity prune
   aidentity rm "Claude Work" --purge
+  aidentity export > profiles.json
   aidentity help rm
   aidentity completion zsh
   aidentity update --check

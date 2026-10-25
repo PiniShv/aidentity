@@ -282,6 +282,7 @@ assert_no_dir "and nothing reached the Trash" "$SB_TRASH/fake-stuck"
 assert_contains "it says why" "$STUCK_OUT" "Could not move $DATA/fake-stuck to the Trash"
 assert_contains "and that nothing was deleted" "$STUCK_OUT" "Nothing was deleted."
 assert_contains "and where the data is" "$STUCK_OUT" "its data is still at: $DATA/fake-stuck"
+assert_contains "and how to use the account again" "$STUCK_OUT" 'To use this account again:  aidentity restore "Fake Stuck"'
 assert_not_contains "and never that it moved it" "$STUCK_OUT" "Moved the profile data"
 assert_no_dir "the launcher is gone, as the prompt said" "$APPS/Fake Stuck.app"
 ai restore "Fake Stuck"

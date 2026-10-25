@@ -15,7 +15,7 @@ ai add "$ELECTRON_APP" --profile Hint
 printf 'session\n' > "$DATA/fake-hint/Cookies"
 ai rm "Fake Hint" -y
 assert_contains "rm prints the restore line that reattaches the data" "$RUN_OUT" 'aidentity restore "Fake Hint"'
-assert_contains "rm points at prune for deleting it" "$RUN_OUT" "aidentity prune"
+assert_contains "rm points at prune for moving the data to the Trash" "$RUN_OUT" "To move the data to the Trash: aidentity prune"
 assert_not_contains "rm no longer suggests a command that cannot work" "$RUN_OUT" 'rm "Fake Hint" --purge'
 ai restore "Fake Hint"
 assert_rc "following the hint brings the launcher back" 0 "$RUN_RC" "$RUN_OUT"
@@ -66,15 +66,37 @@ assert_no_dir "both are gone from the data root" "$DATA/fake-orphan-a"
 assert_contains "it counts them" "$RUN_OUT" "Moved 2 orphaned profile(s) to the Trash."
 assert_contains "and says where each went" "$RUN_OUT" "fake-orphan-a is now at: $SB_TRASH/fake-orphan-a 2"
 assert_contains "and how to undo it" "$RUN_OUT" "To undo, move a folder back into $DATA"
+assert_contains "neither has a restore record, so the hint is add" "$RUN_OUT" "aidentity add <app> --profile <name>"
+assert_not_contains "and not restore" "$RUN_OUT" "run: aidentity restore"
 assert_not_contains "and never that it removed or deleted them" "$RUN_OUT" "Removed"
 
+# One with a restore record and one without: the hint names restore for the
+# first and add for the second.
+ai add "$ELECTRON_APP" --profile Kept
+ai rm "Fake Kept" -y
+mkdir -p "$DATA/fake-orphan-d"
+ai prune -y
+assert_rc "a prune with both kinds exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "restore, for the one marked so" "$RUN_OUT" 'Then, for one marked "can be restored" above, run: aidentity restore'
+assert_contains "and add, for the other" "$RUN_OUT" "For one without that mark, add the profile again"
+mv "$SB_TRASH/fake-kept" "$DATA/fake-kept"
+ai restore "Fake Kept"
+assert_rc "following the restore hint brings it back" 0 "$RUN_RC" "$RUN_OUT"
+ai rm "Fake Kept" --purge -y
+trash_reset
+
 mkdir -p "$DATA/fake-orphan-c"
+mkdir -p "$SB_TRASH"
 chmod 500 "$SB_TRASH"
 ai prune -y
 chmod 700 "$SB_TRASH"
+assert_rc_nonzero "a prune whose move failed exits non-zero" "$RUN_RC" "$RUN_OUT"
 assert_dir "a Trash prune cannot write to leaves the folder in place" "$DATA/fake-orphan-c"
 assert_contains "it says why" "$RUN_OUT" "Could not move $DATA/fake-orphan-c to the Trash"
-assert_contains "and counts nothing as moved" "$RUN_OUT" "Moved 0 orphaned profile(s)"
+assert_contains "and ends with a warning that counts nothing as moved" "$RUN_OUT" \
+  "! Moved 0 orphaned profile(s) to the Trash. 1 could not be moved and stayed in $DATA."
+assert_not_contains "never with a tick" "$RUN_OUT" "✓ Moved"
+assert_not_contains "and gives no undo hint for nothing" "$RUN_OUT" "To undo"
 rm -rf "$DATA/fake-orphan-c"
 trash_reset
 
