@@ -249,6 +249,11 @@ profile starts signed out, unless its profile folder is still here: then it
 uses that folder, as add does, and the plan says so. A file may list up to 200
 launchers.
 
+The launch settings, such as a proxy, come from the file. The plan shows each
+new launcher's switches, and its variables by name. Check them when the file
+is from someone else: a proxy setting sends that profile's traffic through
+the server it names.
+
 OPTIONS
   -y, --yes            Skip the confirmation prompt
 
