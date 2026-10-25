@@ -260,34 +260,21 @@ EOF
   return 1
 }
 
-# The launcher here, other than the one named $1, that keeps its profile in
-# the folder $2, into IMPORT_OWNER: create_profile's test, so the plan skips
-# what it would refuse. The same text, or the same folder spelled another way.
-# The launchers' folders are read once, into cmd_import's own variables;
-# nothing is built while the plan is made.
+# The launchers, other than the one named $1, that keep their profile in the
+# folder $2, into IMPORT_OWNER: create_profile's test (launchers_sharing), so
+# the plan skips what it would refuse. Every launcher is looked for once, into
+# cmd_import's own variables; nothing is built while the plan is made. When
+# that search fails, every entry with a folder of its own is reported as one
+# that might share, with IMPORT_OWNER empty.
 import_folder_owner() { # launcher name, data dir
-  local a d i=0 id=""
   if [ "$IMPORT_OWNERS_READ" -eq 0 ]; then
     IMPORT_OWNERS_READ=1
-    for a in "$APPS_DIR"/*.app; do
-      [ -d "$a" ] || continue
-      is_our_launcher "$a" || continue
-      d=$(plist_get "$a" AIdentityDataDir)
-      [ -n "$d" ] || continue
-      IMPORT_OWNERS[${#IMPORT_OWNERS[@]}]=$(bundle_name "$a")
-      IMPORT_DIRS[${#IMPORT_DIRS[@]}]=$d
-      IMPORT_DIR_IDS[${#IMPORT_DIR_IDS[@]}]=$(dir_id "$d")
-    done
+    IMPORT_LAUNCHERS=$(all_launchers) || IMPORT_SEARCH_FAILED=1
   fi
-  [ -d "$2" ] && id=$(dir_id "$2")
-  while [ "$i" -lt "${#IMPORT_OWNERS[@]}" ]; do
-    if [ "${IMPORT_OWNERS[$i]}" != "$1" ] && { [ "${IMPORT_DIRS[$i]}" = "$2" ] ||
-         { [ -n "$id" ] && [ "${IMPORT_DIR_IDS[$i]}" = "$id" ]; }; }; then
-      IMPORT_OWNER=${IMPORT_OWNERS[$i]}; return 0
-    fi
-    i=$((i + 1))
-  done
-  return 1
+  IMPORT_OWNER=""
+  [ "$IMPORT_SEARCH_FAILED" -eq 0 ] || return 0
+  IMPORT_OWNER=$(launchers_sharing "$2" "$APPS_DIR/$1.app" "$IMPORT_LAUNCHERS")
+  [ -n "$IMPORT_OWNER" ]
 }
 
 # A badge character that can be drawn: one that prints, in any locale. Under
@@ -411,6 +398,7 @@ import_entry() { # index
     E_SLUG=$(slugify "$E_LABEL")
     dir="$DATA_ROOT/$E_SLUG"
     if import_folder_owner "$E_LABEL" "$dir"; then
+      [ -n "$IMPORT_OWNER" ] || { E_WHY="could not look through every launcher, so it might share a profile folder"; return 1; }
       shown other "$IMPORT_OWNER"
       E_WHY="would share a profile folder with '$other'"; return 1
     fi
@@ -541,7 +529,7 @@ cmd_import() {
   local IV="" IMPORT_N=0 IMPORT_SCANNED=0 IMPORT_FOUND="" IMPORT_FOUND_NAME=""
   local IMPORT_APPS=() IMPORT_IDS=() IMPORT_NAMES=()
   local IMPORT_KEYS=() IMPORT_TYPES=() IMPORT_VALS=() IMPORT_NEXT=0
-  local IMPORT_OWNERS_READ=0 IMPORT_OWNER="" IMPORT_OWNERS=() IMPORT_DIRS=() IMPORT_DIR_IDS=()
+  local IMPORT_OWNERS_READ=0 IMPORT_OWNER="" IMPORT_LAUNCHERS="" IMPORT_SEARCH_FAILED=0
   import_load "$file" "$name"
 
   # The plan, an entry each: create or skip, and what create_profile needs.

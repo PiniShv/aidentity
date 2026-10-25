@@ -126,21 +126,21 @@ create_profile() {
     Use a name containing at least one letter or number."
       return 1
     fi
-    local existing
-    for existing in "$APPS_DIR"/*.app; do
-      [ -d "$existing" ] || continue
-      is_our_launcher "$existing" || continue
-      [ "$(bundle_name "$existing")" = "$label" ] && continue
-      local theirs; theirs=$(plist_get "$existing" "AIdentityDataDir")
-      # Same text, or the same directory spelled another way.
-      if [ "$theirs" = "$data_dir" ] || { [ -n "$(dir_id "$theirs")" ] &&
-           [ "$(dir_id "$theirs")" = "$(dir_id "$data_dir")" ]; }; then
-        warn "'$label' would share its profile directory with '$(bundle_name "$existing")':
+    # Every launcher counts, the way rm --purge looks: one filed into a
+    # folder shares the data just the same. If they cannot all be looked at,
+    # no profile is made, rather than one that might share.
+    local others
+    if ! others=$(launchers_sharing "$data_dir" "$dst"); then
+      warn "Could not look through every launcher, so '$label' was not made: it might
+    share its profile directory with one. Check that $APPS_DIR can be read."
+      return 1
+    fi
+    if [ -n "$others" ]; then
+      warn "'$label' would share its profile directory with '$others':
       $data_dir
     Spaces, underscores, hyphens and capitals are treated the same. Pick a more distinct name."
-        return 1
-      fi
-    done
+      return 1
+    fi
   fi
 
   # Never turn a separate profile into a main launcher or back by re-adding

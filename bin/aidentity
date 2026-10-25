@@ -1960,11 +1960,12 @@ cmd_rm() {
 # the launcher directory missed a launcher filed into a folder, and rm --purge
 # moved the data it was signed in with. Returns non-zero when that search
 # fails, so a caller about to move the data keeps it. A view that asks about
-# many launchers passes the list from one all_launchers as $3.
+# many launchers passes the list from one all_launchers as $3. A folder that
+# does not exist yet is matched by its path as recorded: add asks before it
+# makes one, and a launcher can still record a folder that was removed.
 launchers_sharing() { # data dir, [a launcher to leave out], [launcher list]
-  local id app d list names="" seen=" " app_id
-  # Not a directory: no launcher can be using it.
-  id=$(dir_id "$1") || return 0
+  local id="" app d list names="" seen=" " app_id
+  id=$(dir_id "$1") || id=""
   if [ $# -ge 3 ]; then list=$3; else list=$(all_launchers) || return 1; fi
   while IFS= read -r app; do
     [ -n "$app" ] || continue
@@ -1975,7 +1976,8 @@ launchers_sharing() { # data dir, [a launcher to leave out], [launcher list]
     case "$seen" in *" $app_id "*) continue ;; esac
     seen="$seen$app_id "
     d=$(plist_get "$app" "AIdentityDataDir")
-    [ "$(dir_id "$d")" = "$id" ] || continue
+    [ -n "$d" ] || continue
+    [ "$d" = "$1" ] || { [ -n "$id" ] && [ "$(dir_id "$d")" = "$id" ]; } || continue
     [ "${app%/*}" = "$APPS_DIR" ] && app=$(bundle_name "$app")
     names="${names:+$names, }$app"
   done <<EOF
@@ -2306,21 +2308,21 @@ create_profile() {
     Use a name containing at least one letter or number."
       return 1
     fi
-    local existing
-    for existing in "$APPS_DIR"/*.app; do
-      [ -d "$existing" ] || continue
-      is_our_launcher "$existing" || continue
-      [ "$(bundle_name "$existing")" = "$label" ] && continue
-      local theirs; theirs=$(plist_get "$existing" "AIdentityDataDir")
-      # Same text, or the same directory spelled another way.
-      if [ "$theirs" = "$data_dir" ] || { [ -n "$(dir_id "$theirs")" ] &&
-           [ "$(dir_id "$theirs")" = "$(dir_id "$data_dir")" ]; }; then
-        warn "'$label' would share its profile directory with '$(bundle_name "$existing")':
+    # Every launcher counts, the way rm --purge looks: one filed into a
+    # folder shares the data just the same. If they cannot all be looked at,
+    # no profile is made, rather than one that might share.
+    local others
+    if ! others=$(launchers_sharing "$data_dir" "$dst"); then
+      warn "Could not look through every launcher, so '$label' was not made: it might
+    share its profile directory with one. Check that $APPS_DIR can be read."
+      return 1
+    fi
+    if [ -n "$others" ]; then
+      warn "'$label' would share its profile directory with '$others':
       $data_dir
     Spaces, underscores, hyphens and capitals are treated the same. Pick a more distinct name."
-        return 1
-      fi
-    done
+      return 1
+    fi
   fi
 
   # Never turn a separate profile into a main launcher or back by re-adding
@@ -3671,34 +3673,21 @@ EOF
   return 1
 }
 
-# The launcher here, other than the one named $1, that keeps its profile in
-# the folder $2, into IMPORT_OWNER: create_profile's test, so the plan skips
-# what it would refuse. The same text, or the same folder spelled another way.
-# The launchers' folders are read once, into cmd_import's own variables;
-# nothing is built while the plan is made.
+# The launchers, other than the one named $1, that keep their profile in the
+# folder $2, into IMPORT_OWNER: create_profile's test (launchers_sharing), so
+# the plan skips what it would refuse. Every launcher is looked for once, into
+# cmd_import's own variables; nothing is built while the plan is made. When
+# that search fails, every entry with a folder of its own is reported as one
+# that might share, with IMPORT_OWNER empty.
 import_folder_owner() { # launcher name, data dir
-  local a d i=0 id=""
   if [ "$IMPORT_OWNERS_READ" -eq 0 ]; then
     IMPORT_OWNERS_READ=1
-    for a in "$APPS_DIR"/*.app; do
-      [ -d "$a" ] || continue
-      is_our_launcher "$a" || continue
-      d=$(plist_get "$a" AIdentityDataDir)
-      [ -n "$d" ] || continue
-      IMPORT_OWNERS[${#IMPORT_OWNERS[@]}]=$(bundle_name "$a")
-      IMPORT_DIRS[${#IMPORT_DIRS[@]}]=$d
-      IMPORT_DIR_IDS[${#IMPORT_DIR_IDS[@]}]=$(dir_id "$d")
-    done
+    IMPORT_LAUNCHERS=$(all_launchers) || IMPORT_SEARCH_FAILED=1
   fi
-  [ -d "$2" ] && id=$(dir_id "$2")
-  while [ "$i" -lt "${#IMPORT_OWNERS[@]}" ]; do
-    if [ "${IMPORT_OWNERS[$i]}" != "$1" ] && { [ "${IMPORT_DIRS[$i]}" = "$2" ] ||
-         { [ -n "$id" ] && [ "${IMPORT_DIR_IDS[$i]}" = "$id" ]; }; }; then
-      IMPORT_OWNER=${IMPORT_OWNERS[$i]}; return 0
-    fi
-    i=$((i + 1))
-  done
-  return 1
+  IMPORT_OWNER=""
+  [ "$IMPORT_SEARCH_FAILED" -eq 0 ] || return 0
+  IMPORT_OWNER=$(launchers_sharing "$2" "$APPS_DIR/$1.app" "$IMPORT_LAUNCHERS")
+  [ -n "$IMPORT_OWNER" ]
 }
 
 # A badge character that can be drawn: one that prints, in any locale. Under
@@ -3822,6 +3811,7 @@ import_entry() { # index
     E_SLUG=$(slugify "$E_LABEL")
     dir="$DATA_ROOT/$E_SLUG"
     if import_folder_owner "$E_LABEL" "$dir"; then
+      [ -n "$IMPORT_OWNER" ] || { E_WHY="could not look through every launcher, so it might share a profile folder"; return 1; }
       shown other "$IMPORT_OWNER"
       E_WHY="would share a profile folder with '$other'"; return 1
     fi
@@ -3952,7 +3942,7 @@ cmd_import() {
   local IV="" IMPORT_N=0 IMPORT_SCANNED=0 IMPORT_FOUND="" IMPORT_FOUND_NAME=""
   local IMPORT_APPS=() IMPORT_IDS=() IMPORT_NAMES=()
   local IMPORT_KEYS=() IMPORT_TYPES=() IMPORT_VALS=() IMPORT_NEXT=0
-  local IMPORT_OWNERS_READ=0 IMPORT_OWNER="" IMPORT_OWNERS=() IMPORT_DIRS=() IMPORT_DIR_IDS=()
+  local IMPORT_OWNERS_READ=0 IMPORT_OWNER="" IMPORT_LAUNCHERS="" IMPORT_SEARCH_FAILED=0
   import_load "$file" "$name"
 
   # The plan, an entry each: create or skip, and what create_profile needs.

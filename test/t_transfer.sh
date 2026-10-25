@@ -630,6 +630,16 @@ assert_not_contains "the plan does not say the folder is used" "$RUN_OUT" "is he
 assert_contains "the rest are built" "$RUN_OUT" "1 created, 1 skipped, 0 failed."
 assert_no_dir "and it is not" "$APPS/Fake Work_2.app"
 tx rm "Fake Fine" --purge -y
+# A launcher filed into a folder shares the folder just the same.
+mkdir -p "$APPS/Filed"
+mv "$APPS/Fake Work 2.app" "$APPS/Filed/"
+tr_file "$TR_F" "$(tr_entry profile='"Work_2"')"
+tx import "$TR_F" -y
+assert_contains "a launcher filed into a folder is found too, named by its path" "$RUN_OUT" \
+  "would share a profile folder with '$APPS/Filed/Fake Work 2.app'"
+assert_no_dir "and nothing is built" "$APPS/Fake Work_2.app"
+mv "$APPS/Filed/Fake Work 2.app" "$APPS/"
+rmdir "$APPS/Filed"
 # The same folder reached by another path: the data root through a link.
 ln -s "$VSC_DATA" "$SANDBOX/v-link"
 tr_file "$TR_F" "$(tr_entry profile='"Work-2"')"
