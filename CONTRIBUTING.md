@@ -1,8 +1,50 @@
 # Contributing to aidentity
 
-The whole tool is one shell script: `bin/aidentity`. Read it before changing it —
-it is commented throughout, and most questions are answered faster by reading it
-than by asking.
+The tool ships as one shell script, `bin/aidentity`. It is written in `src/`:
+the same code, split by subject into files of a few hundred lines each.
+`make build` joins them back into `bin/aidentity` and updates `SHA256SUMS`.
+Read the code before changing it — it is commented throughout, and most
+questions are answered faster by reading it than by asking.
+
+## Where the code lives
+
+Edit `src/`, never `bin/aidentity`. Commit both: installs and updates fetch
+`bin/aidentity` alone. `make test`, `make lint` and CI stop when the two
+disagree, and say so.
+
+```sh
+make build    # after every change in src/
+```
+
+| File in `src/` | What it holds |
+|---|---|
+| `00-header.sh` | the version, the directories, the environment |
+| `10-output.sh` | messages, prompts, the macOS check |
+| `20-validation.sh` | profile names, quoting, JSON strings |
+| `30-apps.sh` | finding Chromium and Electron apps |
+| `40-colours-icons.sh` | badge colours and icons |
+| `50-launcher.sh` | what counts as our launcher, the running check, safe deletes, clean-up on exit, building a launcher, restore records |
+| `51-launch-settings.sh` | per-profile launch settings |
+| `52-launcher-assembly.sh` | putting a launcher together and moving it into place |
+| `60-cmd-list.sh` | `apps`, `list`, `open`, `version` |
+| `61-cmd-rm-doctor.sh` | `rm`, `doctor` |
+| `62-cmd-add.sh` | `add`, `setup` |
+| `63-cmd-manage.sh` | `rename`, `set`, `restore`, `prune`, `rebuild` |
+| `70-update.sh` | `update`, and the download checks `install.sh` shares |
+| `80-ui.sh` | the menu: drawing and the terminal |
+| `81-ui-keys.sh` | the menu: keys and actions |
+| `90-command-table.sh` | the table every command is listed in |
+| `91-command-help.sh` | help text |
+| `92-completion.sh` | shell completion |
+| `99-dispatch.sh` | `main`, and the last line |
+
+The number sets the order in `bin/aidentity`; a new file needs a free one.
+Bash errors and shellcheck name lines of `bin/aidentity`. To find the line to
+edit:
+
+```sh
+bash scripts/build.sh --where 2345
+```
 
 ## Running the tests
 
@@ -52,6 +94,7 @@ Check yourself before pushing:
 
 ```sh
 /bin/bash --version          # must say 3.2.x
+make build                   # bin/aidentity from src/
 /bin/bash -n bin/aidentity   # syntax check under the real thing
 shellcheck bin/aidentity     # optional, but fix what it finds
 ```
@@ -116,7 +159,9 @@ back regardless of what else it does.
    the line `main "$@"`. So `bin/aidentity` must keep all of these: one
    `AIDENTITY_VERSION="x.y.z"` line, `#!` first, valid shell, and `main "$@"`
    as the last line with content (blank lines are ignored, a trailing comment
-   is not). `scripts/guards.sh` checks each of them before every release.
+   is not). The first two are in `src/00-header.sh`, the last line in
+   `src/99-dispatch.sh`. `scripts/guards.sh` checks each of them before every
+   release.
 
    The download checks (`https_fetch`, `verify_release_file`, `install_atomic`
    and the helpers between the `download block` markers) are pasted into
@@ -129,11 +174,8 @@ back regardless of what else it does.
 8. **Regenerate `SHA256SUMS` in the same commit that changes `bin/aidentity`.**
    `install.sh` fetches that file and refuses to install a script whose hash
    does not match, or that has no checksum, so a stale checksum breaks every
-   `curl` install. CI fails the build when the two disagree.
-
-   ```sh
-   make checksums
-   ```
+   `curl` install. CI fails the build when the two disagree. `make build`
+   regenerates it.
 
 ## Adding support for a new app
 

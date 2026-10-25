@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The code is written in `src/`, split by subject, and built into
+  `bin/aidentity`, which still ships as one file. Installs and updates fetch
+  it as before. The file differs from 1.5.0 only in comments, and in where one
+  function sits.
+
 ## [1.5.0] - 2026-10-25
 
 ### Changed

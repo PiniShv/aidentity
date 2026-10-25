@@ -158,4 +158,14 @@ else
   bad "SHA256SUMS needs a '<64 hex>  bin/aidentity' line; installed copies of update read that format. Run: make checksums"
 fi
 
+# 8. bin/aidentity is built from src/ by scripts/build.sh, and both are
+#    committed. A change made in bin/aidentity alone would be lost at the next
+#    build; one made in src/ alone would never ship.
+if err=$(bash scripts/build.sh --check 2>&1); then
+  pass "bin/aidentity is the build of src/"
+else
+  bad "bin/aidentity is not the build of src/. Edit src/*.sh, then run: make build"
+  printf '%s\n' "$err" >&2
+fi
+
 exit "$fail"

@@ -17,6 +17,6 @@
 
 ## Before you submit
 
-- [ ] `SHA256SUMS` regenerated with `make checksums`, if `bin/aidentity` changed
+- [ ] Changes made in `src/`, then `make build` (it rebuilds `bin/aidentity` and `SHA256SUMS`)
 - [ ] `--help` and `docs/` updated, if behaviour changed
 - [ ] A line under `## [Unreleased]` in `CHANGELOG.md`, if a user would notice the change

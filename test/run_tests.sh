@@ -3054,6 +3054,7 @@ rc_fresh() {
   rm -rf "$RC_DIR"
   mkdir -p "$RC_DIR/bin" "$RC_DIR/scripts" "$RC_DIR/test"
   cp "$REPO_DIR/bin/aidentity" "$RC_DIR/bin/"
+  cp -R "$REPO_DIR/src" "$RC_DIR/"
   cp "$REPO_DIR/uninstall.sh" "$REPO_DIR/SHA256SUMS" "$REPO_DIR/CHANGELOG.md" "$RC_DIR/"
   cp "$REPO_DIR/scripts/"*.sh "$RC_DIR/scripts/"
   cp "$REPO_DIR/test/run_tests.sh" "$RC_DIR/test/"
@@ -3169,6 +3170,9 @@ if then fi'
 rc_guard "a script without #! is refused" "must start with #!" '1d'
 rc_guard "a script that does not end on main \"\$@\" is refused" 'must end on [main "$@"]' '$a\
 echo after'
+# bin/aidentity is built from src/. A change made in it alone would be lost at
+# the next build, so the guards refuse it, even with a matching checksum.
+rc_guard "a script edited by hand, not built from src/, is refused" "is not the build of src/" '2s/.*/# edited by hand/'
 
 # install.sh carries a pasted copy of the download code. A copy that drifted,
 # or a function defined again after it, fails the guards.
@@ -3219,6 +3223,112 @@ for fn in proc_snapshot running_in_snapshot proc_dir_ids; do
   assert_rc "the guards refuse a changed $fn in uninstall.sh" 1 "$RUN_RC" "$RUN_OUT"
   assert_contains "and name it" "$RUN_OUT" "$fn differs between bin/aidentity and uninstall.sh"
 done
+
+
+group "bin/aidentity is built from src/"
+
+# scripts/build.sh joins src/ into the one file that ships. It runs on a copy
+# here, so nothing in this checkout is rebuilt.
+BLD_DIR="$SB/build-repo"
+bld_fresh() {
+  rm -rf "$BLD_DIR"
+  mkdir -p "$BLD_DIR/bin" "$BLD_DIR/scripts"
+  cp -R "$REPO_DIR/src" "$BLD_DIR/"
+  cp "$REPO_DIR/scripts/build.sh" "$BLD_DIR/scripts/"
+}
+bld() { # build.sh arguments
+  RUN_OUT=$(cd "$SB" && detached "$BASH_BIN" "$BLD_DIR/scripts/build.sh" "$@" 2>"$SANDBOX/stderr" </dev/null)
+  RUN_RC=$?
+  RUN_ERR=$(cat "$SANDBOX/stderr")
+  return 0
+}
+
+bld_fresh
+bld
+assert_rc "the build writes bin/aidentity" 0 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+if cmp -s "$BLD_DIR/bin/aidentity" "$REPO_DIR/bin/aidentity"; then _pass "byte for byte the committed file"
+else _fail "byte for byte the committed file" "the build of src/ differs from bin/aidentity: run make build"; fi
+assert_exec "and executable" "$BLD_DIR/bin/aidentity"
+bld --check
+assert_rc "--check passes on what it just built" 0 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+printf '# edited by hand\n' >> "$BLD_DIR/bin/aidentity"
+bld --check
+assert_rc "--check refuses a hand edit" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "and says where to make it" "$RUN_ERR" "Make changes in src/*.sh, not in bin/aidentity, then run: make build"
+assert_contains "and shows the edit" "$RUN_ERR" "# edited by hand"
+
+# Only NN-name.sh files are joined. Anything else in src/ would be left out
+# without a word, so it stops the build.
+bld_fresh
+: > "$BLD_DIR/src/notes.sh"
+bld
+assert_rc "a stray file in src/ stops the build" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "and is named" "$RUN_ERR" "src/notes.sh"
+assert_no_file "and nothing is written" "$BLD_DIR/bin/aidentity"
+bld_fresh
+printf 'echo no newline' > "$BLD_DIR/src/50-zz.sh"
+bld
+assert_rc "a file without a final newline stops the build" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "and is named" "$RUN_ERR" "src/50-zz.sh must end with a newline"
+
+# --where turns a line of bin/aidentity, as bash and shellcheck name it, back
+# into the src/ line to edit. The file names are read, not written in here.
+bld_fresh
+bld_files=("$BLD_DIR"/src/[0-9][0-9]-*.sh)
+bld_first="src/${bld_files[0]##*/}"; bld_second="src/${bld_files[1]##*/}"
+bld_last="src/${bld_files[${#bld_files[@]}-1]##*/}"
+bld_n1=$(wc -l < "${bld_files[0]}" | tr -d ' ')
+bld_total=$(wc -l < "$REPO_DIR/bin/aidentity" | tr -d ' ')
+bld --where 1
+assert_eq "--where 1 is the first file's first line" "$bld_first:1" "$RUN_OUT"
+bld --where "$((bld_n1 + 1))"
+assert_eq "the line the build adds between two files is named as such" "the blank line between $bld_first and $bld_second" "$RUN_OUT"
+bld --where "$((bld_n1 + 2))"
+assert_eq "the next line is the second file's first" "$bld_second:1" "$RUN_OUT"
+bld --where "$bld_total"
+assert_eq "the last line is the last file's last" "$bld_last:$(wc -l < "${bld_files[${#bld_files[@]}-1]}" | tr -d ' ')" "$RUN_OUT"
+bld --where "$((bld_total + 1))"
+assert_rc "a line past the end is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "with the length" "$RUN_ERR" "bin/aidentity has only $bld_total lines"
+for bad_line in 0 007 x ""; do
+  bld --where "$bad_line"
+  assert_rc "--where [$bad_line] is a usage error" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+  assert_contains "that shows the usage" "$RUN_ERR" "Usage: scripts/build.sh --where LINE"
+done
+
+# make test, lint, install and release read bin/aidentity, so each stops first
+# when a src/ change was not built. They run on the release-check copy, with a
+# stand-in suite that only leaves a mark: a stop that failed would show there.
+rc_fresh
+cp "$REPO_DIR/Makefile" "$RC_DIR/"
+printf 'touch "%s"\n' "$SANDBOX/suite-ran" > "$RC_DIR/test/run_tests.sh"
+mk_src=("$RC_DIR"/src/[0-9][0-9]-*.sh)
+printf '# not built yet\n' >> "${mk_src[0]}"
+mk_before=$(rc_tree)
+for target in test lint install release; do
+  RUN_OUT=$(cd "$SB" && detached make --no-print-directory -C "$RC_DIR" "$target" VERSION=9.9.9 \
+    PREFIX="$SB/make-prefix" 2>&1 </dev/null); RUN_RC=$?
+  assert_rc_nonzero "make $target stops when bin/aidentity is not the build of src/" "$RUN_RC" "$RUN_OUT"
+  assert_contains "and says why" "$RUN_OUT" "bin/aidentity is not the build of src/"
+done
+assert_no_file "the suite never ran" "$SANDBOX/suite-ran"
+assert_no_file "nothing was installed" "$SB/make-prefix/bin/aidentity"
+assert_eq "and no file changed" "$mk_before" "$(rc_tree)"
+
+# On a built tree, make release sets the version in src/, rebuilds
+# bin/aidentity from it and updates SHA256SUMS.
+rc_fresh
+cp "$REPO_DIR/Makefile" "$RC_DIR/"
+RUN_OUT=$(cd "$SB" && detached make --no-print-directory -C "$RC_DIR" release VERSION=9.9.9 2>&1 </dev/null); RUN_RC=$?
+assert_rc "make release on a built tree" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "sets the version in src/00-header.sh" 'AIDENTITY_VERSION="9.9.9"' \
+  "$(grep '^AIDENTITY_VERSION=' "$RC_DIR/src/00-header.sh")"
+assert_eq "and in bin/aidentity" 'AIDENTITY_VERSION="9.9.9"' \
+  "$(grep '^AIDENTITY_VERSION=' "$RC_DIR/bin/aidentity")"
+RUN_OUT=$(cd "$SB" && "$BASH_BIN" "$RC_DIR/scripts/build.sh" --check 2>&1); RUN_RC=$?
+assert_rc "which is the build of src/" 0 "$RUN_RC" "$RUN_OUT"
+RUN_OUT=$(cd "$RC_DIR" && shasum -a 256 -c SHA256SUMS 2>&1); RUN_RC=$?
+assert_rc "and SHA256SUMS matches it" 0 "$RUN_RC" "$RUN_OUT"
 
 
 group "uninstall.sh end to end, every search path in the sandbox"
