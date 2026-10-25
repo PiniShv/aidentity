@@ -51,11 +51,15 @@ launcher_status() { # app, data dir, main (1 or 0) -> STATUS
   return 0
 }
 
-# Text from the disk as a person sees it, into the variable named $1: each
-# control character becomes "?", so an escape sequence cannot reach the
-# terminal. In a UTF-8 locale that includes some invisible characters, such as
-# the joiner inside some emoji.
+# Text from the disk or from a file as a person sees it, into the variable
+# named $1: each control character becomes "?", so an escape sequence cannot
+# reach the terminal. The text is read as UTF-8 whatever the locale: under C,
+# [[:cntrl:]] misses the C1 controls (U+0080 to U+009F), and some terminals
+# read U+009B as the start of an escape sequence. Read as UTF-8, some invisible
+# characters count as controls too, such as the joiner inside some emoji. The
+# caller's locale is back when this returns.
 shown() { # variable, text
+  local LC_ALL=en_US.UTF-8
   printf -v "$1" '%s' "${2//[[:cntrl:]]/?}"
 }
 

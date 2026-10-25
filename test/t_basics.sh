@@ -173,6 +173,13 @@ assert_not_contains "and the code is not printed back" "$RUN_OUT" "$C1"
 utf8_call validate_env "A${C1}=1"
 assert_rc_nonzero "a variable name with U+009B is refused" "$RUN_RC" "$RUN_OUT"
 assert_not_contains "and the code is not printed back" "$RUN_OUT" "$C1"
+# shown, which makes text safe to print, reads it as UTF-8 in any locale, so
+# U+009B becomes ? under C too. The caller's locale is back afterwards: under
+# C, é is still two bytes long.
+SHOWN_IN="a${C1}b"$'\033'"c" libcall eval 'shown v "$SHOWN_IN"; u="é"; printf "%s|%s" "$v" "${#u}"'
+assert_eq "under C, shown turns ESC and U+009B into ?, and C is back after it" "a?b?c|2" "$RUN_OUT"
+SHOWN_IN="a${C1}b"$'\033'"c" utf8_call eval 'shown v "$SHOWN_IN"; u="é"; printf "%s|%s" "$v" "${#u}"'
+assert_eq "and the same under UTF-8, which is back after it too" "a?b?c|1" "$RUN_OUT"
 utf8_call validate_switch '--proxy-server=socks5://127.0.0.1:1080'
 assert_rc "and an ASCII switch is still accepted there" 0 "$RUN_RC" "$RUN_OUT"
 utf8_call color_hex 'ｆｆｆｆｆｆ'

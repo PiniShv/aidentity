@@ -115,6 +115,7 @@ cmd_rm() {
     local moved
     if ! moved=$(trash_path "$data"); then
       dim "  The launcher is gone; its data is still at: $data"
+      dim "  To use this account again:  $again"
       return 1
     fi
     ok "Moved the profile data to the Trash."

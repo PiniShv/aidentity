@@ -71,6 +71,9 @@ assert_no_dir "data no launcher pointed at" "$DATA/stray-profile"
 assert_dir "is in the Trash too" "$UN_TRASH/stray-profile"
 assert_contains "it says it moved the data" "$RUN_OUT" "Moved the data for Fake Bye to the Trash"
 assert_contains "and how to get an account back" "$RUN_OUT" "To get an account back"
+assert_contains "with the data folder made first, as it may be gone" "$RUN_OUT" "mkdir -p \"$DATA\""
+assert_contains "then names restore" "$RUN_OUT" "    aidentity restore"
+assert_contains "and add, for a folder restore does not list" "$RUN_OUT" "If restore does not list it, add the profile again"
 assert_not_contains "and never that it deleted the data" "$RUN_OUT" "Deleted data"
 assert_contains "and only then says aidentity is gone" "$RUN_OUT" "aidentity is gone"
 assert_file "it never touched this checkout" "$REPO_DIR/bin/aidentity"
@@ -88,4 +91,18 @@ assert_no_dir "the launcher is still removed" "$APPS/Fake Bye.app"
 assert_dir "and its data goes to the Trash under the next free name" "$UN_TRASH/fake-bye 2"
 rm -f "$UN_BIN/aidentity"
 mkdir -p "$DATA"
+trash_reset
+
+# A running profile stops it before the question: nothing is removed, and the
+# reason talks about moving the data, not deleting it.
+make_pgrep_stubs
+ai add "$ELECTRON_APP" --profile Busy
+printf 'session\n' > "$BUSY_DATA/Cookies"
+PATH="$PGREP_STUB:$PATH" un_tty 'delete\n'
+assert_rc_nonzero "a running profile stops the uninstall" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "Moving a profile's data while its app is open"
+assert_not_contains "and never says Deleting" "$RUN_OUT" "Deleting"
+assert_dir "the launcher stays" "$APPS/Fake Busy.app"
+assert_file "and so does its data" "$BUSY_DATA/Cookies"
+ai rm "Fake Busy" --purge -y
 trash_reset

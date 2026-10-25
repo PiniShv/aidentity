@@ -75,6 +75,13 @@ for row in "${CMD_ROWS[@]}"; do
 done
 
 assert_contains "the overview points to the help of one command" "$HELP_ALL" "Run 'aidentity help COMMAND'"
+assert_contains "its examples include quit" "$HELP_ALL" '  aidentity quit "Claude Work"'
+assert_contains "and export" "$HELP_ALL" "  aidentity export > profiles.json"
+ai help prune
+assert_contains "prune's help promises restore only for the folders marked so" "$RUN_OUT" \
+  'this works for the folders the list marks
+"can be restored"'
+assert_contains "and gives add for the others" "$RUN_OUT" "add the profile again with the"
 ai
 assert_eq "no arguments print the overview, as before" "$HELP_ALL" "$RUN_OUT"
 ai --help

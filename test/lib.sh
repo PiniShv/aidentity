@@ -88,7 +88,9 @@ mkdir -p "$HOME" "$SANDBOX/tty-home"
 # The names in a Trash that start with "fake-", the prefix of every profile
 # folder the suite makes. Only those: other changes to a user's Trash while
 # the suite runs are not the suite's. A Trash that cannot be listed (macOS
-# keeps the real one private from some programs) reads as that, both times.
+# keeps the real one private from some programs) reads as that, both times,
+# so there the final check of the real Trash is only advisory: it cannot see a
+# change. The HOME override above is the real guard.
 trash_names() { # trash folder
   local list
   list=$(ls -A "$1" 2>/dev/null) || { printf '<unreadable>'; return 0; }

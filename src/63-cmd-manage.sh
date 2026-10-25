@@ -446,13 +446,17 @@ EOF
 
   info "${C_BOLD}Profile data with no launcher pointing at it:${C_RESET}"
   info ""
-  local restorable=0
+  # can[i] is 1 when orphans[i] has a restore record, so the undo hint after
+  # the move only promises restore for those.
+  local restorable=0 can=()
   for d in "${orphans[@]}"; do
     printf '  %-10s %s\n' "$(human_bytes "$d")" "$(basename "$d")"
     dim "             $d"
     if label=$(restore_label "$d"); then
       dim "             can be restored: aidentity restore \"$label\""
-      restorable=$((restorable+1))
+      restorable=$((restorable+1)); can+=(1)
+    else
+      can+=(0)
     fi
   done
   info ""
@@ -472,8 +476,9 @@ EOF
     [ "$reply" = "yes" ] || die "Cancelled. Nothing was moved."
   fi
 
-  local moved=0 dest
+  local moved=0 failed=0 by_restore=0 by_add=0 dest i=-1
   for d in "${orphans[@]}"; do
+    i=$((i+1))
     if running_on_profile "$d"; then
       warn "Skipping $(basename "$d") — something is running on it."
       continue
@@ -486,10 +491,26 @@ EOF
     if dest=$(trash_path "$d"); then
       moved=$((moved+1))
       dim "  $(basename "$d") is now at: $dest"
+      if [ "${can[$i]}" = 1 ]; then by_restore=$((by_restore+1)); else by_add=$((by_add+1)); fi
+    else
+      failed=$((failed+1))
     fi
   done
-  ok "Moved $moved orphaned profile(s) to the Trash."
-  [ "$moved" -eq 0 ] || dim "  To undo, move a folder back into $DATA_ROOT, then run: aidentity restore"
+  # A failed move is not a success: no green tick, and a non-zero exit.
+  if [ "$failed" -eq 0 ]; then
+    ok "Moved $moved orphaned profile(s) to the Trash."
+  else
+    warn "Moved $moved orphaned profile(s) to the Trash. $failed could not be moved and stayed in $DATA_ROOT."
+  fi
+  if [ "$moved" -gt 0 ]; then
+    dim "  To undo, move a folder back into $DATA_ROOT."
+    [ "$by_restore" -eq 0 ] || dim "  Then, for one marked \"can be restored\" above, run: aidentity restore"
+    if [ "$by_add" -gt 0 ]; then
+      dim "  For one without that mark, add the profile again with the same app and"
+      dim "  profile name, and it uses the folder:  aidentity add <app> --profile <name>"
+    fi
+  fi
+  [ "$failed" -eq 0 ]
 }
 
 # Rebuild one launcher from what its Info.plist records. Profile data is never
