@@ -37,6 +37,9 @@ sources() {
   [ "$found" = 1 ] || die "No src/NN-name.sh files to build from. Run this from a full checkout."
   for f in src/[0-9][0-9]-*.sh; do
     # A last line without a newline would be glued to the next file's first.
+    # An empty file would still get a blank line before it, which --where
+    # cannot count, so every line after it would map to the wrong place.
+    [ -s "$f" ] || die "$f is empty. Add its code, or delete it."
     [ -z "$(tail -c 1 "$f")" ] || die "$f must end with a newline."
   done
 }

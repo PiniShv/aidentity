@@ -351,6 +351,11 @@ printf 'echo no newline' > "$BLD_DIR/src/50-zz.sh"
 bld
 assert_rc "a file without a final newline stops the build" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
 assert_contains "and is named" "$RUN_ERR" "src/50-zz.sh must end with a newline"
+bld_fresh
+: > "$BLD_DIR/src/50-zz.sh"
+bld
+assert_rc "an empty file stops the build: --where could not count past it" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "and is named" "$RUN_ERR" "src/50-zz.sh is empty"
 
 # --where turns a line of bin/aidentity, as bash and shellcheck name it, back
 # into the src/ line to edit. The file names are read, not written in here.

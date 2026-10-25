@@ -140,6 +140,7 @@ for area_name in $TEST_AREAS; do
   # left behind would go unnoticed there. Each area cleans up after itself.
   assert_eq "area $area_name left no launcher behind" 0 "$(count_launchers)"
   assert_eq "and no profile data" "" "$(ls -A "$DATA" 2>/dev/null)"
+  assert_eq "and no VS Code-style profile data" "" "$(ls -A "$VSC_DATA" 2>/dev/null)"
 done
 
 # ======================================================= always run, last ==
