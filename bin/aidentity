@@ -3220,13 +3220,16 @@ cmd_quit() {
 EXPORT_FORMAT=1
 
 # What import reads is capped, because the file may come from someone else.
-# Up to 200 launchers, each with at most 32 switches and 32 variables (the
-# allowlists hold 9 switches and 13 variables, so an export has fewer), and
-# 4 MiB in all: 200 launchers with every proxy setting at its longest take
-# less than half of that. The file is copied up to that size before anything
-# parses it.
+# Up to 200 launchers, each with at most 32 switches and 32 variables (far
+# more than the allowlists hold, so an export has fewer), each switch or
+# variable at most 1024 characters (a proxy value, the longest allowed, is
+# at most 512), and 4 MiB in all: 200 launchers with every proxy setting at
+# its longest take less than half of that. The file is copied up to that size
+# before anything parses it. The per-value cap keeps the checks quick: they
+# take longer than linear time on a long value.
 IMPORT_MAX_LAUNCHERS=200
 IMPORT_MAX_SETTINGS=32
+IMPORT_MAX_VALUE=1024
 IMPORT_MAX_BYTES=4194304
 
 # The bundle ID of the app a launcher opens. When the app is gone, the one the
@@ -3354,6 +3357,36 @@ EOF
   return 1
 }
 
+# The launcher here, other than the one named $1, that keeps its profile in
+# the folder $2, into IMPORT_OWNER: create_profile's test, so the plan skips
+# what it would refuse. The same text, or the same folder spelled another way.
+# The launchers' folders are read once, into cmd_import's own variables;
+# nothing is built while the plan is made.
+import_folder_owner() { # launcher name, data dir
+  local a d i=0 id
+  if [ "$IMPORT_OWNERS_READ" -eq 0 ]; then
+    IMPORT_OWNERS_READ=1
+    for a in "$APPS_DIR"/*.app; do
+      [ -d "$a" ] || continue
+      is_our_launcher "$a" || continue
+      d=$(plist_get "$a" AIdentityDataDir)
+      [ -n "$d" ] || continue
+      IMPORT_OWNERS[${#IMPORT_OWNERS[@]}]=$(bundle_name "$a")
+      IMPORT_DIRS[${#IMPORT_DIRS[@]}]=$d
+      IMPORT_DIR_IDS[${#IMPORT_DIR_IDS[@]}]=$(dir_id "$d")
+    done
+  fi
+  id=$(dir_id "$2")
+  while [ "$i" -lt "${#IMPORT_OWNERS[@]}" ]; do
+    if [ "${IMPORT_OWNERS[$i]}" != "$1" ] && { [ "${IMPORT_DIRS[$i]}" = "$2" ] ||
+         { [ -n "$id" ] && [ "${IMPORT_DIR_IDS[$i]}" = "$id" ]; }; }; then
+      IMPORT_OWNER=${IMPORT_OWNERS[$i]}; return 0
+    fi
+    i=$((i + 1))
+  done
+  return 1
+}
+
 # A badge character that can be drawn: one that prints, in any locale. Under
 # C, [[:cntrl:]] misses the C1 controls, which some terminals and fonts treat
 # as the start of an escape sequence.
@@ -3375,6 +3408,7 @@ import_list() { # entry key path, key, kind, check
     || { E_WHY="$2 has more than $IMPORT_MAX_SETTINGS entries"; return 1; }
   while [ "$i" -lt "$n" ]; do
     import_value "$1.$2.$i" string || { E_WHY="$2 holds something that is not text"; return 1; }
+    [ "${#IV}" -le "$IMPORT_MAX_VALUE" ] || { E_WHY="$2 has a value that is too long"; return 1; }
     if ! import_check "$4" "$IV"; then
       # A variable's value can be a password: never print it.
       if [ "$3" = env ]; then
@@ -3394,7 +3428,7 @@ import_list() { # entry key path, key, kind, check
 # E_SHOW, the entry's name as it is printed. Returns 1, with the reason in
 # E_WHY, for an entry to skip.
 import_entry() { # index
-  local k="launchers.$1" rc kind="" other
+  local k="launchers.$1" rc kind="" other dir
   E_SHOW="entry $(($1 + 1))"; E_WHY=""; E_APP=""; E_PROFILE=""; E_LABEL=""
   E_MAIN=0; E_BADGE=""; E_NOBADGE=0; E_HEX=""; E_EXTRAS=""
   import_value "$k" dictionary || { E_WHY="not a launcher"; return 1; }
@@ -3461,7 +3495,12 @@ import_entry() { # index
       E_WHY="'$other' already opens the original account"; return 1
     fi
   else
-    import_check socket_path_ok "$E_APP" "$DATA_ROOT/$(slugify "$E_LABEL")" "$E_LABEL" new || return 1
+    dir="$DATA_ROOT/$(slugify "$E_LABEL")"
+    if import_folder_owner "$E_LABEL" "$dir"; then
+      shown other "$IMPORT_OWNER"
+      E_WHY="would share a profile folder with '$other'"; return 1
+    fi
+    import_check socket_path_ok "$E_APP" "$dir" "$E_LABEL" new || return 1
   fi
   return 0
 }
@@ -3487,6 +3526,21 @@ import_clash() { # slug of the entry's profile folder
     j=$((j + 1))
   done
   return 1
+}
+
+# The launch settings an entry brings, under its line in the plan, as list
+# shows them: switches in full, variables by name only, as a value may be a
+# password. They come from the file, and a proxy among them sends the
+# profile's traffic through a server the file names, so they are shown before
+# the question.
+import_show_settings() { # extras
+  local sw envs
+  shown sw "$(extras_lines arg "$1" | tr '\n' ' ')"
+  shown envs "$(extras_lines env "$1" | sed 's/=.*//' | tr '\n' ' ')"
+  [ -n "$sw" ] && printf '          flags  %s\n' "${sw% }"
+  [ -n "$envs" ] && printf '          env    %s\n' "$(dim "${envs% } (values hidden)")"
+  [ -n "$(extras_lines ext "$1")" ] && printf '          ext    %s\n' "$(dim "its own extensions folder")"
+  return 0
 }
 
 # Copy the file, up to the size limit, and convert it with plutil. Dies,
@@ -3533,6 +3587,7 @@ cmd_import() {
   { [ -r "$file" ] && [ ! -d "$file" ]; } || die "Cannot read $name"
 
   local IV="" IMPORT_N=0 IMPORT_SCANNED=0 IMPORT_FOUND="" IMPORT_APPS=() IMPORT_IDS=()
+  local IMPORT_OWNERS_READ=0 IMPORT_OWNER="" IMPORT_OWNERS=() IMPORT_DIRS=() IMPORT_DIR_IDS=()
   import_load "$file" "$name"
 
   # The plan, an entry each: create or skip, and what create_profile needs.
@@ -3564,6 +3619,7 @@ cmd_import() {
         note=" $(dim "— its profile folder is here already, and is used")"
       fi
       printf '  create  %s%s\n' "$E_SHOW" "$note"
+      import_show_settings "$E_EXTRAS"
     else
       n_skip=$((n_skip + 1))
       printf '  skip    %s %s\n' "$E_SHOW" "$(dim "— $E_WHY")"
@@ -3596,7 +3652,7 @@ cmd_import() {
            "${P_NOBADGE[$i]}" "${P_MAIN[$i]}" "${P_EXTRAS[$i]}" >/dev/null; then
       ok "Created ${C_BOLD}${P_SHOW[$i]}${C_RESET}"
       made=$((made + 1))
-      [ -n "$first" ] || first=${P_SHOW[$i]}
+      [ -n "$first" ] || [ "${P_MAIN[$i]}" -eq 1 ] || first=${P_SHOW[$i]}
     else
       warn "Could not create ${P_SHOW[$i]}."
       failed=$((failed + 1))
@@ -5081,6 +5137,11 @@ to type yes. A launcher that exists already is skipped, never changed. A new
 profile starts signed out, unless its profile folder is still here: then it
 uses that folder, as add does, and the plan says so. A file may list up to 200
 launchers.
+
+The launch settings, such as a proxy, come from the file. The plan shows each
+new launcher's switches, and its variables by name. Check them when the file
+is from someone else: a proxy setting sends that profile's traffic through
+the server it names.
 
 OPTIONS
   -y, --yes            Skip the confirmation prompt

@@ -197,6 +197,16 @@ assert_contains "it says a main launcher opens the original account" "$RUN_OUT" 
 assert_contains "it reports each result" "$RUN_OUT" "Created Fake Work"
 assert_contains "and a count" "$RUN_OUT" "6 created, 0 skipped, 0 failed."
 assert_contains "and how to sign in to them" "$RUN_OUT" "Open each new profile to sign in, e.g.:  aidentity open \"Codey Ext\""
+assert_contains "the plan shows the launch settings each launcher brings" "$RUN_OUT" "  create  Fake Work
+          flags  --lang=de
+          env    HTTPS_PROXY (values hidden)"
+assert_contains "every switch, and every variable by name" "$RUN_OUT" "  create  Forky Home
+          flags  --disable-gpu --force-device-scale-factor=1.25
+          env    TZ LANG (values hidden)"
+assert_contains "and its own extensions folder" "$RUN_OUT" "  create  Codey Ext
+          ext    its own extensions folder"
+assert_not_contains "never a variable's value" "$RUN_OUT" "proxy.example"
+assert_not_contains "nor this one's" "$RUN_OUT" "Europe/Berlin"
 i=0
 for l in "${TR_LIST[@]}"; do
   assert_eq "$l is the same launcher again: app, look, settings, folder" "${TR_BEFORE[$i]}" \
@@ -342,6 +352,32 @@ tr_refused "env" env 15 "^  skip    Fake Inj — " "${TR_VALUES[@]}"
 assert_contains "env: a variable that is not allowed is named" "$RUN_OUT" "NODE_OPTIONS is not one aidentity passes on"
 assert_not_contains "env: a value is never printed" "$RUN_OUT" "hunter2"
 
+# A switch or variable longer than 1024 characters is refused before it is
+# checked: the checks take longer than linear time on a long value, and a
+# file of a few MB once kept import busy for over an hour.
+tr_long() { head -c "$1" /dev/zero | tr '\0' "$2"; }
+tr_file "$TR_F" \
+  "$(tr_entry profile='"Longarg"' args="[\"--proxy-server=$(tr_long 2000 a)\"]")" \
+  "$(tr_entry profile='"Longenv"' env="[\"HTTPS_PROXY=$(tr_long 2000 a)\"]")" \
+  "$(tr_entry profile='"Hugearg"' args="[\"--lang=$(tr_long 400000 a)\"]")" \
+  "$(tr_entry profile='"Hugeenv"' env="[\"$(tr_long 400000 X)=1\"]")" \
+  "$(tr_entry profile='"Edge"' args="[\"--proxy-server=$(tr_long 1009 a)\"]")"
+before=$(fingerprint "$APPS")
+TR_T0=$SECONDS
+tx import "$TR_F" -y
+TR_DT=$((SECONDS - TR_T0))
+assert_rc "values that are too long: the import exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "a switch over 1024 characters is skipped as too long" "2" \
+  "$(lines_with "$RUN_OUT" "— args has a value that is too long")"
+assert_eq "and a variable" "2" "$(lines_with "$RUN_OUT" "— env has a value that is too long")"
+assert_contains "one of exactly 1024 is checked as usual" "$RUN_OUT" \
+  "skip    Fake Edge — --proxy-server needs a proxy value"
+assert_eq "nothing is built" "$before" "$(fingerprint "$APPS")"
+assert_eq "values of 400000 characters are refused quickly" "quick" \
+  "$(if [ "$TR_DT" -le 15 ]; then echo quick; else echo "took $TR_DT s"; fi)"
+assert_eq "and never printed" "short" \
+  "$(if [ "${#RUN_OUT}" -le 4000 ]; then echo short; else echo "${#RUN_OUT} characters"; fi)"
+
 # What is checked for its type: each of these is skipped, for its own reason.
 tr_file "$TR_F" '"just text"' '7' \
   "$(tr_entry profile='7')" \
@@ -374,6 +410,22 @@ done
 assert_eq "main of the wrong type, both ways" "2" "$(lines_with "$RUN_OUT" "main is not true or false")"
 assert_eq "a missing profile and a profile that is not text" "2" "$(lines_with "$RUN_OUT" "no profile name")"
 
+# A value that ends in a line break is refused like any other line break: the
+# file's own, not the one plutil adds to what it prints.
+tr_file "$TR_F" \
+  "$(tr_entry profile="$(js $'Tail\n')")" \
+  "$(tr_entry profile='"Bid"' bundle_id="$(js $'com.aidentity.test.electron\n')")" \
+  "$(tr_entry profile='"Argnl"' args="[$(js $'--lang=de\n')]")" \
+  "$(tr_entry profile='"Envnl"' env="[$(js $'LANG=de_DE.UTF-8\n')]")"
+before=$(fingerprint "$APPS")
+tx import "$TR_F" -y
+assert_eq "values that end in a line break: every one is skipped" "4" "$(lines_with "$RUN_OUT" "^  skip    ")"
+assert_contains "a profile name" "$RUN_OUT" "Profile name may only contain"
+assert_contains "a bundle ID" "$RUN_OUT" "skip    Fake Inj — bundle_id is not a bundle ID"
+assert_contains "a switch" "$RUN_OUT" "skip    Fake Argnl — A switch cannot contain a tab, a line break"
+assert_contains "a variable" "$RUN_OUT" "skip    Fake Envnl — An environment value cannot contain a tab, a line break"
+assert_eq "and nothing is built" "$before" "$(fingerprint "$APPS")"
+
 # A badge is one character, add's rule: the first of what is given. One that
 # cannot be drawn (a control character, a line break) is refused.
 tr_file "$TR_F" \
@@ -404,6 +456,25 @@ tr_file "$TR_F" "$(tr_entry name="$(js $'Red \033[31m name')" bundle_id='"com.ex
 tx import "$TR_F" -y
 assert_contains "a name with an escape in it is shown with ? for it" "$RUN_OUT" "skip    Red ?[31m name"
 assert_not_contains "so no escape reaches the terminal" "$RUN_OUT" $'\033'
+
+# name, app and exported_by are only for the person reading the file: each
+# injection attempt in them, and a printf format, is only text.
+TR_ENTRIES=()
+for v in "${TR_INJ[@]}" 'Fmt %s%n%s%n'; do
+  TR_ENTRIES+=("$(tr_entry name="$(js "$v")" app="$(js "$v")" bundle_id='"com.example.nothere"')")
+done
+printf '{"aidentity_export": 1, "exported_by": %s, "launchers": [%s]}\n' \
+  "$(js "$(printf '%s ' "${TR_INJ[@]}")%s%n")" "$(IFS=,; printf '%s' "${TR_ENTRIES[*]}")" > "$TR_F"
+before=$(fingerprint "$APPS")
+tx import "$TR_F" -y
+assert_rc "injection attempts in name, app and exported_by: the import exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "every entry is skipped, as its app is not installed" "8" \
+  "$(lines_with "$RUN_OUT" "no app with the bundle ID com.example.nothere is installed")"
+assert_contains "a format in a name is printed as it is" "$RUN_OUT" "skip    Fmt %s%n%s%n"
+assert_contains "a line break in a name is shown as ?" "$RUN_OUT" "skip    Inj?two"
+assert_eq "nothing is built" "$before" "$(fingerprint "$APPS")"
+assert_no_file "no injected command ran" "$TR_PWN"
+assert_not_contains "no escape reaches the terminal" "$RUN_OUT" $'\033'
 
 # What the file leaves out, add decides: the first letter and the colour add
 # would pick. An empty badge is no badge.
@@ -438,6 +509,56 @@ assert_contains "two main launchers for one app: the second is skipped" "$RUN_OU
   "skip    Codey Orig — another entry opens the original account"
 assert_contains "the first ones are built" "$RUN_OUT" "3 created, 3 skipped, 0 failed."
 for l in "Fake Twice" "Fake Same 2" "Codey Main"; do tx rm "$l" --purge -y; done
+
+# A launcher here whose profile folder the entry would share: create_profile
+# would refuse it, so the plan skips it, and the rest are built.
+tx add "$ELECTRON_APP" --profile "Work 2"
+tr_file "$TR_F" "$(tr_entry profile='"Work_2"')" "$(tr_entry profile='"Fine"')"
+tx import "$TR_F" -y
+assert_rc "an entry that would share an existing launcher's folder: the import exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "it is skipped, with the launcher named" "$RUN_OUT" \
+  "skip    Fake Work_2 — would share a profile folder with 'Fake Work 2'"
+assert_not_contains "the plan does not say the folder is used" "$RUN_OUT" "is here already"
+assert_contains "the rest are built" "$RUN_OUT" "1 created, 1 skipped, 0 failed."
+assert_no_dir "and it is not" "$APPS/Fake Work_2.app"
+tx rm "Fake Fine" --purge -y
+# The same folder reached by another path: the data root through a link.
+ln -s "$VSC_DATA" "$SANDBOX/v-link"
+tr_file "$TR_F" "$(tr_entry profile='"Work-2"')"
+TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$SANDBOX/v-link" ai import "$TR_F" -y
+assert_contains "the same folder spelled another way is found too" "$RUN_OUT" \
+  "skip    Fake Work-2 — would share a profile folder with 'Fake Work 2'"
+rm -f "$SANDBOX/v-link"
+tx rm "Fake Work 2" --purge -y
+
+# A VS Code-style app makes a socket in the profile folder, and macOS caps the
+# length of its path: add refuses a profile that would go past it, and so does
+# the plan.
+tr_file "$TR_F" "$(tr_entry profile="\"$(repeat_char 40 a)\"" bundle_id='"com.example.codey"')" \
+  "$(tr_entry profile="\"$(repeat_char 40 b)\"")"
+TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$VSC_DATA/$(repeat_char 40 d)" ai import "$TR_F" -y
+assert_rc "a profile folder too deep for a VS Code-style app: the import exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "it is skipped" "$RUN_OUT" \
+  "skip    Codey $(repeat_char 40 a) — Codey cannot open 'Codey $(repeat_char 40 a)': its profile folder path is too long."
+assert_contains "another app's profile there is built" "$RUN_OUT" "1 created, 1 skipped, 0 failed."
+assert_no_dir "no launcher is left for the skipped one" "$APPS/Codey $(repeat_char 40 a).app"
+TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$VSC_DATA/$(repeat_char 40 d)" ai rm "Fake $(repeat_char 40 b)" --purge -y
+rm -rf "${VSC_DATA:?}/$(repeat_char 40 d)"
+
+# The closing hint names a new profile, never a main launcher: that opens the
+# app's own account, which is signed in already.
+tr_file "$TR_F" "$(tr_entry profile='"Main"' main=true bundle_id='"com.example.codey"')" \
+  "$(tr_entry profile='"Hinted"')"
+tx import "$TR_F" -y
+assert_contains "the hint names the first new profile" "$RUN_OUT" \
+  "Open each new profile to sign in, e.g.:  aidentity open \"Fake Hinted\""
+tx rm "Fake Hinted" --purge -y
+tx rm "Codey Main" -y
+tr_file "$TR_F" "$(tr_entry profile='"Main"' main=true bundle_id='"com.example.codey"')"
+tx import "$TR_F" -y
+assert_contains "a main launcher alone is built" "$RUN_OUT" "1 created, 0 skipped, 0 failed."
+assert_not_contains "with no hint to sign in" "$RUN_OUT" "Open each new profile"
+tx rm "Codey Main" -y
 
 # A profile folder that is there already is used, as add uses it: the plan says
 # so, because that profile may be signed in.
@@ -529,6 +650,31 @@ tx_in yes import "$TR_F"
 assert_rc "answering yes builds it" 0 "$RUN_RC" "$RUN_OUT"
 assert_dir "the launcher is there" "$APPS/Fake Ask.app"
 tx rm "Fake Ask" --purge -y
+
+# A launcher made between the plan and the answer is skipped, never changed.
+# The answer comes from a pipe: it waits for the question, makes the launcher
+# with add, then types yes.
+tr_file "$TR_F" "$(tr_entry profile='"Race"' badge='"Z"' color='"red"')"
+TR_OUT="$SB/race.out"
+: > "$TR_OUT"
+# SC2094: the left side reads the file the import writes on purpose, to see
+# the question before it answers.
+# shellcheck disable=SC2094
+{ w=0
+  while ! grep -q "Type yes to confirm" "$TR_OUT" && [ "$w" -lt 300 ]; do sleep 0.1; w=$((w + 1)); done
+  tx add "$ELECTRON_APP" --profile Race
+  printf 'yes\n'
+} | TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$VSC_DATA" detached "$BASH_BIN" "$AIDENTITY" import "$TR_F" > "$TR_OUT" 2>&1
+RUN_RC=${PIPESTATUS[1]}
+RUN_OUT=$(cat "$TR_OUT")
+assert_rc "a launcher made while the question waits: the import exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the plan said create" "$RUN_OUT" "create  Fake Race"
+assert_contains "the build skips it" "$RUN_OUT" "Skipped Fake Race: it exists now."
+assert_contains "and counts it" "$RUN_OUT" "0 created, 1 skipped, 0 failed."
+assert_eq "the launcher add made is not changed: its badge" "R" "$(plist_key "$APPS/Fake Race.app" AIdentityBadge)"
+assert_not_contains "no hint to sign in, as nothing was created" "$RUN_OUT" "Open each new profile"
+tx rm "Fake Race" --purge -y
+rm -f "$TR_OUT"
 
 # --help shows the help and imports nothing.
 tx import "$TR_F" -y --help
