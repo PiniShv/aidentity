@@ -68,7 +68,9 @@ Read this before deciding whether a finding is a bug.
   tokens for the account signed into it, exactly as the app's normal data
   directory does. It is protected by your account's file permissions and by
   FileVault if you have it on — nothing more. A second profile is a second live
-  session on your disk. Treat it accordingly.
+  session on your disk. Treat it accordingly. A profile folder that `rm --purge`,
+  `prune` or the uninstaller moved to the Trash keeps that session until the
+  Trash is emptied.
 - **A launcher runs an app you already trust.** aidentity adds a
   `--user-data-dir` argument to an app that is already installed, plus any
   per-profile settings you chose from a short allowlist. It does not inject

@@ -544,7 +544,7 @@ html:not(.js) .chapters{display:none}
 </article>
 <article class="card">
 <h3>Consultants and freelancers</h3>
-<p>Use one account per client, each with an icon that carries the client's name, like <code>Claude Acme</code>. Each one keeps its sign-in in its own folder. When the job ends, remove the icon. Add <code>--purge</code> to move its data to the Trash.</p>
+<p>Use one account per client, each with an icon that carries the client's name, like <code>Claude Acme</code>. Each one keeps its sign-in in its own folder. When the job ends, remove the icon. Add <code>--purge</code> to move its data to the Trash. Then empty the Trash.</p>
 <p class="tags"><span class="tag v-ok"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Verified with Claude Desktop</span><span class="tag v-det">Tested with ChatGPT</span></p>
 </article>
 <article class="card">
@@ -616,7 +616,7 @@ html:not(.js) .chapters{display:none}
 </details>
 <div class="menu-demo">
 <h3 id="h-menu-demo">Prefer a menu? <code>aidentity ui</code></h3>
-<p>Every profile on one screen. Pick one with the arrow keys, then one key recolours, renames, removes or opens it.</p>
+<p>Every profile on one screen. Pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it.</p>
 <figure class="term demo" data-player data-len="30">
 <div class="term-bar">
 <span class="dots"><i></i><i></i><i></i></span>
@@ -695,7 +695,7 @@ html:not(.js) .chapters{display:none}
 <div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="term-title" aria-hidden="true">Terminal: everyday commands</span></div>
 <ul class="cmdlist" role="list">
 <li><code>aidentity apps</code><span class="d">Which of your apps can take extra accounts.</span></li>
-<li><code>aidentity ui</code><span class="d">A menu in your terminal. Pick a profile with the arrow keys, then open, rename, recolour or remove it.</span></li>
+<li><code>aidentity ui</code><span class="d">A menu in your terminal. Pick a profile with the arrow keys, then open, quit, rename, recolour or remove it.</span></li>
 <li><code>aidentity add Claude <span class="nw">--profile Work</span> <span class="nw">--color blue</span></code><span class="d">One more account, no questions.</span></li>
 <li><code>aidentity list</code><span class="d">Every profile, and which are running.</span></li>
 <li><code>aidentity list <span class="nw">--json</span></code><span class="d">The same list as JSON, for scripts.</span></li>
@@ -724,7 +724,7 @@ html:not(.js) .chapters{display:none}
 <article class="card">
 <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-undo"/></svg></span>
 <h3>Easy to reverse</h3>
-<p>Deleted an icon? <code>aidentity restore</code> brings it back, still signed in. <code>rm</code> keeps your data. The one exception is <code>--purge</code>, which moves the account's data to the Trash, where you can still get it back. Something looks wrong? Run <code>aidentity doctor --fix</code>.</p>
+<p>Deleted an icon? <code>aidentity restore</code> brings it back, still signed in. <code>rm</code> keeps your data. The one exception is <code>--purge</code>, which moves the account's data to the Trash, where you can still get it back. Empty the Trash to remove it from your Mac. Something looks wrong? Run <code>aidentity doctor --fix</code>.</p>
 </article>
 <article class="card">
 <span class="ico"><svg class="i" aria-hidden="true"><use href="#i-moon"/></svg></span>
@@ -924,7 +924,7 @@ html:not(.js) .chapters{display:none}
 </details>
 <details>
 <summary>How do I remove it?</summary>
-<div class="a"><p>Use the uninstaller. It removes the command, then lists every launcher and data folder that aidentity made. It removes the launchers and moves the data folders to the Trash only after you type <code>delete</code>. Your apps stay as they were.</p>
+<div class="a"><p>Use the uninstaller. It removes the command, then lists every launcher and data folder that aidentity made. It removes the launchers and moves the data folders to the Trash only after you type <code>delete</code>. Empty the Trash to remove the data from your Mac. Your apps stay as they were.</p>
 <p>If you installed with Homebrew, the uninstaller leaves the command alone. Run <code>brew uninstall aidentity</code> to remove it. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#uninstall">Uninstall steps</a></p></div>
 </details>
 <details>

@@ -275,8 +275,8 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 | The `aidentity` command | Puts one file on your Mac: in `/usr/local/bin` or `~/.local/bin` with the install script, or where Homebrew keeps its commands. `aidentity update` replaces that file with a newer release, when you run it. | [Uninstall](#uninstall) |
 | One launcher per profile | Builds a small app in `~/Applications`, for example `Claude Work.app`. It holds a script, an `Info.plist` with an `AIdentityProfile` marker, and an icon. It tells macOS about the new app so the icon shows at once. | `aidentity rm "Claude Work"` |
 | One data folder per profile | Makes a folder under `~/Library/Application Support/aidentity/profiles/` that only you can open. The app keeps that account's sign-in there. `aidentity` adds one small restore record. | `aidentity rm "Claude Work" --purge`, or `aidentity prune`. Both move the folder to the Trash. |
-| The Trash | `rm --purge`, `prune` and the uninstaller move a profile's data folder into the Trash, with a plain rename. They never empty the Trash, and never delete anything from it. | Move the folder back, then run `aidentity restore`. [How](#data-in-the-trash) |
-| A running app | `aidentity quit` asks one profile's copy of the app to quit, the way the app's Quit menu item does. If that cannot be done, it sends that process `SIGTERM`. It acts only on your own processes. | Open the profile again. |
+| The Trash | `rm --purge`, `prune` and the uninstaller move a profile's data folder into the Trash, with a plain rename. They never empty the Trash, and never delete anything from it. | Move the folder back, then run `aidentity restore` (or `aidentity add`). [How](#data-in-the-trash) |
+| A running app | `aidentity quit` asks one profile's copy of the app to quit, the way the app's Quit menu item does. It acts only on a copy that macOS knows as an app, and only on your own processes. It never stops a command-line tool. | Open the profile again. |
 | A file for `import` | `aidentity import` reads the file you name and builds launchers from it, like `add`. It never changes a launcher that exists. | `aidentity rm "Claude Work"` for each one |
 | Your real app | Read only. It looks at the app's `Info.plist`, its icon and its files, to check that it is a Chromium or Electron app. | Nothing to undo |
 | Your original account | Never moved or changed. One exception: `--seed` reads Claude Desktop's `claude_desktop_config.json` and copies it into the new profile. | Nothing to undo |
@@ -294,7 +294,7 @@ One thing does change. While a profile is running, clicking the app itself switc
 - **Use `sudo` or run in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
 - **Edit your shell files.** If you need a `PATH` line, the installer prints it, and you add it.
 - **Control other apps.** It does not use System Events, so it needs no Accessibility permission. The one thing it does to a running app is `aidentity quit`, which asks that one app to quit, as its Quit menu item does. That needs no permission either.
-- **Trust an import file.** `import` checks every value as `add` does, finds each app by its bundle ID among the apps installed here, ignores any path in the file, and shows what it will build and asks before it builds anything. A launcher that exists is skipped, never changed.
+- **Trust an import file.** `import` checks every value as `add` does, finds each app by its bundle ID among the apps installed here, ignores any path in the file, and shows what it will build, and asks before it builds anything. Only `-y` skips that question. A launcher that exists is skipped, never changed.
 - **Handle your passwords.** You sign in inside the app, with that account's own details.
 
 <details>
@@ -371,7 +371,7 @@ So it catches a cut-off or damaged download. Each release is checked before it i
 
 ### What is not protected
 
-- **Profile data is not encrypted by `aidentity`.** Each data folder holds live sign-in cookies and tokens, just like the app's own folder. Your file permissions and FileVault (Apple's disk encryption) protect them, and nothing else. A second profile is a second live session on your disk.
+- **Profile data is not encrypted by `aidentity`.** Each data folder holds live sign-in cookies and tokens, just like the app's own folder. Your file permissions and FileVault (Apple's disk encryption) protect them, and nothing else. A second profile is a second live session on your disk. A folder in the Trash is the same: it keeps its live sign-in until you empty the Trash.
 - **The launcher is not notarised.** Notarisation is Apple's check of software from a developer. Your launcher is built on your Mac. It gets a local signature if the Xcode Command Line Tools are installed, and none if they are not. It runs either way.
 - **Only the latest release gets fixes.** There are no fixes for older versions.
 
@@ -637,7 +637,7 @@ aidentity quit "Claude Work"
 While several profiles run, the Dock shows them as identical tiles, so it is hard to tell which one to quit. `quit` takes the launcher name that `aidentity list` shows. It finds the copy of the app that runs on that profile and asks only that copy to quit.
 
 - **The app is asked the way its Quit menu item asks,** so it can still ask about unsaved work. This needs no permission.
-- **If the app cannot be asked,** `quit` sends its process `SIGTERM`, the standard signal that asks a program to stop. Electron and Chromium apps treat it as quit.
+- **It acts only on a copy that macOS knows as a running app.** It never stops a command-line tool, even one that runs the app's own program.
 - **It waits up to 10 seconds.** When the copy has quit, it prints `Quit Claude Work.` and exits with 0. If the app is still running by then, it says so and exits with 1. The app may be asking you something, so look at its window. There is no option to force a quit.
 - **A profile that is not running** gives the message `'Claude Work' is not running.` and exit status 0.
 - **A Main launcher** quits the copy on your original account.
@@ -683,7 +683,9 @@ aidentity prune
 
 This data is left behind when you delete a launcher in Finder, or run `rm` without `--purge`. The folder stays, and it still holds a signed-in session. `prune` lists each folder with its size and full path, and marks the ones `restore` can bring back. Then it asks `Move N orphaned profile(s) to the Trash?` and waits for you to type `yes`. `-y` or `--yes` skips the question. With no terminal and no `-y`, it refuses and moves nothing. It skips anything that is running, and anything outside the profiles folder.
 
-Each folder goes to the Trash, and `prune` prints where each one went. To undo, move a folder back into the profiles folder and run `aidentity restore`. [More on the Trash](#data-in-the-trash).
+Each folder goes to the Trash, and `prune` prints where each one went. If a folder cannot be moved, `prune` says why, leaves that folder where it is, and exits with 1.
+
+To undo, move a folder back into the profiles folder. If the list marked it `can be restored`, run `aidentity restore`. If it did not, run `aidentity add` with the same app and profile name: it uses the folder. [More on the Trash](#data-in-the-trash).
 
 Before it calls a folder an orphan, `prune` looks for launchers in your launcher folder, in the app folders and through Spotlight. If you keep a launcher somewhere else, its data shows up in the list. Read the list before you type `yes`.
 
@@ -701,7 +703,7 @@ aidentity restore --all            # restore all of them
 - If the app moved, it finds it again: first by name, then by bundle ID (the name macOS uses for an app, such as `com.anthropic.claudefordesktop`).
 - It builds the launcher with the same look and settings. It checks everything in the record as if you had typed it.
 - Profiles made before version 1.2.0 have no record yet. They get one the next time their launcher is rebuilt, and `aidentity doctor --fix` does that for you.
-- A profile removed with `--purge`, or moved by `prune` or the uninstaller, is in the Trash. Move its folder back into the profiles folder first, and `restore` lists it again. [How](#data-in-the-trash). Once the Trash is emptied, the data and its record are gone.
+- A profile removed with `--purge`, or moved by `prune` or the uninstaller, is in the Trash. Move its folder back into the profiles folder first. `restore` then lists it again, if the folder holds a restore record. If it does not, run `aidentity add` with the same app and profile name: it uses the folder. [How](#data-in-the-trash). Once the Trash is emptied, the data and its record are gone.
 
 ### `aidentity rebuild`
 
@@ -728,6 +730,8 @@ aidentity rm "Claude Work"
 
 It then prints how to bring the profile back (`aidentity restore "Claude Work"`) and how to move its data to the Trash (`aidentity prune`). If it cannot write a restore record, it prints the matching `aidentity add` line instead.
 
+A Main launcher has no data, so `rm` only says that it removed the launcher. `restore` does not list a Main launcher. To get one back, run `aidentity add Claude --main`, with your own app's name.
+
 To remove the launcher and move the profile's data to the Trash:
 
 ```bash
@@ -743,7 +747,7 @@ aidentity rm "Claude Work" --purge
 ```
 
 > [!NOTE]
-> `--purge` takes the account's cookies, sign-in and settings out of the profiles folder, so that account is signed out. Nothing is deleted yet: the data waits in the Trash. Move it back and run `aidentity restore` to undo this. Once you empty the Trash, the data is gone for good.
+> `--purge` takes the account's cookies, sign-in and settings out of the profiles folder, so `aidentity` no longer has that account. Nothing is deleted yet: the data waits in the Trash, and the sign-in in it is still live. Anyone who uses your Mac as you can read it there. To undo this, move the folder back and run `aidentity restore`. To remove the data and the sign-in from this Mac, empty the Trash: then they are gone for good. If you need to cut access to the account, also sign out of its sessions on the vendor's site.
 
 `rm` takes one name and asks you to type `yes`. Add `-y` or `--yes` to skip the question. It refuses while that profile is running. A Main launcher has no data of its own, so `rm` removes it even while the app runs. On a Main launcher, `--purge` does nothing, because `aidentity` never touches the app's own data.
 
@@ -751,14 +755,21 @@ aidentity rm "Claude Work" --purge
 
 `rm --purge`, `prune` and the uninstaller never delete profile data. They move the folder into the Trash, and tell you where it went.
 
-- **To undo, move the folder back.** Put it in the profiles folder, at the path after `To undo, move it back to:`. Then run the `aidentity restore` line the command printed. Open the Trash in Finder and drag the folder out. In Finder, **Go > Go to Folder** lets you paste a path. Use Finder because macOS may not let Terminal read the Trash.
-- **The restore record is written first.** If the profile has no restore record yet (profiles made before 1.2.0 have none), `rm --purge` writes one before it moves the folder, so `restore` works after you move the folder back. `prune` and the uninstaller write none. [More on this](#i-deleted-an-icon-by-mistake)
-- **The name.** The folder keeps its name, for example `claude-work`. If the Trash holds a folder with that name already, the new one is called `claude-work 2`, then `claude-work 3`, and so on.
+- **To undo, move the folder back.** Open the Trash in Finder and drag the folder into the profiles folder. In Finder, **Go > Go to Folder** lets you paste a path. Use Finder because macOS may not let Terminal read the Trash. `rm --purge` prints the full path after `To undo, move it back to:`. `prune` prints the profiles folder. The uninstaller prints only where each folder went in the Trash. The target is always the profiles folder, and the folder keeps its own name, for example `claude-work`.
+- **After the uninstaller, make the profiles folder first.** The uninstaller removes the profiles folder when it is empty, and the folder above it. Install `aidentity` again, then make the folder again. This is the default place. If you set `AIDENTITY_DATA_ROOT`, use that folder instead.
+
+  ```bash
+  mkdir -p ~/Library/Application\ Support/aidentity/profiles
+  ```
+
+- **Then bring the launcher back.** If the folder holds a restore record, run `aidentity restore`. `rm --purge` prints the line to use. If it holds no record, `restore` does not list it. Run `aidentity add` with the same app and profile name instead: it uses the folder.
+- **The restore record is written first.** If the profile has no restore record yet (profiles made before 1.2.0 have none), `rm --purge` writes one before it moves the folder, so `restore` works after you move the folder back. `prune` and the uninstaller write none, so for an old profile use `add`. [More on this](#i-deleted-an-icon-by-mistake)
+- **The name.** The folder keeps its name, for example `claude-work`. If the Trash holds a folder with that name already, the new one is called `claude-work 2`, then `claude-work 3`, and so on. If the name ends in a number, change it back to the plain name when you move it in, for example `claude-work`. `restore` accepts any folder name, but `add` uses only a folder named exactly like the profile.
 - **One volume.** Each volume (a disk or a partition) has its own Trash. If the profiles folder is on your home volume, which is the default, the data goes to `~/.Trash`. If you moved it to another volume with `AIDENTITY_DATA_ROOT`, the data goes to a folder named with your user number (often `501`) inside the `.Trashes` folder of that volume. `.Trashes` must exist already: Finder makes `.Trashes` the first time you put something in the Trash from that volume. If it is not there, nothing is moved. The data stays where it was, and the message says why.
 - **No copying.** `aidentity` renames the folder into the Trash, and never copies it across volumes. A rename happens whole or not at all. A copy that stops half way would leave half of the data in each place.
 - **If it cannot move the data,** it says why and leaves the folder exactly where it was. `rm --purge` has already removed the launcher by then, so it prints where the data stayed and exits with 1. Run `aidentity restore` to bring the launcher back.
 - **No Finder request.** `aidentity` moves the folder itself. It does not ask Finder to do it, which would need a permission prompt.
-- **Emptying the Trash** is what deletes the data for good. `aidentity` never does that.
+- **The sign-in stays live in the Trash.** A folder there holds the same cookies and tokens as before. Emptying the Trash is what deletes the data for good, and removes the sign-in from this Mac. `aidentity` never does that.
 
 ### `aidentity export`
 
@@ -780,7 +791,7 @@ There is one object for each launcher, in the order that `aidentity list` shows 
 |---|---|
 | `name` | The launcher's name. It is there for the person who reads the file. |
 | `app` | The app's name. Also only for reading. |
-| `bundle_id` | The app's bundle ID. `import` finds the app by this alone. |
+| `bundle_id` | The app's bundle ID. `import` finds the app by this alone. An empty string when it is not known: `import` skips that launcher. |
 | `profile` | The profile name. |
 | `main` | `true` for a Main launcher, otherwise `false`. |
 | `badge` | The badge character. An empty string when the launcher uses the app's own icon. |
@@ -790,11 +801,11 @@ There is one object for each launcher, in the order that `aidentity list` shows 
 | `own_extensions` | `true` when the profile has its own extensions folder. |
 
 - **No account goes with the file.** It holds no cookies, no sign-in and no app data. It holds no data folder and no other path. A profile you import starts signed out.
-- **Keep the file private.** It holds the launch settings in full, and the values of the variables. A proxy setting can carry a password. When the file holds variable values, `export` says so on standard error.
+- **Keep the file private.** It holds the launch settings in full, and the values of the variables. A proxy setting can carry a password. `export` says so on standard error when the file holds variable values, or a switch with a password in it (`user:password@`). No warning does not make the file safe to share, so read it first.
 - Only the JSON goes to standard output, so `> profiles.json` saves just the file. Warnings go to standard error.
 - In a launcher's object, a value is text, `true` or `false`, or a list of text. It is never `null`.
 - With no launchers, it prints the same object with an empty `launchers` list, and exits with 0.
-- If a launcher's app is gone, `export` takes the bundle ID from the profile's restore record. With no record, it warns that `import` will skip that launcher.
+- If a launcher's app is gone, `export` takes the bundle ID from the profile's restore record. If there is no record either, it warns on standard error that `import` will skip that launcher, and `bundle_id` is empty.
 - `exported_by` is the version of `aidentity` that made the file. `aidentity_export` is the format number. `import` reads format 1.
 - It takes no options other than `--help`.
 
@@ -829,7 +840,7 @@ Then it builds each launcher as `add` would, says what it made, and prints a cou
 - **A bad or unknown entry is skipped,** with a one-line reason. The other entries go on. An entry is also skipped when its launcher exists already (it is never changed), when two entries would build the same launcher, and when its profile would share a folder with another launcher or a second Main launcher would be made for one app.
 - **The name is built, not copied.** The launcher is named `<App> <Profile>`, as `add` names it, whatever the file calls it.
 - **Profiles start signed out.** The one exception: if the data folder for that name is still here, `import` uses it, as `add` does, and the plan says so. That account may be signed in.
-- **Check the launch settings.** They come from the file. The plan shows each new launcher's switches in full, and its variables by name only. A proxy setting sends that profile's traffic through the server it names, so read the plan when the file is from someone else.
+- **Check the launch settings.** They come from the file. The plan shows each new launcher's switches in full, but its variables by name only: it does not show their values. A proxy setting sends that profile's traffic through the server it names. When the file is from someone else, read the plan, and also open the file in a text editor to read the values of the variables.
 - `-y` or `--yes` skips the question. With no terminal and no `-y`, `import` refuses with `Nothing to confirm with.` and builds nothing. If you answer anything but `yes`, nothing is built.
 - A file with no launchers in it prints `Nothing to do.` and exits with 0.
 
@@ -1087,7 +1098,7 @@ If you removed the profile with `--purge`, its data is in the Trash, not in the 
 
 ### I used `--purge` by mistake. Can I undo it?
 
-Yes, as long as you have not emptied the Trash. `rm --purge`, `prune` and the uninstaller move the data to the Trash. They do not delete it. The command printed where the folder went, and where to move it back. Move it back into the profiles folder, then run `aidentity restore "Claude Work"`, with your own profile's name. The account opens again, still signed in. [The steps](#data-in-the-trash). Before version 1.6.0, these commands deleted the data. If you ran one with an older version, the data is gone.
+Yes, as long as you have not emptied the Trash. `rm --purge`, `prune` and the uninstaller move the data to the Trash. They do not delete it. The command printed where the folder went in the Trash. Move it back into the profiles folder, then run `aidentity restore "Claude Work"`, with your own profile's name. The account opens again, still signed in. After the uninstaller, make the profiles folder first. For a folder from `prune` or the uninstaller that has no restore record, use `aidentity add` with the same app and profile name. [The steps](#data-in-the-trash). Before version 1.6.0, these commands deleted the data. If you ran one with an older version, the data is gone.
 
 ### Does it work with Claude Code or other command-line tools?
 
@@ -1119,6 +1130,8 @@ aidentity import profiles.json
 
 It shows what it will build and asks you to type `yes`. Each launcher comes back with the same app, profile name, badge, colour and launch settings. Open each one and sign in again: the file holds no account data and no folder paths, so every profile starts signed out.
 
+`import` does not copy your Claude Desktop MCP server list. On the new Mac, run `aidentity add Claude --profile Work --seed` for each profile that needs it, with your own profile name. It keeps the badge, colour and settings.
+
 The file holds your launch settings in full, and a proxy setting can carry a password. Keep the file private, and delete it when you are done. [More on `export`](#aidentity-export) and [`import`](#aidentity-import).
 
 ### How do I remove everything?
@@ -1143,12 +1156,12 @@ What it does:
 
 1. **Removes the command, without asking.** It looks in the usual install folders and wherever your `PATH` finds it. It leaves a Homebrew install and a repository checkout alone, and tells you so. If it cannot delete the file, it prints a `sudo rm -f` line for you to run. It never runs `sudo` itself.
 2. **Lists everything else, with sizes.** That means every launcher that carries the marker, and every data folder, including data that no launcher points at any more.
-3. **Stops if any listed profile is running.** Quit it, then run the script again.
+3. **Stops if any listed profile is running.** The command is already gone by then, so quit that app yourself, for example with **Cmd + Q** in its window. Then run the script again.
 4. **Removes only after you type `delete`.** It deletes the launchers and moves the profile data to the Trash. Any other answer keeps your launchers and data. They keep working without the command.
 
-The data waits in the Trash, so a mistake can be undone: move a folder back into the profiles folder, install `aidentity` again, and run `aidentity restore`. [More on the Trash](#data-in-the-trash). Once you empty the Trash, the data is gone for good.
+The data waits in the Trash, so you can undo a mistake. The uninstaller also removes the profiles folder when it is empty, so make that folder again first. To undo, install `aidentity` again, make the profiles folder, and move the folders back from the Trash. Then run `aidentity restore`. For a profile with no restore record, run `aidentity add` with the same app and profile name instead. [The steps](#data-in-the-trash). Once you empty the Trash, the data is gone for good.
 
-It removes launchers only if they carry the marker, and moves data only from inside the profiles folder. For a Main launcher, it removes the launcher and keeps the app's own data. macOS keeps Dock tiles after an app is gone, so drag the old ones out yourself.
+It removes launchers only if they carry the marker, and moves data only from inside the profiles folder. For a Main launcher, it removes the launcher and keeps the app's own data. A Main launcher is not in the Trash: build it again with `aidentity add <App> --main`. macOS keeps Dock tiles after an app is gone, so drag the old ones out yourself.
 
 <details>
 <summary>Remove everything by hand</summary>
@@ -1185,13 +1198,21 @@ Do these steps in order, one block at a time. Quit every profile first.
    rm -f "$(command -v aidentity)"
    ```
 
-5. Remove the empty data folders. `rmdir` deletes a folder only if it is empty, so it stops if any profile data is left:
+5. Remove the empty data folders. `rmdir` deletes a folder only if it is empty, so it stops if anything is left in it:
 
    ```bash
    rmdir ~/Library/Application\ Support/aidentity/profiles ~/Library/Application\ Support/aidentity
    ```
 
    If you set `AIDENTITY_DATA_ROOT`, use that folder instead.
+
+   If `rmdir` says `Directory not empty`, look inside with `ls -A`. A file named `.DS_Store` is only Finder's view settings. Delete it, then run `rmdir` again:
+
+   ```bash
+   rm -f ~/Library/Application\ Support/aidentity/profiles/.DS_Store
+   ```
+
+   Any other file or folder is profile data that is still there. Move it to the Trash, or leave it.
 
 Nothing here deletes profile data: it all goes to the Trash. Empty the Trash when you are sure you do not need it.
 
