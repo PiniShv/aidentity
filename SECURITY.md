@@ -95,11 +95,19 @@ Read this before deciding whether a finding is a bug.
 - **`aidentity update`**: anything that makes it install a file other than the
   release's published script, replace a file other than the copy you ran,
   downgrade, connect over plain HTTP, or leave a broken file in place.
-- **The deletion logic** (`rm`, `--purge`, and the overwrite path in `add`):
-  anything that removes or overwrites a bundle without the `AIdentityProfile`
-  marker key, or deletes a path outside `$AIDENTITY_DATA_ROOT`. Symlink and
-  path-traversal tricks in a profile name are exactly the kind of thing I want
-  to hear about.
+- **The removal logic** (`rm`, `--purge`, `prune`, the uninstaller, and the
+  overwrite path in `add`): anything that removes or overwrites a bundle
+  without the `AIdentityProfile` marker key, or moves or deletes a path
+  outside `$AIDENTITY_DATA_ROOT`. Profile data goes to the Trash; anything
+  that moves something else there, or loses data on the way, is in scope.
+  Symlink and path-traversal tricks in a profile name are exactly the kind of
+  thing I want to hear about.
+- **`aidentity quit`**: anything that makes it quit or signal a process other
+  than the chosen profile's own app.
+- **`aidentity import`**: the file is untrusted input. Anything in it that
+  reaches a path, a shell, the generated launcher or the terminal without the
+  checks a command-line value gets, or that changes a launcher that already
+  exists.
 - **Profile-name validation**: any input accepted by `validate_profile_name`
   that then misbehaves as a directory name, a bundle name, a slug, or a string
   embedded in the launcher.
