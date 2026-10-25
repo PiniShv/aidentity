@@ -240,12 +240,15 @@ assert_contains "it names the other launcher" "$RUN_OUT" \
 assert_file "and the data stays" "$DATA/fake-shared/Cookies"
 assert_no_dir "the launcher asked for is removed" "$APPS/Fake Shared.app"
 
-# Filed into a folder, then added again: the new launcher uses the same
-# folder, as an import would.
+# Filed into a folder: a second add for the same profile is refused, as an
+# import would be. A copy of the launcher still uses the same folder.
 mkdir -p "$APPS/Filed"
 mv "$APPS/Fake Shared Copy.app" "$APPS/Filed/"
 ai add "$ELECTRON_APP" --profile Shared
-assert_eq "a second add uses the same folder" "$DATA/fake-shared" \
+assert_rc_nonzero "a second add for the folder a filed launcher uses is refused" "$RUN_RC" "$RUN_OUT"
+assert_contains "and names that launcher by its path" "$RUN_OUT" "$APPS/Filed/Fake Shared Copy.app"
+cp -R "$APPS/Filed/Fake Shared Copy.app" "$APPS/Fake Shared.app"
+assert_eq "a copy of it uses the same folder" "$DATA/fake-shared" \
   "$(plist_key "$APPS/Fake Shared.app" AIdentityDataDir)"
 ai doctor
 assert_contains "doctor sees the filed launcher on the same folder" "$RUN_OUT" \
@@ -700,6 +703,22 @@ ai add "$ELECTRON_APP" --profile "Coll_A"
 assert_rc_nonzero "a name colliding on slug is refused" "$RUN_RC" "$RUN_OUT"
 assert_contains "the collision is explained" "$RUN_OUT" "share its profile directory"
 assert_no_dir "no launcher is built for the colliding name" "$APPS/Fake Coll_A.app"
+# A launcher filed into a folder counts too, as it does for rm --purge.
+mkdir -p "$APPS/Filed"
+mv "$APPS/Fake Coll A.app" "$APPS/Filed/"
+ai add "$ELECTRON_APP" --profile "Coll_A"
+assert_rc_nonzero "a name colliding with a launcher filed into a folder is refused" "$RUN_RC" "$RUN_OUT"
+assert_contains "and that launcher is named by its path" "$RUN_OUT" "$APPS/Filed/Fake Coll A.app"
+assert_no_dir "no launcher is built for it" "$APPS/Fake Coll_A.app"
+mv "$APPS/Filed/Fake Coll A.app" "$APPS/"
+rmdir "$APPS/Filed"
+# A launcher still records its folder after the folder is gone. A new one
+# must not take that path: the old launcher would open it as its own.
+mv "$DATA/fake-coll-a" "$SANDBOX/coll-a-aside"
+ai add "$ELECTRON_APP" --profile "Coll_A"
+assert_rc_nonzero "a name colliding with a recorded folder that is gone is refused" "$RUN_RC" "$RUN_OUT"
+assert_contains "and the reason is given" "$RUN_OUT" "share its profile directory"
+mv "$SANDBOX/coll-a-aside" "$DATA/fake-coll-a"
 ai rm "Fake Coll A" --purge -y
 
 # data_is_ours must never hang. A relative path made its walk-up loop spin

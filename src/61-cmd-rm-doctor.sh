@@ -146,11 +146,12 @@ cmd_rm() {
 # the launcher directory missed a launcher filed into a folder, and rm --purge
 # moved the data it was signed in with. Returns non-zero when that search
 # fails, so a caller about to move the data keeps it. A view that asks about
-# many launchers passes the list from one all_launchers as $3.
+# many launchers passes the list from one all_launchers as $3. A folder that
+# does not exist yet is matched by its path as recorded: add asks before it
+# makes one, and a launcher can still record a folder that was removed.
 launchers_sharing() { # data dir, [a launcher to leave out], [launcher list]
-  local id app d list names="" seen=" " app_id
-  # Not a directory: no launcher can be using it.
-  id=$(dir_id "$1") || return 0
+  local id="" app d list names="" seen=" " app_id
+  id=$(dir_id "$1") || id=""
   if [ $# -ge 3 ]; then list=$3; else list=$(all_launchers) || return 1; fi
   while IFS= read -r app; do
     [ -n "$app" ] || continue
@@ -161,7 +162,8 @@ launchers_sharing() { # data dir, [a launcher to leave out], [launcher list]
     case "$seen" in *" $app_id "*) continue ;; esac
     seen="$seen$app_id "
     d=$(plist_get "$app" "AIdentityDataDir")
-    [ "$(dir_id "$d")" = "$id" ] || continue
+    [ -n "$d" ] || continue
+    [ "$d" = "$1" ] || { [ -n "$id" ] && [ "$(dir_id "$d")" = "$id" ]; } || continue
     [ "${app%/*}" = "$APPS_DIR" ] && app=$(bundle_name "$app")
     names="${names:+$names, }$app"
   done <<EOF
