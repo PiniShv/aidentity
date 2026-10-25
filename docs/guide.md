@@ -263,7 +263,7 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 
 ## Is this safe?
 
-`aidentity` is one shell script, about 5,000 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it.
+`aidentity` is one shell script, about 5,000 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The repository also keeps it in [`src/`](../src), split by subject into smaller files that are joined to make that one.
 
 ### What it touches
 
@@ -1068,7 +1068,7 @@ If you change code, read [CONTRIBUTING.md](../CONTRIBUTING.md) first. In short:
 - It has no third-party dependencies. It uses only tools that come with macOS, plus the optional Xcode Command Line Tools.
 - Tests set `AIDENTITY_APPS_DIR`, `AIDENTITY_DATA_ROOT` and `AIDENTITY_APP_DIRS`, so they never touch a real setup.
 - `make check` runs the lint, the tests and the source checks.
-- When you change `bin/aidentity`, update `SHA256SUMS` with `make checksums` in the same commit.
+- The code is written in `src/`. After a change there, run `make build`: it rebuilds `bin/aidentity` and `SHA256SUMS`. Commit all three.
 
 Please follow the [Code of Conduct](../CODE_OF_CONDUCT.md). Release notes are in the [changelog](../CHANGELOG.md). For security reports, see [SECURITY.md](../SECURITY.md).
 

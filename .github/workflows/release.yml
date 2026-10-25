@@ -13,8 +13,10 @@ name: Release
 #   release  checks the signatures, then creates the release and uploads the
 #            files. It can write releases, but it cannot sign.
 #
-# aidentity has no build step: a release file is a copy of a file in the
-# repository at the tag. Both jobs check out the commit by its hash, the one
+# The release has no build step of its own: a release file is a copy of a
+# file in the repository at the tag. bin/aidentity is built from src/ and
+# committed, and the release check (through scripts/guards.sh) refuses a tag
+# where the two differ. Both jobs check out the commit by its hash, the one
 # the tag pointed to when it was pushed, so a tag moved while the run is going
 # cannot change the bytes that are signed or uploaded. The release page itself
 # is attached to the tag by name, so the release job also checks, just before

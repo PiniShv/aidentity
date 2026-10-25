@@ -5,6 +5,7 @@
 # out — everyone else can use install.sh.
 #
 #   make               show this help
+#   make build         rebuild bin/aidentity (and SHA256SUMS) after editing src/
 #   make check         everything CI checks: lint, the test suite, the guards
 #   make install       copy bin/aidentity to $(PREFIX)/bin
 #   sudo make install  same, when /usr/local/bin needs root
@@ -18,7 +19,7 @@ BINDIR ?= $(PREFIX)/bin
 SCRIPT   := bin/aidentity
 TARGET   := $(BINDIR)/aidentity
 TESTS    := test/run_tests.sh
-SH_FILES := bin/aidentity install.sh uninstall.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh
+SH_FILES := bin/aidentity install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh
 
 # shellcheck findings we accept on purpose. Clear it to see everything:
 #   make lint SHELLCHECK_EXCLUDE=
@@ -28,7 +29,7 @@ SH_FILES := bin/aidentity install.sh uninstall.sh scripts/guards.sh scripts/rele
 SHELLCHECK_EXCLUDE ?= SC2034,SC2012,SC2015
 
 .DEFAULT_GOAL := help
-.PHONY: help install uninstall test lint check guards release formula
+.PHONY: help install uninstall build test lint check guards release formula
 
 help: ## Show this help
 	@printf 'aidentity — run several accounts of the same Mac app at the same time.\n\n'
@@ -44,6 +45,7 @@ install: ## Copy bin/aidentity into BINDIR
 		printf 'Cannot find %s — run make from the repository root.\n' "$(SCRIPT)" >&2; \
 		exit 1; \
 	fi
+	@bash scripts/build.sh --check
 	@if [ ! -d "$(BINDIR)" ] && ! mkdir -p "$(BINDIR)" 2>/dev/null; then \
 		printf 'Cannot create %s.\n  Try:  sudo make install PREFIX=%s\n' "$(BINDIR)" "$(PREFIX)" >&2; \
 		exit 1; \
@@ -68,7 +70,17 @@ uninstall: ## Remove aidentity from BINDIR (leaves launchers and profile data al
 	fi
 	@printf 'Launchers and profile data are untouched. To remove those too: ./uninstall.sh\n'
 
+# The code is written in src/ and shipped as the one file bin/aidentity, which
+# is committed: install.sh, `aidentity update` and Homebrew fetch it alone.
+build: ## Rebuild bin/aidentity from src/, and SHA256SUMS with it
+	@bash scripts/build.sh
+	@$(MAKE) --no-print-directory checksums
+
+# The suite, the lint, install and release read bin/aidentity, so a src/
+# change that was not built yet would be used as the old code. They stop
+# first and say so.
 test: ## Run the test suite (test/run_tests.sh)
+	@bash scripts/build.sh --check
 	@if [ ! -f "$(TESTS)" ]; then \
 		printf 'No test suite at %s\n' "$(TESTS)" >&2; \
 		exit 1; \
@@ -81,6 +93,7 @@ guards: ## Run the source guards CI runs (scripts/guards.sh)
 check: lint test guards ## Everything CI checks, in one go
 
 lint: ## shellcheck every shell file, or syntax-check them if shellcheck is absent
+	@bash scripts/build.sh --check
 	@if command -v shellcheck >/dev/null 2>&1; then \
 		printf 'shellcheck\n'; \
 		for f in $(SH_FILES) $(TESTS); do \
@@ -103,8 +116,9 @@ lint: ## shellcheck every shell file, or syntax-check them if shellcheck is abse
 # Keep this exact line format, "<64 hex>  bin/aidentity", and the file at the
 # top of the repository: install.sh and every installed copy's
 # `aidentity update` read it from there. scripts/guards.sh checks both.
+# `make build` runs this too.
 .PHONY: checksums
-checksums: ## Regenerate SHA256SUMS after changing bin/aidentity
+checksums: ## Regenerate SHA256SUMS for the current bin/aidentity
 	@shasum -a 256 bin/aidentity | awk '{print $$1"  bin/aidentity"}' > SHA256SUMS
 	@echo "SHA256SUMS updated"
 
@@ -121,7 +135,8 @@ CHECK_VERSION = case "$$VERSION" in ''|*[!0-9.]*|.*|*.|*..*|*.*.*.*) false ;; *.
 release: ## Prepare a release: make release VERSION=1.2.0
 	@$(CHECK_VERSION) \
 		|| { printf 'Usage: make release VERSION=x.y.z\n' >&2; exit 1; }
-	@cur=$$(sed -n 's/^AIDENTITY_VERSION="\(.*\)"$$/\1/p' bin/aidentity); \
+	@bash scripts/build.sh --check
+	@cur=$$(sed -n 's/^AIDENTITY_VERSION="\(.*\)"$$/\1/p' src/00-header.sh); \
 	 if grep -q "^## \[$$VERSION\]" CHANGELOG.md; then \
 	   printf 'CHANGELOG.md already has a %s section. Nothing was changed.\n' "$$VERSION" >&2; exit 1; fi; \
 	 newest=$$(printf '%s\n%s\n' "$$cur" "$$VERSION" | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1); \
@@ -129,11 +144,11 @@ release: ## Prepare a release: make release VERSION=1.2.0
 	   printf '%s is not newer than the current %s. Nothing was changed.\n' "$$VERSION" "$$cur" >&2; exit 1; fi
 	@grep -q '^## \[Unreleased\]' CHANGELOG.md \
 		|| { printf 'CHANGELOG.md has no [Unreleased] section to release.\n' >&2; exit 1; }
-	@perl -pi -e 's/^AIDENTITY_VERSION=".*"$$/AIDENTITY_VERSION="$(VERSION)"/' bin/aidentity
+	@perl -pi -e 's/^AIDENTITY_VERSION=".*"$$/AIDENTITY_VERSION="$(VERSION)"/' src/00-header.sh
 	@perl -pi -e 's/^REF="\$$\{AIDENTITY_REF:-[^}]*\}"$$/REF="\$${AIDENTITY_REF:-v$(VERSION)}"/' install.sh
 	@perl -0pi -e 's/^## \[Unreleased\]\n/## [Unreleased]\n\n## [$(VERSION)] - '"$$(date +%Y-%m-%d)"'\n/m' CHANGELOG.md
 	@perl -0pi -e 's{^\[Unreleased\]: (\S+)/compare/(v[0-9.]+)\.\.\.HEAD$$}{[Unreleased]: $$1/compare/v$(VERSION)...HEAD\n[$(VERSION)]: $$1/compare/$$2...v$(VERSION)}m' CHANGELOG.md
-	@$(MAKE) --no-print-directory checksums
+	@$(MAKE) --no-print-directory build
 	@bash scripts/guards.sh >/dev/null
 	@printf '\nPrepared $(VERSION). Next:\n'
 	@printf '  1. Commit, open a PR, merge it.\n'
