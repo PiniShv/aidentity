@@ -102,11 +102,13 @@ group "sandbox isolation"
 
 REAL_APPS_BEFORE=$(snapshot "$REAL_APPS")
 REAL_DATA_BEFORE=$(snapshot "$REAL_DATA")
+REAL_TRASH_BEFORE=$(trash_names "$REAL_TRASH")
 
 assert_nonempty "AIDENTITY_APPS_DIR is set" "${AIDENTITY_APPS_DIR:-}"
 assert_nonempty "AIDENTITY_DATA_ROOT is set" "${AIDENTITY_DATA_ROOT:-}"
 assert_contains "AIDENTITY_APPS_DIR lives inside the sandbox" "$AIDENTITY_APPS_DIR" "$SANDBOX"
 assert_contains "AIDENTITY_DATA_ROOT lives inside the sandbox" "$AIDENTITY_DATA_ROOT" "$SANDBOX"
+assert_contains "HOME lives inside the sandbox, so its Trash does too" "$HOME" "$SANDBOX"
 assert_ne "AIDENTITY_APPS_DIR is not the real ~/Applications" "$REAL_APPS" "$AIDENTITY_APPS_DIR"
 assert_ne "AIDENTITY_DATA_ROOT is not the real profile directory" \
   "$REAL_DATA/profiles" "$AIDENTITY_DATA_ROOT"
@@ -151,6 +153,7 @@ assert_eq "the real ~/Applications is unchanged" "$REAL_APPS_BEFORE" "$(snapshot
 assert_eq "the real aidentity data directory is unchanged" "$REAL_DATA_BEFORE" "$(snapshot "$REAL_DATA")"
 assert_no_dir "no launcher leaked into the real ~/Applications" "$REAL_APPS/Fake Work.app"
 assert_no_dir "no profile leaked into the real data directory" "$REAL_DATA/profiles/fake-work"
+assert_eq "no profile data went to the real Trash" "$REAL_TRASH_BEFORE" "$(trash_names "$REAL_TRASH")"
 assert_dir "everything the suite created is inside the sandbox" "$SANDBOX"
 
 # ================================================================== report ==

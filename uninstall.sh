@@ -12,16 +12,17 @@
 #      each launcher is a standalone .app that holds no reference to the tool.
 #
 #   2. Your launchers and their profile data. Offered, never assumed. This is
-#      the part that loses accounts and local app state, so it prints every
-#      path first and then waits for you to type a word. Answer anything else
-#      and nothing is deleted.
+#      the part that signs accounts out and takes local app state away, so it
+#      prints every path first and then waits for you to type a word. Answer
+#      anything else and nothing is removed. Launchers are deleted; profile
+#      data is moved to the Trash, so it can still be put back.
 #
 # The safety rule is the same one aidentity itself uses: a bundle is only ever
 # deleted if its Info.plist carries the "AIdentityProfile" key, which only
 # aidentity writes. A real app that happens to sit in the same folder — or an
 # app named after one of your profiles — is never touched. Profile data is only
-# deleted from inside the aidentity data root; a path recorded outside it, or one
-# that walks back out of it with "..", is reported and left alone.
+# moved to the Trash from inside the aidentity data root; a path recorded outside
+# it, or one that walks back out of it with "..", is reported and left alone.
 #
 # The command file gets the same treatment: a file called "aidentity" is only
 # removed once it has been read and found to be aidentity. Your own script of
@@ -51,7 +52,7 @@ BIN_NAME="aidentity"
 APPS_DIR="${AIDENTITY_APPS_DIR:-$HOME/Applications}"
 DATA_ROOT="${AIDENTITY_DATA_ROOT:-$HOME/Library/Application Support/aidentity/profiles}"
 
-# The word you have to type to lose your profiles.
+# The word you have to type to remove your launchers and profiles.
 CONFIRM_WORD="delete"
 
 # ---------------------------------------------------------------- output --
@@ -78,7 +79,8 @@ ${C_BOLD}aidentity uninstaller${C_RESET}
   ./uninstall.sh --help   This text.
 
 Launchers and profile data are never removed without you typing '$CONFIRM_WORD'
-at the prompt. Only bundles carrying the $MARKER_KEY key are eligible.
+at the prompt. Only bundles carrying the $MARKER_KEY key are eligible. Profile
+data is moved to the Trash, not deleted.
 EOF
 }
 
@@ -110,7 +112,8 @@ plist_get() {
 
 # Is this recorded data directory genuinely inside our data root? A plain prefix
 # test is not enough — "$DATA_ROOT/../../Pictures" is prefixed by $DATA_ROOT and
-# resolves nowhere near it, and rm -rf does not care about the difference.
+# resolves nowhere near it, and a move to the Trash does not care about the
+# difference.
 # Kept deliberately identical to bin/aidentity's version. A string prefix test
 # is not enough: "$DATA_ROOT//" matches "$DATA_ROOT"/?* yet IS the root, and a
 # symlink inside the root escapes it entirely. Resolve both sides instead.
@@ -236,6 +239,104 @@ proc_dir_ids() { # process list
 $1
 EOF
   printf '%s' "$ids"
+}
+
+# trash_path is kept identical to bin/aidentity's; scripts/guards.sh compares
+# them. It moves a folder into the Trash of its own volume with a plain mv (a
+# rename, so it happens whole or not at all) and prints where it went. If it
+# cannot, it says why, and the folder stays where it was.
+trash_path() { # path -> prints where it went
+  local src="$1" base parent dev uid trash mount up dest n id err moved
+  base=${src##*/}
+  case "$src" in /?*) ;; *) base="" ;; esac
+  if [ -z "$base" ] || [ "$base" = "." ] || [ "$base" = ".." ]; then
+    warn "Could not move '$src' to the Trash: it is not a full path to a folder. Nothing was deleted."
+    return 1
+  fi
+  if [ ! -e "$src" ] && [ ! -L "$src" ]; then
+    warn "Could not move $src to the Trash: it does not exist."
+    return 1
+  fi
+  parent=${src%/*}; [ -n "$parent" ] || parent="/"
+  # Without -L: the device of the entry that mv renames, even when it is a
+  # symlink.
+  dev=$(/usr/bin/stat -f %d "$src" 2>/dev/null) || dev=""
+  if [ -z "$dev" ]; then
+    warn "Could not move $src to the Trash: it cannot be read. Nothing was deleted."
+    return 1
+  fi
+
+  if [ -n "${HOME:-}" ] && [ "$(/usr/bin/stat -L -f %d "$HOME" 2>/dev/null)" = "$dev" ]; then
+    trash="$HOME/.Trash"
+    if [ ! -d "$trash" ] && ! mkdir -m 700 "$trash" 2>/dev/null; then
+      warn "Could not move $src to the Trash: $trash is missing and could not be created. Nothing was deleted."
+      return 1
+    fi
+  else
+    # Another volume. Its top folder is where the device changes, walking up
+    # from the folder PATH is in. A PATH that is itself a volume (its folder
+    # is on another device) cannot be moved anywhere.
+    up=$(command cd -P "$parent" 2>/dev/null && pwd -P) || up=""
+    if [ -z "$up" ] || [ "$(/usr/bin/stat -f %d "$up" 2>/dev/null)" != "$dev" ]; then
+      warn "Could not move $src to the Trash: it is a volume of its own, or its folder cannot be read. Nothing was deleted."
+      return 1
+    fi
+    mount=$up
+    while [ "$mount" != "/" ]; do
+      up=${mount%/*}; [ -n "$up" ] || up="/"
+      [ "$(/usr/bin/stat -f %d "$up" 2>/dev/null)" = "$dev" ] || break
+      mount=$up
+    done
+    # Finder makes .Trashes on a volume it has put things in the Trash on. A
+    # volume without one may not want one (a backup disk, a network share), so
+    # it is not made here.
+    if [ ! -d "$mount/.Trashes" ]; then
+      warn "Could not move $src to the Trash: its volume, $mount, has no Trash folder (.Trashes). Nothing was deleted."
+      return 1
+    fi
+    uid=$(id -u 2>/dev/null) || uid=""
+    trash="$mount/.Trashes/$uid"
+    if [ -z "$uid" ] || { [ ! -d "$trash" ] && ! mkdir -m 700 "$trash" 2>/dev/null; }; then
+      warn "Could not move $src to the Trash: $trash is missing and could not be created. Nothing was deleted."
+      return 1
+    fi
+  fi
+  # A symlinked Trash could lead to another volume, and then mv would copy.
+  if [ "$(/usr/bin/stat -L -f %d "$trash" 2>/dev/null)" != "$dev" ]; then
+    warn "Could not move $src to the Trash: $trash is on another volume. Nothing was deleted."
+    return 1
+  fi
+
+  # mv onto a folder that exists moves INTO it, so the name must be free:
+  # "name", then "name 2", "name 3", and so on, as Finder names them.
+  dest="$trash/$base"; n=2
+  while [ -e "$dest" ] || [ -L "$dest" ]; do
+    if [ "$n" -gt 9999 ]; then
+      warn "Could not move $src to the Trash: too many items named '$base' there already. Nothing was deleted."
+      return 1
+    fi
+    dest="$trash/$base $n"; n=$((n + 1))
+  done
+  id=$(/usr/bin/stat -f %d:%i "$src" 2>/dev/null) || id=""
+  # -n: never replace an item that took the name since the check above.
+  err=$(mv -n "$src" "$dest" 2>&1) || err=${err:-mv failed}
+  err=${err#mv: }
+  if [ -e "$src" ] || [ -L "$src" ]; then
+    warn "Could not move $src to the Trash: ${err:-$dest was taken just before the move}. Nothing was deleted."
+    return 1
+  fi
+  # Gone from where it was, so a rename put it in the Trash, whole. The return
+  # status says only that: whether PATH is still where it was.
+  moved=$dest
+  if [ -n "$id" ] && [ "$(/usr/bin/stat -f %d:%i "$dest" 2>/dev/null)" != "$id" ] \
+     && [ "$(/usr/bin/stat -f %d:%i "$dest/$base" 2>/dev/null)" = "$id" ]; then
+    # A folder made at that name in the moment before the move holds it.
+    moved="$dest/$base"
+  elif [ -n "$err" ] || { [ ! -e "$dest" ] && [ ! -L "$dest" ]; }; then
+    # The system may keep a Trash private even from its owner's programs.
+    warn "Moved $src to the Trash, but could not check it there${err:+ ($err)}. Look in: $trash"
+  fi
+  printf '%s\n' "$moved"
 }
 
 # Whether /dev/tty can really be opened. Its mode bits say yes on every Mac,
@@ -369,6 +470,9 @@ LAUNCHERS=(); LABELS=(); PROFILES=(); DATA_DIRS=(); ORPHANS=()
 # data outside the root or in use). "aidentity is gone" is said only at zero.
 LEFT_BEHIND=0
 
+# Profile folders moved to the Trash, for the note on how to put one back.
+MOVED_DATA=0
+
 # Every aidentity launcher worth removing, one path per line: the launcher
 # directory and folders inside it (followed with -H when it is a symlink), the
 # app folders (AIDENTITY_APP_DIRS, as aidentity itself searches them), and what
@@ -489,8 +593,8 @@ confirm_removal() {
     Deleting a profile's data while its app is open loses whatever it has not saved."
   fi
 
-  info "Removing them deletes ${C_BOLD}${#LAUNCHERS[@]}${C_RESET} launcher(s) and the profile data listed above."
-  info "Every account signed in through that data will have to sign in again."
+  info "Removing them deletes ${C_BOLD}${#LAUNCHERS[@]}${C_RESET} launcher(s) and moves the profile data listed above to the Trash."
+  info "Every account signed in through that data is signed out, until its folder is moved back."
   dim "  Your real apps — the ones in /Applications — are not touched."
   info ""
 
@@ -499,29 +603,29 @@ confirm_removal() {
   local reply="" from="/dev/stdin"
   if [ ! -t 0 ]; then
     if ! tty_opens; then
-      warn "Not running in a terminal, so there is nobody to confirm with. No launchers or profile data were deleted."
+      warn "Not running in a terminal, so there is nobody to confirm with. No launchers or profile data were removed."
       dim "  Run ./uninstall.sh directly in a terminal to remove them."
       return 2
     fi
     from="/dev/tty"
   fi
 
-  printf 'Type %s%s%s to delete them, or anything else to keep them: ' "$C_BOLD" "$CONFIRM_WORD" "$C_RESET"
+  printf 'Type %s%s%s to remove them, or anything else to keep them: ' "$C_BOLD" "$CONFIRM_WORD" "$C_RESET"
   IFS= read -r reply < "$from" || reply="${reply:-}"
   if [ "$reply" != "$CONFIRM_WORD" ]; then
     info ""
-    ok "Kept. Nothing was deleted."
+    ok "Kept. Nothing was removed."
     dim "  Your launchers still work; they do not need the aidentity command."
     return 1
   fi
   return 0
 }
 
-# Delete one profile directory, with the same checks as aidentity's own purge:
-# inside the data root, and not running. The running check is repeated here
-# because the confirmation prompt can sit for minutes.
+# Move one profile directory to the Trash, with the same checks as aidentity's
+# own purge: inside the data root, and not running. The running check is
+# repeated here because the confirmation prompt can sit for minutes.
 remove_data() {
-  local data="$1" name="$2"
+  local data="$1" name="$2" moved
   if ! data_is_ours "$data"; then
     warn "Left profile data in place (outside the aidentity data directory):"
     dim "    $data"
@@ -534,10 +638,13 @@ remove_data() {
     LEFT_BEHIND=$((LEFT_BEHIND + 1))
     return 0
   fi
-  if rm -rf "$data" 2>/dev/null && [ ! -e "$data" ]; then
-    ok "Deleted data for $name"
+  # trash_path says why when it cannot; the data then stays where it is.
+  if moved=$(trash_path "$data"); then
+    ok "Moved the data for $name to the Trash"
+    dim "    $moved"
+    MOVED_DATA=$((MOVED_DATA + 1))
   else
-    warn "Could not delete the data for $name; it is still at $data"
+    dim "    The data for $name is still at: $data"
     LEFT_BEHIND=$((LEFT_BEHIND + 1))
   fi
 }
@@ -582,6 +689,10 @@ remove_launchers() {
   rmdir "$(dirname "$DATA_ROOT")" 2>/dev/null || true
 
   info ""
+  if [ "$MOVED_DATA" -gt 0 ]; then
+    dim "  To get an account back: move its folder from the Trash back into"
+    dim "  $DATA_ROOT, install aidentity again, then run: aidentity restore"
+  fi
   dim "  If a launcher was pinned to your Dock, drag the tile out — macOS keeps it"
   dim "  until you do, even though the app is gone."
 }

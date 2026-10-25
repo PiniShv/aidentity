@@ -11,9 +11,12 @@
 group "uninstall.sh end to end, every search path in the sandbox"
 
 # AIDENTITY_BIN_DIRS keeps it from finding a real installed copy; HOME and
-# AIDENTITY_APP_DIRS keep its launcher search inside the sandbox.
+# AIDENTITY_APP_DIRS keep its launcher search inside the sandbox. HOME also
+# keeps the Trash it moves profile data to in the sandbox.
 UN_BIN="$SB/un-bin"
+UN_TRASH="$SANDBOX/tty-home/.Trash"
 mkdir -p "$UN_BIN"
+trash_reset
 un_prepare() {
   cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
   ai add "$ELECTRON_APP" --profile Bye
@@ -32,14 +35,29 @@ un_tty() { # typed input
 un_prepare
 un_tty 'no\n'
 assert_rc "declining exits 0" 0 "$RUN_RC" "$RUN_OUT"
-assert_contains "and says nothing was deleted" "$RUN_OUT" "Kept"
+assert_contains "and says nothing was removed" "$RUN_OUT" "Kept. Nothing was removed."
 assert_dir "the launcher stays" "$APPS/Fake Bye.app"
 assert_file "the data stays" "$DATA/fake-bye/Cookies"
+assert_contains "the prompt says the data goes to the Trash" "$RUN_OUT" "moves the profile data listed above to the Trash"
 
 cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
 RUN_OUT=$(HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" detached "$BASH_BIN" "$REPO_DIR/uninstall.sh" 2>&1 </dev/null); RUN_RC=$?
 assert_rc_nonzero "with no terminal to confirm on, it exits non-zero" "$RUN_RC" "$RUN_OUT"
 assert_dir "and deletes no launcher" "$APPS/Fake Bye.app"
+
+# A Trash it cannot write to: the data stays, and the end says so.
+un_prepare
+mkdir -p "$UN_TRASH"
+chmod 500 "$UN_TRASH"
+un_tty 'delete\n'
+chmod 700 "$UN_TRASH"
+assert_no_dir "with a Trash it cannot write to, the launcher is still removed" "$APPS/Fake Bye.app"
+assert_file "but the data stays where it was" "$DATA/fake-bye/Cookies"
+assert_contains "it says why" "$RUN_OUT" "Could not move $DATA/fake-bye to the Trash"
+assert_contains "and that nothing was deleted" "$RUN_OUT" "Nothing was deleted."
+assert_contains "and the end does not claim it is all gone" "$RUN_OUT" "some things were left in place"
+assert_not_contains "nor that the data moved" "$RUN_OUT" "Moved the data"
+rm -rf "$DATA/fake-bye"
 
 un_prepare
 mkdir -p "$DATA/stray-profile"
@@ -48,7 +66,12 @@ assert_rc "typing delete removes everything" 0 "$RUN_RC" "$RUN_OUT"
 assert_no_file "the command" "$UN_BIN/aidentity"
 assert_no_dir "the launcher" "$APPS/Fake Bye.app"
 assert_no_dir "its data" "$DATA/fake-bye"
+assert_file "which is in the Trash" "$UN_TRASH/fake-bye/Cookies"
 assert_no_dir "data no launcher pointed at" "$DATA/stray-profile"
+assert_dir "is in the Trash too" "$UN_TRASH/stray-profile"
+assert_contains "it says it moved the data" "$RUN_OUT" "Moved the data for Fake Bye to the Trash"
+assert_contains "and how to get an account back" "$RUN_OUT" "To get an account back"
+assert_not_contains "and never that it deleted the data" "$RUN_OUT" "Deleted data"
 assert_contains "and only then says aidentity is gone" "$RUN_OUT" "aidentity is gone"
 assert_file "it never touched this checkout" "$REPO_DIR/bin/aidentity"
 mkdir -p "$DATA"
@@ -62,5 +85,7 @@ un_tty 'delete\n'
 assert_contains "a Homebrew copy is left for brew" "$RUN_OUT" "managed by Homebrew"
 assert_not_contains "and the end does not claim it is all gone" "$RUN_OUT" "aidentity is gone"
 assert_no_dir "the launcher is still removed" "$APPS/Fake Bye.app"
+assert_dir "and its data goes to the Trash under the next free name" "$UN_TRASH/fake-bye 2"
 rm -f "$UN_BIN/aidentity"
 mkdir -p "$DATA"
+trash_reset

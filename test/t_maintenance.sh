@@ -49,6 +49,35 @@ AIDENTITY_DATA_ROOT="$SB/data-link" ai rm "Fake Linked" --purge -y
 rm -f "$SB/data-link"
 ai rm "Fake Hint" --purge -y
 
+# prune moves what it finds to the Trash, and says so.
+trash_reset
+mkdir -p "$DATA/fake-orphan-a" "$DATA/fake-orphan-b"
+printf 'session\n' > "$DATA/fake-orphan-a/Cookies"
+ai_in "no" prune
+assert_contains "prune asks to move them to the Trash" "$RUN_OUT" "Move 2 orphaned profile(s) to the Trash?"
+assert_contains "a cancelled prune says nothing was moved" "$RUN_OUT" "Cancelled. Nothing was moved."
+assert_file "and moves nothing" "$DATA/fake-orphan-a/Cookies"
+mkdir -p "$SB_TRASH/fake-orphan-a"
+ai prune -y
+assert_rc "prune -y moves them" 0 "$RUN_RC" "$RUN_OUT"
+assert_file "one to 'name 2', as its name is taken in the Trash" "$SB_TRASH/fake-orphan-a 2/Cookies"
+assert_dir "the other under its own name" "$SB_TRASH/fake-orphan-b"
+assert_no_dir "both are gone from the data root" "$DATA/fake-orphan-a"
+assert_contains "it counts them" "$RUN_OUT" "Moved 2 orphaned profile(s) to the Trash."
+assert_contains "and says where each went" "$RUN_OUT" "fake-orphan-a is now at: $SB_TRASH/fake-orphan-a 2"
+assert_contains "and how to undo it" "$RUN_OUT" "To undo, move a folder back into $DATA"
+assert_not_contains "and never that it removed or deleted them" "$RUN_OUT" "Removed"
+
+mkdir -p "$DATA/fake-orphan-c"
+chmod 500 "$SB_TRASH"
+ai prune -y
+chmod 700 "$SB_TRASH"
+assert_dir "a Trash prune cannot write to leaves the folder in place" "$DATA/fake-orphan-c"
+assert_contains "it says why" "$RUN_OUT" "Could not move $DATA/fake-orphan-c to the Trash"
+assert_contains "and counts nothing as moved" "$RUN_OUT" "Moved 0 orphaned profile(s)"
+rm -rf "$DATA/fake-orphan-c"
+trash_reset
+
 
 group "rename and rebuild edge cases"
 

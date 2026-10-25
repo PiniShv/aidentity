@@ -28,9 +28,9 @@ launcher_for() {
 
 # Every aidentity launcher that can be found, one path per line: the launcher
 # directory and folders inside it, the app search path, and whatever Spotlight
-# knows. `prune` deletes data that no launcher claims, so a launcher it cannot
-# see is a signed-in session it would delete. Looking only in the launcher
-# directory deleted the data of any launcher moved somewhere else.
+# knows. `prune` moves data that no launcher claims to the Trash, so a launcher
+# it cannot see is a signed-in session it would throw out. Looking only in the
+# launcher directory deleted the data of any launcher moved somewhere else.
 #
 # find runs with -H so a symlinked launcher directory is followed, as the old
 # "$APPS_DIR"/*.app glob was; without it a symlinked ~/Applications looked
@@ -463,16 +463,16 @@ EOF
   dim "  This is what is left when a launcher is deleted in Finder, or removed with"
   dim "  'aidentity rm' without --purge. Launchers were looked for in $APPS_DIR"
   dim "  (and folders inside it), in the app folders and through Spotlight. If you"
-  dim "  keep a launcher anywhere else, its account is listed here: do not delete it."
+  dim "  keep a launcher anywhere else, its account is listed here: do not remove it."
   info ""
 
   if [ "$yes" -eq 0 ]; then
-    local reply; reply=$(ask "Delete $n orphaned profile(s)? Type yes to confirm: ") \
+    local reply; reply=$(ask "Move $n orphaned profile(s) to the Trash? Type yes to confirm: ") \
       || die "Nothing to confirm with."
-    [ "$reply" = "yes" ] || die "Cancelled. Nothing was deleted."
+    [ "$reply" = "yes" ] || die "Cancelled. Nothing was moved."
   fi
 
-  local removed=0
+  local moved=0 dest
   for d in "${orphans[@]}"; do
     if running_on_profile "$d"; then
       warn "Skipping $(basename "$d") — something is running on it."
@@ -482,9 +482,14 @@ EOF
       warn "Skipping $(basename "$d") — outside the aidentity data root."
       continue
     fi
-    if rm -rf "$d"; then removed=$((removed+1)); else warn "Could not remove $d"; fi
+    # trash_path says why when it cannot; the folder then stays where it is.
+    if dest=$(trash_path "$d"); then
+      moved=$((moved+1))
+      dim "  $(basename "$d") is now at: $dest"
+    fi
   done
-  ok "Removed $removed orphaned profile(s)."
+  ok "Moved $moved orphaned profile(s) to the Trash."
+  [ "$moved" -eq 0 ] || dim "  To undo, move a folder back into $DATA_ROOT, then run: aidentity restore"
 }
 
 # Rebuild one launcher from what its Info.plist records. Profile data is never

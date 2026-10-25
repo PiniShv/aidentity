@@ -189,7 +189,7 @@ touch "$DATA/fake-purgeable/marker"
 assert_file "the profile data has a marker file" "$DATA/fake-purgeable/marker"
 ai rm "Fake Purgeable" --purge -y
 assert_rc "rm --purge exits 0" 0 "$RUN_RC" "$RUN_OUT"
-assert_no_dir "rm --purge deletes data inside the data root" "$DATA/fake-purgeable"
+assert_no_dir "rm --purge takes data inside the data root away" "$DATA/fake-purgeable"
 assert_dir "rm --purge leaves the data root itself alone" "$DATA"
 
 # A launcher whose recorded data directory points outside the data root must not
@@ -223,6 +223,152 @@ assert_rc "rm --purge pointed at the data root exits 0" 0 "$RUN_RC" "$RUN_OUT"
 assert_dir "rm --purge never deletes the data root itself" "$DATA"
 assert_dir "unrelated profile data survives" "$DATA/keep-me"
 rm -rf "$DATA/keep-me"
+
+group "--purge moves the data to the Trash"
+
+trash_reset
+ai add "$ELECTRON_APP" --profile Trashy
+printf 'session\n' > "$DATA/fake-trashy/Cookies"
+# A launcher from before restore records: purge writes the record first, so
+# the folder can be restored once it is moved back.
+rm -f "$DATA/fake-trashy/.aidentity-profile.plist"
+ai_in "no" rm "Fake Trashy" --purge
+assert_contains "the prompt says the data goes to the Trash" "$RUN_OUT" "move its data to the Trash"
+assert_not_contains "and does not say it is deleted for good" "$RUN_OUT" "permanently"
+assert_dir "a cancelled purge keeps the launcher" "$APPS/Fake Trashy.app"
+ai rm "Fake Trashy" --purge -y
+assert_rc "rm --purge exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_no_dir "the data is gone from the data root" "$DATA/fake-trashy"
+assert_file "it is in the Trash of the home folder" "$SB_TRASH/fake-trashy/Cookies"
+assert_eq "a Trash made for it is private" "700" "$(/usr/bin/stat -f %Lp "$SB_TRASH")"
+assert_file "with a restore record written before the move" "$SB_TRASH/fake-trashy/.aidentity-profile.plist"
+assert_contains "it says so" "$RUN_OUT" "Moved the profile data to the Trash."
+assert_contains "and where it is now" "$RUN_OUT" "It is now at: $SB_TRASH/fake-trashy"
+assert_contains "and where it came from" "$RUN_OUT" "move it back to: $DATA/fake-trashy"
+assert_contains "and how to get the launcher back" "$RUN_OUT" 'then run:  aidentity restore "Fake Trashy"'
+assert_not_contains "and never that it deleted it" "$RUN_OUT" "Deleted"
+
+mv "$SB_TRASH/fake-trashy" "$DATA/fake-trashy"
+ai restore "Fake Trashy"
+assert_rc "following the undo hint brings the launcher back" 0 "$RUN_RC" "$RUN_OUT"
+assert_dir "the launcher is there" "$APPS/Fake Trashy.app"
+assert_file "still signed in" "$DATA/fake-trashy/Cookies"
+
+# A name already taken in the Trash: "name 2", never into the folder there.
+mkdir -p "$SB_TRASH/fake-trashy"
+printf 'older\n' > "$SB_TRASH/fake-trashy/older.txt"
+ai rm "Fake Trashy" --purge -y
+assert_rc "a name taken in the Trash is no problem" 0 "$RUN_RC" "$RUN_OUT"
+assert_file "the data goes to 'name 2'" "$SB_TRASH/fake-trashy 2/Cookies"
+assert_contains "and it says so" "$RUN_OUT" "It is now at: $SB_TRASH/fake-trashy 2"
+assert_no_dir "not into the folder of that name" "$SB_TRASH/fake-trashy/fake-trashy"
+assert_eq "which is left as it was" "older" "$(cat "$SB_TRASH/fake-trashy/older.txt")"
+mv "$SB_TRASH/fake-trashy 2" "$DATA/fake-trashy"
+mkdir "$SB_TRASH/fake-trashy 2"
+ai restore "Fake Trashy"
+ai rm "Fake Trashy" --purge -y
+assert_file "with 'name 2' taken too, it is 'name 3'" "$SB_TRASH/fake-trashy 3/Cookies"
+
+# A Trash it cannot write to: nothing is moved, and the data stays.
+ai add "$ELECTRON_APP" --profile Stuck
+printf 'session\n' > "$DATA/fake-stuck/Cookies"
+chmod 500 "$SB_TRASH"
+ai rm "Fake Stuck" --purge -y
+STUCK_RC=$RUN_RC; STUCK_OUT=$RUN_OUT
+chmod 700 "$SB_TRASH"
+assert_rc_nonzero "a purge that cannot reach the Trash exits non-zero" "$STUCK_RC" "$STUCK_OUT"
+assert_file "the data stays where it was" "$DATA/fake-stuck/Cookies"
+assert_no_dir "and nothing reached the Trash" "$SB_TRASH/fake-stuck"
+assert_contains "it says why" "$STUCK_OUT" "Could not move $DATA/fake-stuck to the Trash"
+assert_contains "and that nothing was deleted" "$STUCK_OUT" "Nothing was deleted."
+assert_contains "and where the data is" "$STUCK_OUT" "its data is still at: $DATA/fake-stuck"
+assert_not_contains "and never that it moved it" "$STUCK_OUT" "Moved the profile data"
+assert_no_dir "the launcher is gone, as the prompt said" "$APPS/Fake Stuck.app"
+ai restore "Fake Stuck"
+assert_rc "the account comes back through restore" 0 "$RUN_RC" "$RUN_OUT"
+ai rm "Fake Stuck" --purge -y
+assert_no_dir "and a later purge moves it" "$DATA/fake-stuck"
+
+# No Trash in the home folder yet: one is made, private to its owner.
+ai add "$ELECTRON_APP" --profile Fresh
+mkdir -p "$SANDBOX/home-fresh"
+RUN_OUT=$(HOME="$SANDBOX/home-fresh" detached "$BASH_BIN" "$AIDENTITY" rm "Fake Fresh" --purge -y 2>&1 </dev/null); RUN_RC=$?
+assert_rc "a home folder with no Trash gets one" 0 "$RUN_RC" "$RUN_OUT"
+assert_dir "the data is in it" "$SANDBOX/home-fresh/.Trash/fake-fresh"
+assert_eq "and it is private" "700" "$(/usr/bin/stat -f %Lp "$SANDBOX/home-fresh/.Trash")"
+
+# A profile folder that is already gone: the launcher goes, nothing to move.
+ai add "$ELECTRON_APP" --profile Hollow
+rm -rf "$DATA/fake-hollow"
+ai rm "Fake Hollow" --purge -y
+assert_rc "a purge with no data left exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "and says there was nothing to move" "$RUN_OUT" "no profile data to move"
+assert_no_dir "the launcher is gone" "$APPS/Fake Hollow.app"
+trash_reset
+
+group "--purge on another volume"
+
+# A profile folder on another volume goes to that volume's own Trash,
+# .Trashes/<uid>, and only if the volume has .Trashes. A disk image stands in
+# for the other volume.
+VOL="$SANDBOX/volume"
+if vol_attach "$VOL"; then
+  AIDENTITY_DATA_ROOT="$VOL/profiles" ai add "$ELECTRON_APP" --profile Away
+  printf 'session\n' > "$VOL/profiles/fake-away/Cookies"
+  AIDENTITY_DATA_ROOT="$VOL/profiles" ai rm "Fake Away" --purge -y
+  assert_rc_nonzero "a volume with no .Trashes is refused" "$RUN_RC" "$RUN_OUT"
+  assert_file "and the data stays there" "$VOL/profiles/fake-away/Cookies"
+  assert_contains "it says why" "$RUN_OUT" "has no Trash folder (.Trashes)"
+  assert_contains "and that nothing was deleted" "$RUN_OUT" "Nothing was deleted."
+  assert_no_dir "no .Trashes is made for it" "$VOL/.Trashes"
+  assert_no_dir "and nothing went to the home folder's Trash" "$SB_TRASH/fake-away"
+
+  mkdir "$VOL/.Trashes"
+  AIDENTITY_DATA_ROOT="$VOL/profiles" ai restore "Fake Away"
+  AIDENTITY_DATA_ROOT="$VOL/profiles" ai rm "Fake Away" --purge -y
+  VOL_UID=$(id -u)
+  assert_rc "with .Trashes it is moved" 0 "$RUN_RC" "$RUN_OUT"
+  assert_file "to .Trashes/<uid> on that volume" "$VOL/.Trashes/$VOL_UID/fake-away/Cookies"
+  assert_eq "the <uid> folder made for it is private" "700" "$(/usr/bin/stat -f %Lp "$VOL/.Trashes/$VOL_UID")"
+  assert_no_dir "it is gone from the data root" "$VOL/profiles/fake-away"
+  # The volume's folder as the system resolves it (/var is /private/var).
+  VOL_REAL=$(cd -P "$VOL" && pwd -P)
+  assert_contains "it says where it is" "$RUN_OUT" "It is now at: $VOL_REAL/.Trashes/$VOL_UID/fake-away"
+  assert_no_dir "and the home folder's Trash is not used" "$SB_TRASH/fake-away"
+  vol_detach
+  assert_eq "the disk image is detached" "$(/usr/bin/stat -f %d "$SANDBOX")" "$(/usr/bin/stat -f %d "$VOL")"
+else
+  vol_detach
+  _skip "--purge on another volume" "hdiutil cannot make or attach a disk image here"
+fi
+rm -rf "$VOL"
+
+group "trash_path on its own, and uninstall.sh's copy"
+
+trash_reset
+mkdir -p "$SB/tp/target"
+printf 'keep\n' > "$SB/tp/target/keep.txt"
+ln -s "$SB/tp/target" "$SB/tp/link"
+libcall trash_path "$SB/tp/link"
+assert_rc "a symlink can be moved" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "it prints where it went, and nothing else" "$SB_TRASH/link" "$RUN_OUT"
+if [ -L "$SB_TRASH/link" ]; then _pass "the link itself is moved"; else _fail "the link itself is moved" "no symlink at $SB_TRASH/link"; fi
+assert_file "never what it points to" "$SB/tp/target/keep.txt"
+libcall trash_path "tp/target"
+assert_rc_nonzero "a relative path is refused" "$RUN_RC" "$RUN_OUT"
+libcall trash_path "$SB/tp/target/"
+assert_rc_nonzero "so is a path ending in /" "$RUN_RC" "$RUN_OUT"
+libcall trash_path "$SB/tp/missing"
+assert_rc_nonzero "and one that does not exist" "$RUN_RC" "$RUN_OUT"
+assert_file "the folder is still there after all three" "$SB/tp/target/keep.txt"
+# uninstall.sh runs under set -e; its copy must work there too.
+RUN_OUT=$("$BASH_BIN" -c 'lib=$1; dir=$2; set --; . "$lib" >/dev/null 2>&1; trash_path "$dir"; echo "rc=$?"' \
+  x "$UNINST_LIB" "$SB/tp/target" 2>&1 </dev/null)
+assert_contains "uninstall.sh's copy moves a folder under set -e" "$RUN_OUT" "$SB_TRASH/target"
+assert_contains "and returns 0" "$RUN_OUT" "rc=0"
+assert_file "it is in the Trash" "$SB_TRASH/target/keep.txt"
+rm -rf "$SB/tp"
+trash_reset
 
 group "--seed copies an existing Claude config"
 
@@ -475,6 +621,9 @@ printf 'x\n' > "$DATA/an-orphan/data"
 ai prune -y
 assert_rc "prune succeeds" 0 "$RUN_RC" "$RUN_OUT"
 assert_no_dir "an orphaned profile directory is removed" "$DATA/an-orphan"
+assert_file "to the Trash" "$SB_TRASH/an-orphan/data"
+assert_contains "and prune says so" "$RUN_OUT" "orphaned profile(s) to the Trash."
+rm -rf "$SB_TRASH/an-orphan"
 assert_dir "a claimed profile directory survives prune" "$DATA/fake-renamed"
 assert_file "prune never touches a live session" "$DATA/fake-renamed/session.marker"
 ai prune -y
