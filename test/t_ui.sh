@@ -310,14 +310,30 @@ assert_contains "the row still counts as running" "$(ui_frame)" "4 profiles · 1
 if kill -0 "$UI_QPID" 2>/dev/null; then _pass "the profile's process still runs"; else _fail "the profile's process still runs"; fi
 assert_eq "and the terminal is intact" "same" "$RUN_FLAGS"
 
-# An osascript that finds no app for the PID, so quit sends SIGTERM.
+# An osascript that finds no app for the PID: the process is not an app, so
+# quit sends it nothing, and the footer says so in red, never as a success.
 UI_QNOAPP="$SANDBOX/ui-quit-no-app"
 mkdir -p "$UI_QNOAPP"
 printf '#!/bin/sh\ncat >/dev/null\necho none\n' > "$UI_QNOAPP/osascript"
 chmod +x "$UI_QNOAPP/osascript"
+NO_COLOR='' ui_pty 24 200 '<4 profiles · 1 running>jjjs;<Nothing was quit>q' \
+  /bin/sh -c 'PATH="$1:$PATH"; exec "$2" "$3" ui' x "$UI_QNOAPP" "$BASH_BIN" "$AIDENTITY"
+assert_rc "s on a profile with no app open, then q, exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the footer says what still runs, in red" "$(ui_frame)" \
+  "${ESC}[31m! 'Quitty Work' has no app open, but these still use its profile folder:"
+assert_not_contains "and no frame claims it quit" "$RUN_OUT" "Quit Quitty Work."
+assert_contains "the row still counts as running" "$(ui_frame)" "4 profiles · 1 running"
+if kill -0 "$UI_QPID" 2>/dev/null; then _pass "the process is sent nothing"; else _fail "the process is sent nothing"; fi
+
+# An osascript that finds an app that would not take the quit event, so quit
+# sends SIGTERM.
+UI_QREFUSED="$SANDBOX/ui-quit-refused"
+mkdir -p "$UI_QREFUSED"
+printf '#!/bin/sh\ncat >/dev/null\necho refused\n' > "$UI_QREFUSED/osascript"
+chmod +x "$UI_QREFUSED/osascript"
 
 NO_COLOR='' ui_pty 24 200 '<4 profiles · 1 running>jjjs;<Quit Quitty Work.>q' \
-  /bin/sh -c 'PATH="$1:$PATH"; exec "$2" "$3" ui' x "$UI_QNOAPP" "$BASH_BIN" "$AIDENTITY"
+  /bin/sh -c 'PATH="$1:$PATH"; exec "$2" "$3" ui' x "$UI_QREFUSED" "$BASH_BIN" "$AIDENTITY"
 assert_rc "s on a running profile, then q, exits 0" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "the footer says it is quitting first" "$RUN_OUT" "Quitting Quitty Work"
 assert_contains "then shows quit's own message, in green" "$(ui_frame)" "${ESC}[32m✓ Quit Quitty Work."

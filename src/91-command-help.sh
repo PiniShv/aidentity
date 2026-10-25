@@ -198,8 +198,13 @@ NAME is the launcher name that 'aidentity list' shows. It quits the copy of the
 app that runs on that profile, and every other copy keeps running. For a main
 launcher, that is the copy on your original account. The app is asked to quit
 the way its Quit menu item does, so it can still ask about unsaved work. If it
-cannot be asked, its process is sent SIGTERM, which these apps also treat as
+does not take the request, it is sent SIGTERM, which these apps also treat as
 quit. It waits up to 10 seconds, and exits 1 if the app is still running then.
+
+Only an app is asked to quit. A process that is not an app is left alone: an
+app's helpers, or a command line tool that runs the app's program, such as
+'code --wait'. If only such processes still use the profile, quit names them
+and exits 1, as 'aidentity list' still shows the profile as running.
 
 EXAMPLES
   aidentity quit "Claude Work"
