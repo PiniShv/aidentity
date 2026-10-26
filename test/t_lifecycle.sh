@@ -297,6 +297,32 @@ assert_contains "once nothing else uses it, the data goes" "$RUN_OUT" "Moved the
 assert_no_dir "out of the data root" "$DATA/fake-shared"
 trash_reset
 
+group "a launcher is never built through a symlink"
+
+# A launcher filed into a folder, with a symlink left where it was. Building
+# at that path replaced only the symlink, so the filed launcher stayed and two
+# launchers used one profile folder. add's shared-folder check leaves out
+# both paths, as both are the launcher it rebuilds.
+ai add "$ELECTRON_APP" --profile Work
+mkdir -p "$APPS/Filed"
+mv "$APPS/Fake Work.app" "$APPS/Filed/"
+ln -s "$APPS/Filed/Fake Work.app" "$APPS/Fake Work.app"
+ai add "$ELECTRON_APP" --profile Work
+assert_rc_nonzero "add through a symlink to a launcher is refused" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "it is a symlink, not a launcher"
+if [ -L "$APPS/Fake Work.app" ]; then _pass "the symlink is left as it was"; else _fail "the symlink is left as it was" "it was replaced"; fi
+assert_dir "and the launcher it leads to is untouched" "$APPS/Filed/Fake Work.app"
+ai rebuild "Fake Work"
+assert_rc_nonzero "a rebuild by that name is refused too" "$RUN_RC" "$RUN_OUT"
+if [ -L "$APPS/Fake Work.app" ]; then _pass "and the symlink is still a symlink"; else _fail "and the symlink is still a symlink" "it was replaced"; fi
+rm -f "$APPS/Fake Work.app"
+mv "$APPS/Filed/Fake Work.app" "$APPS/"
+rmdir "$APPS/Filed"
+ai add "$ELECTRON_APP" --profile Work
+assert_rc "once it is back in place, add rebuilds it" 0 "$RUN_RC" "$RUN_OUT"
+ai rm "Fake Work" --purge -y
+trash_reset
+
 group "--purge moves the data to the Trash"
 
 trash_reset
