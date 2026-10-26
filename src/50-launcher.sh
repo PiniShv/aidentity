@@ -355,6 +355,17 @@ build_launcher() {
   local extras="${8:-}"
   local dst="$APPS_DIR/$label.app" rc
 
+  # Never build through a symlink. The swap below replaces the link itself, so
+  # the launcher it leads to stayed too, and both used one profile folder.
+  # add's shared-folder check leaves out the launcher it rebuilds by -ef,
+  # which matches both paths, so it could not see that.
+  if [ -L "$dst" ]; then
+    warn "Refusing to replace '$dst' — it is a symlink, not a launcher.
+    A launcher built here would leave the one it leads to in place, and both
+    would use one profile folder. Remove the symlink, or move that launcher
+    back here in its place, then re-run."
+    return 1
+  fi
   # Only ever replace a bundle that is ours.
   if [ -e "$dst" ] && ! is_our_launcher "$dst"; then
     warn "Refusing to replace '$dst' — it was not created by aidentity."

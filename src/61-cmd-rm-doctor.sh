@@ -149,6 +149,9 @@ cmd_rm() {
 # many launchers passes the list from one all_launchers as $3. A folder that
 # does not exist yet is matched by its path as recorded: add asks before it
 # makes one, and a launcher can still record a folder that was removed.
+# The launcher left out is matched by -ef, so a symlink to it is left out
+# too. That is safe for add only because build_launcher never builds through
+# a symlink: the launcher behind it would stay, on the same folder.
 launchers_sharing() { # data dir, [a launcher to leave out], [launcher list]
   local id="" app d list names="" seen=" " app_id
   id=$(dir_id "$1") || id=""
