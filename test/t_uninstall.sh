@@ -276,3 +276,45 @@ assert_no_dir "and not in the Trash" "$UN_TRASH/fake-bye"
 rm -rf "$APPS/Fake Bye.app" "$DATA/fake-bye"
 mkdir -p "$DATA"
 trash_reset
+
+# A folder in the launcher directory that cannot be read could hold a
+# launcher, and its data would then look like no launcher's. Not knowing is
+# not "no launcher uses it": the uninstall stops before the question, and
+# nothing is removed.
+un_prepare
+ai add "$ELECTRON_APP" --profile Hidden
+printf 'session\n' > "$DATA/fake-hidden/Cookies"
+mkdir -p "$APPS/Private"
+mv "$APPS/Fake Hidden.app" "$APPS/Private/"
+chmod 000 "$APPS/Private"
+un_tty 'delete\n'
+chmod 755 "$APPS/Private"
+assert_rc_nonzero "a launcher search that fails stops the uninstall" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "Could not search all of $APPS — part of it cannot be read."
+assert_not_contains "and asks nothing" "$RUN_OUT" "to remove them, or anything else"
+assert_file "the data of the launcher it could not see stays" "$DATA/fake-hidden/Cookies"
+assert_no_dir "and none of it went to the Trash" "$UN_TRASH/fake-hidden"
+assert_dir "that launcher is untouched" "$APPS/Private/Fake Hidden.app"
+assert_dir "the launcher it could see stays" "$APPS/Fake Bye.app"
+assert_file "and so does its data" "$DATA/fake-bye/Cookies"
+rm -rf "$APPS/Private" "$APPS/Fake Bye.app" "$DATA/fake-hidden" "$DATA/fake-bye"
+mkdir -p "$DATA"
+trash_reset
+
+# The same folder made unreadable while the question waits: the launchers
+# are removed as asked, and all the data is kept, listed or not.
+un_prepare
+mkdir -p "$APPS/Private" "$DATA/fake-stray-unsure"
+un_tty_late 'chmod 000 "$APPS/Private"' 'delete\n'
+chmod 755 "$APPS/Private"
+assert_no_dir "the launcher is removed as asked" "$APPS/Fake Bye.app"
+assert_contains "the data is kept, and it says why" "$RUN_OUT" \
+  "Kept all profile data — could not search all of $APPS for a launcher that uses it."
+assert_file "the launcher's data is where it was" "$DATA/fake-bye/Cookies"
+assert_dir "and so is data no launcher pointed at" "$DATA/fake-stray-unsure"
+assert_no_dir "none of it went to the Trash" "$UN_TRASH/fake-bye"
+assert_not_contains "and none is said to have moved" "$RUN_OUT" "Moved the data"
+assert_contains "the end says something was left" "$RUN_OUT" "some things were left in place"
+rm -rf "$APPS/Private" "$DATA/fake-bye" "$DATA/fake-stray-unsure"
+mkdir -p "$DATA"
+trash_reset
