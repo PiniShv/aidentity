@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The uninstaller missed a launcher inside a folder in the launcher folder
+  that it could not read. It then moved that launcher's profile data to the
+  Trash, and the launcher was left signed out. Now, when it cannot search the
+  whole launcher folder, it stops before it asks and removes nothing. If the
+  search fails after you answer, it still removes the launchers, but it keeps
+  all profile data. `prune` and `rm --purge` already worked this way.
+- `add`, `rebuild` and `doctor --fix` no longer build a launcher in place of
+  a symlink. When a launcher was moved into a folder and a symlink was left
+  at its old place, they replaced only the symlink. The moved launcher stayed,
+  so two launchers used one profile folder. They now refuse and say why.
+
 ## [1.6.0] - 2026-10-26
 
 ### Added
