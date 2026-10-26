@@ -93,15 +93,23 @@ ui_enter() {
   printf '%s%s%s[2J%s[H' "$UI_SMCUP" "$UI_CIVIS" "$UI_ESC" "$UI_ESC"
 }
 
+# stty on the terminal itself, not on whatever standard input is. stty reads the
+# terminal from standard input, and a trap runs where the shell was when the
+# signal came: inside a loop that reads a here-document, standard input is that
+# document, stty fails, and the terminal stays as the menu left it.
+ui_stty() {
+  stty "$@" 2>/dev/null </dev/tty || stty "$@" 2>/dev/null
+}
+
 # Give it back exactly as it was found. Safe to call twice, and from a trap.
 ui_leave() {
   [ "$UI_ACTIVE" -eq 1 ] || return 0
   UI_ACTIVE=0
   printf '%s%s%s' "$C_RESET" "$UI_CNORM" "$UI_RMCUP"
   if [ -n "$UI_STTY" ]; then
-    stty "$UI_STTY" 2>/dev/null || stty sane 2>/dev/null
+    ui_stty "$UI_STTY" || ui_stty sane
   else
-    stty sane 2>/dev/null
+    ui_stty sane
   fi
   trap - TSTP
   return 0

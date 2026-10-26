@@ -496,6 +496,24 @@ assert_rc "Ctrl-C ends the menu with 130" 130 "$RUN_RC" "$RUN_OUT"
 assert_eq "and gives the terminal back" "same" "$RUN_FLAGS"
 assert_contains "after leaving the alternate screen" "${RUN_OUT##*"${ESC}[?1049h"}" "${ESC}[?1049l"
 
+# Ctrl-C while the first load is still going through the process list. The trap
+# then runs inside the loop that reads that list, where standard input is the
+# list and not the terminal; stty gave up there, and the terminal stayed as the
+# menu had left it. The stub ps prints a long list, then drops a marker, and
+# the key is typed once the marker is there: the loop is the next thing to run.
+UI_PSLOAD="$SANDBOX/ui-psload"; UI_PSDONE="$SANDBOX/ui-psdone"
+export UI_PSDONE
+mkdir -p "$UI_PSLOAD"
+printf '#!/bin/sh\njot -b x 40000\n: > "$UI_PSDONE"\nexit 0\n' > "$UI_PSLOAD/ps"
+chmod +x "$UI_PSLOAD/ps"
+# shellcheck disable=SC2329,SC2317  # run by name from ui_feed (a ! chunk)
+ui_wait_psdone() { local i=0; while [ ! -e "$UI_PSDONE" ] && [ "$i" -lt 400 ]; do sleep 0.05; i=$((i + 1)); done; }
+rm -f "$UI_PSDONE"
+PATH="$UI_PSLOAD:$PATH" ui_run_menu 20 100 '!ui_wait_psdone;\003'
+assert_file "the load read the long process list before Ctrl-C came" "$UI_PSDONE"
+assert_rc "Ctrl-C then ends the menu with 130" 130 "$RUN_RC" "$RUN_OUT"
+assert_eq "and gives the terminal back" "same" "$RUN_FLAGS"
+
 ui_signal WINCH
 UI_AFTER_RESIZE=${RUN_OUT##*"${ESC}[2;1H "}
 assert_contains "a resize redraws the menu at once, in the narrow layout" "$UI_AFTER_RESIZE" "3 profiles · 0 running"

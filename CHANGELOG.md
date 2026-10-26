@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `aidentity ui` gives the terminal back when Ctrl-C ends it while it is still
+  reading the profiles. Before, the terminal could be left with echo off, and
+  Ctrl-Z not working, until you ran `reset`.
+
 ### Changed
 
 - The code is written in `src/`, split by subject, and built into
