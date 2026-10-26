@@ -96,6 +96,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   why.
 - The messages that say a profile is running now name the command that quits
   it: `aidentity quit "NAME"`.
+- Ctrl-C in `aidentity ui` could leave the terminal with echo off, when it
+  came while the menu read its profiles or as a wait for a key ran out, and
+  in bash 3.2 it could be lost. The terminal now always comes back.
+- The uninstaller kept going after a launcher it could not remove (a locked
+  one, say) and moved that launcher's data, so the launcher that was left
+  opened signed out. It now keeps that data, and the data of any launcher
+  that still uses a folder.
 
 ### Changed (for maintainers and contributors)
 
