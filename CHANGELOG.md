@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-26
+
 ### Added
 
 - `aidentity quit NAME` quits the copy of the app that runs on one profile and
@@ -83,6 +85,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   like it worked. A failure now shows in red. A failure that printed nothing,
   such as Ctrl-C while `s` waits for an app, shows a line of its own, for
   example `Did not finish quitting NAME.`
+- `rm --purge` kept a profile's data when another launcher in the launcher
+  folder used it, but it missed one filed into a folder inside it, or kept in
+  an app folder. It now looks wherever `prune` looks, and so do `add` and
+  `import` before they make a profile. If that search fails, the data is kept
+  and no profile is made.
+- `prune` and the uninstaller check each folder again just before they move
+  it, so a launcher made while they waited for your answer keeps its folder.
+  A profile folder that is a symbolic link is not moved, and the message says
+  why.
+- The messages that say a profile is running now name the command that quits
+  it: `aidentity quit "NAME"`.
 
 ### Changed (for maintainers and contributors)
 
@@ -652,7 +665,8 @@ auto-update intact. Nothing needs re-running when the app updates.
   aidentity is for when you want the accounts signed in at the same time, in
   separate windows.
 
-[Unreleased]: https://github.com/PiniShv/aidentity/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/PiniShv/aidentity/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/PiniShv/aidentity/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/PiniShv/aidentity/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/PiniShv/aidentity/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/PiniShv/aidentity/compare/v1.2.0...v1.3.0
