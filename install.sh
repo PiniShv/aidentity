@@ -38,7 +38,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/PiniShv/aidentity"
-REF="${AIDENTITY_REF:-v1.5.0}"
+REF="${AIDENTITY_REF:-v1.6.0}"
 
 # REF is interpolated into a raw.githubusercontent.com path, and curl collapses
 # dot-segments before sending the request — so a REF containing ".." walked up
