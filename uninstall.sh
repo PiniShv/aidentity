@@ -546,6 +546,23 @@ EOF
   return 0
 }
 
+# The identities of the folders that the launchers found right now record, as
+# " id id ". Asked again after the question, as prune does: the scan is as old
+# as the question, and a launcher may have been made for one of those folders
+# since, by 'aidentity restore' for example.
+claimed_now() {
+  local app d id ids=" " found
+  found=$(discover_launchers) || found=""
+  while IFS= read -r app; do
+    [ -n "$app" ] || continue
+    d=$(plist_get "$app" "AIdentityDataDir")
+    if id=$(dir_id "$d"); then ids="$ids$id "; fi
+  done <<EOF
+$found
+EOF
+  printf '%s' "$ids"
+}
+
 # Show exactly what would go, then ask. Returns 1 if the user declines, and 2
 # if there is no terminal to ask on.
 confirm_removal() {
@@ -682,8 +699,20 @@ remove_launchers() {
     i=$((i + 1))
   done
 
-  local d
+  # Looked for again only now, after the launchers above are gone, so every
+  # launcher still there counts. Moving a folder one of them uses would open
+  # that account signed out.
+  local d id claimed=" "
+  if [ "${#ORPHANS[@]}" -gt 0 ]; then claimed=$(claimed_now); fi
   for d in ${ORPHANS[@]+"${ORPHANS[@]}"}; do
+    if id=$(dir_id "$d"); then
+      case "$claimed" in
+        *" $id "*)
+          warn "Kept $(basename "$d") — a launcher uses it now."
+          LEFT_BEHIND=$((LEFT_BEHIND + 1))
+          continue ;;
+      esac
+    fi
     remove_data "$d" "$(basename "$d")"
   done
 

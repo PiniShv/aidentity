@@ -37,6 +37,20 @@ assert_file "prune keeps the data of a launcher moved into a folder" "$DATA/fake
 mv "$APPS/Accounts/Fake Hint.app" "$APPS/"
 rmdir "$APPS/Accounts"
 
+# A launcher in a Trash folder is on its way out, as one deleted in Finder is:
+# it claims nothing, so prune moves its data.
+ai add "$ELECTRON_APP" --profile Binned
+printf 'session\n' > "$DATA/fake-binned/Cookies"
+mkdir -p "$APPS/.Trash"
+mv "$APPS/Fake Binned.app" "$APPS/.Trash/"
+trash_reset
+ai prune -y
+assert_rc "prune with a launcher in a Trash folder exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_file "that launcher's data goes to the Trash" "$SB_TRASH/fake-binned/Cookies"
+assert_no_dir "and is gone from the data root" "$DATA/fake-binned"
+rm -rf "$APPS/.Trash"
+trash_reset
+
 # The same root spelled through a symlink is the same directory.
 ln -s "$DATA" "$SB/data-link"
 AIDENTITY_DATA_ROOT="$SB/data-link" ai add "$ELECTRON_APP" --profile Linked

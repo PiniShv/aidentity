@@ -82,6 +82,12 @@ ai rebuild "Fake Original"
 assert_rc "rebuild works on a main launcher" 0 "$RUN_RC" "$RUN_OUT"
 assert_not_contains "rebuild keeps it on the original account" \
   "$(cat "$APPS/Fake Original.app/Contents/MacOS/launcher")" "user-data-dir"
+# Without -y the question is the main launcher's: no data is moved.
+ai_in "no" rm "Fake Original" --purge
+assert_contains "rm --purge on a main launcher says --purge does nothing" "$RUN_OUT" "--purge does nothing here"
+assert_contains "and asks only about the launcher" "$RUN_OUT" "Your original account is not affected."
+assert_not_contains "never about moving data to the Trash" "$RUN_OUT" "move its data to the Trash"
+assert_dir "answering no keeps the launcher" "$APPS/Fake Original.app"
 ai rm "Fake Original" --purge -y
 assert_rc "rm --purge on a main launcher removes only the launcher" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "and says --purge did nothing" "$RUN_OUT" "does nothing"

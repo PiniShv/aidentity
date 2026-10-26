@@ -170,3 +170,57 @@ assert_no_dir "and none of it went to the Trash" "$UN_TRASH/fake-bye"
 rm -rf "$APPS/Fake Marked.app" "$DATA/fake-bye" "$DATA/fake-marked"
 mkdir -p "$DATA"
 trash_reset
+
+# A launcher whose profile folder is gone already: there is nothing to move,
+# so nothing failed and nothing was left in place.
+un_prepare
+rm -rf "$DATA/fake-bye"
+un_tty 'delete\n'
+assert_rc "a launcher with no profile folder is removed cleanly" 0 "$RUN_RC" "$RUN_OUT"
+assert_no_dir "the launcher is gone" "$APPS/Fake Bye.app"
+assert_not_contains "no move is said to have failed" "$RUN_OUT" "Could not move"
+assert_not_contains "and the end does not say something was left" "$RUN_OUT" "left in place"
+mkdir -p "$DATA"
+trash_reset
+
+# A launcher in the Trash is on its way out: it is not counted, listed or
+# deleted, even when Spotlight still knows it. rm -rf there would empty that
+# part of the Trash for good. A volume's Trash (.Trashes) is the same.
+UN_MDFIND="$SANDBOX/stub-un-mdfind"
+UN_VOL_TRASH="$APPS/.Trashes/$(id -u)"
+mkdir -p "$UN_MDFIND"
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_TRASH/Fake Bye.app' '$UN_VOL_TRASH/Fake Bye.app'" > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
+un_prepare
+mkdir -p "$UN_TRASH" "$UN_VOL_TRASH"
+cp -R "$APPS/Fake Bye.app" "$UN_TRASH/"
+cp -R "$APPS/Fake Bye.app" "$UN_VOL_TRASH/"
+PATH="$UN_MDFIND:$PATH" un_tty 'delete\n'
+assert_rc "an uninstall with launchers in the Trash exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "only the launcher outside the Trash is counted" "$RUN_OUT" "deletes 1 launcher(s)"
+assert_not_contains "the one in the Trash is not listed" "$RUN_OUT" "$UN_TRASH/Fake Bye.app"
+assert_not_contains "nor the one in a volume's Trash" "$RUN_OUT" ".Trashes"
+assert_file "the one in the Trash is still there" "$UN_TRASH/Fake Bye.app/Contents/Info.plist"
+assert_file "and so is the one in a volume's Trash" "$UN_VOL_TRASH/Fake Bye.app/Contents/Info.plist"
+assert_no_dir "the launcher outside the Trash is removed" "$APPS/Fake Bye.app"
+rm -rf "$APPS/.Trashes"
+mkdir -p "$DATA"
+trash_reset
+
+# A launcher made for a listed folder while the question waited (here by
+# restore) keeps that folder: it is asked again before the move. Another
+# folder no launcher uses still goes to the Trash.
+ai add "$ELECTRON_APP" --profile Late
+printf 'session\n' > "$DATA/fake-late/Cookies"
+ai rm "Fake Late" -y
+mkdir -p "$DATA/fake-stray-late"
+un_tty_late 'ai restore "Fake Late"' 'delete\n'
+assert_dir "restore made the launcher while the question waited" "$APPS/Fake Late.app"
+assert_contains "the folder it uses is kept" "$RUN_OUT" "Kept fake-late — a launcher uses it now."
+assert_file "where it was" "$DATA/fake-late/Cookies"
+assert_no_dir "and not in the Trash" "$UN_TRASH/fake-late"
+assert_dir "a folder no launcher uses still goes to the Trash" "$UN_TRASH/fake-stray-late"
+assert_contains "and the end says something was left" "$RUN_OUT" "some things were left in place"
+ai rm "Fake Late" --purge -y
+mkdir -p "$DATA"
+trash_reset
