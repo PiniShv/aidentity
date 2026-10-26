@@ -672,18 +672,19 @@ remove_data() {
 }
 
 remove_launchers() {
-  local i app data
+  local i app data d id kept="" claimed gone=()
 
   i=0
   while [ "$i" -lt "${#LAUNCHERS[@]}" ]; do
     app="${LAUNCHERS[$i]}"
-    data="${DATA_DIRS[$i]}"
+    gone[i]=0
 
     # Checked once at scan time and again here: the list could be minutes old,
     # and nothing without the marker is ever removed.
     if is_our_launcher "$app"; then
       if rm -rf "$app" 2>/dev/null && [ ! -e "$app" ]; then
         ok "Removed ${LABELS[$i]}.app"
+        gone[i]=1
       else
         warn "Could not remove $app — it is still there."
         LEFT_BEHIND=$((LEFT_BEHIND + 1))
@@ -692,18 +693,40 @@ remove_launchers() {
       warn "Skipped $app — it no longer carries the $MARKER_KEY key."
       LEFT_BEHIND=$((LEFT_BEHIND + 1))
     fi
+    i=$((i + 1))
+  done
 
-    if [ -n "$data" ]; then
-      remove_data "$data" "${LABELS[$i]}"
+  # The data only now, after every launcher above is dealt with. Moving a
+  # folder that a launcher still there records would open that account signed
+  # out. So a launcher this could not remove keeps its folder, whatever its
+  # Info.plist says now, even when a removed one shares it.
+  i=0
+  while [ "$i" -lt "${#LAUNCHERS[@]}" ]; do
+    if [ "${gone[$i]}" -eq 0 ] && id=$(dir_id "${DATA_DIRS[$i]}"); then
+      warn "Kept the data for ${LABELS[$i]} — its launcher is still there."
+      LEFT_BEHIND=$((LEFT_BEHIND + 1))
+      kept="$kept$id "
+    fi
+    i=$((i + 1))
+  done
+  # Every launcher found now counts too: one this left behind, and one made
+  # for a listed folder while the question waited.
+  claimed="$(claimed_now)$kept"
+
+  i=0
+  while [ "$i" -lt "${#LAUNCHERS[@]}" ]; do
+    data="${DATA_DIRS[$i]}"
+    if [ "${gone[$i]}" -eq 1 ] && [ -n "$data" ]; then
+      if id=$(dir_id "$data") && case "$claimed" in *" $id "*) true ;; *) false ;; esac; then
+        warn "Kept the data for ${LABELS[$i]} — a launcher uses it now."
+        LEFT_BEHIND=$((LEFT_BEHIND + 1))
+      else
+        remove_data "$data" "${LABELS[$i]}"
+      fi
     fi
     i=$((i + 1))
   done
 
-  # Looked for again only now, after the launchers above are gone, so every
-  # launcher still there counts. Moving a folder one of them uses would open
-  # that account signed out.
-  local d id claimed=" "
-  if [ "${#ORPHANS[@]}" -gt 0 ]; then claimed=$(claimed_now); fi
   for d in ${ORPHANS[@]+"${ORPHANS[@]}"}; do
     if id=$(dir_id "$d"); then
       case "$claimed" in

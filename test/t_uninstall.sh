@@ -224,3 +224,55 @@ assert_contains "and the end says something was left" "$RUN_OUT" "some things we
 ai rm "Fake Late" --purge -y
 mkdir -p "$DATA"
 trash_reset
+
+# A launcher that could not be removed keeps its folder: it is still there,
+# and would open signed out. Its folders are read-only here, so rm cannot
+# empty it.
+un_prepare
+chmod -R a-w "$APPS/Fake Bye.app"
+un_tty 'delete\n'
+chmod -R u+w "$APPS/Fake Bye.app"
+assert_contains "a launcher it cannot remove is reported" "$RUN_OUT" \
+  "Could not remove $APPS/Fake Bye.app — it is still there."
+assert_file "and is left whole" "$APPS/Fake Bye.app/Contents/Info.plist"
+assert_contains "its data is kept, and it says why" "$RUN_OUT" \
+  "Kept the data for Fake Bye — its launcher is still there."
+assert_file "where it was" "$DATA/fake-bye/Cookies"
+assert_no_dir "and none of it went to the Trash" "$UN_TRASH/fake-bye"
+assert_contains "and the end says something was left" "$RUN_OUT" "some things were left in place"
+rm -rf "$APPS/Fake Bye.app" "$DATA/fake-bye"
+mkdir -p "$DATA"
+trash_reset
+
+# A launcher made while the question waited, here a copy under another name,
+# keeps the folder of a launcher that is removed: it records it too.
+un_prepare
+un_tty_late 'cp -R "$APPS/Fake Bye.app" "$APPS/Fake Twin.app"' 'delete\n'
+assert_no_dir "the listed launcher is removed" "$APPS/Fake Bye.app"
+assert_contains "the folder the new one records is kept" "$RUN_OUT" \
+  "Kept the data for Fake Bye — a launcher uses it now."
+assert_file "where it was" "$DATA/fake-bye/Cookies"
+assert_no_dir "and not in the Trash" "$UN_TRASH/fake-bye"
+rm -rf "$APPS/Fake Twin.app" "$DATA/fake-bye"
+mkdir -p "$DATA"
+trash_reset
+
+# Two launchers share a folder, and one of them loses its marker while the
+# question waits, so it is skipped. The folder stays for it, whatever its
+# Info.plist says now, even though the other one is removed.
+un_prepare
+cp -R "$APPS/Fake Bye.app" "$APPS/Fake Twin.app"
+un_tty_late '/usr/libexec/PlistBuddy -c "Delete :AIdentityProfile" "$APPS/Fake Bye.app/Contents/Info.plist" >/dev/null 2>&1' \
+  'delete\n'
+assert_contains "the launcher that lost its marker is skipped" "$RUN_OUT" \
+  "Skipped $APPS/Fake Bye.app — it no longer carries the AIdentityProfile key."
+assert_no_dir "the other one is removed" "$APPS/Fake Twin.app"
+assert_contains "the skipped one keeps its data" "$RUN_OUT" \
+  "Kept the data for Fake Bye — its launcher is still there."
+assert_contains "and the removed one does not move it" "$RUN_OUT" \
+  "Kept the data for Fake Twin — a launcher uses it now."
+assert_file "the shared folder is where it was" "$DATA/fake-bye/Cookies"
+assert_no_dir "and not in the Trash" "$UN_TRASH/fake-bye"
+rm -rf "$APPS/Fake Bye.app" "$DATA/fake-bye"
+mkdir -p "$DATA"
+trash_reset
