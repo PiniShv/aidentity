@@ -350,16 +350,18 @@ cmd_ui() {
   esac
 
   ui_caps
-  UI_STTY=$(stty -g 2>/dev/null) || UI_STTY=""
+  UI_TTY=$(tty 2>/dev/null) || UI_TTY=/dev/tty
+  UI_STTY=$(ui_stty -g) || UI_STTY=""
   # Whatever ends us, the terminal is given back first. TERM and HUP only
   # note the signal: the menu waits in `read -s`, and bash puts back the
   # terminal mode it saved when that read began AFTER a trap that exits from
   # inside it, so exiting there left the terminal with echo off. bash 3.2 does
   # not cut the read short for these signals either, so the loop sees UI_SIG
   # within the 2 seconds of one read and leaves through the normal path below.
-  # (INT is different: bash restores the terminal before the INT trap runs.)
+  # Ctrl-C exits from its trap at once; the exit trap then puts the settings
+  # back once more, as the last thing (see ui_on_int).
   UI_SIG=""
-  trap 'ui_leave; _on_exit' EXIT
+  trap 'ui_leave; ui_stty_back; _on_exit' EXIT
   trap 'ui_on_int' INT
   trap 'UI_SIG=143' TERM
   trap 'UI_SIG=129' HUP

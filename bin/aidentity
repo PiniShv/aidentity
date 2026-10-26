@@ -4399,6 +4399,7 @@ UI_STOPPED=0    # 1 after Ctrl-Z took the terminal back: it is entered again on 
 UI_SIG=""       # 143 or 129 once TERM or HUP arrived: the loop then ends
 UI_DIRTY=1
 UI_STTY=""      # the terminal settings to put back
+UI_TTY=""       # the terminal the menu runs on, by name (see ui_stty)
 UI_ROWS=24
 UI_COLS=80
 UI_HDR=2        # header lines, rule included
@@ -4466,7 +4467,7 @@ ui_caps() {
 ui_enter() {
   UI_ACTIVE=1
   trap 'ui_on_tstp' TSTP
-  stty -echo susp undef 2>/dev/null
+  ui_stty -echo susp undef
   printf '%s%s%s[2J%s[H' "$UI_SMCUP" "$UI_CIVIS" "$UI_ESC" "$UI_ESC"
 }
 
@@ -4475,18 +4476,25 @@ ui_leave() {
   [ "$UI_ACTIVE" -eq 1 ] || return 0
   UI_ACTIVE=0
   printf '%s%s%s' "$C_RESET" "$UI_CNORM" "$UI_RMCUP"
-  if [ -n "$UI_STTY" ]; then
-    stty "$UI_STTY" 2>/dev/null || stty sane 2>/dev/null
-  else
-    stty sane 2>/dev/null
-  fi
+  ui_stty_back
   trap - TSTP
   return 0
 }
 
+# stty on the menu's terminal, by its name, not on standard input. A trap runs
+# with the input of whatever it cut into, and the rows are read in `while read
+# … done <<EOF` loops, where that input is a here-document: stty failed there,
+# and Ctrl-C while the rows were read left the terminal with echo off.
+ui_stty() { stty "$@" 2>/dev/null <"${UI_TTY:-/dev/tty}"; }
+
+# The terminal's settings as the menu found them.
+ui_stty_back() {
+  if [ -n "$UI_STTY" ]; then ui_stty "$UI_STTY" || ui_stty sane; else ui_stty sane; fi
+}
+
 ui_size() {
   local out r c
-  out=$(stty size 2>/dev/null) || out=""
+  out=$(ui_stty size) || out=""
   r=${out%% *}; c=${out##* }
   case "$r$c" in ''|*[!0-9]*) r=0; c=0 ;; esac
   # A terminal that reports no size (0 0) gets what terminfo says, then 24x80.
@@ -4814,9 +4822,18 @@ ui_on_winch() {
 
 # Ctrl-C quits the menu. While a command runs it only ends that command, which
 # has stopped itself: back to the menu, not out of it.
+#
+# The exit trap gives the terminal back, after this. A `read -s` that this trap
+# cuts into has set a mode of its own: bash 5 puts back the one it saved when
+# the read began (echo off, in the menu) after this trap, and bash 3.2 never
+# undoes it. bash 3.2 also runs this trap from inside that read: when the
+# read's 2-second timer went off meanwhile, it jumped back into the read and
+# the rest of the trap never ran, so the Ctrl-C was lost. The timer is ignored
+# first.
 ui_on_int() {
   [ "$UI_BUSY" -eq 1 ] && return 0
-  ui_leave; _on_exit; exit 130
+  trap '' ALRM
+  exit 130
 }
 
 # Hand the terminal back and stop (the Ctrl-Z key, or a stop signal sent to the
@@ -5189,16 +5206,18 @@ cmd_ui() {
   esac
 
   ui_caps
-  UI_STTY=$(stty -g 2>/dev/null) || UI_STTY=""
+  UI_TTY=$(tty 2>/dev/null) || UI_TTY=/dev/tty
+  UI_STTY=$(ui_stty -g) || UI_STTY=""
   # Whatever ends us, the terminal is given back first. TERM and HUP only
   # note the signal: the menu waits in `read -s`, and bash puts back the
   # terminal mode it saved when that read began AFTER a trap that exits from
   # inside it, so exiting there left the terminal with echo off. bash 3.2 does
   # not cut the read short for these signals either, so the loop sees UI_SIG
   # within the 2 seconds of one read and leaves through the normal path below.
-  # (INT is different: bash restores the terminal before the INT trap runs.)
+  # Ctrl-C exits from its trap at once; the exit trap then puts the settings
+  # back once more, as the last thing (see ui_on_int).
   UI_SIG=""
-  trap 'ui_leave; _on_exit' EXIT
+  trap 'ui_leave; ui_stty_back; _on_exit' EXIT
   trap 'ui_on_int' INT
   trap 'UI_SIG=143' TERM
   trap 'UI_SIG=129' HUP
