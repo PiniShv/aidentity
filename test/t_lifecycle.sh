@@ -526,6 +526,16 @@ assert_file "the data stays" "$DATA/fake-linkdata-real/Cookies"
 if [ -L "$DATA/fake-linkdata" ]; then _pass "and so does the link"; else _fail "and so does the link" "it is gone"; fi
 rm -f "$DATA/fake-linkdata"
 rm -rf "$DATA/fake-linkdata-real"
+# One that leads nowhere is still a link, not data that is gone already.
+ai add "$ELECTRON_APP" --profile Dangle
+rm -rf "$DATA/fake-dangle"
+ln -s "$SB/no-such-folder" "$DATA/fake-dangle"
+ai rm "Fake Dangle" --purge -y
+assert_rc_nonzero "rm --purge of a profile folder that is a broken link exits non-zero" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "$DATA/fake-dangle to the Trash: it is a symbolic link"
+assert_not_contains "and never that the data is gone already" "$RUN_OUT" "gone already"
+if [ -L "$DATA/fake-dangle" ]; then _pass "the link stays"; else _fail "the link stays" "it is gone"; fi
+rm -f "$DATA/fake-dangle"
 # uninstall.sh runs under set -e; its copy must work there too.
 RUN_OUT=$("$BASH_BIN" -c 'lib=$1; dir=$2; set --; . "$lib" >/dev/null 2>&1; trash_path "$dir"; echo "rc=$?"' \
   x "$UNINST_LIB" "$SB/tp/target" 2>&1 </dev/null)
