@@ -67,6 +67,7 @@ assert_eq "and prints an empty list" \
 assert_eq "and nothing on stderr" "" "$RUN_ERR"
 ai export extra
 assert_rc_nonzero "export takes no argument" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says how to save the file" "$RUN_OUT" "aidentity export > profiles.json"
 ai export --json
 assert_rc_nonzero "and no option" "$RUN_RC" "$RUN_OUT"
 assert_contains "and names it" "$RUN_OUT" "--json"
@@ -419,17 +420,21 @@ tr_file "$TR_F" \
   "$(tr_entry profile='"Longenv"' env="[\"HTTPS_PROXY=$(tr_long 2000 a)\"]")" \
   "$(tr_entry profile='"Hugearg"' args="[\"--lang=$(tr_long 400000 a)\"]")" \
   "$(tr_entry profile='"Hugeenv"' env="[\"$(tr_long 400000 X)=1\"]")" \
-  "$(tr_entry profile='"Edge"' args="[\"--proxy-server=$(tr_long 1009 a)\"]")"
+  "$(tr_entry profile='"Edge"' args="[\"--proxy-server=$(tr_long 1009 a)\"]")" \
+  "$(tr_entry profile='"Overarg"' args="[\"--proxy-server=$(tr_long 1010 a)\"]")" \
+  "$(tr_entry profile='"Overenv"' env="[\"HTTPS_PROXY=$(tr_long 1013 a)\"]")"
 before=$(fingerprint "$APPS")
 TR_T0=$SECONDS
 tx import "$TR_F" -y
 TR_DT=$((SECONDS - TR_T0))
 assert_rc "values that are too long: the import exits 0" 0 "$RUN_RC" "$RUN_OUT"
-assert_eq "a switch over 1024 characters is skipped as too long" "2" \
+assert_eq "a switch over 1024 characters is skipped as too long" "3" \
   "$(lines_with "$RUN_OUT" "— args has a value that is too long")"
-assert_eq "and a variable" "2" "$(lines_with "$RUN_OUT" "— env has a value that is too long")"
+assert_eq "and a variable" "3" "$(lines_with "$RUN_OUT" "— env has a value that is too long")"
 assert_contains "one of exactly 1024 is checked as usual" "$RUN_OUT" \
   "skip    Fake Edge — --proxy-server needs a proxy value"
+assert_contains "a switch of 1025 is too long" "$RUN_OUT" "skip    Fake Overarg — args has a value that is too long"
+assert_contains "and so is a variable of 1025" "$RUN_OUT" "skip    Fake Overenv — env has a value that is too long"
 assert_eq "nothing is built" "$before" "$(fingerprint "$APPS")"
 assert_eq "values of 400000 characters are refused quickly" "quick" \
   "$(if [ "$TR_DT" -le 15 ]; then echo quick; else echo "took $TR_DT s"; fi)"
@@ -649,6 +654,47 @@ assert_contains "the same folder spelled another way is found too" "$RUN_OUT" \
 rm -f "$SANDBOX/v-link"
 tx rm "Fake Work 2" --purge -y
 
+# The plan reads each launcher once, not once for each entry: read again
+# for each, its time grew with the entries times the launchers. plist_get
+# counts its reads here, and a Spotlight that finds nothing keeps launchers
+# outside the sandbox out of the count.
+for p in 1 2 3 4 5; do tx add "$ELECTRON_APP" --profile "Count $p"; done
+TR_COUNT="$SB/plist-reads"
+: > "$TR_COUNT"
+TR_COUNT="$TR_COUNT" AIDENTITY_DATA_ROOT="$VSC_DATA" libcall eval '
+  mdfind() { return 0; }
+  plist_get() { printf x >> "$TR_COUNT"; /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
+  IMPORT_OWNERS_READ=0 IMPORT_SEARCH_FAILED=0 IMPORT_OWNER=""
+  IMPORT_OWNER_APPS=() IMPORT_OWNER_DIRS=() IMPORT_OWNER_IDS=() IMPORT_OWNER_NAMES=()
+  i=0
+  while [ "$i" -lt 50 ]; do
+    import_folder_owner "Fake New $i" "$DATA_ROOT/fake-new-$i" && echo "wrongly shared: $i"
+    i=$((i + 1))
+  done
+  import_folder_owner "Fake Count_3" "$DATA_ROOT/fake-count-3" && echo "shared with: $IMPORT_OWNER"
+  printf "reads: %s\n" "$(wc -c < "$TR_COUNT" | tr -d " ")"'
+assert_not_contains "50 new folders: none is shared" "$RUN_OUT" "wrongly shared"
+assert_contains "a folder a launcher uses is still found" "$RUN_OUT" "shared with: Fake Count 3"
+assert_eq "5 launchers and 51 entries: each launcher is read once" "reads: 5" "$(printf '%s\n' "$RUN_OUT" | grep '^reads: ')"
+for p in 1 2 3 4 5; do tx rm "Fake Count $p" --purge -y; done
+rm -f "$TR_COUNT"
+
+# Not knowing is not "no launcher": a folder in the launcher directory that
+# cannot be read could hold one that uses the entry's profile folder. The
+# entry is skipped, as add would refuse it.
+mkdir -p "$APPS/Private"
+chmod 000 "$APPS/Private"
+tr_file "$TR_F" "$(tr_entry profile='"Unseen"')"
+tx import "$TR_F" -y
+chmod 755 "$APPS/Private"
+rmdir "$APPS/Private"
+assert_rc "a search for launchers that fails: the import exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the entry is skipped, and the plan says why" "$RUN_OUT" \
+  "skip    Fake Unseen — could not look through every launcher, so it might share a profile folder"
+assert_contains "nothing is created" "$RUN_OUT" "Nothing to create."
+assert_no_dir "no launcher is built" "$APPS/Fake Unseen.app"
+assert_no_dir "and no profile folder is made" "$VSC_DATA/fake-unseen"
+
 # A VS Code-style app makes a socket in the profile folder, and macOS caps the
 # length of its path: add refuses a profile that would go past it, and so does
 # the plan.
@@ -687,7 +733,22 @@ tx import "$TR_F" -y
 assert_contains "the plan says the folder is there" "$RUN_OUT" \
   "create  Fake Again — its profile folder is here already, and is used"
 assert_file "and it is kept" "$VSC_DATA/fake-again/Cookies"
+assert_not_contains "the closing hint does not ask to sign in" "$RUN_OUT" "to sign in"
+assert_contains "it says how to open it" "$RUN_OUT" 'Open one with:  aidentity open "Fake Again"'
 tx rm "Fake Again" --purge -y
+
+# The same after rm without --purge: the profile folder stays, and an import
+# of the export uses it again.
+tx add "$ELECTRON_APP" --profile Kept
+tx_stdout export
+printf '%s\n' "$RUN_OUT" > "$TR_F"
+tx rm "Fake Kept" -y
+tx import "$TR_F" -y
+assert_contains "a launcher removed without its data: the plan uses its folder" "$RUN_OUT" \
+  "create  Fake Kept — its profile folder is here already, and is used"
+assert_not_contains "and the closing hint does not ask to sign in" "$RUN_OUT" "to sign in"
+assert_contains "it says how to open it" "$RUN_OUT" 'Open one with:  aidentity open "Fake Kept"'
+tx rm "Fake Kept" --purge -y
 
 
 group "import: files that are refused whole"
@@ -712,6 +773,10 @@ tr_refused_file "a null in an entry" "it holds a null" "$TR_F" -y
 tr_refused_file "an empty file" "is not valid JSON" "$TR_F" -y
 printf '{"aidentity_export": 2, "launchers": [%s]}\n' "$(tr_entry profile='"Two"')" > "$TR_F"
 tr_refused_file "format 2" "is in export format 2, and this aidentity reads format 1" "$TR_F" -y
+assert_contains "format 2: it says to update" "$RUN_OUT" "Run aidentity update, then try again."
+printf '{"aidentity_export": 0, "launchers": [%s]}\n' "$(tr_entry profile='"Zero"')" > "$TR_F"
+tr_refused_file "format 0" "is in export format 0, and this aidentity reads format 1" "$TR_F" -y
+assert_not_contains "format 0: an update would not help, so it is not suggested" "$RUN_OUT" "aidentity update"
 for fmt in '"1"' '1.5' 'true' '[1]'; do
   printf '{"aidentity_export": %s, "launchers": [%s]}\n' "$fmt" "$(tr_entry profile='"Fmt"')" > "$TR_F"
   tr_refused_file "a format number of $fmt" "is not a file made by 'aidentity export'" "$TR_F" -y
@@ -750,15 +815,26 @@ i=0
 while [ "$i" -lt 201 ]; do TR_MANY+=(1); i=$((i + 1)); done
 tr_file "$TR_F" "${TR_MANY[@]}"
 tr_refused_file "201 entries" "lists 201 launchers; import reads at most 200" "$TR_F" -y
+assert_contains "201 entries: it says to split the file" "$RUN_OUT" \
+  "Split the file into parts of at most 200, and import each part."
 tr_file "$TR_F" "${TR_MANY[@]:1}"
 tx import "$TR_F" -y
 assert_rc "200 entries are read" 0 "$RUN_RC" "$RUN_OUT"
 assert_eq "every one of them" "200" "$(lines_with "$RUN_OUT" "— not a launcher")"
 
-{ printf '{"aidentity_export": 1, "launchers": [], "pad": "'
-  head -c 4194304 /dev/zero | tr '\0' x
-  printf '"}\n'; } > "$TR_F"
-tr_refused_file "a file over 4 MB" "is bigger than 4 MB" "$TR_F" -y
+# The size limit itself: a file of 4 MiB is read, one a byte bigger is not.
+tr_sized() { # path, size in bytes
+  local top='{"aidentity_export": 1, "launchers": [], "pad": "'
+  { printf '%s' "$top"; head -c $(($2 - ${#top} - 3)) /dev/zero | tr '\0' x; printf '"}\n'; } > "$1"
+}
+tr_sized "$TR_F" 4194304
+assert_eq "the file at the limit is 4194304 bytes" "4194304" "$(wc -c < "$TR_F" | tr -d ' ')"
+tx import "$TR_F" -y
+assert_rc "a file of exactly 4 MiB is read" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "to the end" "$RUN_OUT" "lists no launchers"
+tr_sized "$TR_F" 4194305
+assert_eq "the file over it is 4194305 bytes" "4194305" "$(wc -c < "$TR_F" | tr -d ' ')"
+tr_refused_file "a file a byte over 4 MiB" "is bigger than 4 MB" "$TR_F" -y
 rm -f "$TR_F"
 
 # Only the first 4 MB are ever read: a file that does not end is refused, and

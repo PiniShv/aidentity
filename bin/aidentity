@@ -3437,7 +3437,8 @@ EXPORT_FORMAT=1
 # its longest take less than half of that. The file is copied up to that size
 # before anything parses it. The per-value cap keeps the checks quick: they
 # take longer than linear time on a long value. The file is read once, as
-# JSON only, so the whole import takes seconds even at these limits.
+# JSON only, and the launchers on this Mac are read once, so the plan is
+# ready in seconds even at these limits.
 IMPORT_MAX_LAUNCHERS=200
 IMPORT_MAX_SETTINGS=32
 IMPORT_MAX_VALUE=1024
@@ -3475,7 +3476,8 @@ cmd_export() {
   while [ $# -gt 0 ]; do
     case "$1" in
       -*) die "Unknown option for export: $1" ;;
-      *) die "Unexpected argument: $1" ;;
+      *) die "Unexpected argument: $1. export prints the file to the screen; save it with:
+    aidentity export > profiles.json" ;;
     esac
   done
   local i=0 app target ex bid obj flag v secrets=0 creds=0 held=""
@@ -3682,18 +3684,46 @@ EOF
 
 # The launchers, other than the one named $1, that keep their profile in the
 # folder $2, into IMPORT_OWNER: create_profile's test (launchers_sharing), so
-# the plan skips what it would refuse. Every launcher is looked for once, into
-# cmd_import's own variables; nothing is built while the plan is made. When
-# that search fails, every entry with a folder of its own is reported as one
-# that might share, with IMPORT_OWNER empty.
+# the plan skips what it would refuse. It matches as launchers_sharing does:
+# the same text, or the same folder spelled another way, and a launcher by
+# its name in the launcher folder, by its path anywhere else. Every launcher
+# is found and read once, on the first call, into cmd_import's own
+# variables: read again for each entry, the plan's time grew with the number
+# of entries times the number of launchers. Nothing is built while the plan
+# is made. When the search fails, every entry with a folder of its own is
+# reported as one that might share, with IMPORT_OWNER empty.
 import_folder_owner() { # launcher name, data dir
+  local list app app_id d seen=" " id i=0
   if [ "$IMPORT_OWNERS_READ" -eq 0 ]; then
     IMPORT_OWNERS_READ=1
-    IMPORT_LAUNCHERS=$(all_launchers) || IMPORT_SEARCH_FAILED=1
+    list=$(all_launchers) || IMPORT_SEARCH_FAILED=1
+    while IFS= read -r app; do
+      [ -n "$app" ] || continue
+      # One launcher can be found under two spellings: read it once.
+      app_id=$(dir_id "$app") || continue
+      case "$seen" in *" $app_id "*) continue ;; esac
+      seen="$seen$app_id "
+      d=$(plist_get "$app" AIdentityDataDir)
+      [ -n "$d" ] || continue
+      IMPORT_OWNER_APPS[${#IMPORT_OWNER_APPS[@]}]=$app
+      IMPORT_OWNER_DIRS[${#IMPORT_OWNER_DIRS[@]}]=$d
+      IMPORT_OWNER_IDS[${#IMPORT_OWNER_IDS[@]}]=$(dir_id "$d")
+      [ "${app%/*}" = "$APPS_DIR" ] && app=$(bundle_name "$app")
+      IMPORT_OWNER_NAMES[${#IMPORT_OWNER_NAMES[@]}]=$app
+    done <<EOF
+$list
+EOF
   fi
   IMPORT_OWNER=""
   [ "$IMPORT_SEARCH_FAILED" -eq 0 ] || return 0
-  IMPORT_OWNER=$(launchers_sharing "$2" "$APPS_DIR/$1.app" "$IMPORT_LAUNCHERS")
+  id=$(dir_id "$2") || id=""
+  while [ "$i" -lt "${#IMPORT_OWNER_APPS[@]}" ]; do
+    if { [ "${IMPORT_OWNER_DIRS[$i]}" = "$2" ] || { [ -n "$id" ] && [ "${IMPORT_OWNER_IDS[$i]}" = "$id" ]; }; } \
+       && [ ! "${IMPORT_OWNER_APPS[$i]}" -ef "$APPS_DIR/$1.app" ]; then
+      IMPORT_OWNER="${IMPORT_OWNER:+$IMPORT_OWNER, }${IMPORT_OWNER_NAMES[$i]}"
+    fi
+    i=$((i + 1))
+  done
   [ -n "$IMPORT_OWNER" ]
 }
 
@@ -3920,11 +3950,16 @@ import_load() { # file, its name as printed
   import_records "$IMPORT_TMP/top"
   import_value aidentity_export integer \
     || die "$2 is not a file made by 'aidentity export'. Nothing was changed."
+  if [ "$IV" -gt "$EXPORT_FORMAT" ]; then
+    die "$2 is in export format $IV, and this aidentity reads format $EXPORT_FORMAT. Nothing was changed.
+    A newer aidentity made it. Run aidentity update, then try again."
+  fi
   [ "$IV" = "$EXPORT_FORMAT" ] \
     || die "$2 is in export format $IV, and this aidentity reads format $EXPORT_FORMAT. Nothing was changed."
   import_value launchers array || die "$2 has no list of launchers. Nothing was changed."
   [ "$IV" -le "$IMPORT_MAX_LAUNCHERS" ] \
-    || die "$2 lists $IV launchers; import reads at most $IMPORT_MAX_LAUNCHERS. Nothing was changed."
+    || die "$2 lists $IV launchers; import reads at most $IMPORT_MAX_LAUNCHERS. Nothing was changed.
+    Split the file into parts of at most $IMPORT_MAX_LAUNCHERS, and import each part."
   IMPORT_N=$IV
 }
 
@@ -3949,11 +3984,12 @@ cmd_import() {
   local IV="" IMPORT_N=0 IMPORT_SCANNED=0 IMPORT_FOUND="" IMPORT_FOUND_NAME=""
   local IMPORT_APPS=() IMPORT_IDS=() IMPORT_NAMES=()
   local IMPORT_KEYS=() IMPORT_TYPES=() IMPORT_VALS=() IMPORT_NEXT=0
-  local IMPORT_OWNERS_READ=0 IMPORT_OWNER="" IMPORT_LAUNCHERS="" IMPORT_SEARCH_FAILED=0
+  local IMPORT_OWNERS_READ=0 IMPORT_OWNER="" IMPORT_SEARCH_FAILED=0
+  local IMPORT_OWNER_APPS=() IMPORT_OWNER_DIRS=() IMPORT_OWNER_IDS=() IMPORT_OWNER_NAMES=()
   import_load "$file" "$name"
 
   # The plan, an entry each: create or skip, and what create_profile needs.
-  local P_ACT=() P_SHOW=() P_WHY=() P_APP=() P_PROFILE=() P_LABEL=() P_SLUG=() P_MAIN=()
+  local P_ACT=() P_SHOW=() P_APP=() P_PROFILE=() P_LABEL=() P_SLUG=() P_MAIN=()
   local P_BADGE=() P_NOBADGE=() P_HEX=() P_EXTRAS=() P_LOWER=()
   local E_SHOW E_WHY E_APP E_PROFILE E_LABEL E_SLUG E_MAIN E_BADGE E_NOBADGE E_HEX E_EXTRAS
   local i=0 slug low act note n_new=0 n_skip=0
@@ -3969,7 +4005,7 @@ cmd_import() {
       slug=$E_SLUG; low=$(lower "$E_LABEL")
       import_clash "$slug" "$low" || act=create
     fi
-    P_ACT[i]=$act; P_SHOW[i]=$E_SHOW; P_WHY[i]=$E_WHY; P_APP[i]=$E_APP; P_LOWER[i]=$low
+    P_ACT[i]=$act; P_SHOW[i]=$E_SHOW; P_APP[i]=$E_APP; P_LOWER[i]=$low
     P_PROFILE[i]=$E_PROFILE; P_LABEL[i]=$E_LABEL; P_SLUG[i]=$slug; P_MAIN[i]=$E_MAIN
     P_BADGE[i]=$E_BADGE; P_NOBADGE[i]=$E_NOBADGE; P_HEX[i]=$E_HEX; P_EXTRAS[i]=$E_EXTRAS
     if [ "$act" = create ]; then
@@ -4000,10 +4036,15 @@ cmd_import() {
     [ "$reply" = "yes" ] || die "Cancelled. Nothing was created."
   fi
 
-  local made=0 failed=0 first=""
+  # The closing hint names a new profile, never a main launcher: that opens
+  # the app's own account, which is signed in already. A profile whose folder
+  # was here before may be signed in too, so it gets no sign-in hint.
+  local made=0 failed=0 first="" reused="" had
   i=0
   while [ "$i" -lt "$IMPORT_N" ]; do
     if [ "${P_ACT[$i]}" != create ]; then i=$((i + 1)); continue; fi
+    had=0
+    [ "${P_MAIN[$i]}" -eq 1 ] || [ ! -d "$DATA_ROOT/${P_SLUG[$i]}" ] || had=1
     if [ -e "$APPS_DIR/${P_LABEL[$i]}.app" ]; then
       # Made since the plan was shown. It is not changed either.
       warn "Skipped ${P_SHOW[$i]}: it exists now."
@@ -4014,7 +4055,10 @@ cmd_import() {
            "${P_NOBADGE[$i]}" "${P_MAIN[$i]}" "${P_EXTRAS[$i]}" >/dev/null; then
       ok "Created ${C_BOLD}${P_SHOW[$i]}${C_RESET}"
       made=$((made + 1))
-      [ -n "$first" ] || [ "${P_MAIN[$i]}" -eq 1 ] || first=${P_SHOW[$i]}
+      if [ "${P_MAIN[$i]}" -eq 0 ]; then
+        if [ "$had" -eq 0 ]; then [ -n "$first" ] || first=${P_SHOW[$i]}
+        else [ -n "$reused" ] || reused=${P_SHOW[$i]}; fi
+      fi
     else
       warn "Could not create ${P_SHOW[$i]}."
       failed=$((failed + 1))
@@ -4023,7 +4067,11 @@ cmd_import() {
   done
   info ""
   info "$made created, $n_skip skipped, $failed failed."
-  [ -z "$first" ] || dim "  Open each new profile to sign in, e.g.:  aidentity open \"$first\""
+  if [ -n "$first" ]; then
+    dim "  Open each new profile to sign in, e.g.:  aidentity open \"$first\""
+  elif [ -n "$reused" ]; then
+    dim "  Open one with:  aidentity open \"$reused\""
+  fi
   [ "$failed" -eq 0 ]
 }
 

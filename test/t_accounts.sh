@@ -146,3 +146,16 @@ assert_dir "the first is untouched" "$APPS/Fake One.app"
 assert_dir "the second is untouched" "$APPS/Fake Two.app"
 ai rm "Fake One" --purge -y
 ai rm "Fake Two" --purge -y
+
+# Not knowing is not "no launcher": a folder in the launcher directory that
+# cannot be read could hold one that already uses the new profile's folder.
+# add makes no profile then, rather than one that might share.
+mkdir -p "$APPS/Private"
+chmod 000 "$APPS/Private"
+ai add "$ELECTRON_APP" --profile Unseen
+chmod 755 "$APPS/Private"
+rmdir "$APPS/Private"
+assert_rc_nonzero "add refuses when it cannot look through every launcher" "$RUN_RC" "$RUN_OUT"
+assert_contains "it says why" "$RUN_OUT" "Could not look through every launcher"
+assert_no_dir "no launcher is built" "$APPS/Fake Unseen.app"
+assert_no_dir "and no profile folder is made" "$DATA/fake-unseen"
