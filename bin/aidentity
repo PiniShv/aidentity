@@ -1846,7 +1846,7 @@ cmd_rm() {
   fi
 
   if [ "$main" -eq 0 ] && running_on_profile "$data"; then
-    die "'$want' is running right now. Quit it first, then re-run."
+    die "'$want' is running right now. Quit it first (aidentity quit \"$want\"), then re-run."
   fi
 
   if [ "$yes" -eq 0 ]; then
@@ -1884,9 +1884,9 @@ cmd_rm() {
     die "Could not remove $app — it may be locked (Finder → Get Info) or
     owned by another user. Nothing was changed."
   fi
-  local trash="$BUILD_STAGE"
+  local leftover="$BUILD_STAGE"
   _cleanup_stage || warn "Part of the old launcher could not be deleted (a locked file?).
-    It is out of the way, in: $trash"
+    It is out of the way, in: $leftover"
   ok "Removed launcher '$want'."
   [ "$main" -eq 1 ] && return 0
 
@@ -2408,8 +2408,14 @@ create_profile() {
     return 1
   fi
 
+  # quit finds the copy through the launcher, so it is named only when there
+  # is one: a folder can also be in use with its launcher gone.
   if [ -n "$data_dir" ] && running_on_profile "$data_dir"; then
-    warn "'$label' is running right now. Quit it, then re-run."
+    if [ "$existing_launcher" -eq 1 ]; then
+      warn "'$label' is running right now. Quit it (aidentity quit \"$label\"), then re-run."
+    else
+      warn "'$label' is running right now. Quit it, then re-run."
+    fi
     return 1
   fi
 
@@ -2722,7 +2728,7 @@ cmd_rename() {
     # Renaming while the app is open would move the directory out from under a
     # live Chromium instance.
     if running_on_profile "$old_data"; then
-      die "'$from' is running right now. Quit it, then rename."
+      die "'$from' is running right now. Quit it (aidentity quit \"$from\"), then rename."
     fi
 
     # Names that differ only in case, or in spaces against hyphens, keep the
@@ -3327,7 +3333,8 @@ cmd_quit() {
   local PS_RC="" PS_LIST="" PS_IDS="" PS_ALL=""
   target=$(plist_get "$app" AIdentityTargetApp)
   exe=$(app_exe "$target") \
-    || die "Cannot find the app that '$want' opens${target:+: $target}. Nothing was quit."
+    || die "Cannot find the app that '$want' opens${target:+: $target}. Nothing was quit.
+    Run: aidentity rebuild \"$want\", then quit again."
   xid=$(exe_id "$exe") || xid=""
   # A main launcher's copy is the one with no --user-data-dir. Any other
   # launcher must name its folder: without one, its copy cannot be told from
@@ -3401,7 +3408,7 @@ cmd_quit() {
     i=$((i + 1))
   done
   if [ -n "$left" ]; then
-    warn "${want} is still running. It may be asking you something; look at its window."
+    warn "${want} is still running; it may be asking you something."
     return 1
   fi
   ok "Quit ${want}."
@@ -5079,7 +5086,7 @@ ui_help() {
   done <<EOF
 Up, Down, k, j|move
 Enter|open the profile
-s|stop: quit the profile; other copies of the app keep running
+s|stop: quit the profile; other copies keep running
 a|add a profile: pick an app, then name the account
 r|rename the account name (it stays signed in)
 c|colour: arrows choose, Enter applies, Esc cancels
@@ -5566,10 +5573,10 @@ USAGE
   aidentity ui
 
 A full-screen menu in Terminal: every profile, what is running, and keys to
-open, quit, add, rename, recolour, change the badge, remove, and run doctor.
-Each key runs the same command you would type, with the same checks. It needs
-a terminal; in a script, use the commands themselves or aidentity list --json.
-Press ? in the menu for its keys, and q to leave.
+open, stop (quit a profile), add, rename, recolour, change the badge, remove,
+and run doctor. Each key runs the same command you would type, with the same
+checks. It needs a terminal; in a script, use the commands themselves or
+aidentity list --json. Press ? in the menu for its keys, and q to leave.
 
 EXAMPLES
   aidentity ui

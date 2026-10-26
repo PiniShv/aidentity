@@ -139,7 +139,7 @@ cmd_rename() {
     # Renaming while the app is open would move the directory out from under a
     # live Chromium instance.
     if running_on_profile "$old_data"; then
-      die "'$from' is running right now. Quit it, then rename."
+      die "'$from' is running right now. Quit it (aidentity quit \"$from\"), then rename."
     fi
 
     # Names that differ only in case, or in spaces against hyphens, keep the

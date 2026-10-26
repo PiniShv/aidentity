@@ -310,6 +310,23 @@ assert_contains "the row still counts as running" "$(ui_frame)" "4 profiles · 1
 if kill -0 "$UI_QPID" 2>/dev/null; then _pass "the profile's process still runs"; else _fail "the profile's process still runs"; fi
 assert_eq "and the terminal is intact" "same" "$RUN_FLAGS"
 
+# An app still running after the wait. At 80 columns the footer shows the
+# whole line, down to what the app may be doing. The sleep stub ends each step
+# of the wait at once, so this run does not take 10 seconds.
+UI_QSTILL="$SANDBOX/ui-quit-still"
+mkdir -p "$UI_QSTILL"
+printf '#!/bin/sh\ncat >/dev/null\necho sent\n' > "$UI_QSTILL/osascript"
+printf '#!/bin/sh\nexit 0\n' > "$UI_QSTILL/sleep"
+chmod +x "$UI_QSTILL/osascript" "$UI_QSTILL/sleep"
+NO_COLOR='' ui_pty 24 80 '<4 profiles · 1 running>jjjs;<asking you>q' \
+  /bin/sh -c 'PATH="$1:$PATH"; exec "$2" "$3" ui' x "$UI_QSTILL" "$BASH_BIN" "$AIDENTITY"
+assert_rc "s on an app that does not quit, then q, exits 0" 0 "$RUN_RC" "$RUN_OUT"
+UI_STILL=$(ui_frame | tr '\033' '\n' | grep -F 'still running')
+assert_contains "at 80 columns the footer shows the whole line, in red" "$UI_STILL" \
+  "[31m! Quitty Work is still running; it may be asking you something."
+assert_not_contains "and cuts none of it" "$UI_STILL" "…"
+if kill -0 "$UI_QPID" 2>/dev/null; then _pass "and the process still runs"; else _fail "and the process still runs"; fi
+
 # An osascript that finds no app for the PID: the process is not an app, so
 # quit sends it nothing, and the footer says so in red, never as a success.
 UI_QNOAPP="$SANDBOX/ui-quit-no-app"
@@ -383,13 +400,14 @@ ui_run_menu 3 80 'q'
 assert_rc "a window far too small still quits cleanly" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "and says it is too small" "$RUN_OUT" "too small"
 
-ui_run_menu 24 80 '?aq'
+# 68 columns: the longest key line still fits whole.
+ui_run_menu 24 68 '?aq'
 assert_rc "the help screen returns to the menu" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "the help screen lists the keys" "$RUN_OUT" "this help"
 assert_contains "and how to remove" "$RUN_OUT" "k keeps the data"
 assert_contains "p moves the data to the Trash, as the remove question says" "$RUN_OUT" "remove: k keeps the data, p moves it to the Trash"
 assert_not_contains "and nothing says it deletes" "$RUN_OUT" "delete"
-assert_contains "and that s quits one profile" "$RUN_OUT" "stop: quit the profile; other copies of the app keep running"
+assert_contains "and that s quits one profile" "$RUN_OUT" "stop: quit the profile; other copies keep running"
 
 # --- rename
 
