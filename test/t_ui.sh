@@ -588,7 +588,9 @@ assert_contains "the one with a process is running" "$RUN_OUT" "S 1 running"
 # --- signals, and a crash: the terminal always comes back
 
 # The menu runs in the background so a signal can be sent to it; <&0 keeps the
-# terminal as its input. Each step waits for what the one before it caused.
+# terminal as its input, and perl gives it SIGINT back (a background job of a
+# script starts with it ignored, and could not trap it). Each step waits for
+# what the one before it caused.
 # TERM and HUP are sent once the first screen is drawn and the menu waits for a
 # key: a signal during that read once left the terminal with echo off. The
 # resize waits for the narrow layout's own header line, not for any redraw.
@@ -605,14 +607,18 @@ waitfor() {
 }
 stty rows 20 cols 100
 before=$(flags)
-"$1" "$2" ui <&0 & p=$!
+/usr/bin/perl -e "\$SIG{INT} = q(DEFAULT); exec @ARGV" "$1" "$2" ui <&0 & p=$!
 waitfor "?1049h" 0
 case "$3" in
   WINCH) o=$(size); stty rows 12 cols 40 </dev/tty; waitfor "[2;1H 3 profiles" "$o"; kill -TERM $p ;;
   TSTP)  o=$(size); kill -TSTP $p; waitfor "?1049l" "$o"; o=$(size); kill -CONT $p; waitfor "?1049h" "$o"; kill -TERM $p ;;
+  INT2)  waitfor "quit" 0; sleep 1.7; kill -INT $p
+         # A menu that lost the signal is killed, so none is left running.
+         /usr/bin/perl -e "sleep 10; kill 9, $p" </dev/null >/dev/null 2>&1 & w=$! ;;
   *)     waitfor "quit" 0; sleep 0.5; kill -"$3" $p ;;
 esac
 wait $p; rc=$?
+[ -z "${w:-}" ] || kill $w 2>/dev/null
 after=$(flags)
 if [ "$before" = "$after" ]; then f=same; else f=differ; fi
 printf "\n__flags=%s\n" "$f"
@@ -636,6 +642,47 @@ ui_run_menu 20 100 '\003'
 assert_rc "Ctrl-C ends the menu with 130" 130 "$RUN_RC" "$RUN_OUT"
 assert_eq "and gives the terminal back" "same" "$RUN_FLAGS"
 assert_contains "after leaving the alternate screen" "${RUN_OUT##*"${ESC}[?1049h"}" "${ESC}[?1049l"
+
+# Ctrl-C while the rows are read. They are read in `while read … done <<EOF`
+# loops, and a trap that runs there has the here-document as its input: the
+# terminal's settings, put back through it, never reached the terminal. A long
+# process list keeps the menu in such a loop (the main launcher's status reads
+# it line by line); the stub drops a file once it has written the list.
+UI_LONGPS="$SANDBOX/ui-longps"; UI_PS_DONE="$SANDBOX/ui-ps-done"
+export UI_PS_DONE
+mkdir -p "$UI_LONGPS"
+printf '#!/bin/sh\nyes "x other process" | head -n 150000\n: > "$UI_PS_DONE"\nexit 0\n' > "$UI_LONGPS/ps"
+chmod +x "$UI_LONGPS/ps"
+# shellcheck disable=SC2329,SC2317  # run by name from ui_feed (a ! chunk)
+ui_wait_ps() { local i=0; while [ ! -e "$UI_PS_DONE" ] && [ "$i" -lt 800 ]; do sleep 0.05; i=$((i + 1)); done; }
+rm -f "$UI_PS_DONE"
+PATH="$UI_LONGPS:$PATH" ui_run_menu 20 100 '!ui_wait_ps;\003'
+assert_rc "Ctrl-C while the rows are read ends the menu with 130" 130 "$RUN_RC" "$RUN_OUT"
+assert_eq "and gives the terminal back" "same" "$RUN_FLAGS"
+assert_not_contains "without waiting for the rows" "$RUN_OUT" "profiles ·"
+
+# Ctrl-C while the menu waits for a key: in bash 5, a `read -s` that the trap
+# cuts into puts back the mode it saved when it began (echo off) after the trap.
+ui_run_menu 20 100 '<quit>\003'
+assert_rc "Ctrl-C while the menu waits for a key ends it with 130" 130 "$RUN_RC" "$RUN_OUT"
+assert_eq "and gives the terminal back" "same" "$RUN_FLAGS"
+
+# And just before that wait runs out: bash 3.2 runs the trap inside the read,
+# and the read's 2-second timer jumped back into it, so Ctrl-C was lost. A slow
+# stty when the settings are put back stands in for a busy machine.
+UI_SLOWSTTY="$SANDBOX/ui-slowstty"
+mkdir -p "$UI_SLOWSTTY"
+printf '#!/bin/sh\ncase "$1" in gfmt1:*) sleep 0.5 ;; esac\nexec /bin/stty "$@"\n' > "$UI_SLOWSTTY/stty"
+chmod +x "$UI_SLOWSTTY/stty"
+PATH="$UI_SLOWSTTY:$PATH" ui_signal INT2
+assert_rc "Ctrl-C as the wait for a key runs out ends the menu with 130" 130 "$RUN_RC" "$RUN_OUT"
+assert_eq "and gives the terminal back" "same" "$RUN_FLAGS"
+
+# Ctrl-C at a wait for a key on the normal screen, here the doctor's: bash 3.2
+# never undoes the mode the read set there.
+ui_run_menu 20 100 'x;<Any other key returns>\003'
+assert_rc "Ctrl-C at a key wait after a command ends the menu with 130" 130 "$RUN_RC" "$RUN_OUT"
+assert_eq "and gives the terminal back" "same" "$RUN_FLAGS"
 
 ui_signal WINCH
 UI_AFTER_RESIZE=${RUN_OUT##*"${ESC}[2;1H "}
