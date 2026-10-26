@@ -488,17 +488,26 @@ MOVED_DATA=0
 # launcher points at" and deleted it while the launcher stayed. Our own hidden
 # .aidentity-* folders and the Trash are skipped. Every hit is still checked
 # for the marker key before it is listed.
+#
+# Returns non-zero, after printing what it did find, when part of the launcher
+# directory could not be searched (a folder in it that cannot be read), as
+# aidentity's own all_launchers does: a launcher there would go unseen, and
+# its data would look like no launcher's. The app folders and Spotlight are
+# extra places, searched as far as they can be.
 discover_launchers() {
-  local app dir DIRS=()
+  local app dir rc=0 filed="" DIRS=()
   split_dirs "${AIDENTITY_APP_DIRS:-/Applications:$HOME/Applications}"
+  if [ -d "$APPS_DIR" ]; then
+    filed=$(find -H "$APPS_DIR" -maxdepth 3 -type d -name '.aidentity-*' -prune \
+      -o -type d -name '*.app' -print -prune 2>/dev/null) || rc=1
+  fi
   {
     # The top level by glob as well: find's -type d skips a launcher that is
     # itself a symlink, and its data would then look orphaned.
     for app in "$APPS_DIR"/*.app; do
       if [ -d "$app" ]; then printf '%s\n' "$app"; fi
     done
-    find -H "$APPS_DIR" -maxdepth 3 -type d -name '.aidentity-*' -prune \
-      -o -type d -name '*.app' -print -prune 2>/dev/null || true
+    [ -z "$filed" ] || printf '%s\n' "$filed"
     for dir in ${DIRS[@]+"${DIRS[@]}"}; do
       [ -n "$dir" ] && [ -d "$dir" ] || continue
       find -H "$dir" -maxdepth 2 -type d -name '.aidentity-*' -prune \
@@ -519,12 +528,14 @@ discover_launchers() {
     [ "$inside" -eq 1 ] || continue
     is_our_launcher "$app" && printf '%s\n' "$app"
   done
-  return 0
+  return "$rc"
 }
 
+# Returns non-zero when the launcher search was incomplete. The lists are then
+# not safe to act on: a launcher that was missed has its data among ORPHANS.
 scan_launchers() {
-  local app label d id claimed=" " found
-  found=$(discover_launchers) || found=""
+  local app label d id claimed=" " found rc=0
+  found=$(discover_launchers) || rc=1
   while IFS= read -r app; do
     [ -n "$app" ] || continue
     label=$(basename "$app" .app)
@@ -537,7 +548,7 @@ scan_launchers() {
   done <<EOF
 $found
 EOF
-  [ -d "$DATA_ROOT" ] || return 0
+  [ -d "$DATA_ROOT" ] || return "$rc"
   for d in "$DATA_ROOT"/*; do
     [ -d "$d" ] || continue
     id=$(dir_id "$d") || continue
@@ -545,16 +556,17 @@ EOF
     data_is_ours "$d" || continue
     ORPHANS+=("$d")
   done
-  return 0
+  return "$rc"
 }
 
 # The identities of the folders that the launchers found right now record, as
 # " id id ". Asked again after the question, as prune does: the scan is as old
 # as the question, and a launcher may have been made for one of those folders
-# since, by 'aidentity restore' for example.
+# since, by 'aidentity restore' for example. Fails when the search does: not
+# knowing is not "no launcher uses it".
 claimed_now() {
   local app d id ids=" " found
-  found=$(discover_launchers) || found=""
+  found=$(discover_launchers) || return 1
   while IFS= read -r app; do
     [ -n "$app" ] || continue
     d=$(plist_get "$app" "AIdentityDataDir")
@@ -674,7 +686,7 @@ remove_data() {
 }
 
 remove_launchers() {
-  local i app data d id kept="" claimed gone=()
+  local i app data d id kept="" claimed searched=1 gone=()
 
   i=0
   while [ "$i" -lt "${#LAUNCHERS[@]}" ]; do
@@ -712,11 +724,20 @@ remove_launchers() {
     i=$((i + 1))
   done
   # Every launcher found now counts too: one this left behind, and one made
-  # for a listed folder while the question waited.
-  claimed="$(claimed_now)$kept"
+  # for a listed folder while the question waited. If they cannot all be
+  # looked for (a folder made unreadable while it asked), no data is moved:
+  # a launcher that was missed would open signed out.
+  if claimed=$(claimed_now); then
+    claimed="$claimed$kept"
+  else
+    searched=0
+    warn "Kept all profile data — could not search all of $APPS_DIR for a launcher that uses it."
+    dim "    Make every folder in it readable, then re-run this script to move the data to the Trash."
+    LEFT_BEHIND=$((LEFT_BEHIND + 1))
+  fi
 
   i=0
-  while [ "$i" -lt "${#LAUNCHERS[@]}" ]; do
+  while [ "$searched" -eq 1 ] && [ "$i" -lt "${#LAUNCHERS[@]}" ]; do
     data="${DATA_DIRS[$i]}"
     if [ "${gone[$i]}" -eq 1 ] && [ -n "$data" ]; then
       if id=$(dir_id "$data") && case "$claimed" in *" $id "*) true ;; *) false ;; esac; then
@@ -730,6 +751,7 @@ remove_launchers() {
   done
 
   for d in ${ORPHANS[@]+"${ORPHANS[@]}"}; do
+    [ "$searched" -eq 1 ] || break
     if id=$(dir_id "$d"); then
       case "$claimed" in
         *" $id "*)
@@ -770,7 +792,15 @@ main() {
 
   remove_binary
 
-  scan_launchers
+  # Stopped before the question, as a running profile is: a launcher in a
+  # folder that cannot be read is not listed, and its data would be listed
+  # as no launcher's and moved.
+  if ! scan_launchers; then
+    die "Could not search all of $APPS_DIR — part of it cannot be read.
+    A launcher kept there would be missed, and its profile data moved to the Trash
+    while it still uses it. So no launchers or profile data were removed.
+    Make every folder in it readable, then re-run this script."
+  fi
 
   if [ "${#LAUNCHERS[@]}" -eq 0 ] && [ "${#ORPHANS[@]}" -eq 0 ]; then
     info "No aidentity launchers or profile data found — nothing else to remove."
