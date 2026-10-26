@@ -1579,8 +1579,10 @@ trash_path() { # path -> prints where it went
     dest="$trash/$base $n"; n=$((n + 1))
   done
   id=$(/usr/bin/stat -f %d:%i "$src" 2>/dev/null) || id=""
-  # -n: never replace an item that took the name since the check above.
-  err=$(mv -n "$src" "$dest" 2>&1) || err=${err:-mv failed}
+  # -n: never replace an item that took the name since the check above. -h:
+  # never follow a symlink put there, which would move the data out of the
+  # Trash, perhaps by a copy to another volume.
+  err=$(mv -h -n "$src" "$dest" 2>&1) || err=${err:-mv failed}
   err=${err#mv: }
   if [ -e "$src" ] || [ -L "$src" ]; then
     warn "Could not move $src to the Trash: ${err:-$dest was taken just before the move}. Nothing was deleted."
@@ -3213,24 +3215,25 @@ cmd_rebuild() {
 # asks only that one to quit.
 
 # Whether a command line names the profile's folder in a real --user-data-dir
-# argument: after a space, then the folder, then a space or the end, or the
-# same folder under another spelling (id is the folder's device:inode). The
-# same words inside another switch's value, such as
+# argument: after a space, the whole folder, up to the next " --" or the end,
+# as proc_dir_ids reads it. A folder can hold spaces, so a space alone does not
+# end it: ".../fake-work archive/x" is another folder, not "fake-work". The same
+# folder under another spelling matches too (id is its device:inode). The same
+# words inside another switch's value, such as
 # --proxy-bypass-list=user-data-dir=<folder>, are not that argument. With no
 # folder it is the app's own account: no --user-data-dir at all, as
 # main_running reads it.
 quit_on_folder() { # data folder or "", its id or "", command line
-  local data="$1" id="$2" rest="$3"
+  local data="$1" id="$2" rest="$3" value
   if [ -z "$data" ]; then
     case "$rest" in *--user-data-dir=*) return 1 ;; esac
     return 0
   fi
-  case "$rest" in *" --user-data-dir=$data "*|*" --user-data-dir=$data") return 0 ;; esac
-  [ -n "$id" ] || return 1
-  # Each path up to the next " --" or the end, as proc_dir_ids reads them.
   while :; do
     case "$rest" in *" --user-data-dir="*) rest=${rest#*" --user-data-dir="} ;; *) return 1 ;; esac
-    [ "$(dir_id "${rest%% --*}")" = "$id" ] && return 0
+    value=${rest%% --*}
+    [ "$value" = "$data" ] && return 0
+    [ -n "$id" ] && [ "$(dir_id "$value")" = "$id" ] && return 0
   done
 }
 

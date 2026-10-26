@@ -510,6 +510,17 @@ RACE_INNER=1 PATH="$RACE_BIN:$PATH" libcall trash_path "$SB/tp/fake-raced"
 assert_rc_nonzero "with that name inside it taken too, nothing is replaced" "$RUN_RC" "$RUN_OUT"
 assert_contains "it says why" "$RUN_OUT" "was taken just before the move"
 assert_file "and the data stays where it was" "$SB/tp/fake-raced/keep.txt"
+# A symlink made at the name is never followed: that would move the data out
+# of the Trash, to wherever the link leads.
+mkdir -p "$SB/tp/elsewhere"
+printf '%s\n' '#!/bin/sh' 'last=""' 'for a in "$@"; do last=$a; done' \
+  'ln -s "$RACE_LINK" "$last"' 'exec /bin/mv "$@"' > "$RACE_BIN/mv"
+RACE_LINK="$SB/tp/elsewhere" PATH="$RACE_BIN:$PATH" libcall trash_path "$SB/tp/fake-raced"
+assert_rc_nonzero "a symlink made at the name just before the move is not followed" "$RUN_RC" "$RUN_OUT"
+assert_file "the data stays where it was" "$SB/tp/fake-raced/keep.txt"
+assert_eq "and nothing went where the symlink leads" "" "$(ls -A "$SB/tp/elsewhere")"
+rm -f "$SB_TRASH/fake-raced 2"
+rm -rf "$SB/tp/elsewhere"
 rm -rf "$SB/tp/fake-raced" "$SB/tp/fake-dangle"
 
 # A profile folder that is a symlink inside the data root: rm --purge moves

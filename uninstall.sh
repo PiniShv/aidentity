@@ -323,8 +323,10 @@ trash_path() { # path -> prints where it went
     dest="$trash/$base $n"; n=$((n + 1))
   done
   id=$(/usr/bin/stat -f %d:%i "$src" 2>/dev/null) || id=""
-  # -n: never replace an item that took the name since the check above.
-  err=$(mv -n "$src" "$dest" 2>&1) || err=${err:-mv failed}
+  # -n: never replace an item that took the name since the check above. -h:
+  # never follow a symlink put there, which would move the data out of the
+  # Trash, perhaps by a copy to another volume.
+  err=$(mv -h -n "$src" "$dest" 2>&1) || err=${err:-mv failed}
   err=${err#mv: }
   if [ -e "$src" ] || [ -L "$src" ]; then
     warn "Could not move $src to the Trash: ${err:-$dest was taken just before the move}. Nothing was deleted."

@@ -5,24 +5,25 @@
 # asks only that one to quit.
 
 # Whether a command line names the profile's folder in a real --user-data-dir
-# argument: after a space, then the folder, then a space or the end, or the
-# same folder under another spelling (id is the folder's device:inode). The
-# same words inside another switch's value, such as
+# argument: after a space, the whole folder, up to the next " --" or the end,
+# as proc_dir_ids reads it. A folder can hold spaces, so a space alone does not
+# end it: ".../fake-work archive/x" is another folder, not "fake-work". The same
+# folder under another spelling matches too (id is its device:inode). The same
+# words inside another switch's value, such as
 # --proxy-bypass-list=user-data-dir=<folder>, are not that argument. With no
 # folder it is the app's own account: no --user-data-dir at all, as
 # main_running reads it.
 quit_on_folder() { # data folder or "", its id or "", command line
-  local data="$1" id="$2" rest="$3"
+  local data="$1" id="$2" rest="$3" value
   if [ -z "$data" ]; then
     case "$rest" in *--user-data-dir=*) return 1 ;; esac
     return 0
   fi
-  case "$rest" in *" --user-data-dir=$data "*|*" --user-data-dir=$data") return 0 ;; esac
-  [ -n "$id" ] || return 1
-  # Each path up to the next " --" or the end, as proc_dir_ids reads them.
   while :; do
     case "$rest" in *" --user-data-dir="*) rest=${rest#*" --user-data-dir="} ;; *) return 1 ;; esac
-    [ "$(dir_id "${rest%% --*}")" = "$id" ] && return 0
+    value=${rest%% --*}
+    [ "$value" = "$data" ] && return 0
+    [ -n "$id" ] && [ "$(dir_id "$value")" = "$id" ] && return 0
   done
 }
 
