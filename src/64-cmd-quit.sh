@@ -125,7 +125,8 @@ cmd_quit() {
   local PS_RC="" PS_LIST="" PS_IDS="" PS_ALL=""
   target=$(plist_get "$app" AIdentityTargetApp)
   exe=$(app_exe "$target") \
-    || die "Cannot find the app that '$want' opens${target:+: $target}. Nothing was quit."
+    || die "Cannot find the app that '$want' opens${target:+: $target}. Nothing was quit.
+    Run: aidentity rebuild \"$want\", then quit again."
   xid=$(exe_id "$exe") || xid=""
   # A main launcher's copy is the one with no --user-data-dir. Any other
   # launcher must name its folder: without one, its copy cannot be told from
@@ -199,7 +200,7 @@ cmd_quit() {
     i=$((i + 1))
   done
   if [ -n "$left" ]; then
-    warn "${want} is still running. It may be asking you something; look at its window."
+    warn "${want} is still running; it may be asking you something."
     return 1
   fi
   ok "Quit ${want}."

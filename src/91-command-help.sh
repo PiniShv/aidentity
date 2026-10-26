@@ -322,10 +322,10 @@ USAGE
   aidentity ui
 
 A full-screen menu in Terminal: every profile, what is running, and keys to
-open, quit, add, rename, recolour, change the badge, remove, and run doctor.
-Each key runs the same command you would type, with the same checks. It needs
-a terminal; in a script, use the commands themselves or aidentity list --json.
-Press ? in the menu for its keys, and q to leave.
+open, stop (quit a profile), add, rename, recolour, change the badge, remove,
+and run doctor. Each key runs the same command you would type, with the same
+checks. It needs a terminal; in a script, use the commands themselves or
+aidentity list --json. Press ? in the menu for its keys, and q to leave.
 
 EXAMPLES
   aidentity ui

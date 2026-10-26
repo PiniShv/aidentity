@@ -177,6 +177,17 @@ if quit_alive "$P_W2"; then _pass "a profile whose folder name starts the same k
 if quit_alive "$P_M"; then _pass "the app's own copy keeps running"; else _fail "the app's own copy keeps running"; fi
 if quit_alive "$P_H"; then _pass "a helper on the same folder is never matched"; else _fail "a helper on the same folder is never matched"; fi
 
+# The signal is SIGTERM, which an app can catch to close cleanly, and never
+# SIGKILL: no --force. This copy notes the SIGTERM it catches, then ends.
+QUIT_TERMED="$SANDBOX/quit-termed"
+rm -f "$QUIT_TERMED"
+quit_start "$QEXE" "trap 'echo termed > \"$QUIT_TERMED\"; exit 0' TERM; $QUIT_WAIT" "--user-data-dir=$QDATA"; P_T=$QPID
+quit_run "$QUIT_REFUSED" "$QW"
+assert_rc "an app that catches SIGTERM is quit" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "the quit event is tried first" "$P_T " "$QUIT_ASKED"
+assert_eq "then it is sent SIGTERM, never SIGKILL" "termed" "$(cat "$QUIT_TERMED" 2>/dev/null)"
+if quit_alive "$P_T"; then _fail "and it is gone"; else _pass "and it is gone"; fi
+
 # Only a helper is left on the folder. list and rm count it as running, so
 # quit does not say "not running" either: it names what is left and exits 1.
 quit_run "$QUIT_NOAPP" "$QW"
@@ -193,7 +204,26 @@ assert_eq "list says the profile is running too" "running" "$QUIT_STATUS"
 ai rm "$QW"
 assert_rc_nonzero "and rm refuses to remove it" "$RUN_RC" "$RUN_OUT"
 assert_contains "as running" "$RUN_OUT" "'$QW' is running right now. Quit it first"
+assert_contains "and it says how to quit it" "$RUN_OUT" "(aidentity quit \"$QW\")"
+ai rename "$QW" Other
+assert_rc_nonzero "rename refuses it too" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says how to quit it" "$RUN_OUT" \
+  "'$QW' is running right now. Quit it (aidentity quit \"$QW\"), then rename."
+ai add "$QUIT_APP" --profile Work
+assert_rc_nonzero "adding it again refuses it too" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says how to quit it" "$RUN_OUT" \
+  "'$QW' is running right now. Quit it (aidentity quit \"$QW\"), then re-run."
+# With its launcher gone there is nothing for quit to find, so add names no
+# command for it. Once the helper is gone, add makes it again on that folder.
+rm -rf "$APPS/$QW.app"
+ai add "$QUIT_APP" --profile Work
+assert_rc_nonzero "adding it with its launcher gone refuses it too" "$RUN_RC" "$RUN_OUT"
+assert_contains "as running" "$RUN_OUT" "'$QW' is running right now. Quit it, then re-run."
+assert_not_contains "and names no quit command" "$RUN_OUT" "aidentity quit"
 quit_end "$P_H"
+ai add "$QUIT_APP" --profile Work
+assert_rc "once the helper is gone, add makes the launcher again" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "on the same folder" "$QDATA" "$(plist_key "$APPS/$QW.app" AIdentityDataDir)"
 quit_run "$QUIT_NOAPP" "$QW"
 assert_rc "once the helper is gone, quit exits 0" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "and says the profile is not running" "$RUN_OUT" "'$QW' is not running."
@@ -345,6 +375,7 @@ if quit_alive "$P_M"; then _pass "the app's own copy keeps running"; else _fail 
 quit_run "$QUIT_REFUSED" "Quitty Blank"
 assert_rc_nonzero "a launcher whose app is gone is refused" "$RUN_RC" "$RUN_OUT"
 assert_contains "and it names the app it looked for" "$RUN_OUT" "$SANDBOX/gone/Quitty.app"
+assert_contains "and says that a rebuild finds it again" "$RUN_OUT" 'Run: aidentity rebuild "Quitty Blank", then quit again.'
 assert_eq "and asks nothing of any process" "" "$QUIT_ASKED"
 if quit_alive "$P_W2"; then _pass "the profile on that folder keeps running"; else _fail "the profile on that folder keeps running"; fi
 rm -rf "$APPS/Quitty Blank.app"
@@ -441,7 +472,7 @@ SECONDS_BEFORE=$SECONDS
 quit_run "$QUIT_DEAF" "$QW2"
 assert_rc "an app still running after the wait exits 1" 1 "$RUN_RC" "$RUN_OUT"
 assert_contains "and says it may be asking something" "$RUN_OUT" \
-  "$QW2 is still running. It may be asking you something; look at its window."
+  "$QW2 is still running; it may be asking you something."
 if [ $((SECONDS - SECONDS_BEFORE)) -ge 9 ]; then _pass "it waited about 10 seconds first"
 else _fail "it waited about 10 seconds first" "waited $((SECONDS - SECONDS_BEFORE)) s"; fi
 assert_eq "the quit event was sent once" "$P_W2 " "$QUIT_ASKED"

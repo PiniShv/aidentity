@@ -226,8 +226,14 @@ create_profile() {
     return 1
   fi
 
+  # quit finds the copy through the launcher, so it is named only when there
+  # is one: a folder can also be in use with its launcher gone.
   if [ -n "$data_dir" ] && running_on_profile "$data_dir"; then
-    warn "'$label' is running right now. Quit it, then re-run."
+    if [ "$existing_launcher" -eq 1 ]; then
+      warn "'$label' is running right now. Quit it (aidentity quit \"$label\"), then re-run."
+    else
+      warn "'$label' is running right now. Quit it, then re-run."
+    fi
     return 1
   fi
 

@@ -32,7 +32,7 @@ cmd_rm() {
   fi
 
   if [ "$main" -eq 0 ] && running_on_profile "$data"; then
-    die "'$want' is running right now. Quit it first, then re-run."
+    die "'$want' is running right now. Quit it first (aidentity quit \"$want\"), then re-run."
   fi
 
   if [ "$yes" -eq 0 ]; then
@@ -70,9 +70,9 @@ cmd_rm() {
     die "Could not remove $app — it may be locked (Finder → Get Info) or
     owned by another user. Nothing was changed."
   fi
-  local trash="$BUILD_STAGE"
+  local leftover="$BUILD_STAGE"
   _cleanup_stage || warn "Part of the old launcher could not be deleted (a locked file?).
-    It is out of the way, in: $trash"
+    It is out of the way, in: $leftover"
   ok "Removed launcher '$want'."
   [ "$main" -eq 1 ] && return 0
 

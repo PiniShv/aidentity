@@ -82,6 +82,10 @@ assert_contains "prune's help promises restore only for the folders marked so" "
   'this works for the folders the list marks
 "can be restored"'
 assert_contains "and gives add for the others" "$RUN_OUT" "add the profile again with the"
+ai help ui
+assert_contains "ui's help calls the s key stop, as the menu does" "$RUN_OUT" \
+  "keys to
+open, stop (quit a profile), add, rename"
 ai
 assert_eq "no arguments print the overview, as before" "$HELP_ALL" "$RUN_OUT"
 ai --help

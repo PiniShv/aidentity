@@ -295,7 +295,7 @@ ui_help() {
   done <<EOF
 Up, Down, k, j|move
 Enter|open the profile
-s|stop: quit the profile; other copies of the app keep running
+s|stop: quit the profile; other copies keep running
 a|add a profile: pick an app, then name the account
 r|rename the account name (it stays signed in)
 c|colour: arrows choose, Enter applies, Esc cancels
