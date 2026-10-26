@@ -518,6 +518,19 @@ assert_eq "the folder under another spelling, in a real argument, matches" yes \
 assert_eq "but not inside another switch's value" no \
   "$(quit_match "$X" "$QDATA" "$QID" "$X --user-data-dir=/e --proxy-bypass-list=user-data-dir=$SANDBOX/qa/${QDATA##*/}")"
 rm -f "$SANDBOX/qa"
+# The folder runs to the next " --" or the end: a space inside a path does not
+# end it, so a longer folder that starts with this one's path is another one.
+assert_eq "a folder that goes on past a space is another folder" no \
+  "$(quit_match "$X" /p/fake-work "" "$X --user-data-dir=/p/fake-work archive/fake-other")"
+assert_eq "and the next switch still ends the folder" yes \
+  "$(quit_match "$X" /p/fake-work "" "$X --user-data-dir=/p/fake-work --lang=de")"
+assert_eq "a folder with a space in its name matches whole" yes \
+  "$(quit_match "$X" "/p/fake work" "" "$X --user-data-dir=/p/fake work --lang=de")"
+mkdir -p "$SB/qsp/fake-work" "$SB/qsp/fake-work archive/fake-other"
+QSP_ID=$(/usr/bin/stat -L -f '%d:%i' "$SB/qsp/fake-work")
+assert_eq "nor does the longer folder match by its identity" no \
+  "$(quit_match "$X" "$SB/qsp/fake-work" "$QSP_ID" "$X --user-data-dir=$SB/qsp/fake-work archive/fake-other")"
+rm -rf "$SB/qsp"
 
 # The executable file, under the spellings Launch Services does not use.
 ln -sfn "$SRC" "$SB/src-link"
