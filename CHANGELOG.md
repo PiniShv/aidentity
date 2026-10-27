@@ -11,13 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A 20-second film, at the top of the README and in the first section of the
   site. On the site it plays muted while it is on screen. **Watch with sound**
-  starts it again from the beginning, with the narration. In full screen it
-  has captions.
+  starts it again from the beginning, with the narration, and a button turns
+  its captions on.
   `assets/film/` holds its source, and `assets/film/build.sh` makes it again
   in a container with pinned versions and no network.
 
 ### Changed
 
+- The site's front page is new, in the style of a product page: one idea per
+  section, the film full width at the top, and the uses told as "One Mac, many
+  uses". Every fact and command from the old page is still there. The
+  card shown when a link to the site is shared has the new lead, and
+  `assets/film/build.sh` now makes that card too.
 - Both terminal demos are recorded again on 1.6.1. `assets/record-demo.sh`
   builds its sandbox at the fixed path `/tmp/aidentity-demo`, so the
   recordings always show the same short path. The command-line tape waits for
