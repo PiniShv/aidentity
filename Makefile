@@ -21,7 +21,7 @@ SCRIPT   := bin/aidentity
 TARGET   := $(BINDIR)/aidentity
 TESTS    := test/run_tests.sh
 TEST_SH  := $(TESTS) test/lib.sh $(sort $(wildcard test/t_*.sh))
-SH_FILES := bin/aidentity install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh
+SH_FILES := bin/aidentity install.sh uninstall.sh scripts/build.sh scripts/guards.sh scripts/release-notes.sh scripts/release-check.sh assets/record-demo.sh assets/film/build.sh assets/film/render.sh
 
 # shellcheck findings we accept on purpose. Clear it to see everything:
 #   make lint SHELLCHECK_EXCLUDE=
