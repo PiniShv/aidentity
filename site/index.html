@@ -121,18 +121,7 @@ h1{font-size:clamp(2.2rem,1.2rem + 5vw,4.25rem);font-weight:800;letter-spacing:-
 }
 .lead{font-size:clamp(1.125rem,1rem + .6vw,1.375rem);line-height:1.5;max-width:42ch;margin-bottom:14px}
 .sub{color:var(--muted);max-width:56ch;margin-bottom:0}
-.vis-body{padding:18px 18px 20px;font:500 .75rem/1.75 var(--mono)}
-@media (min-width:560px) and (max-width:959px){.vis-body{font-size:.8125rem}
-}
-.vis-body p{margin:0;overflow-wrap:anywhere}
 .p{color:var(--term-ok);margin-right:.6em;user-select:none;-webkit-user-select:none}
-.vis-body .o{margin-bottom:8px;color:var(--term-muted)}
-.vis-body .o b{color:var(--term-ok);margin-right:.4em}
-.vis-tiles{display:flex;flex-wrap:wrap;gap:12px 28px;margin-top:16px;padding-top:20px;border-top:1px solid var(--term-line)}
-.vis .tile{width:64px;height:64px;border-radius:16px}
-.vis .tile .i{width:30px;height:30px}
-.vis .badge{width:20px;height:20px;right:-6px;bottom:-6px}
-.vis-body .vis-cap{margin-top:16px;color:var(--term-muted);font:.875rem/1.5 var(--sans)}
 .term{background:var(--term-bg);color:var(--term-text);border:1px solid var(--term-line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;min-width:0}
 .term-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:8px 14px;min-height:46px;background:var(--term-bar);border-bottom:1px solid var(--term-line)}
 .dots{display:flex;gap:7px;flex:none}
@@ -242,6 +231,29 @@ h3{font-size:1.125rem;font-weight:700;letter-spacing:-.01em}
 }
 @media (max-width:420px){.demo .term-title{display:none}
 }
+.film{background:#000;color:var(--term-text);border:1px solid var(--term-line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;min-width:0}
+.film .shot{aspect-ratio:16/9;background:#000}
+.film .shot video{background:#000}
+.film :focus-visible{outline-color:#67E8F9}
+.film-bar{display:none;flex-wrap:wrap;align-items:center;gap:6px;padding:8px;background:var(--term-bar);border-top:1px solid var(--term-line)}
+.js .film-bar{display:flex}
+.film-bar .ctl{padding:0 12px}
+.film-bar .vbtn{margin-left:0}
+.film-bar .fs{margin-left:auto}
+.snd .i{fill:none;stroke:currentColor}
+.snd{color:var(--term-muted)}
+.snd.on{border-color:var(--term-accent);background:#0C2A44;color:#fff}
+.eq{display:none;align-items:flex-end;gap:2px;height:12px}
+.snd.on .eq{display:inline-flex}
+.eq i{width:3px;height:100%;border-radius:1px;background:currentColor;transform-origin:50% 100%;transform:scaleY(.4)}
+@media (prefers-reduced-motion:no-preference){.playing .eq i{animation:eq .8s ease-in-out infinite alternate}
+.eq i:nth-child(2){animation-delay:-.27s}
+.eq i:nth-child(3){animation-delay:-.53s}
+}
+@keyframes eq{from{transform:scaleY(.3)}to{transform:scaleY(1)}}
+.watch{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;min-height:44px;padding:0 18px 0 14px;border-radius:999px;border:1px solid rgba(125,211,252,.7);background:rgba(10,16,25,.82);color:#fff;font:600 .9375rem/1.2 var(--sans);white-space:nowrap;cursor:pointer;box-shadow:0 10px 30px -8px rgba(0,0,0,.6)}
+.watch:hover{background:#14203A;border-color:#7DD3FC}
+.watch .i{color:var(--term-accent)}
 .chapters{display:flex;flex-wrap:wrap;align-items:center;gap:8px 6px;padding:10px 12px;border-top:1px solid var(--term-line);background:var(--term-bar)}
 .cl{margin:0 6px 0 4px;font:700 .75rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--term-muted)}
 .chapters ul{display:flex;flex-wrap:wrap;gap:6px}
@@ -401,7 +413,7 @@ html:not(.js) .chapters{display:none}
 .foot li a:hover{color:var(--text);text-decoration:underline}
 .legal{margin-top:32px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:.875rem}
 .legal p{margin:0 0 6px}
-@media (forced-colors:active){  .term,.card,.low,.ladder,.note,.faq details,.pill,.chips li,.chip,.tag{border:1px solid CanvasText}
+@media (forced-colors:active){  .term,.film,.card,.low,.ladder,.note,.faq details,.pill,.chips li,.chip,.tag{border:1px solid CanvasText}
   .dots i,.badge{forced-color-adjust:none}
   .tabs button[aria-selected=true]{border-color:Highlight;text-decoration:underline}
 }
@@ -431,6 +443,8 @@ html:not(.js) .chapters{display:none}
 <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></symbol>
 <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></symbol>
 <symbol id="i-fs" viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></symbol>
+<symbol id="i-sound" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+<symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m23 9-6 6M17 9l6 6"/></symbol>
 </svg>
 
 <a class="skip" href="#main">Skip to content</a>
@@ -461,23 +475,31 @@ html:not(.js) .chapters{display:none}
 <div class="hero-copy">
 <a class="pill" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-ui"><b>New</b><span><code>aidentity ui</code>, a menu in your terminal</span><svg class="i" aria-hidden="true"><use href="#i-right"/></svg></a>
 <h1 id="h-hero">Stop signing out to <span class="grad">switch accounts.</span></h1>
-<p class="lead">Run your work, personal and client accounts of the same app side by side on your Mac. Each one stays signed in.</p>
+<p class="lead">One app, every account, all open at once. Each one stays signed in.</p>
 <p class="sub">A free, open-source command-line tool for Chromium and Electron apps. It never changes your app. It opens it again, with one data folder per account.</p>
 </div>
 
-<figure class="term vis hero-visual">
-<div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="term-title" aria-hidden="true">Terminal</span></div>
-<div class="vis-body" role="img" aria-label="Two aidentity add commands create two icons, Claude Work and Claude Client, each with its own coloured badge. After one sign-in each, both accounts stay signed in at the same time.">
-<p><span class="p">$</span>aidentity add Claude <span class="nw">--profile Work</span> <span class="nw">--color blue</span></p>
-<p class="o"><b>&#10003;</b>Created Claude Work</p>
-<p><span class="p">$</span>aidentity add Claude <span class="nw">--profile Client</span> <span class="nw">--color teal</span></p>
-<p class="o"><b>&#10003;</b>Created Claude Client</p>
-<div class="vis-tiles">
-<span class="t"><span class="tile"><svg class="i"><use href="#i-win"/></svg><span class="badge"></span></span>Claude Work</span>
-<span class="t"><span class="tile"><svg class="i"><use href="#i-win"/></svg><span class="badge b2"></span></span>Claude Client</span>
+<figure class="film hero-visual" data-player data-len="19.5" data-what="film">
+<div class="shot">
+<video id="film-vid" width="1280" height="720" controls muted loop playsinline preload="none" poster="assets/film-poster.jpg" aria-label="A 20-second film: the same chat app open three times at once, one window for each account, each one signed in. One command sets it up.">
+<source src="assets/film.webm" type='video/webm; codecs="vp9, opus"'>
+<source src="assets/film.mp4" type="video/mp4">
+<track kind="captions" src="assets/film.vtt" srclang="en" label="English">
+<a href="assets/film.mp4">Watch the film (MP4, 1 MB)</a>
+</video>
+<div class="ov" hidden>
+<button type="button" class="bigplay"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play with sound</button>
+<p class="why" hidden></p>
 </div>
-<p class="vis-cap">Two icons. Two accounts. Sign in once, stay signed in.</p>
+<button type="button" class="watch" hidden><svg class="i" aria-hidden="true"><use href="#i-sound"/></svg>Watch with sound</button>
+<div class="prog" aria-hidden="true"><i></i></div>
 </div>
+<div class="film-bar">
+<button type="button" class="ctl vbtn" aria-controls="film-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the film</span></button>
+<button type="button" class="ctl snd" aria-controls="film-vid" hidden><svg class="i" aria-hidden="true"><use class="sico" href="#i-mute"/></svg><span class="slbl">Sound off</span><span class="shint sr">, turn it on</span><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></button>
+<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="sr">Show the film in full screen</span></button>
+</div>
+<figcaption class="sr">The narration: Meet aidentity. Every account you use. Open at once. Each in its own window. Each one signed in. Set it up with one command. No copies. No signing out. aidentity. Free, for your Mac.</figcaption>
 </figure>
 
 <div class="install" id="install">
@@ -574,7 +596,7 @@ html:not(.js) .chapters{display:none}
 <span class="term-title" aria-hidden="true">aidentity: demo</span>
 <span class="vtime" aria-hidden="true">0:00 / 1:25</span>
 <button type="button" class="ctl vbtn" aria-controls="demo-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the demo</span></button>
-<button type="button" class="ctl fs" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg>Expand<span class="sr"> the demo to full screen</span></button>
+<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="sr">Show the demo in full screen</span></button>
 </div>
 <div class="shot">
 <video id="demo-vid" width="920" height="592" controls muted loop playsinline preload="none" poster="assets/demo-poster.jpg" aria-label="Terminal demo: aidentity creates Claude and ChatGPT profiles, then renames, recolours, removes and restores one">
@@ -623,7 +645,7 @@ html:not(.js) .chapters{display:none}
 <span class="term-title" aria-hidden="true">aidentity ui</span>
 <span class="vtime" aria-hidden="true">0:00 / 0:31</span>
 <button type="button" class="ctl vbtn" aria-controls="menu-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the menu demo</span></button>
-<button type="button" class="ctl fs" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg>Expand<span class="sr"> the menu demo to full screen</span></button>
+<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="sr">Show the menu demo in full screen</span></button>
 </div>
 <div class="shot">
 <video id="menu-vid" width="920" height="592" controls muted loop playsinline preload="none" poster="assets/demo-ui-poster.jpg" aria-label="Terminal demo: aidentity ui shows the profiles in a menu, then recolours and renames one and lists every key">
@@ -1056,14 +1078,13 @@ tabs.forEach(function(t,i){
   });
 });
 
-/* Demo videos. One function sets up a player from its own root element (a figure marked
-   data-player), so the command-line demo and the menu demo share every behaviour. Pause keeps the
-   place and Play carries on from there. A video plays (muted) only while it is on screen, and
-   never by itself when the device asks for less motion or Data Saver is on. Only one plays at a
-   time: starting one pauses the others. */
+/* Videos. One function sets up a player from its own root element (a figure marked data-player),
+   so the film and the two demos share every behaviour. Pause keeps the place and Play carries on
+   from there. A video plays (muted) only while it is on screen, and never by itself when the
+   device asks for less motion or Data Saver is on. Only one plays at a time: starting one pauses
+   the others. */
 var mq=window.matchMedia('(prefers-reduced-motion: reduce)');
 var saver=!!(navigator.connection&&navigator.connection.saveData);
-var narrow=window.matchMedia('(max-width: 700px)');
 var players=[];
 function fmt(x){x=Math.max(0,Math.floor(x||0));return Math.floor(x/60)+':'+('0'+x%60).slice(-2)}
 function initPlayer(root){
@@ -1073,7 +1094,8 @@ function initPlayer(root){
   var ov=root.querySelector('.ov'),big=root.querySelector('.bigplay'),why=root.querySelector('.why');
   var bar=root.querySelector('.prog i'),vt=root.querySelector('.vtime'),fsb=root.querySelector('.fs');
   var chap=[].slice.call(root.querySelectorAll('.chapters button'));
-  var len=+root.getAttribute('data-len')||1;
+  var snd=root.querySelector('.snd'),watch=root.querySelector('.watch'),heard=false;
+  var len=+root.getAttribute('data-len')||1,what=root.getAttribute('data-what')||'demo';
   var last=v.querySelector('source:last-of-type');
   var userPaused=false,autoPaused=false,started=false,blocked=false,failed=false,seen=false,raf=0;
   v.controls=false;
@@ -1081,8 +1103,9 @@ function initPlayer(root){
   function ui(){
     if(failed){
       shot.classList.add('paused');ov.hidden=false;big.hidden=true;btn.hidden=true;fsb.hidden=true;why.hidden=false;
+      if(snd){snd.hidden=true;watch.hidden=true}
       var a=d.createElement('a');a.href=last?last.getAttribute('src'):'';a.textContent='Open the video file';
-      why.textContent='The demo could not load. ';why.appendChild(a);why.appendChild(d.createTextNode(' or reload the page.'));
+      why.textContent='The '+what+' could not load. ';why.appendChild(a);why.appendChild(d.createTextNode(' or reload the page.'));
       return;
     }
     /* Before the first start: dim the poster and show a big Play. Later, a pause leaves the frame clear to read. */
@@ -1091,13 +1114,27 @@ function initPlayer(root){
     ov.hidden=!pre;btn.hidden=false;
     ico.setAttribute('href',p?'#i-play':'#i-pause');
     lbl.textContent=p?'Play':'Pause';
-    if(pre)w=blocked?'Your browser did not start the demo by itself.':mq.matches?'Autoplay is off, because your device asks for less motion.':saver?'Autoplay is off, because Data Saver is on.':'';
+    if(pre)w=blocked?'Your browser did not start the '+what+' by itself.':mq.matches?'Autoplay is off, because your device asks for less motion.':saver?'Autoplay is off, because Data Saver is on.':'';
     why.textContent=w;why.hidden=!w;
+    root.classList.toggle('playing',!p);sound();
   }
+  /* Sound, on a player that has it (the film). The button says what is happening now: "Sound off"
+     with a crossed-out speaker, or "Sound on" with moving level bars. The first time sound is turned
+     on, from any button, the film starts again from the beginning, so the narration is heard from
+     its first line, and then it plays once. */
+  function sound(){
+    if(!snd)return;
+    var on=!v.muted;
+    snd.classList.toggle('on',on);snd.querySelector('.sico').setAttribute('href',on?'#i-sound':'#i-mute');
+    snd.querySelector('.slbl').textContent=on?'Sound on':'Sound off';
+    snd.querySelector('.shint').textContent=on?', turn it off':', turn it on';
+    watch.hidden=!(v.muted&&!heard&&started);
+  }
+  function listen(){heard=true;v.loop=false;seekTo(0);v.muted=false;userPaused=false;go()}
   function paint(){
     var t=v.currentTime||0,n=v.duration||len,cur=0;
     bar.style.setProperty('--p',Math.min(1,t/n).toFixed(4));
-    vt.textContent=fmt(t)+' / '+fmt(n);
+    if(vt)vt.textContent=fmt(t)+' / '+fmt(n);
     chap.forEach(function(b,i){if(t>=+b.getAttribute('data-t')-.25)cur=i});
     chap.forEach(function(b,i){if(i===cur)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});
   }
@@ -1125,7 +1162,7 @@ function initPlayer(root){
   if(last)last.addEventListener('error',fail);
   btn.addEventListener('click',toggle);
   v.addEventListener('click',toggle);
-  big.addEventListener('click',function(){userPaused=false;go();btn.focus()});
+  big.addEventListener('click',function(){if(snd&&!heard)listen();else{userPaused=false;go()}btn.focus()});
   /* A jump before the video has loaded waits for its metadata: until then the browser does not know
      the video's length, and some browsers drop the seek. The video has a keyframe at every chapter
      time, so a browser that seeks only to keyframes still lands exactly there. */
@@ -1134,6 +1171,15 @@ function initPlayer(root){
     v.addEventListener('loadedmetadata',function h(){v.removeEventListener('loadedmetadata',h);v.currentTime=t;paint()});
   }
   chap.forEach(function(b){b.addEventListener('click',function(){seekTo(+b.getAttribute('data-t'));userPaused=false;go();paint()})});
+  if(snd){
+    snd.addEventListener('click',function(){
+      if(v.muted&&!heard)listen();
+      else{v.muted=!v.muted;if(!v.muted){userPaused=false;go()}}
+    });
+    watch.addEventListener('click',function(){listen();snd.focus()});
+    v.addEventListener('volumechange',function(){if(!v.muted&&!heard)listen();sound()});
+    snd.hidden=false;
+  }
   if('IntersectionObserver' in window){
     new IntersectionObserver(function(es){
       seen=es[0].isIntersecting;
@@ -1148,15 +1194,16 @@ function initPlayer(root){
   }
   if(mq.addEventListener)mq.addEventListener('change',motion);else if(mq.addListener)mq.addListener(motion);
 
-  /* A phone is too narrow to read the terminal text, so offer full screen. The picture can then turn sideways. */
+  /* Full screen on any screen: the button, or a double click on the picture. The browser's own
+     controls show while it lasts. On a phone the picture can then turn sideways. */
+  function full(){
+    userPaused=false;go();
+    if(v.requestFullscreen)v.requestFullscreen();else v.webkitEnterFullscreen();
+  }
   if(v.requestFullscreen||v.webkitEnterFullscreen){
-    var fsShow=function(){fsb.hidden=failed||!narrow.matches};
-    fsShow();
-    if(narrow.addEventListener)narrow.addEventListener('change',fsShow);
-    fsb.addEventListener('click',function(){
-      userPaused=false;go();
-      if(v.requestFullscreen)v.requestFullscreen();else v.webkitEnterFullscreen();
-    });
+    fsb.hidden=false;
+    fsb.addEventListener('click',full);
+    v.addEventListener('dblclick',full);
     d.addEventListener('fullscreenchange',function(){v.controls=d.fullscreenElement===v});
   }
   ui();paint();
