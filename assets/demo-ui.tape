@@ -6,6 +6,11 @@
 # Privacy: as in demo.tape, everything points at a throwaway temporary
 # directory with stand-in apps, so no app list, username, hostname or real
 # path can appear. The profiles are made off camera.
+#
+# Each step waits for the screen it needs (Wait) instead of sleeping and hoping:
+# on a slow or busy machine a fixed sleep lets the next key arrive before the
+# menu is ready, and the key is echoed into the shell instead. Wait only polls;
+# the pauses after it are what the viewer sees.
 
 Output aidentity-ui-demo.gif
 
@@ -24,7 +29,7 @@ Type "export PS1='$ ' && clear"
 Enter
 Type "aidentity add Claude --profile Work --color blue >/dev/null && aidentity add Claude --profile Personal --color green >/dev/null && aidentity add ChatGPT --profile Work --color teal >/dev/null && aidentity add Claude --main >/dev/null && clear"
 Enter
-Sleep 3s
+Wait@120s /^\$$/
 Show
 
 Type "# Prefer a menu? One key per action."
@@ -32,7 +37,8 @@ Enter
 Sleep 800ms
 Type "aidentity ui"
 Enter
-Sleep 2500ms
+Wait+Screen@120s /0 running/
+Sleep 2s
 
 Down
 Sleep 600ms
@@ -48,25 +54,33 @@ Sleep 450ms
 Right
 Sleep 800ms
 Enter
-Sleep 2200ms
+Wait+Screen@120s /Press any key to return/
+Sleep 2s
 Space
-Sleep 1500ms
+Wait+Screen@120s /0 running/
+Sleep 1800ms
 
 Type "r"
-Sleep 1500ms
+Wait+Screen@120s /New account name/
+Sleep 1200ms
 Type "Client"
 Sleep 700ms
 Enter
-Sleep 2500ms
+Wait+Screen@120s /Renamed Claude Personal/
+Sleep 2300ms
 Space
-Sleep 2000ms
+Wait+Screen@120s /0 running/
+Sleep 2s
 
 Type "?"
+Wait+Screen@120s /this help/
 Sleep 3s
 Space
-Sleep 1200ms
+Wait+Screen@120s /0 running/
+Sleep 1800ms
 
 Type "q"
+Wait@120s /^\$$/
 Sleep 1s
 Type "# Back in your shell, as you left it."
 Enter

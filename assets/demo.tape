@@ -32,18 +32,22 @@ Sleep 1500ms
 
 Type "aidentity apps"
 Enter
+Wait@20s /^\$$/
 Sleep 2500ms
 
 Type "aidentity add Claude --profile Work --color blue"
 Enter
+Wait@20s /^\$$/
 Sleep 3s
 
 Type "aidentity add Claude --profile Personal --color green"
 Enter
+Wait@20s /^\$$/
 Sleep 3s
 
 Type "aidentity add ChatGPT --profile Work --color teal"
 Enter
+Wait@20s /^\$$/
 Sleep 3s
 
 Type "# And one for your original account, so Claude.app is never in the way."
@@ -52,6 +56,7 @@ Sleep 1500ms
 
 Type "aidentity add Claude --main"
 Enter
+Wait@20s /^\$$/
 Sleep 3s
 
 Type "# Three extra accounts and your original one, each in its own window."
@@ -60,6 +65,7 @@ Sleep 1500ms
 
 Type "aidentity list"
 Enter
+Wait@20s /^\$$/
 Sleep 4s
 
 Type "# Rename one: the account stays signed in."
@@ -68,6 +74,7 @@ Sleep 1500ms
 
 Type "aidentity rename 'Claude Personal' Client"
 Enter
+Wait@20s /^\$$/
 Sleep 2500ms
 
 Type "# Recolour it without touching the session."
@@ -76,6 +83,7 @@ Sleep 1200ms
 
 Type "aidentity set 'Claude Client' --color purple"
 Enter
+Wait@20s /^\$$/
 Sleep 2500ms
 
 Type "# Deleted a launcher by mistake? Its account is still there."
@@ -84,10 +92,12 @@ Sleep 1500ms
 
 Type "aidentity rm 'Claude Client' -y"
 Enter
+Wait@20s /^\$$/
 Sleep 2500ms
 
 Type "aidentity restore 'Claude Client'"
 Enter
+Wait@20s /^\$$/
 Sleep 3500ms
 
 Type "# Then click the new icons in your Dock. That's it."

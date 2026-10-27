@@ -23,11 +23,17 @@ for tool in vhs rsvg-convert ffmpeg iconutil; do
   command -v "$tool" >/dev/null || { echo "$tool is required (see the header of this script)." >&2; exit 1; }
 done
 
-# A fresh directory each run, removed on exit. A fixed /tmp path that is
-# rm -rf'd first would delete whatever someone else had put there. It sits in
-# /tmp, not $TMPDIR: the recording prints these paths, and $TMPDIR is a
-# per-user folder whose name is specific to this machine.
-D=$(mktemp -d /tmp/aidentity-demo.XXXXXX)
+# A fresh directory each run, removed on exit. The menu prints a profile's
+# folder when it renames one, so the path appears in the recording. It is a
+# short fixed name in /tmp: a random suffix, or $TMPDIR (a per-user folder whose
+# name is specific to this machine), would show in the video. mkdir makes it
+# only when it does not exist yet, so the script never removes a folder it did
+# not create. The trap is set after that check, for the same reason.
+D=/tmp/aidentity-demo
+mkdir "$D" 2>/dev/null || {
+  echo "$D already exists. Move or remove it, then run this again." >&2
+  exit 1
+}
 trap 'rm -rf "$D"' EXIT
 
 mkdir -p "$D/Apps" "$D/Applications" "$D/data" "$D/f.iconset"
@@ -78,18 +84,20 @@ ffmpeg -y -loglevel error -i aidentity-demo.gif -i palette.png \
 
 # The site plays a video instead: it can pause and resume in place, which a
 # GIF cannot, and it is half the size. Same frames, made from the GIF above.
-# The poster is the frame at 20 s.
+# The poster is the frame at 25 s.
 # Keyframes sit exactly at the chapter times in site/index.html (data-t), so a
 # browser that seeks only to keyframes still lands on each chapter. Keep the
-# two lists the same when the tape changes.
-chapters="0,32,41,49,57"
+# two lists the same. The tape waits for each command, so the timing follows
+# the machine's speed: measure the chapter and poster times again after every
+# recording.
+chapters="0,36,46,55,64"
 ffmpeg -y -loglevel error -i "$REPO/assets/demo.gif" "${clean[@]}" -movflags +faststart \
   -pix_fmt yuv420p -c:v libx264 -preset veryslow -tune animation -crf 24 \
   -force_key_frames "$chapters" \
   -bsf:v filter_units=remove_types=6 -vf "$vf" "$REPO/site/assets/demo.mp4"
 ffmpeg -y -loglevel error -i "$REPO/assets/demo.gif" "${clean[@]}" -pix_fmt yuv420p \
   -c:v libvpx-vp9 -b:v 0 -crf 36 -row-mt 1 -force_key_frames "$chapters" -vf "$vf" "$REPO/site/assets/demo.webm"
-ffmpeg -y -loglevel error -ss 20 -i "$REPO/site/assets/demo.mp4" "${clean[@]}" \
+ffmpeg -y -loglevel error -ss 25 -i "$REPO/site/assets/demo.mp4" "${clean[@]}" \
   -frames:v 1 -q:v 4 "$REPO/site/assets/demo-poster.jpg"
 
 echo "Wrote $REPO/assets/demo.gif and site/assets/demo.mp4, demo.webm, demo-poster.jpg"
@@ -106,17 +114,19 @@ ffmpeg -y -loglevel error -i aidentity-ui-demo.gif -i palette-ui.png \
   "$REPO/assets/demo-ui.gif"
 # As with the main video, keyframes sit exactly at the chapter times in
 # site/index.html (data-t of the menu player), so a browser that seeks only to
-# keyframes still lands on each chapter. Keep the two lists the same when the
-# tape changes.
-ui_chapters="0,5,13,20,24"
+# keyframes still lands on each chapter. Keep the two lists the same, and
+# measure them again after every recording.
+ui_chapters="0,5,14,21,25"
 ffmpeg -y -loglevel error -i "$REPO/assets/demo-ui.gif" "${clean[@]}" -movflags +faststart \
   -pix_fmt yuv420p -c:v libx264 -preset veryslow -tune animation -crf 24 \
   -force_key_frames "$ui_chapters" \
   -bsf:v filter_units=remove_types=6 -vf "$vf" "$REPO/site/assets/demo-ui.mp4"
 ffmpeg -y -loglevel error -i "$REPO/assets/demo-ui.gif" "${clean[@]}" -pix_fmt yuv420p \
   -c:v libvpx-vp9 -b:v 0 -crf 36 -row-mt 1 -force_key_frames "$ui_chapters" -vf "$vf" "$REPO/site/assets/demo-ui.webm"
-# The poster shows the menu with every profile, before the first key.
-ffmpeg -y -loglevel error -ss 4 -i "$REPO/site/assets/demo-ui.mp4" "${clean[@]}" \
+# The poster shows the menu with every profile, before the first key. The tape
+# waits for the menu, then pauses 2 s before the first key, so 5 s is inside
+# that pause.
+ffmpeg -y -loglevel error -ss 5 -i "$REPO/site/assets/demo-ui.mp4" "${clean[@]}" \
   -frames:v 1 -q:v 4 "$REPO/site/assets/demo-ui-poster.jpg"
 echo "Wrote $REPO/assets/demo-ui.gif and site/assets/demo-ui.mp4, demo-ui.webm, demo-ui-poster.jpg"
 fi
