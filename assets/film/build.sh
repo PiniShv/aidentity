@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Rebuild the product film and its posters:
+# Rebuild the product film, its posters and the social card:
 #   bash assets/film/build.sh             build the image if it is missing, then the film
 #   bash assets/film/build.sh --rebuild   build the image again first
 #   FILM_KEEP=some/folder bash assets/film/build.sh
@@ -12,6 +12,7 @@
 # with --network none, the repository mounted read-only, and writes only to a
 # throwaway folder. Then the results are copied into place:
 #   site/assets/film.mp4, film.webm, film-poster.jpg   what the site plays
+#   site/assets/og.png                                 the card for shared links
 #   assets/film-poster.jpg                             the README poster
 # The script runs under /bin/bash, the 3.2 every Mac has.
 #
@@ -48,7 +49,7 @@ docker run --rm --network none --shm-size=1g \
 # The container wrote to $out, so anything there could be a symlink to any
 # file on this Mac, and copying through it would put that file in the
 # repository. Only plain, non-empty files with these names are copied.
-outputs="film.mp4 film.webm film-poster.jpg readme-poster.jpg film-mix.wav"
+outputs="film.mp4 film.webm film-poster.jpg readme-poster.jpg og.png film-mix.wav"
 for f in $outputs; do
   if [ -L "$out/$f" ] || [ ! -f "$out/$f" ] || [ ! -s "$out/$f" ]; then
     echo "The build did not make $f as a plain file. Nothing was copied." >&2
@@ -58,7 +59,7 @@ done
 [ -z "${FILM_KEEP:-}" ] || mkdir -p "$FILM_KEEP"
 
 mkdir -p "$REPO/site/assets"
-cp "$out/film.mp4" "$out/film.webm" "$out/film-poster.jpg" "$REPO/site/assets/"
+cp "$out/film.mp4" "$out/film.webm" "$out/film-poster.jpg" "$out/og.png" "$REPO/site/assets/"
 cp "$out/readme-poster.jpg" "$REPO/assets/film-poster.jpg"
 if [ -n "${FILM_KEEP:-}" ]; then
   for f in $outputs; do cp "$out/$f" "$FILM_KEEP/"; done
@@ -66,7 +67,7 @@ fi
 
 echo
 echo "Wrote:"
-for f in site/assets/film.mp4 site/assets/film.webm site/assets/film-poster.jpg assets/film-poster.jpg; do
+for f in site/assets/film.mp4 site/assets/film.webm site/assets/film-poster.jpg site/assets/og.png assets/film-poster.jpg; do
   printf '  %-28s %s bytes\n' "$f" "$(wc -c < "$REPO/$f" | tr -d ' ')"
 done
-echo "Watch the film with sound and look at both posters before committing."
+echo "Watch the film with sound and look at both posters and the card before committing."

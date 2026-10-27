@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>aidentity social card</title>
+<!-- The card that shows when a link to the site is shared: 1200x630.
+     render.sh draws it with the image's Chromium, next to the film. -->
+<style>
+  @font-face { font-family: "AidSans"; src: url("fonts/Inter-Regular.otf"); font-weight: 400; }
+  @font-face { font-family: "AidSans"; src: url("fonts/Inter-Medium.otf"); font-weight: 500; }
+  @font-face { font-family: "AidSans"; src: url("fonts/Inter-Bold.otf"); font-weight: 700; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; background: #070B14; }
+  body { position: relative; font-family: "AidSans", sans-serif; color: #EAF0FA; }
+  .strip { position: absolute; left: 0; right: 0; top: 0; height: 8px; background: linear-gradient(90deg, #1D4ED8, #2E7DF6, #0EA5E9, #38BDF8, #22D3EE); }
+  .glow { position: absolute; inset: 0; background:
+      radial-gradient(ellipse 420px 360px at 990px 230px, rgba(34,211,238,.20), transparent 70%),
+      radial-gradient(ellipse 520px 380px at 120px 40px, rgba(46,125,246,.20), transparent 70%); }
+  .grid { position: absolute; inset: 0; background-image:
+      linear-gradient(rgba(56,189,248,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,.06) 1px, transparent 1px);
+      background-size: 44px 44px; -webkit-mask-image: radial-gradient(ellipse 70% 80% at 75% 30%, #000, transparent 75%); }
+  .brand { position: absolute; left: 80px; top: 76px; display: flex; align-items: center; gap: 18px; font: 700 34px "DejaVu Sans Mono", monospace; letter-spacing: -.5px; }
+  .brand img { width: 52px; height: 52px; }
+  h1 { position: absolute; left: 80px; top: 178px; width: 760px; font-size: 84px; font-weight: 700; line-height: 1.04; letter-spacing: -2.6px; }
+  .grad { background: linear-gradient(90deg, #2E7DF6, #22D3EE); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { position: absolute; left: 80px; top: 380px; width: 700px; font-size: 30px; font-weight: 400; line-height: 1.4; color: #A5B4CB; }
+  .cmd { position: absolute; left: 80px; top: 507px; display: flex; align-items: center; gap: 14px; height: 60px; padding: 0 24px;
+    border: 1px solid #1F2C45; border-radius: 12px; background: #0A1019; font: 700 25px "DejaVu Sans Mono", monospace; color: #E6EDF7; }
+  .cmd b { color: #4ADE80; }
+  .free { position: absolute; left: 690px; top: 524px; font: 400 23px "DejaVu Sans Mono", monospace; color: #9AA9C0; }
+  .mark { position: absolute; left: 878px; top: 96px; width: 232px; height: 270px; object-fit: contain;
+    filter: drop-shadow(0 0 18px rgba(56,189,248,.65)) drop-shadow(0 0 40px rgba(46,125,246,.45)); }
+  .tiles { position: absolute; left: 905px; top: 386px; display: flex; gap: 26px; }
+  .t { display: grid; justify-items: center; gap: 12px; font: 500 20px "DejaVu Sans Mono", monospace; color: #C9D1DE; }
+  .tile { position: relative; width: 76px; height: 76px; border-radius: 18px; display: grid; place-items: center;
+    background: linear-gradient(160deg, #3A4A68, #1E2A44); border: 1px solid #41537A; }
+  .tile i { width: 34px; height: 28px; border: 3px solid #C9D6EA; border-radius: 6px; position: relative; }
+  .tile i::after { content: ""; position: absolute; left: 0; right: 0; top: 6px; border-top: 3px solid #C9D6EA; }
+  .badge { position: absolute; right: -7px; bottom: -7px; width: 22px; height: 22px; border-radius: 50%; border: 4px solid #070B14; background: #2E7DF6; }
+  .badge.b2 { background: #22D3EE; }
+</style>
+</head>
+<body>
+<div class="glow"></div><div class="grid"></div><div class="strip"></div>
+<div class="brand"><img src="logo.svg" alt="">aidentity</div>
+<h1>Stop signing out to <span class="grad">switch accounts.</span></h1>
+<p class="lead">One app, every account, all open at once. Each one stays signed in.</p>
+<div class="cmd"><b>$</b>brew install pinishv/tap/aidentity</div>
+<div class="free">Free and open source</div>
+<img class="mark" src="logo.svg" alt="">
+<div class="tiles">
+  <div class="t"><div class="tile"><i></i><span class="badge"></span></div>Work</div>
+  <div class="t"><div class="tile"><i></i><span class="badge b2"></span></div>Client</div>
+</div>
+</body>
+</html>
