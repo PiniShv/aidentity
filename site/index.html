@@ -198,8 +198,8 @@ h1{font-size:clamp(2.5rem,1.15rem + 6.2vw,5rem);line-height:1.02;letter-spacing:
 .watch:hover{background:#fff}
 .watch .i{color:#0066cc;fill:none;stroke:currentColor}
 .ccon .watch{display:none}
+@media (max-width:767px){.film-bar .fsl,.film-bar .ccl,.film-bar .vtime{display:none}.film-bar .fs{margin-left:auto}}
 @media (max-width:480px){.fsl,.ccl{display:none}.watch{min-height:44px;font-size:.9375rem}.film-bar .ctl{padding:0 12px}}
-@media (max-width:600px){.film-bar .fs{margin-left:auto}}
 @media (max-width:359px){.film-bar{padding:8px;gap:6px}.ctl{padding:0 11px;gap:6px}}
 @media (max-width:379px){.film-bar .vlbl,.film-bar .slbl{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
 
@@ -640,9 +640,9 @@ html:not(.js) .chapters{display:none}
 <div class="film-bar">
 <button type="button" class="ctl vbtn" aria-controls="film-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the film</span></button>
 <button type="button" class="ctl snd" aria-controls="film-vid" hidden><svg class="i" aria-hidden="true"><use class="sico" href="#i-mute"/></svg><span class="slbl">Sound off</span><span class="shint sr">, turn it on</span><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></button>
-<button type="button" class="ctl cc" aria-controls="film-vid" aria-pressed="false" hidden><svg class="i" aria-hidden="true"><use href="#i-cc"/></svg><span class="ccl" aria-hidden="true">Captions</span><span class="sr">Captions for the film</span></button>
+<button type="button" class="ctl cc" title="Captions" aria-controls="film-vid" aria-pressed="false" hidden><svg class="i" aria-hidden="true"><use href="#i-cc"/></svg><span class="ccl" aria-hidden="true">Captions</span><span class="sr">Captions for the film</span></button>
 <span class="vtime" aria-hidden="true">0:00 / 0:19</span>
-<button type="button" class="ctl fs" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="fsl" aria-hidden="true">Full screen</span><span class="sr">Show the film in full screen</span></button>
+<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="fsl" aria-hidden="true">Full screen</span><span class="sr">Show the film in full screen</span></button>
 </div>
 <figcaption class="sr">The narration: Meet aidentity. Every account you use. Open at once. Each in its own window. Each one signed in. Set it up with one command. No copies. No signing out. aidentity. Free, for your Mac.</figcaption>
 </figure>
@@ -846,7 +846,7 @@ html:not(.js) .chapters{display:none}
 <span class="term-title" aria-hidden="true">aidentity: demo</span>
 <span class="vtime" aria-hidden="true">0:00 / 1:25</span>
 <button type="button" class="ctl vbtn" aria-controls="demo-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the demo</span></button>
-<button type="button" class="ctl fs" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="fsl" aria-hidden="true">Full screen</span><span class="sr">Show the demo in full screen</span></button>
+<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="fsl" aria-hidden="true">Full screen</span><span class="sr">Show the demo in full screen</span></button>
 </div>
 <div class="shot">
 <video id="demo-vid" width="920" height="592" controls muted loop playsinline preload="none" poster="assets/demo-poster.jpg" aria-label="Terminal demo: aidentity creates Claude and ChatGPT profiles, then renames, recolours, removes and restores one">
@@ -909,7 +909,7 @@ html:not(.js) .chapters{display:none}
 <span class="term-title" aria-hidden="true">aidentity ui</span>
 <span class="vtime" aria-hidden="true">0:00 / 0:31</span>
 <button type="button" class="ctl vbtn" aria-controls="menu-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the menu demo</span></button>
-<button type="button" class="ctl fs" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="fsl" aria-hidden="true">Full screen</span><span class="sr">Show the menu demo in full screen</span></button>
+<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="fsl" aria-hidden="true">Full screen</span><span class="sr">Show the menu demo in full screen</span></button>
 </div>
 <div class="shot">
 <video id="menu-vid" width="920" height="592" controls muted loop playsinline preload="none" poster="assets/demo-ui-poster.jpg" aria-label="Terminal demo: aidentity ui shows the profiles in a menu, then recolours and renames one and lists every key">
@@ -1457,18 +1457,20 @@ if(menu){
   d.addEventListener('keydown',function(e){if(e.key==='Escape'&&menu.open){menu.open=false;menu.querySelector('summary').focus()}});
 }
 
-/* Local nav: mark the section that is on screen. */
-if('IntersectionObserver' in window){
-  var links=[].slice.call(d.querySelectorAll('.links a')),map={};
-  links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a});
-  var navIO=new IntersectionObserver(function(es){
-    es.forEach(function(e){
-      var a=map[e.target.id];if(!a)return;
-      if(e.isIntersecting){links.forEach(function(x){x.removeAttribute('aria-current')});a.setAttribute('aria-current','true')}
-      else a.removeAttribute('aria-current');
-    });
-  },{rootMargin:'-45% 0px -50% 0px'});
-  Object.keys(map).forEach(function(id){var s=d.getElementById(id);if(s)navIO.observe(s)});
+/* Local nav: mark the section that crosses a line 40% down the screen, if a link names it. Checked
+   on scroll (once per frame) and on resize, from where each section is now, so it holds for any
+   window size. */
+var links=[].slice.call(d.querySelectorAll('.links a')),secs=[],tick=0;
+links.forEach(function(a){var s=d.getElementById(a.getAttribute('href').slice(1));if(s)secs.push([s,a])});
+function mark(){
+  tick=0;var y=window.innerHeight*.4,cur=null;
+  secs.forEach(function(p){var r=p[0].getBoundingClientRect();if(r.top<=y&&r.bottom>y)cur=p[1]});
+  links.forEach(function(a){if(a===cur)a.setAttribute('aria-current','true');else a.removeAttribute('aria-current')});
+}
+if(secs.length){
+  window.addEventListener('scroll',function(){if(!tick)tick=requestAnimationFrame(mark)},{passive:true});
+  window.addEventListener('resize',mark);
+  mark();
 }
 
 /* Scroll-in reveals. What is already on screen at load shows at once, with no fade. Everything
