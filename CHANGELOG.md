@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A 20-second film, at the top of the README and in the first section of the
+  site. On the site it plays muted while it is on screen. **Watch with sound**
+  starts it again from the beginning, with the narration. In full screen it
+  has captions.
+  `assets/film/` holds its source, and `assets/film/build.sh` makes it again
+  in a container with pinned versions and no network.
+
+### Changed
+
+- Both terminal demos are recorded again on 1.6.1. `assets/record-demo.sh`
+  builds its sandbox at the fixed path `/tmp/aidentity-demo`, so the
+  recordings always show the same short path. The command-line tape waits for
+  each command to finish, and the menu tape waits for each screen, before they
+  type the next step.
+
 ## [1.6.1] - 2026-10-27
 
 ### Fixed
