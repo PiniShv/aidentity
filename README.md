@@ -6,7 +6,7 @@
 
 ### Stop signing out to switch accounts.
 
-**Run your work, personal and client accounts side by side. Each one stays signed in.**
+**One app, every account, all open at once. Each one stays signed in.**
 
 Built for AI desktop apps like Claude and ChatGPT. Also tested with Slack, VS Code, Cursor, Notion and other apps built on Chromium, the engine inside Google Chrome. [See the list](#which-apps-work).
 
@@ -21,7 +21,9 @@ Built for AI desktop apps like Claude and ChatGPT. Also tested with Slack, VS Co
 curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash
 ```
 
-<img src="assets/demo.gif" alt="Terminal demo: aidentity creates Claude and ChatGPT profiles, then renames, recolours, removes and restores one" width="800">
+<a href="https://aidentity.pinishv.com/assets/film.mp4"><img src="assets/film-poster.jpg" alt="Play the 20-second film, with sound: the same chat app open three times at once, one window for each account, each one signed in" width="800"></a>
+
+<sub>A 20-second film, with sound. Click to play.</sub>
 
 </div>
 
@@ -65,6 +67,12 @@ aidentity export > profiles.json                   # save your launchers; "aiden
 aidentity doctor --fix                             # check and repair
 aidentity help rm                                  # options for one command (also: rm --help)
 ```
+
+<div align="center">
+
+<img src="assets/demo.gif" alt="Terminal demo: aidentity creates Claude and ChatGPT profiles, then renames, recolours, removes and restores one" width="800">
+
+</div>
 
 Moving to another Mac? `aidentity export > profiles.json` saves how each launcher looks and starts, and `aidentity import profiles.json` builds them there. The file holds no account data, so each profile starts signed out. It does hold launch settings such as proxy values, so keep it private. `export` warns on standard error when it finds variable values, or a password in a switch. [More](docs/guide.md#aidentity-export)
 
