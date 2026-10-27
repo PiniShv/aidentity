@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>aidentity film</title>
+<style>
+  @font-face { font-family: "AidSans"; src: url("fonts/Inter-Regular.otf"); font-weight: 400; }
+  @font-face { font-family: "AidSans"; src: url("fonts/Inter-Medium.otf"); font-weight: 500; }
+  @font-face { font-family: "AidSans"; src: url("fonts/Inter-SemiBold.otf"); font-weight: 600; }
+  @font-face { font-family: "AidSans"; src: url("fonts/Inter-Bold.otf"); font-weight: 700; }
+  :root { --text:#F5F7FB; --muted:#A1A9B8; --ok:#4ADE80; --blue:#1D4ED8; --green:#15803D; --purple:#6D28D9; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; background: #000; overflow: hidden; }
+  body { font-family: "AidSans", sans-serif; color: var(--text); }
+  #root { position: relative; width: 1280px; height: 720px; overflow: hidden; background: #000; }
+  .clip { position: absolute; inset: 0; }
+  .abs { position: absolute; }
+  .center { left: 0; right: 0; text-align: center; }
+
+  /* Soft colour that drifts behind everything. */
+  .aura { position: absolute; width: 1100px; height: 1100px; border-radius: 50%; }
+  #aura1 { left: -380px; top: -520px; background: radial-gradient(circle, rgba(46,125,246,.30), rgba(46,125,246,0) 62%); }
+  #aura2 { left: 560px; top: -260px; background: radial-gradient(circle, rgba(34,211,238,.20), rgba(34,211,238,0) 60%); }
+  #aura3 { left: 120px; top: 120px; background: radial-gradient(circle, rgba(139,92,246,.18), rgba(139,92,246,0) 60%); }
+  #stage { position: absolute; inset: 0; }
+
+  .h1 { font-size: 72px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05; }
+  .h2 { font-size: 48px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+  .grad { background: linear-gradient(90deg, #4F8DFB 0%, #38BDF8 45%, #A78BFA 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* A window, drawn with depth: glass, a fine edge, a long soft shadow. */
+  .win { position: absolute; width: 520px; height: 340px; border-radius: 16px; overflow: hidden;
+    background: linear-gradient(180deg, rgba(30,38,56,.96), rgba(20,26,40,.96));
+    border: 1px solid rgba(255,255,255,.10); box-shadow: 0 50px 110px -30px rgba(0,0,0,.85), 0 0 0 1px rgba(0,0,0,.4); }
+  .bar { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .d1 { background: #FF5F57; } .d2 { background: #FEBC2E; } .d3 { background: #28C840; }
+  .bar .t { margin-left: 10px; font-size: 19px; font-weight: 600; color: #C9D1DE; }
+  .side { position: absolute; left: 0; top: 44px; bottom: 0; width: 36%; border-right: 1px solid rgba(255,255,255,.06); padding: 18px 16px; }
+  .main { position: absolute; left: 36%; right: 0; top: 44px; bottom: 0; padding: 20px; }
+  .who { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 19px; color: #fff; }
+  .av.w { background: var(--blue); } .av.p { background: var(--green); } .av.c { background: var(--purple); }
+  .who .n { font-size: 20px; font-weight: 600; }
+  .row { height: 11px; border-radius: 6px; background: rgba(255,255,255,.10); margin: 14px 0; }
+  .bub { height: 28px; border-radius: 14px; background: rgba(255,255,255,.08); margin-bottom: 12px; }
+  .bub.me { background: rgba(56,189,248,.28); margin-left: auto; }
+  .pill { position: absolute; right: 14px; top: 8px; font-size: 19px; font-weight: 600; color: var(--ok);
+    background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.35); border-radius: 999px; padding: 2px 12px; opacity: 0; }
+
+  .term { position: absolute; left: 290px; top: 300px; width: 700px; border-radius: 16px; overflow: hidden; opacity: 0;
+    background: rgba(18,22,32,.92); border: 1px solid rgba(255,255,255,.10); box-shadow: 0 50px 110px -30px rgba(0,0,0,.85); }
+  .term pre { font-family: "DejaVu Sans Mono", monospace; font-size: 22px; line-height: 1.7; padding: 20px 26px 24px; color: #E8ECF3; }
+  .typed { display: inline-block; overflow: hidden; white-space: nowrap; vertical-align: bottom; width: 0; }
+  .ps { color: #38BDF8; }
+  .okline { color: var(--ok); opacity: 0; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="root" data-width="1280" data-height="720" data-start="0" data-duration="19.5">
+ <div class="aura" id="aura1"></div><div class="aura" id="aura2"></div><div class="aura" id="aura3"></div>
+ <div id="stage">
+
+  <!-- 1. Meet aidentity -->
+  <div id="s1" class="clip" data-start="0" data-duration="3.1">
+    <img id="logo" src="logo.svg" alt="" style="position:absolute; left:50%; width:132px; height:132px; margin-left:-66px; top:200px">
+    <div class="abs center h1" id="name" style="top:356px"><span class="grad">aidentity</span></div>
+  </div>
+
+  <!-- 2. Every account, open at once -->
+  <div id="s2" class="clip" data-start="2.9" data-duration="3.4">
+    <div class="abs center h2" id="l2a" style="top:64px; opacity:0">Every account you use.</div>
+    <div class="abs center h2 grad" id="l2b" style="top:122px; opacity:0">Open at once.</div>
+    <div class="win" id="wC" style="left:150px; top:262px; opacity:0">
+      <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat Client</span></div>
+      <div class="side"><div class="who"><div class="av c">C</div><div class="n">Client</div></div><div class="row" style="width:80%"></div><div class="row" style="width:62%"></div></div>
+      <div class="main"><div class="bub" style="width:66%"></div><div class="bub me" style="width:44%"></div></div>
+    </div>
+    <div class="win" id="wP" style="left:610px; top:262px; opacity:0">
+      <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat Personal</span></div>
+      <div class="side"><div class="who"><div class="av p">P</div><div class="n">Personal</div></div><div class="row" style="width:58%"></div><div class="row" style="width:84%"></div></div>
+      <div class="main"><div class="bub" style="width:54%"></div><div class="bub me" style="width:48%"></div></div>
+    </div>
+    <div class="win" id="wW" style="left:380px; top:330px; opacity:0">
+      <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat</span></div>
+      <div class="side"><div class="who"><div class="av w">W</div><div class="n">Work</div></div><div class="row" style="width:88%"></div><div class="row" style="width:70%"></div><div class="row" style="width:76%"></div></div>
+      <div class="main"><div class="bub" style="width:62%"></div><div class="bub me" style="width:50%"></div><div class="bub" style="width:70%"></div></div>
+    </div>
+  </div>
+
+  <!-- 3. Each in its own window -->
+  <div id="s3" class="clip" data-start="6.1" data-duration="3.9">
+    <div class="abs center h2" id="l3a" style="top:64px; opacity:0">Each in its own window.</div>
+    <div class="abs center h2 grad" id="l3b" style="top:122px; opacity:0">Each one signed in.</div>
+    <div class="win" id="sW" style="left:90px; top:262px; width:540px; opacity:0">
+      <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat</span><span class="pill" id="pW">● Signed in</span></div>
+      <div class="side"><div class="who"><div class="av w">W</div><div class="n">Work</div></div><div class="row" style="width:88%"></div><div class="row" style="width:70%"></div><div class="row" style="width:76%"></div></div>
+      <div class="main"><div class="bub" style="width:62%"></div><div class="bub me" style="width:50%"></div><div class="bub" style="width:70%"></div></div>
+    </div>
+    <div class="win" id="sP" style="left:650px; top:262px; width:540px; opacity:0">
+      <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat Personal</span><span class="pill" id="pP">● Signed in</span></div>
+      <div class="side"><div class="who"><div class="av p">P</div><div class="n">Personal</div></div><div class="row" style="width:58%"></div><div class="row" style="width:84%"></div></div>
+      <div class="main"><div class="bub" style="width:54%"></div><div class="bub me" style="width:48%"></div><div class="bub" style="width:60%"></div></div>
+    </div>
+  </div>
+
+  <!-- 4. One command -->
+  <div id="s4" class="clip" data-start="9.9" data-duration="3.0">
+    <div class="abs center h2" id="l4" style="top:150px; opacity:0">Set it up with <span class="grad">one command.</span></div>
+    <div class="term" id="term">
+<pre><span class="ps">$ </span><span class="typed" id="typed">aidentity add Chat --profile Personal</span>
+<span class="okline" id="ok">✓ Created Chat Personal</span></pre>
+    </div>
+  </div>
+
+  <!-- 5. No copies. No signing out. -->
+  <div id="s5" class="clip" data-start="12.7" data-duration="2.9">
+    <div class="abs center h1" id="l5a" style="top:240px; opacity:0">No copies.</div>
+    <div class="abs center h1 grad" id="l5b" style="top:330px; opacity:0">No signing out.</div>
+  </div>
+
+  <!-- 6. End card -->
+  <div id="s6" class="clip" data-start="15.3" data-duration="4.2">
+    <img id="logo2" src="logo.svg" alt="" style="position:absolute; left:50%; width:116px; height:116px; margin-left:-58px; top:150px; opacity:0">
+    <div class="abs center h1" id="name2" style="top:290px; opacity:0"><span class="grad">aidentity</span></div>
+    <div class="abs center h2" id="tag" style="top:388px; opacity:0">Free, for your Mac.</div>
+    <div class="abs center" id="foot" style="top:478px; opacity:0; font-size:22px; font-weight:500; color:#A1A9B8">Open source · <span style="font-family:'DejaVu Sans Mono',monospace; font-size:21px; color:#E8ECF3">brew install pinishv/tap/aidentity</span></div>
+  </div>
+
+ </div>
+</div>
+<script src="vendor/gsap.min.js"></script>
+<script>
+  const tl = gsap.timeline({ paused: true });
+  const rise = (sel, at, d = 0.8) => tl.fromTo(sel, { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: d, ease: "power3.out" }, at);
+  const leave = (sel, at, d = 0.5) => tl.to(sel, { opacity: 0, y: -12, duration: d, ease: "power2.in" }, at);
+
+  // The aura drifts slowly for the whole film.
+  tl.fromTo("#aura1", { x: 0, y: 0 }, { x: 220, y: 90, duration: 19.5, ease: "sine.inOut" }, 0);
+  tl.fromTo("#aura2", { x: 0, y: 0 }, { x: -260, y: 120, duration: 19.5, ease: "sine.inOut" }, 0);
+  tl.fromTo("#aura3", { x: 0, y: 0, scale: 0.9 }, { x: 140, y: -80, scale: 1.1, duration: 19.5, ease: "sine.inOut" }, 0);
+
+  // 1. Meet aidentity: on screen from the first frame, settling in.
+  tl.fromTo("#logo", { opacity: 1, scale: 0.92, y: 10 }, { scale: 1, y: 0, duration: 1.4, ease: "power3.out" }, 0);
+  tl.fromTo("#name", { opacity: 1, y: 12 }, { y: 0, duration: 1.4, ease: "power3.out" }, 0);
+  tl.to(["#logo", "#name"], { opacity: 0, scale: 0.97, duration: 0.6, ease: "power2.in" }, 2.5);
+
+  // 2. Every account you use. Open at once.
+  rise("#l2a", 3.05);
+  tl.fromTo("#wW", { opacity: 0, y: 70, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 1.0, ease: "power3.out" }, 3.3);
+  tl.fromTo("#wP", { opacity: 0, y: 70, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 1.0, ease: "power3.out" }, 3.5);
+  tl.fromTo("#wC", { opacity: 0, y: 70, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 1.0, ease: "power3.out" }, 3.7);
+  rise("#l2b", 4.4);
+  leave(["#l2a", "#l2b", "#wC", "#wP", "#wW"], 5.8);
+
+  // 3. Each in its own window. Each one signed in.
+  rise("#l3a", 6.2);
+  tl.fromTo("#sW", { opacity: 0, x: -50 }, { opacity: 1, x: 0, duration: 1.0, ease: "power3.out" }, 6.25);
+  tl.fromTo("#sP", { opacity: 0, x: 50 }, { opacity: 1, x: 0, duration: 1.0, ease: "power3.out" }, 6.35);
+  rise("#l3b", 7.6);
+  tl.fromTo("#pW", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.8)" }, 7.65);
+  tl.fromTo("#pP", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.8)" }, 7.8);
+  leave(["#l3a", "#l3b", "#sW", "#sP"], 9.6);
+
+  // 4. Set it up with one command.
+  rise("#l4", 10.1);
+  tl.fromTo("#term", { opacity: 0, y: 40, scale: 0.97 }, { opacity: 1, y: 0, scale: 1, duration: 0.9, ease: "power3.out" }, 10.2);
+  tl.to("#typed", { width: 515, duration: 1.0, ease: "steps(38)" }, 10.55);
+  tl.to("#ok", { opacity: 1, duration: 0.4 }, 11.7);
+  leave(["#l4", "#term"], 12.45);
+
+  // 5. No copies. No signing out.
+  rise("#l5a", 12.85, 0.7);
+  rise("#l5b", 13.8, 0.7);
+  leave(["#l5a", "#l5b"], 15.0);
+
+  // 6. End card.
+  tl.fromTo("#logo2", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 1.0, ease: "power3.out" }, 15.4);
+  rise("#name2", 15.55, 0.9);
+  rise("#tag", 16.45, 0.8);
+  rise("#foot", 17.0, 0.8);
+  tl.set({}, {}, 19.5);
+  window.__timelines = window.__timelines || {};
+  window.__timelines["root"] = tl;
+</script>
+</body>
+</html>
