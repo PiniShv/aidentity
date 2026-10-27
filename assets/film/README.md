@@ -1,9 +1,10 @@
 # The product film
 
-The source of the 19.5-second film on the site, with its sound and its two
-posters. It is a build tool for the repository, not part of the installed
-tool: `aidentity`, `install.sh` and the Homebrew formula never fetch or run
-anything from this folder.
+The source of the 19.5-second film on the site, with its sound, its two
+posters and the card shown when a link to the site is shared. It is a build
+tool for the repository, not part of the installed tool: `aidentity`,
+`install.sh` and the Homebrew formula never fetch or run anything from this
+folder.
 
 ## Rebuild it
 
@@ -21,9 +22,11 @@ network off. The script copies the results into place:
 |---|---|
 | `site/assets/film.mp4`, `film.webm` | the site player |
 | `site/assets/film-poster.jpg` | the site, before play |
+| `site/assets/og.png` | the card shown when a link to the site is shared |
 | `assets/film-poster.jpg` | the README, with a play button drawn on it |
 
-Watch the film with sound and look at both posters before you commit them.
+Watch the film with sound and look at both posters and the card before you
+commit them.
 
 - `--rebuild` builds the image again first.
 - `FILM_KEEP=some/folder bash assets/film/build.sh` also keeps every output
@@ -41,6 +44,7 @@ Watch the film with sound and look at both posters before you commit them.
 | File | What it does |
 |---|---|
 | `index.html` | The film: a 1280x720 page, animated with a GSAP timeline |
+| `og.html` | The card for shared links: a 1200x630 page |
 | `narration.py` | The six spoken lines, made with Kokoro, offline |
 | `music.py` | The music, written in code from fixed seeds, and the mix with the narration |
 | `master.py` | Gain and a true-peak limiter |
@@ -66,6 +70,7 @@ The steps in `render.sh`:
    settings, versions or dates.
 7. The site poster: the frame at 8.9 s.
 8. The README poster: the frame at 8.9 s, with a play button on it.
+9. The card for shared links: `og.html`, drawn by the same Chromium.
 
 ## What is pinned, and why
 
@@ -86,8 +91,9 @@ change under it.
 Not pinned: the Debian packages (ffmpeg 5.1.9, Chromium 156, Inter 4.0~beta7,
 librsvg 2.54.7 when this was written). They come from Debian 12 when the image
 is built, so a later build can take newer security updates, and the video bytes
-can then differ. To get the same bytes again, keep the built image and run it
-on a machine with the same number of CPUs: the H.264 output depends on it.
+can then differ. Even with the same image, the video bytes change a little from
+run to run: Chromium's drawing is not bit-exact, though the difference cannot
+be seen. The sound comes out the same, sample for sample.
 
 ## No network while rendering
 

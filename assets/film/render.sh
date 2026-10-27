@@ -10,6 +10,7 @@
 #   film.mp4  film.webm        the film, 1280x720, 19.5 s, with sound
 #   film-poster.jpg            the poster the site shows before play
 #   readme-poster.jpg          the README poster, with a play button
+#   og.png                     the card shown when a link to the site is shared
 #   film-mix.wav               the finished sound, for checking by ear
 set -euo pipefail
 
@@ -131,10 +132,19 @@ rsvg-convert -w 1280 -h 720 play.svg -o play.png
 ff -ss 8.9 -i film.mp4 -i play.png -filter_complex "overlay=0:0" "${clean[@]}" \
   -frames:v 1 -q:v 3 readme-poster.jpg
 
-cp film.mp4 film.webm film-poster.jpg readme-poster.jpg "$OUT/"
+# 9. The card shown when a link to the site is shared: og.html at 1200x630,
+# drawn by the same Chromium with the same fonts and logo as the film.
+step "Social card"
+cp "$HERE/og.html" "$P/og.html"
+chromium --headless --no-sandbox --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+  --virtual-time-budget=4000 --window-size=1200,630 --screenshot="$W/og.png" "file://$P/og.html" \
+  >/dev/null 2>&1
+[ -s og.png ] || { echo "Chromium wrote no og.png." >&2; exit 1; }
+
+cp film.mp4 film.webm film-poster.jpg readme-poster.jpg og.png "$OUT/"
 
 step "Done"
-for f in film.mp4 film.webm film-poster.jpg readme-poster.jpg film-mix.wav; do
+for f in film.mp4 film.webm film-poster.jpg readme-poster.jpg og.png film-mix.wav; do
   printf '  %-18s %s bytes\n' "$f" "$(wc -c < "$OUT/$f" | tr -d ' ')"
 done
 for f in film.mp4 film.webm; do
