@@ -29,6 +29,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each command to finish, and the menu tape waits for each screen, before they
   type the next step.
 
+### Fixed
+
+- `rename` moves the old launcher aside before it deletes it, as `rm` does.
+  When a file inside the old launcher was locked, it was left without its
+  Info.plist. aidentity no longer recognised it, so `rm` refused to remove it.
+  Now a locked file is left out of the way in a hidden folder, and the message
+  names that folder. A launcher that cannot be moved at all is left whole.
+- The uninstaller counts a launcher wherever Spotlight finds it, as `prune`
+  and `rm --purge` do. It left out a launcher kept outside your home folder
+  and the app folders, listed that launcher's profile data as data no
+  launcher uses, and moved it to the Trash. The launcher then opened signed
+  out. Such a launcher is now listed with the others and removed with them.
+- `add` refuses `--` like any other option it does not know. It used to read
+  `--` as the end of its options and ignore every word after it without
+  saying so.
+
 ## [1.6.1] - 2026-10-27
 
 ### Fixed
