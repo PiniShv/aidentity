@@ -39,6 +39,11 @@ assert_contains "an unknown command says which one" "$RUN_OUT" "definitely-not-a
 
 ai add --no-such-flag
 assert_rc_nonzero "an unknown option for add exits non-zero" "$RUN_RC" "$RUN_OUT"
+ai add "$ELECTRON_APP" --profile Dashes -- junk
+assert_rc_nonzero "add refuses -- instead of ignoring what follows it" "$RUN_RC" "$RUN_OUT"
+assert_contains "and names it as an unknown option" "$RUN_OUT" "Unknown option for add: --"
+assert_no_dir "no launcher is built for it" "$APPS/Fake Dashes.app"
+assert_no_dir "no profile directory is created for it" "$DATA/fake-dashes"
 ai rm --no-such-flag
 assert_rc_nonzero "an unknown option for rm exits non-zero" "$RUN_RC" "$RUN_OUT"
 
