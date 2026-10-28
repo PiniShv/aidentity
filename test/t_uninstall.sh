@@ -11,11 +11,17 @@
 group "uninstall.sh end to end, every search path in the sandbox"
 
 # AIDENTITY_BIN_DIRS keeps it from finding a real installed copy; HOME and
-# AIDENTITY_APP_DIRS keep its launcher search inside the sandbox. HOME also
+# AIDENTITY_APP_DIRS keep its launcher search inside the sandbox, and a stub
+# mdfind keeps Spotlight out of it: the real one would hand these tests the
+# developer's own launchers, and `delete` removes launchers for good. The
+# Spotlight cases below write the hits they need into the same stub. HOME also
 # keeps the Trash it moves profile data to in the sandbox.
 UN_BIN="$SB/un-bin"
 UN_TRASH="$SANDBOX/tty-home/.Trash"
-mkdir -p "$UN_BIN"
+UN_MDFIND="$SANDBOX/stub-un-mdfind"
+mkdir -p "$UN_BIN" "$UN_MDFIND"
+printf '#!/bin/sh\nexit 0\n' > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
 trash_reset
 un_prepare() {
   cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
@@ -24,7 +30,7 @@ un_prepare() {
 }
 un_tty() { # typed input
   RUN_OUT=$( { { sleep 0.3; printf '%b' "$1"; sleep 1; } \
-      | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$PATH" \
+      | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$UN_MDFIND:$PATH" \
         script -q /dev/null "$BASH_BIN" "$REPO_DIR/uninstall.sh"
       echo "__rc=${PIPESTATUS[1]}"; } 2>&1 | tr -d '\r')
   RUN_RC=${RUN_OUT##*__rc=}
@@ -41,7 +47,7 @@ assert_file "the data stays" "$DATA/fake-bye/Cookies"
 assert_contains "the prompt says the data goes to the Trash" "$RUN_OUT" "moves the profile data listed above to the Trash"
 
 cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
-RUN_OUT=$(HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" detached "$BASH_BIN" "$REPO_DIR/uninstall.sh" 2>&1 </dev/null); RUN_RC=$?
+RUN_OUT=$(HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$UN_MDFIND:$PATH" detached "$BASH_BIN" "$REPO_DIR/uninstall.sh" 2>&1 </dev/null); RUN_RC=$?
 assert_rc_nonzero "with no terminal to confirm on, it exits non-zero" "$RUN_RC" "$RUN_OUT"
 assert_dir "and deletes no launcher" "$APPS/Fake Bye.app"
 
@@ -141,7 +147,7 @@ un_tty_late() { # command to run once the question is on screen, typed input
   : > "$out"
   { while ! grep -q 'to remove them, or anything else' "$out" && [ "$n" -lt 100 ]; do sleep 0.1; n=$((n + 1)); done
     eval "$1"; printf '%b' "$2"; sleep 1; } \
-    | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$PATH" \
+    | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$UN_MDFIND:$PATH" \
       script -q /dev/null "$BASH_BIN" "$REPO_DIR/uninstall.sh" > "$out" 2>&1
   RUN_RC=${PIPESTATUS[1]}
   RUN_OUT=$(tr -d '\r' < "$out")
@@ -186,16 +192,14 @@ trash_reset
 # A launcher in the Trash is on its way out: it is not counted, listed or
 # deleted, even when Spotlight still knows it. rm -rf there would empty that
 # part of the Trash for good. A volume's Trash (.Trashes) is the same.
-UN_MDFIND="$SANDBOX/stub-un-mdfind"
 UN_VOL_TRASH="$APPS/.Trashes/$(id -u)"
-mkdir -p "$UN_MDFIND"
 printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_TRASH/Fake Bye.app' '$UN_VOL_TRASH/Fake Bye.app'" > "$UN_MDFIND/mdfind"
 chmod +x "$UN_MDFIND/mdfind"
 un_prepare
 mkdir -p "$UN_TRASH" "$UN_VOL_TRASH"
 cp -R "$APPS/Fake Bye.app" "$UN_TRASH/"
 cp -R "$APPS/Fake Bye.app" "$UN_VOL_TRASH/"
-PATH="$UN_MDFIND:$PATH" un_tty 'delete\n'
+un_tty 'delete\n'
 assert_rc "an uninstall with launchers in the Trash exits 0" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "only the launcher outside the Trash is counted" "$RUN_OUT" "deletes 1 launcher(s)"
 assert_not_contains "the one in the Trash is not listed" "$RUN_OUT" "$UN_TRASH/Fake Bye.app"
@@ -203,7 +207,135 @@ assert_not_contains "nor the one in a volume's Trash" "$RUN_OUT" ".Trashes"
 assert_file "the one in the Trash is still there" "$UN_TRASH/Fake Bye.app/Contents/Info.plist"
 assert_file "and so is the one in a volume's Trash" "$UN_VOL_TRASH/Fake Bye.app/Contents/Info.plist"
 assert_no_dir "the launcher outside the Trash is removed" "$APPS/Fake Bye.app"
+printf '#!/bin/sh\nexit 0\n' > "$UN_MDFIND/mdfind"
 rm -rf "$APPS/.Trashes"
+mkdir -p "$DATA"
+trash_reset
+
+# A launcher Spotlight finds outside the launcher folder, the home folder and
+# the app folders (a shared folder, another disk, a backup copy) is not the
+# uninstaller's to delete. It is listed, and it and its data stay. Its data is
+# still a launcher's, so it is never listed as no launcher's and moved: the
+# launcher would open signed out.
+UN_OUT="$SANDBOX/elsewhere"
+un_prepare
+ai add "$ELECTRON_APP" --profile Away
+printf 'session\n' > "$DATA/fake-away/Cookies"
+mkdir -p "$UN_OUT"
+mv "$APPS/Fake Away.app" "$UN_OUT/"
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_OUT/Fake Away.app'" > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
+un_tty 'delete\n'
+assert_rc "an uninstall with a launcher found elsewhere exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the launcher found elsewhere is listed as not removed" "$RUN_OUT" "Found elsewhere, not removed"
+assert_contains "with its path" "$RUN_OUT" "    launcher  $UN_OUT/Fake Away.app"
+assert_contains "only the usual launcher is counted" "$RUN_OUT" "deletes 1 launcher(s)"
+assert_not_contains "its data is not listed as no launcher's" "$RUN_OUT" "Profile data no launcher points at"
+assert_no_dir "the usual launcher is removed" "$APPS/Fake Bye.app"
+assert_dir "the launcher found elsewhere stays" "$UN_OUT/Fake Away.app"
+assert_file "and so does its data, in the data root" "$DATA/fake-away/Cookies"
+assert_no_dir "none of it went to the Trash" "$UN_TRASH/fake-away"
+assert_contains "the end names it" "$RUN_OUT" "Found elsewhere, not removed: $UN_OUT/Fake Away.app"
+assert_not_contains "and does not claim it is all gone" "$RUN_OUT" "aidentity is gone"
+printf '#!/bin/sh\nexit 0\n' > "$UN_MDFIND/mdfind"
+rm -rf "$UN_OUT" "$DATA/fake-away"
+mkdir -p "$DATA"
+trash_reset
+
+# A usual launcher that shares its folder with a launcher found elsewhere is
+# removed, and the folder stays for the other one. The list says so before
+# the question.
+un_prepare
+mkdir -p "$UN_OUT"
+cp -R "$APPS/Fake Bye.app" "$UN_OUT/Fake Twin.app"
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_OUT/Fake Twin.app'" > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
+un_tty 'delete\n'
+assert_no_dir "the usual launcher that shares a folder is removed" "$APPS/Fake Bye.app"
+assert_contains "the list says its data is kept" "$RUN_OUT" "used by a launcher found elsewhere — will be KEPT"
+assert_file "the shared folder is where it was" "$DATA/fake-bye/Cookies"
+assert_no_dir "and not in the Trash" "$UN_TRASH/fake-bye"
+assert_dir "the launcher found elsewhere stays" "$UN_OUT/Fake Twin.app"
+printf '#!/bin/sh\nexit 0\n' > "$UN_MDFIND/mdfind"
+rm -rf "$UN_OUT" "$DATA/fake-bye"
+mkdir -p "$DATA"
+trash_reset
+
+# Only a launcher found elsewhere, and nothing else to remove: it is listed,
+# nothing is asked, and nothing is removed.
+un_prepare
+mkdir -p "$UN_OUT"
+mv "$APPS/Fake Bye.app" "$UN_OUT/"
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_OUT/Fake Bye.app'" > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
+un_tty 'delete\n'
+assert_rc "with only a launcher found elsewhere, it exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "it is listed" "$RUN_OUT" "    launcher  $UN_OUT/Fake Bye.app"
+assert_not_contains "nothing is asked" "$RUN_OUT" "to remove them, or anything else"
+assert_dir "the launcher stays" "$UN_OUT/Fake Bye.app"
+assert_file "and so does its data" "$DATA/fake-bye/Cookies"
+assert_not_contains "and the end does not claim it is all gone" "$RUN_OUT" "aidentity is gone"
+printf '#!/bin/sh\nexit 0\n' > "$UN_MDFIND/mdfind"
+rm -rf "$UN_OUT" "$DATA/fake-bye"
+mkdir -p "$DATA"
+trash_reset
+
+# A launcher found elsewhere whose data is outside the data root: the data
+# root empties and goes, and the launcher still keeps "gone" from being said.
+un_prepare
+ai add "$ELECTRON_APP" --profile Away
+rm -rf "$DATA/fake-away"
+mkdir -p "$UN_OUT" "$SB/outside-away"
+mv "$APPS/Fake Away.app" "$UN_OUT/"
+/usr/libexec/PlistBuddy -c "Set :AIdentityDataDir $SB/outside-away" \
+  "$UN_OUT/Fake Away.app/Contents/Info.plist" >/dev/null 2>&1
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_OUT/Fake Away.app'" > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
+un_tty 'delete\n'
+assert_no_dir "the data root is emptied and removed" "$DATA"
+assert_dir "the launcher found elsewhere stays" "$UN_OUT/Fake Away.app"
+assert_not_contains "and the end does not claim it is all gone" "$RUN_OUT" "aidentity is gone"
+printf '#!/bin/sh\nexit 0\n' > "$UN_MDFIND/mdfind"
+rm -rf "$UN_OUT" "$SB/outside-away"
+mkdir -p "$DATA"
+trash_reset
+
+# The launcher folder is a symlink to another disk, and Spotlight knows the
+# launcher by its real path. It is one launcher: listed once, under the
+# launcher folder, and removed with its data.
+UN_LINK="$SB/apps-link"
+un_prepare
+mkdir -p "$UN_OUT"
+mv "$APPS/Fake Bye.app" "$UN_OUT/"
+ln -s "$UN_OUT" "$UN_LINK"
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_OUT/Fake Bye.app'" > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
+AIDENTITY_APPS_DIR="$UN_LINK" un_tty 'delete\n'
+assert_eq "a launcher in a symlinked launcher folder is listed once" 1 \
+  "$(printf '%s\n' "$RUN_OUT" | grep -c '^    launcher  ')"
+assert_contains "and counted once" "$RUN_OUT" "deletes 1 launcher(s)"
+assert_not_contains "not as found elsewhere" "$RUN_OUT" "Found elsewhere"
+assert_not_contains "and its data is not kept for it" "$RUN_OUT" "will be KEPT"
+assert_no_dir "the launcher is removed" "$UN_OUT/Fake Bye.app"
+assert_file "and its data goes to the Trash" "$UN_TRASH/fake-bye/Cookies"
+printf '#!/bin/sh\nexit 0\n' > "$UN_MDFIND/mdfind"
+rm -f "$UN_LINK"
+rm -rf "$UN_OUT"
+mkdir -p "$DATA"
+trash_reset
+
+# A launcher that is itself a symlink, to a launcher filed in a folder, is a
+# launcher of its own: both are listed and removed. rm on the symlink alone
+# would leave the one it points at.
+un_prepare
+mkdir -p "$APPS/Filed"
+mv "$APPS/Fake Bye.app" "$APPS/Filed/"
+ln -s "$APPS/Filed/Fake Bye.app" "$APPS/Fake Bye.app"
+un_tty 'delete\n'
+assert_contains "a symlinked launcher and the one it points at are both counted" "$RUN_OUT" "deletes 2 launcher(s)"
+assert_no_dir "the one it points at is removed too" "$APPS/Filed/Fake Bye.app"
+assert_file "and the data goes to the Trash" "$UN_TRASH/fake-bye/Cookies"
+rm -rf "$APPS/Filed" "$APPS/Fake Bye.app"
 mkdir -p "$DATA"
 trash_reset
 
