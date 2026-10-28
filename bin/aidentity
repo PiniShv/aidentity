@@ -2219,7 +2219,6 @@ cmd_add() {
 }env$TAB$2"; shift 2 ;;
       --own-extensions) extras="${extras:+$extras
 }ext${TAB}1"; shift ;;
-      --)           shift; break ;;
       -*)           die "Unknown option for add: $1" ;;
       *)            [ -z "$app_arg" ] && app_arg="$1" || die "Unexpected argument: $1"; shift ;;
     esac
