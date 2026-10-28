@@ -4429,8 +4429,9 @@ cmd_update() {
 # why a resize can redraw at once.
 
 UI_ESC=$'\033'
-# The colours `set --color` takes by name, in the order the picker shows them.
-UI_COLORS="blue green orange purple teal pink red yellow gray graphite"
+# The colours the picker offers: COLOR_NAMES without the aliases (grey, black),
+# which it does not need to offer twice. Derived so a new colour reaches it.
+UI_COLORS=${COLOR_NAMES/ grey/}; UI_COLORS=${UI_COLORS/ black/}
 
 UI_ACTIVE=0     # 1 while the menu owns the terminal: alternate screen, no echo
 UI_BUSY=0       # 1 while a command runs for the menu
