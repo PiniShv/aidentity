@@ -207,6 +207,27 @@ rm -rf "$APPS/.Trashes"
 mkdir -p "$DATA"
 trash_reset
 
+# A launcher kept outside the home folder and the app folders counts wherever
+# Spotlight finds it, as prune and rm --purge count it. Leaving it out listed
+# its data as no launcher's and moved it to the Trash: it opened signed out.
+UN_OUT="$SANDBOX/elsewhere"
+un_prepare
+mkdir -p "$UN_OUT"
+cp -R "$APPS/Fake Bye.app" "$UN_OUT/"
+rm -rf "$APPS/Fake Bye.app"
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_OUT/Fake Bye.app'" > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
+PATH="$UN_MDFIND:$PATH" un_tty 'delete\n'
+assert_rc "an uninstall with a launcher kept elsewhere exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the launcher kept elsewhere is counted" "$RUN_OUT" "deletes 1 launcher(s)"
+assert_contains "and listed" "$RUN_OUT" "$UN_OUT/Fake Bye.app"
+assert_not_contains "its data is not listed as no launcher's" "$RUN_OUT" "Profile data no launcher points at"
+assert_no_dir "the launcher kept elsewhere is removed" "$UN_OUT/Fake Bye.app"
+assert_contains "its data goes to the Trash as the launcher's" "$RUN_OUT" "Moved the data for Fake Bye to the Trash"
+rm -rf "$UN_OUT"
+mkdir -p "$DATA"
+trash_reset
+
 # A launcher made for a listed folder while the question waited (here by
 # restore) keeps that folder: it is asked again before the move. Another
 # folder no launcher uses still goes to the Trash.
