@@ -484,8 +484,11 @@ EOF
 # profile directories in the data root that no launcher points at. Those hold
 # signed-in sessions too — left by a launcher deleted in Finder, or by
 # `aidentity rm` without --purge — and leaving them behind while saying
-# "aidentity is gone" was not true.
+# "aidentity is gone" was not true. ELSEWHERE / ELSEWHERE_DATA hold the
+# launchers found outside the usual places, and their data: listed, never
+# removed or moved.
 LAUNCHERS=(); LABELS=(); PROFILES=(); DATA_DIRS=(); ORPHANS=()
+ELSEWHERE=(); ELSEWHERE_DATA=()
 
 # Things kept on purpose or by failure (a Homebrew copy, a locked launcher,
 # data outside the root or in use). "aidentity is gone" is said only at zero.
@@ -494,14 +497,16 @@ LEFT_BEHIND=0
 # Profile folders moved to the Trash, for the note on how to put one back.
 MOVED_DATA=0
 
-# Every aidentity launcher worth removing, one path per line: the launcher
-# directory and folders inside it (followed with -H when it is a symlink), the
-# app folders (AIDENTITY_APP_DIRS, as aidentity itself searches them), and what
-# Spotlight knows inside those places or your home folder. Looking only at the
-# top of the launcher directory listed a filed-away launcher's data as "no
-# launcher points at" and deleted it while the launcher stayed. Our own hidden
-# .aidentity-* folders and the Trash are skipped. Every hit is still checked
-# for the marker key before it is listed.
+# Every aidentity launcher, one path per line: the launcher directory and
+# folders inside it (followed with -H when it is a symlink), the app folders
+# (AIDENTITY_APP_DIRS, as aidentity itself searches them), and what Spotlight
+# knows wherever it is, as aidentity's all_launchers counts them. A Spotlight
+# hit outside the usual places (in_usual_place) is returned too, so its data
+# counts as a launcher's here and in claimed_now; scan_launchers lists it as
+# found elsewhere and nothing removes it. Leaving such hits out listed their
+# data as "no launcher points at" and moved it to the Trash while the launcher
+# stayed. Our own hidden .aidentity-* folders and the Trash are skipped. Every
+# hit is still checked for the marker key before it is listed.
 #
 # Returns non-zero, after printing what it did find, when part of the launcher
 # directory could not be searched (a folder in it that cannot be read), as
@@ -509,7 +514,7 @@ MOVED_DATA=0
 # its data would look like no launcher's. The app folders and Spotlight are
 # extra places, searched as far as they can be.
 discover_launchers() {
-  local app dir rc=0 filed="" DIRS=()
+  local app dir id ids=" " rc=0 filed="" DIRS=()
   split_dirs "${AIDENTITY_APP_DIRS:-/Applications:$HOME/Applications}"
   if [ -d "$APPS_DIR" ]; then
     filed=$(find -H "$APPS_DIR" -maxdepth 3 -type d -name '.aidentity-*' -prune \
@@ -532,33 +537,53 @@ discover_launchers() {
     fi
   } | awk 'NF && !seen[$0]++' | while IFS= read -r app; do
     case "$app" in */.aidentity-*|*/.Trash/*|*/.Trashes/*) continue ;; esac
-    inside=0
-    case "$app" in "$APPS_DIR"/*|"$HOME"/*) inside=1 ;; esac
-    for dir in ${DIRS[@]+"${DIRS[@]}"}; do
-      # "/" as an app folder would make every Spotlight hit "inside" it.
-      [ -n "${dir%/}" ] || continue
-      case "$app" in "${dir%/}"/*) inside=1 ;; esac
-    done
-    [ "$inside" -eq 1 ] || continue
+    # One folder by two paths (a symlinked launcher folder) is one launcher. A
+    # path that is itself a symlink stays: rm on it would remove only the link.
+    if [ ! -L "$app" ]; then
+      id=$(dir_id "$app") || continue
+      case "$ids" in *" $id "*) continue ;; esac
+      ids="$ids$id "
+    fi
     is_our_launcher "$app" && printf '%s\n' "$app"
   done
   return "$rc"
 }
 
+# The places this script removes launchers from: under the launcher directory,
+# your home folder or an app folder. A launcher anywhere else (a shared folder,
+# another disk, a backup copy) is not its to delete. An app folder of "/" is
+# skipped: every path would be under it.
+in_usual_place() {
+  local dir DIRS=()
+  case "$1" in "$APPS_DIR"/*|"$HOME"/*) return 0 ;; esac
+  split_dirs "${AIDENTITY_APP_DIRS:-/Applications:$HOME/Applications}"
+  for dir in ${DIRS[@]+"${DIRS[@]}"}; do
+    [ -n "${dir%/}" ] || continue
+    case "$1" in "${dir%/}"/*) return 0 ;; esac
+  done
+  return 1
+}
+
 # Returns non-zero when the launcher search was incomplete. The lists are then
 # not safe to act on: a launcher that was missed has its data among ORPHANS.
+# A launcher found elsewhere claims its data too, so that data is never an orphan.
 scan_launchers() {
   local app label d id claimed=" " found rc=0
   found=$(discover_launchers) || rc=1
   while IFS= read -r app; do
     [ -n "$app" ] || continue
+    d=$(plist_get "$app" "AIdentityDataDir")
+    if id=$(dir_id "$d"); then claimed="$claimed$id "; fi
+    if ! in_usual_place "$app"; then
+      ELSEWHERE+=("$app")
+      ELSEWHERE_DATA+=("$d")
+      continue
+    fi
     label=$(basename "$app" .app)
     LAUNCHERS+=("$app")
     LABELS+=("$label")
     PROFILES+=("$(plist_get "$app" "$MARKER_KEY")")
-    d=$(plist_get "$app" "AIdentityDataDir")
     DATA_DIRS+=("$d")
-    if id=$(dir_id "$d"); then claimed="$claimed$id "; fi
   done <<EOF
 $found
 EOF
@@ -591,10 +616,30 @@ EOF
   printf '%s' "$ids"
 }
 
+# The launchers found elsewhere and their data, which nothing here touches.
+# Not checked for running: nothing of theirs is moved.
+show_elsewhere() {
+  local i=0
+  info "${C_BOLD}Found elsewhere, not removed${C_RESET} (outside the launcher folder, your home"
+  info "folder and the app folders). Neither these launchers nor their data are touched:"
+  info ""
+  while [ "$i" -lt "${#ELSEWHERE[@]}" ]; do
+    printf '    launcher  %s\n' "${ELSEWHERE[$i]}"
+    [ -z "${ELSEWHERE_DATA[$i]}" ] || printf '    data      %s\n' "${ELSEWHERE_DATA[$i]}"
+    i=$((i + 1))
+  done
+  info ""
+}
+
 # Show exactly what would go, then ask. Returns 1 if the user declines, and 2
 # if there is no terminal to ask on.
 confirm_removal() {
-  local i data running=0 d
+  local i data running=0 d id kept=" "
+
+  # A folder a launcher found elsewhere records stays for it.
+  for d in ${ELSEWHERE_DATA[@]+"${ELSEWHERE_DATA[@]}"}; do
+    if id=$(dir_id "$d"); then kept="$kept$id "; fi
+  done
 
   if [ "${#LAUNCHERS[@]}" -gt 0 ]; then
     info "${C_BOLD}These launchers were built by aidentity:${C_RESET}"
@@ -611,6 +656,9 @@ confirm_removal() {
     if [ -n "$data" ]; then
       if data_is_ours "$data"; then
         printf '    data      %s  (%s)\n' "$data" "$(human_size "$data")"
+        if id=$(dir_id "$data") && case "$kept" in *" $id "*) true ;; *) false ;; esac; then
+          printf '              %sused by a launcher found elsewhere — will be KEPT%s\n' "$C_YELLOW" "$C_RESET"
+        fi
       else
         printf '    data      %s\n' "$data"
         printf '              %soutside the aidentity data directory — will be KEPT%s\n' "$C_YELLOW" "$C_RESET"
@@ -637,6 +685,8 @@ confirm_removal() {
     done
     info ""
   fi
+
+  [ "${#ELSEWHERE[@]}" -eq 0 ] || show_elsewhere
 
   if [ "$running" -gt 0 ]; then
     die "$running profile(s) are running right now. Quit them, then re-run this script.
@@ -722,6 +772,10 @@ remove_launchers() {
       LEFT_BEHIND=$((LEFT_BEHIND + 1))
     fi
     i=$((i + 1))
+  done
+  for app in ${ELSEWHERE[@]+"${ELSEWHERE[@]}"}; do
+    warn "Found elsewhere, not removed: $app"
+    LEFT_BEHIND=$((LEFT_BEHIND + 1))
   done
 
   # The data only now, after every launcher above is dealt with. Moving a
@@ -817,6 +871,12 @@ main() {
   fi
 
   if [ "${#LAUNCHERS[@]}" -eq 0 ] && [ "${#ORPHANS[@]}" -eq 0 ]; then
+    # Nothing to ask about, and "gone" would not be true.
+    if [ "${#ELSEWHERE[@]}" -gt 0 ]; then
+      show_elsewhere
+      warn "Done, but some things were left in place — see the messages above."
+      return 0
+    fi
     info "No aidentity launchers or profile data found — nothing else to remove."
     info ""
     ok "Done."

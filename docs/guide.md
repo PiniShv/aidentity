@@ -1161,7 +1161,7 @@ What it does:
 
 The data waits in the Trash, so you can undo a mistake. The uninstaller also removes the profiles folder when it is empty, so make that folder again first. To undo, install `aidentity` again, make the profiles folder, and move the folders back from the Trash. Then run `aidentity restore`. For a profile with no restore record, run `aidentity add` with the same app and profile name instead. [The steps](#data-in-the-trash). Once you empty the Trash, the data is gone for good.
 
-It removes launchers only if they carry the marker, and moves data only from inside the profiles folder. For a Main launcher, it removes the launcher and keeps the app's own data. A Main launcher is not in the Trash: build it again with `aidentity add <App> --main`. macOS keeps Dock tiles after an app is gone, so drag the old ones out yourself.
+It removes launchers only if they carry the marker, and moves data only from inside the profiles folder. A launcher outside the launcher folder, your home folder and the app folders, such as one in a shared folder, on another disk or in a backup copy, is listed as found elsewhere and left in place with its data. For a Main launcher, it removes the launcher and keeps the app's own data. A Main launcher is not in the Trash: build it again with `aidentity add <App> --main`. macOS keeps Dock tiles after an app is gone, so drag the old ones out yourself.
 
 <details>
 <summary>Remove everything by hand</summary>
