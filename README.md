@@ -125,7 +125,7 @@ Apps built on **Chromium** (the engine inside Google Chrome) or **Electron** (a 
 | **Browsers**: detected, but their built-in profiles usually do the job better | Chrome, Edge, Brave, Arc, Vivaldi, Comet |
 | **Does not work** | ChatGPT Classic and other native Mac apps (Swift or AppKit), and the few Electron apps that ignore the separate folder. |
 
-Native apps have no Chromium inside, so they have no `--user-data-dir` option to use. `aidentity add` checks this first and refuses. A few Electron apps ignore that option, and `add` cannot tell, so they are listed above. For VS Code, Cursor and Kiro, keep profile names short. Support for native apps is not planned for version 1. [Full list and notes](docs/guide.md#which-apps-work)
+Native apps have no Chromium inside, so they have no `--user-data-dir` option to use. `aidentity add` checks this first and refuses. A few Electron apps ignore that option, and `add` cannot tell, so they are listed above. For VS Code, Cursor and Kiro, keep profile names short. On macOS 11 or earlier, `aidentity` cannot check the length for you, and `--own-extensions` is refused. Support for native apps is not planned for version 1. [Full list and notes](docs/guide.md#which-apps-work)
 
 Tried another app? [Tell us how it went](https://github.com/PiniShv/aidentity/issues). That is how an app moves to Verified.
 

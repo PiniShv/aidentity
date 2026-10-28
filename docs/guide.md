@@ -198,7 +198,7 @@ An app can take extra accounts if it is built on **Chromium** or **Electron**. C
 
 `aidentity apps` lists every app with the right structure, including the few that ignore the separate folder. If an app misbehaves, [open an issue](https://github.com/PiniShv/aidentity/issues) and the table gets fixed.
 
-**VS Code, Cursor and Kiro: keep the profile name short.** These apps put a small connection file inside the profile folder, and macOS limits how long its path can be. With a long profile name, the app would quit right after it starts. `add`, `rename` and `restore` refuse a name that is too long and say how many characters to cut. `aidentity doctor` reports older profiles that are already too long; fix those with `rename`.
+**VS Code, Cursor and Kiro: keep the profile name short.** These apps put a small connection file inside the profile folder, and macOS limits how long its path can be. With a long profile name, the app would quit right after it starts. `add`, `rename` and `restore` refuse a name that is too long and say how many characters to cut. `aidentity doctor` reports older profiles that are already too long; fix those with `rename`. On macOS 11 or earlier this check does not run: see [Requirements](#requirements).
 
 There is no list of apps in the code. `aidentity` looks at how each app is built: it looks for `Electron Framework.framework`, or for a framework with Chromium helper apps inside. `apps` and `setup` look in `/Applications` and `~/Applications`. For an app somewhere else, give `add` the path to the `.app`.
 
@@ -1224,7 +1224,7 @@ Nothing here deletes profile data: it all goes to the Trash. Empty the Trash whe
 
 ## Requirements
 
-- **macOS.** There is no Linux or Windows version. No minimum macOS version is set. `aidentity doctor` shows yours.
+- **macOS.** There is no Linux or Windows version. No minimum macOS version is set. `aidentity doctor` shows yours. Two things for VS Code, Cursor and Kiro need macOS 12 or later: `--own-extensions`, and the check that keeps the profile folder path short. Both read the app's `product.json` with `plutil -extract … raw`, which older macOS does not have, so there the length check is skipped and `--own-extensions` is refused.
 - **The `bash` that comes with macOS** (version 3.2). You do not need a newer one.
 - **Tools that come with macOS**, such as `PlistBuddy`, `plutil`, `iconutil`, `osascript` and `open`. It uses no Python, Node, Perl or `jq`.
 - **Optional: the Xcode Command Line Tools.** Without them, launchers are unsigned. They still run. The tools also provide `strings`, which `add` uses for a slower, deeper check of an app with an unusual layout. `aidentity doctor` shows how to install the tools.
