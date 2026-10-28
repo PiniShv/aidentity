@@ -883,5 +883,33 @@ done
 assert_dir "the decoy survives all three" "$DECOY4"
 rm -rf "$DECOY4"
 
+# A locked file inside the old launcher: rm -rf used to delete its Info.plist
+# and leave a hollow bundle that aidentity no longer recognised.
+ai add "$ELECTRON_APP" --profile Lockable
+chflags uchg "$APPS/Fake Lockable.app/Contents/MacOS/launcher"
+ai rename "Fake Lockable" Unlocked
+assert_rc "rename succeeds with a locked file in the old launcher" 0 "$RUN_RC" "$RUN_OUT"
+assert_dir "the renamed launcher exists" "$APPS/Fake Unlocked.app"
+assert_no_dir "no hollow bundle is left at the old name" "$APPS/Fake Lockable.app"
+assert_contains "rename says where the leftover is" "$RUN_OUT" "could not be deleted"
+chflags -R nouchg "$APPS"/.aidentity-rename.*
+rm -rf "$APPS"/.aidentity-rename.*
+
+# The whole bundle locked: it cannot be moved, so it is left whole.
+ai add "$ELECTRON_APP" --profile Bolted
+chflags uchg "$APPS/Fake Bolted.app"
+ai rename "Fake Bolted" Loose
+BOLT_RC=$RUN_RC; BOLT_OUT=$RUN_OUT
+chflags nouchg "$APPS/Fake Bolted.app"
+assert_rc "rename completes when the old bundle is locked" 0 "$BOLT_RC" "$BOLT_OUT"
+assert_dir "the renamed launcher exists" "$APPS/Fake Loose.app"
+assert_file "the locked old launcher is left whole" "$APPS/Fake Bolted.app/Contents/Info.plist"
+assert_contains "rename says to delete it by hand" "$BOLT_OUT" "delete it by hand"
+ai rm "Fake Bolted" -y
+assert_rc "the left-over launcher is still recognised and removed" 0 "$RUN_RC" "$RUN_OUT"
+
+ai rm "Fake Loose" --purge -y
+ai rm "Fake Unlocked" --purge -y
+
 ai rm "Fake Renamed" --purge -y
 assert_rc "the renamed profile is removed cleanly" 0 "$RUN_RC" "$RUN_OUT"
