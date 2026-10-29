@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `aidentity dashboard` opens a localhost browser workspace for profile
+  management, launch settings, maintenance, import/export, help and updates.
+  Includes an animated Explore view adapted from 21st.dev's Perspective Tunnel
+  Hero and Works Wheel. The optional dashboard needs Python 3.9+ without extra
+  packages and is bundled into the same single-file install.
+
 - A 20-second film, at the top of the README and in the first section of the
   site. On the site it plays muted while it is on screen. **Watch with sound**
   starts it again from the beginning, with the narration, and a button turns

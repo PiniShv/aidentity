@@ -30,10 +30,10 @@ Read this before deciding whether a finding is a bug.
   `~/Applications` is ad-hoc signed at most (`codesign --sign -`). It is not
   notarised and never will be, because it is generated on your Mac. macOS treats
   it as a locally-built app.
-- **It makes no network calls except when you run `aidentity update`.** No
+- **It accesses the internet only when you run `aidentity update`.** No
   telemetry, no analytics, no automatic update check, no crash reporting.
   `aidentity update` (and `update --check`) is the only code in the script that
-  connects anywhere. It uses `curl` over HTTPS only (TLS 1.2 or later, also on
+  connects to an external service. It uses `curl` over HTTPS only (TLS 1.2 or later, also on
   redirects). It does not read your `~/.curlrc`, so settings there cannot turn
   off certificate checks. It contacts:
   - `api.github.com`, to read the tag of the latest release;
@@ -80,6 +80,15 @@ Read this before deciding whether a finding is a bug.
 - **Each profile folder holds a small restore record** (`.aidentity-profile.plist`)
   that `aidentity restore` reads. Its contents are checked as if typed on the
   command line.
+- **The optional dashboard listens on loopback while you run it.** Its Python
+  server binds `127.0.0.1`, validates Host/Origin and requires a per-session CSRF
+  token for actions. Inventory and actions also verify the connecting process's
+  macOS user using the system's `lsof`; an unknown or different account is
+  refused. Only the exact client-to-server socket record can authorize access.
+  Assets are bundled and served locally. Requests are mapped
+  to allowlisted CLI argument arrays; the browser cannot submit a shell command.
+  No request bodies or environment values are logged. Export has the same
+  sensitivity as CLI export. Ctrl+C closes the server; there is no login item.
 
 ## In scope
 

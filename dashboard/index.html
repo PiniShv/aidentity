@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>aidentity — your account workspace</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/experience.css">
+  <script src="/experience.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to workspace</a>
+  <div class="app-shell">
+    <button id="nav-scrim" class="nav-scrim" aria-label="Close navigation" hidden></button>
+    <aside id="sidebar" class="sidebar" aria-label="Main navigation">
+      <a href="#explore" class="brand" aria-label="aidentity home">
+        <svg class="brand-mark" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="5" y="3" width="15" height="23" rx="6" stroke="currentColor" stroke-width="2.5"/><rect x="12" y="6" width="15" height="23" rx="6" fill="var(--ground)" stroke="currentColor" stroke-width="2.5"/><circle cx="20" cy="18" r="3" fill="currentColor"/></svg>
+        <span class="nav-label">aidentity<span class="brand-sub">One app. Every account.</span></span>
+      </a>
+      <div class="scope"><span class="connection-dot"></span><span class="nav-label">This Mac <span>Local workspace</span></span></div>
+      <nav id="primary-nav"></nav>
+      <div class="nav-apps"><div class="nav-group-title nav-label">Your apps</div><div id="app-nav"></div></div>
+      <div class="sidebar-foot">
+        <button class="nav-item" data-view="guide"><span data-icon="book"></span><span class="nav-label">Command guide</span></button>
+        <div class="version-row"><span id="version">aidentity</span><button id="collapse-nav" class="icon-button" aria-label="Collapse sidebar" title="Collapse sidebar"><span data-icon="panel"></span></button></div>
+      </div>
+    </aside>
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="topbar-leading"><button id="mobile-nav" class="icon-button" aria-label="Open navigation" aria-expanded="false"><span data-icon="menu"></span></button><span id="breadcrumb">Explore</span></div>
+        <div class="topbar-actions"><span id="freshness" class="freshness">Connecting…</span><button id="refresh" class="icon-button" aria-label="Refresh profiles" title="Refresh profiles"><span data-icon="refresh"></span></button><button class="button button-primary" id="header-add"><span data-icon="plus"></span><span>Add profile</span></button></div>
+      </header>
+      <main id="main" tabindex="-1"><div class="initial-loading"><span class="spinner" aria-hidden="true"></span><h1>Connecting to your workspace</h1><p>Reading apps and profile launchers on this Mac.</p></div></main>
+      <button id="activity-toggle" class="activity-toggle"><span data-icon="terminal"></span><span id="activity-summary">Operation activity</span><span data-icon="chevron"></span></button>
+      <section id="activity-panel" class="activity-panel" aria-label="Operation activity" hidden><div class="panel-heading"><h2>Activity</h2><button id="activity-close" class="icon-button" aria-label="Close activity"><span data-icon="x"></span></button></div><div id="activity-content"><p class="muted">Completed operations appear here.</p></div></section>
+    </div>
+  </div>
+  <dialog id="dialog" aria-labelledby="dialog-title" aria-describedby="dialog-description"></dialog>
+  <div id="toast-viewport" class="toast-viewport" aria-label="Notifications" aria-live="polite"></div>
+</body>
+</html>

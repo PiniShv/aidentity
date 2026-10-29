@@ -35,3 +35,5 @@ aidentity.*[A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9][A-Za-z0-9]/
 .envrc
 scratch/
 NOTES.local.md
+__pycache__/
+*.pyc

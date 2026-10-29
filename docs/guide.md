@@ -10,7 +10,7 @@ macOS runs an app only once, so you get one account at a time. To check your per
 
 - **Verified with** Claude Desktop. Also tested with ChatGPT, Slack, VS Code, Cursor, Notion and other apps built on Chromium (the engine inside Google Chrome) or Electron. See [Which apps work](#which-apps-work).
 - **Your real app is not changed.** It is never copied, patched or re-signed. See [Is this safe?](#is-this-safe)
-- **One shell script** (a text file of Terminal commands). It makes no network calls except when you run `aidentity update`, never uses `sudo` (admin rights) and runs nothing in the background.
+- **One executable file.** The shell commands need nothing extra. The optional dashboard uses Python 3.9+ and listens on localhost while its terminal is open. Only `aidentity update` accesses the internet; there is no background service or `sudo` (admin rights).
 - **Set up once in Terminal.** After that, you open each account by clicking its icon, like any other app.
 
 ---
@@ -266,7 +266,7 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 
 ## Is this safe?
 
-`aidentity` is one shell script, about 5,600 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The repository also keeps it in [`src/`](../src), split by subject into smaller files that are joined to make that one.
+`aidentity` ships as one executable file. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The shell code lives in [`src/`](../src); the optional dashboard's Python, HTML, CSS and JavaScript live in [`dashboard/`](../dashboard) and are embedded by `make build`.
 
 ### What it touches
 
@@ -290,7 +290,7 @@ One thing does change. While a profile is running, clicking the app itself switc
 - **Delete profile data.** `--purge`, `prune` and the uninstaller move a data folder to the Trash, where you can still get it back. Emptying the Trash is what deletes it. If the folder cannot be moved there, it stays where it was.
 - **Touch profile data outside its profiles folder.** `--purge`, `prune` and the uninstaller move a data folder only if it is inside `~/Library/Application Support/aidentity/profiles`, or the folder set by `AIDENTITY_DATA_ROOT`.
 - **Move or rename a profile's data while the profile is running.** If it cannot tell, it treats the profile as running and stops.
-- **Use the network, except when you run `aidentity update`.** No telemetry, no analytics, no automatic update check, no crash reports. `aidentity update` (and `update --check`) is the only code in the script that connects anywhere, and only to GitHub. Apart from it, only the installer downloads anything, and only when you run it. [What `update` does](#aidentity-update).
+- **Access the internet, except when you run `aidentity update`.** No telemetry, analytics, automatic update checks or crash reports. `aidentity update` (and `update --check`) connects only to GitHub. The dashboard serves bundled assets on `127.0.0.1`; it loads no external scripts or fonts. Apart from update, only the installer downloads anything, when you run it. [What `update` does](#aidentity-update).
 - **Use `sudo` or run in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
 - **Edit your shell files.** If you need a `PATH` line, the installer prints it, and you add it.
 - **Control other apps.** It does not use System Events, so it needs no Accessibility permission. The one thing it does to a running app is `aidentity quit`, which asks that one app to quit, as its Quit menu item does. That needs no permission either.
@@ -439,6 +439,7 @@ Type `aidentity` and a command. Put a name that has a space in quotes, like `"Cl
 |---|---|---|
 | [`setup`](#aidentity-setup) | `init`, `wizard` | Guided walkthrough. Start here. |
 | [`ui`](#aidentity-ui) | | A menu in your terminal: open, quit, add, rename, recolour or remove profiles with one key. |
+| [`dashboard`](#aidentity-dashboard) | | Open the visual account workspace at localhost. Requires Python 3.9+. |
 | [`add [app]`](#aidentity-add) | | Create one profile directly. |
 | [`list`](#aidentity-list) | `ls` | Show every profile and whether it is running. `--json` prints it for scripts. |
 | [`open NAME`](#aidentity-open) | | Open a profile from Terminal. |
@@ -477,6 +478,43 @@ It asks, in this order:
 At the end it offers to open `~/Applications`, so you can drag the new icons to your Dock. If one profile fails, the walkthrough says so and continues.
 
 It needs a terminal. In a script, use `add` with its options instead.
+
+### `aidentity dashboard`
+
+```sh
+aidentity dashboard
+```
+
+Opens the visual account manager in your default browser at `127.0.0.1`, using
+an available port. It shows your existing profiles and installed compatible
+apps. The Explore view adds the Perspective Tunnel Hero and Works Wheel from
+21st.dev, adapted to browse those actual identities.
+
+The workspace can create, open, quit, rename and customize profiles, including
+Main accounts, Claude seeding, badges, launch switches, environment settings
+and separate editor extensions. Maintenance offers restore, rebuild, prune,
+doctor and repair. Transfer downloads the CLI's export format and imports it
+back. Help includes command documentation, shell completion and update actions.
+
+Removing or pruning requires confirmation in the UI. Existing environment
+values stay hidden; appearance changes preserve them. Export can contain
+sensitive launch settings, just like `aidentity export`.
+
+Keep the terminal open while using the dashboard. Press **Ctrl+C** to stop the
+server. It is available only on this Mac; it creates no startup service.
+Profile reads and actions are restricted to the same macOS account using the
+system's connection-owner information. No API key or account setup is needed.
+
+```sh
+aidentity dashboard --port 8765   # choose a fixed port
+aidentity dashboard --no-open     # print the address for manual opening
+```
+
+`--port` accepts 0 through 65535; 0 chooses a free port. An occupied explicit
+port produces an error. Python 3.9 or newer is required only for this command,
+with no pip packages. Install Python 3 if startup reports it is missing.
+The full dashboard is embedded in the executable, so a copied or installed
+`aidentity` works without the source checkout.
 
 ### `aidentity ui`
 

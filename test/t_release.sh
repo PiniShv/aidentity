@@ -136,8 +136,10 @@ rc_fresh() {
   mkdir -p "$RC_DIR/bin" "$RC_DIR/scripts" "$RC_DIR/test"
   cp "$REPO_DIR/bin/aidentity" "$RC_DIR/bin/"
   cp -R "$REPO_DIR/src" "$RC_DIR/"
+  cp -R "$REPO_DIR/dashboard" "$RC_DIR/"
   cp "$REPO_DIR/uninstall.sh" "$REPO_DIR/SHA256SUMS" "$REPO_DIR/CHANGELOG.md" "$RC_DIR/"
   cp "$REPO_DIR/scripts/"*.sh "$RC_DIR/scripts/"
+  cp "$REPO_DIR/scripts/bundle-dashboard.py" "$RC_DIR/scripts/"
   cp "$REPO_DIR/test/"*.sh "$RC_DIR/test/"
   sed "s|^REF=.*|REF=\"\${AIDENTITY_REF:-v$rc_version}\"|" "$REPO_DIR/install.sh" > "$RC_DIR/install.sh"
 }

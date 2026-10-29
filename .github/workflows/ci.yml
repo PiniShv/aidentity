@@ -186,6 +186,14 @@ jobs:
       - name: Test suite — macOS system bash 3.2
         run: /bin/bash test/run_tests.sh
 
+      - name: Dashboard bundle, API and installed-file tests
+        run: make dashboard-check
+
+      - name: Dashboard JavaScript syntax
+        run: |
+          node --check dashboard/app.js
+          node --check dashboard/experience.js
+
       # The suite runs the script under /bin/bash unless told otherwise; this
       # step points it at the bash first on PATH, so both shells are covered.
       # It runs the areas one at a time, which also shows that each passes

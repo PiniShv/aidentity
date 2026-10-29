@@ -15,6 +15,7 @@
 # name, without the __: cmd_add, cmd_overview.
 COMMANDS='setup|init wizard|-||Guided walkthrough that sets up accounts (start here)
 ui||-||Full-screen menu over your profiles
+dashboard||-|--port= --no-open|Open the visual account manager in your browser
 add||apps|--profile/-p= --badge/-b= --color/--colour/-c= --no-badge --seed --main --arg= --env= --own-extensions|Create a profile for an app
 list|ls|-|--json|Show every profile and what is running
 open||launchers||Open a profile
