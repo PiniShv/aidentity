@@ -1,12 +1,15 @@
-# Music for the film, synthesized from a fixed seed: light plucked
-# arpeggios over I-V-vi-IV, a soft pad and bass. Smooth on purpose: no noise
-# sources, a fade at the end of every note, no detuned (beating) pad voices, a
-# soft convolution reverb, and one steady duck under the whole narration.
+# Music for the film, synthesized from a fixed seed. Before the turn, a quiet
+# high pad holds a G chord and one soft figure, D then G, plays on each sign out
+# and each sign in: the music is stuck in the loop too. At the turn it lands on
+# C, and light plucked arpeggios run over I-V-vi-IV with a soft pad and bass.
+# Smooth on purpose: no noise sources, a fade at the end of every note, no
+# detuned (beating) pad voices, a soft convolution reverb, and one steady duck
+# under the whole narration.
 # Kind to small speakers: a laptop speaker cannot play deep bass and buzzes
 # when pushed to, so there is no kick, the bass carries overtones that small
 # speakers can play, and everything below about 110 Hz is filtered out.
 # Usage: music.py WORKDIR     (or set AIDENTITY_FILM_WORK)
-# Reads WORKDIR/vo1.wav ... vo6.wav (the processed narration, 48 kHz) and
+# Reads WORKDIR/vo1.wav ... vo10.wav (the processed narration, 48 kHz) and
 # writes WORKDIR/mix.wav, the narration over the music, as 32-bit float.
 import os, sys
 import numpy as np, soundfile as sf
@@ -17,7 +20,11 @@ if not WORK:
     sys.exit("usage: music.py WORKDIR")
 
 SR = 48000
-LEN = 19.5
+# The hook comes first; the loop starts HOOK seconds in, and the turn 9 s after
+# that. The turn and the answer take 19.5 s, and their times count from TURN.
+HOOK = 2.9
+TURN = HOOK + 9.0
+LEN = TURN + 19.5
 BPM = 104
 BEAT = 60 / BPM
 BAR = 4 * BEAT
@@ -86,18 +93,32 @@ def put(at, x, db, pan=0.0):
     l, r = np.sqrt((1 - pan) / 2), np.sqrt((1 + pan) / 2)
     music[s:s + len(x), 0] += x * l; music[s:s + len(x), 1] += x * r
 
+# The hook and the loop, before the turn: only notes above middle C, and no
+# bass. The pad starts with the hook and grows a little as the loop goes
+# round. D then G on each sign out and each sign in, a little uneven, so it
+# breathes and does not tick. The third time, the cursor only rests on
+# "Sign out": the D sounds, and the G never comes.
+put(0.0, pad([62, 67, 71], TURN + 0.6) * np.linspace(0.8, 1.0, int((TURN + 0.6) * SR)), -21)
+# The hook: the pad is already there, and one D sounds as the pointer comes to
+# rest on "Sign out". At the turn the D comes again, as the camera closes in.
+put(1.2, pluck(74, 1.6), -22, -0.15)
+for at, gap, db in [(1.62, 0.30, -21), (3.25, 0.34, -22.5), (4.66, 0.28, -21.5), (6.55, 0.36, -23)]:
+    put(HOOK + at, pluck(74), db, -0.15)
+    put(HOOK + at + gap, pluck(79), db - 1, 0.15)
+put(TURN, pluck(74, 1.6), -22, -0.15)
+
 # C, G, Am, F: the root, the pad, and the tones the arpeggio walks.
 CHORDS = [(48, [60, 64, 67], [60, 64, 67, 72, 76, 72, 67, 64]),
           (43, [55, 59, 62], [59, 62, 67, 71, 74, 71, 67, 62]),
           (45, [57, 60, 64], [60, 64, 69, 72, 76, 72, 69, 64]),
           (41, [53, 57, 60], [60, 65, 69, 72, 77, 72, 69, 65])]
-START = 0.55
-END_CHORD = 15.4
+START = TURN + 0.55
+END_CHORD = TURN + 15.4
 def play(at, x, db, pan=0.0):
     """A note of the groove: nothing starts once the end chord is due."""
     if at < END_CHORD - 0.05: put(at, x, db, pan)
 
-put(0.0, swell(), -24)
+put(TURN, swell(), -24)
 bar = 0; at = START
 while at < END_CHORD - 0.05:
     root, padn, arp = CHORDS[bar % 4]
@@ -108,7 +129,7 @@ while at < END_CHORD - 0.05:
     for k, m in enumerate(arp):
         play(at + k * BEAT / 2, pluck(m), -18 + (2 if k == 0 else 0), -0.25 if k % 2 else 0.25)
     bar += 1; at += BAR
-put(0.8, chime([84, 88, 91]), -24)
+put(TURN + 0.8, chime([84, 88, 91]), -24)
 put(END_CHORD, pad([60, 64, 67, 74], 4.2), -21)
 put(END_CHORD, bass(48, 3.0), -18)
 put(END_CHORD, chime([79, 84, 88, 91], 3.5), -20)
@@ -133,9 +154,11 @@ music = np.stack([highpass(highpass(music[:, c], 110), 110) for c in range(2)], 
 # master limiter has almost nothing to do. The music stays 6 dB down under the
 # whole narration, pauses included, so it never breathes between lines, and
 # comes back up over one second after the last word.
-VO = [(0.8, 1), (3.1, 2), (6.2, 3), (10.2, 4), (12.9, 5), (15.6, 6)]
+# When each line starts: the hook, the loop's three lines, then the turn and the
+# answer, counted from the turn.
+VO = [0.4] + [HOOK + t for t in (0.7, 4.3, 7.15)] + [TURN + t for t in (0.8, 3.1, 6.2, 10.2, 12.9, 15.6)]
 voice = np.zeros(N)
-for at, n in VO:
+for n, at in enumerate(VO, 1):
     v, sr = sf.read(os.path.join(WORK, f"vo{n}.wav")); assert sr == SR
     s = int(at * SR); v = v[: N - s]; voice[s:s + len(v)] += v
 voice = limit(norm(voice, 0.95)[:, None], SR, 0.95 * 10 ** (-3 / 20), release=0.05)[0][:, 0]
