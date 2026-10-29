@@ -483,9 +483,10 @@ MOVED_DATA=0
 # Every aidentity launcher worth removing, one path per line: the launcher
 # directory and folders inside it (followed with -H when it is a symlink), the
 # app folders (AIDENTITY_APP_DIRS, as aidentity itself searches them), and what
-# Spotlight knows inside those places or your home folder. Looking only at the
-# top of the launcher directory listed a filed-away launcher's data as "no
-# launcher points at" and deleted it while the launcher stayed. Our own hidden
+# Spotlight knows wherever it is, as aidentity's all_launchers counts them.
+# Looking only at the top of the launcher directory, or only at Spotlight hits
+# inside those places, listed a launcher's data as "no launcher points at" and
+# moved it to the Trash while the launcher stayed. Our own hidden
 # .aidentity-* folders and the Trash are skipped. Every hit is still checked
 # for the marker key before it is listed.
 #
@@ -518,14 +519,6 @@ discover_launchers() {
     fi
   } | awk 'NF && !seen[$0]++' | while IFS= read -r app; do
     case "$app" in */.aidentity-*|*/.Trash/*|*/.Trashes/*) continue ;; esac
-    inside=0
-    case "$app" in "$APPS_DIR"/*|"$HOME"/*) inside=1 ;; esac
-    for dir in ${DIRS[@]+"${DIRS[@]}"}; do
-      # "/" as an app folder would make every Spotlight hit "inside" it.
-      [ -n "${dir%/}" ] || continue
-      case "$app" in "${dir%/}"/*) inside=1 ;; esac
-    done
-    [ "$inside" -eq 1 ] || continue
     is_our_launcher "$app" && printf '%s\n' "$app"
   done
   return "$rc"

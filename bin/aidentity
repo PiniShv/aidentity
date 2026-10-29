@@ -2219,7 +2219,6 @@ cmd_add() {
 }env$TAB$2"; shift 2 ;;
       --own-extensions) extras="${extras:+$extras
 }ext${TAB}1"; shift ;;
-      --)           shift; break ;;
       -*)           die "Unknown option for add: $1" ;;
       *)            [ -z "$app_arg" ] && app_arg="$1" || die "Unexpected argument: $1"; shift ;;
     esac
@@ -2789,9 +2788,20 @@ cmd_rename() {
 
   # After a case-only rename the old path IS the new launcher. Deleting it
   # would delete the launcher just built.
+  # Move it aside first, delete it second, as rm does: rm -rf in place left a
+  # locked file's bundle hollow, without its Info.plist, so it was no longer
+  # recognised as ours and rm refused it. A bundle that cannot be moved stays
+  # whole and recognisable.
   if ! [ "$app" -ef "$new_app" ]; then
-    rm -rf "$app" 2>/dev/null
-    [ -e "$app" ] && warn "Could not remove the old launcher; delete it by hand: $app"
+    BUILD_STAGE=$(mktemp -d "$APPS_DIR/.aidentity-rename.XXXXXX" 2>/dev/null) || BUILD_STAGE=""
+    if [ -z "$BUILD_STAGE" ] || ! mv "$app" "$BUILD_STAGE/" 2>/dev/null; then
+      _cleanup_stage
+      warn "Could not remove the old launcher; delete it by hand: $app"
+    else
+      local leftover="$BUILD_STAGE"
+      _cleanup_stage || warn "Part of the old launcher could not be deleted (a locked file?).
+    It is out of the way, in: $leftover"
+    fi
   fi
   ok "Renamed ${C_BOLD}$from${C_RESET} to ${C_BOLD}$new_label${C_RESET}"
   if [ "$kind" = "main" ]; then
@@ -4405,8 +4415,9 @@ cmd_update() {
 # why a resize can redraw at once.
 
 UI_ESC=$'\033'
-# The colours `set --color` takes by name, in the order the picker shows them.
-UI_COLORS="blue green orange purple teal pink red yellow gray graphite"
+# The colours the picker offers: COLOR_NAMES without the aliases (grey, black),
+# which it does not need to offer twice. Derived so a new colour reaches it.
+UI_COLORS=${COLOR_NAMES/ grey/}; UI_COLORS=${UI_COLORS/ black/}
 
 UI_ACTIVE=0     # 1 while the menu owns the terminal: alternate screen, no echo
 UI_BUSY=0       # 1 while a command runs for the menu

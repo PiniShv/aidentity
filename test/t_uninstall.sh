@@ -11,11 +11,17 @@
 group "uninstall.sh end to end, every search path in the sandbox"
 
 # AIDENTITY_BIN_DIRS keeps it from finding a real installed copy; HOME and
-# AIDENTITY_APP_DIRS keep its launcher search inside the sandbox. HOME also
+# AIDENTITY_APP_DIRS keep its launcher search inside the sandbox, and a stub
+# mdfind keeps Spotlight out of it: the real one would hand these tests the
+# developer's own launchers, and `delete` removes launchers for good. The
+# Spotlight cases below write the hits they need into the same stub. HOME also
 # keeps the Trash it moves profile data to in the sandbox.
 UN_BIN="$SB/un-bin"
 UN_TRASH="$SANDBOX/tty-home/.Trash"
-mkdir -p "$UN_BIN"
+UN_MDFIND="$SANDBOX/stub-un-mdfind"
+mkdir -p "$UN_BIN" "$UN_MDFIND"
+printf '#!/bin/sh\nexit 0\n' > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
 trash_reset
 un_prepare() {
   cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
@@ -24,7 +30,7 @@ un_prepare() {
 }
 un_tty() { # typed input
   RUN_OUT=$( { { sleep 0.3; printf '%b' "$1"; sleep 1; } \
-      | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$PATH" \
+      | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$UN_MDFIND:$PATH" \
         script -q /dev/null "$BASH_BIN" "$REPO_DIR/uninstall.sh"
       echo "__rc=${PIPESTATUS[1]}"; } 2>&1 | tr -d '\r')
   RUN_RC=${RUN_OUT##*__rc=}
@@ -41,7 +47,7 @@ assert_file "the data stays" "$DATA/fake-bye/Cookies"
 assert_contains "the prompt says the data goes to the Trash" "$RUN_OUT" "moves the profile data listed above to the Trash"
 
 cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
-RUN_OUT=$(HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" detached "$BASH_BIN" "$REPO_DIR/uninstall.sh" 2>&1 </dev/null); RUN_RC=$?
+RUN_OUT=$(HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$UN_MDFIND:$PATH" detached "$BASH_BIN" "$REPO_DIR/uninstall.sh" 2>&1 </dev/null); RUN_RC=$?
 assert_rc_nonzero "with no terminal to confirm on, it exits non-zero" "$RUN_RC" "$RUN_OUT"
 assert_dir "and deletes no launcher" "$APPS/Fake Bye.app"
 
@@ -141,7 +147,7 @@ un_tty_late() { # command to run once the question is on screen, typed input
   : > "$out"
   { while ! grep -q 'to remove them, or anything else' "$out" && [ "$n" -lt 100 ]; do sleep 0.1; n=$((n + 1)); done
     eval "$1"; printf '%b' "$2"; sleep 1; } \
-    | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$PATH" \
+    | HOME="$SANDBOX/tty-home" AIDENTITY_BIN_DIRS="$UN_BIN" PATH="$STUB_BIN:$UN_MDFIND:$PATH" \
       script -q /dev/null "$BASH_BIN" "$REPO_DIR/uninstall.sh" > "$out" 2>&1
   RUN_RC=${PIPESTATUS[1]}
   RUN_OUT=$(tr -d '\r' < "$out")
@@ -186,16 +192,14 @@ trash_reset
 # A launcher in the Trash is on its way out: it is not counted, listed or
 # deleted, even when Spotlight still knows it. rm -rf there would empty that
 # part of the Trash for good. A volume's Trash (.Trashes) is the same.
-UN_MDFIND="$SANDBOX/stub-un-mdfind"
 UN_VOL_TRASH="$APPS/.Trashes/$(id -u)"
-mkdir -p "$UN_MDFIND"
 printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_TRASH/Fake Bye.app' '$UN_VOL_TRASH/Fake Bye.app'" > "$UN_MDFIND/mdfind"
 chmod +x "$UN_MDFIND/mdfind"
 un_prepare
 mkdir -p "$UN_TRASH" "$UN_VOL_TRASH"
 cp -R "$APPS/Fake Bye.app" "$UN_TRASH/"
 cp -R "$APPS/Fake Bye.app" "$UN_VOL_TRASH/"
-PATH="$UN_MDFIND:$PATH" un_tty 'delete\n'
+un_tty 'delete\n'
 assert_rc "an uninstall with launchers in the Trash exits 0" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "only the launcher outside the Trash is counted" "$RUN_OUT" "deletes 1 launcher(s)"
 assert_not_contains "the one in the Trash is not listed" "$RUN_OUT" "$UN_TRASH/Fake Bye.app"
@@ -204,6 +208,28 @@ assert_file "the one in the Trash is still there" "$UN_TRASH/Fake Bye.app/Conten
 assert_file "and so is the one in a volume's Trash" "$UN_VOL_TRASH/Fake Bye.app/Contents/Info.plist"
 assert_no_dir "the launcher outside the Trash is removed" "$APPS/Fake Bye.app"
 rm -rf "$APPS/.Trashes"
+mkdir -p "$DATA"
+trash_reset
+
+# A launcher kept outside the home folder and the app folders counts wherever
+# Spotlight finds it, as prune and rm --purge count it. Leaving it out listed
+# its data as no launcher's and moved it to the Trash: it opened signed out.
+UN_OUT="$SANDBOX/elsewhere"
+un_prepare
+mkdir -p "$UN_OUT"
+cp -R "$APPS/Fake Bye.app" "$UN_OUT/"
+rm -rf "$APPS/Fake Bye.app"
+printf '%s\n' '#!/bin/sh' "printf '%s\\n' '$UN_OUT/Fake Bye.app'" > "$UN_MDFIND/mdfind"
+chmod +x "$UN_MDFIND/mdfind"
+un_tty 'delete\n'
+assert_rc "an uninstall with a launcher kept elsewhere exits 0" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "the launcher kept elsewhere is counted" "$RUN_OUT" "deletes 1 launcher(s)"
+assert_contains "and listed" "$RUN_OUT" "$UN_OUT/Fake Bye.app"
+assert_not_contains "its data is not listed as no launcher's" "$RUN_OUT" "Profile data no launcher points at"
+assert_no_dir "the launcher kept elsewhere is removed" "$UN_OUT/Fake Bye.app"
+assert_contains "its data goes to the Trash as the launcher's" "$RUN_OUT" "Moved the data for Fake Bye to the Trash"
+printf '#!/bin/sh\nexit 0\n' > "$UN_MDFIND/mdfind"
+rm -rf "$UN_OUT"
 mkdir -p "$DATA"
 trash_reset
 

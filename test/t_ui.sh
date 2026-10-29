@@ -120,6 +120,12 @@ ai add "$ELECTRON_APP" --main
 assert_eq "three launchers to look at" "3" "$(count_launchers)"
 ALPHA="$APPS/Fake Alpha.app"; BETA="$APPS/Fake Beta.app"; MAINL="$APPS/Fake Main.app"
 
+# --- the colour picker's list
+
+libcall eval 'printf "%s\n" "$UI_COLORS"'
+assert_eq "the picker offers every colour once, aliases left out, in order" \
+  "blue green orange purple teal pink red yellow gray graphite" "$RUN_OUT"
+
 # --- what it refuses, and what the plain command still does
 
 ai ui
