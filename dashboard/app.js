@@ -86,7 +86,7 @@
   function animateMotion(element,frames,kind="surface",options={}){
     if(!element||reducedMotion.matches||!element.animate)return null;
     motionAnimations.get(element)?.cancel();
-    const animation=element.animate(frames,{duration:kind==="control"?360:520,easing:motionCurve(kind),...options});
+    const animation=element.animate(frames,{duration:kind==="control"?360:520,easing:motionCurve(kind),fill:"backwards",...options});
     motionAnimations.set(element,animation);
     animation.finished.catch(()=>{}).finally(()=>{if(motionAnimations.get(element)===animation)motionAnimations.delete(element);});
     return animation;
@@ -132,13 +132,15 @@
   function renderNav() {
     $("#primary-nav").innerHTML=navigation.map(([id,label,glyph])=>`<button class="nav-item" data-view="${id}" title="${label}"${view===id?' aria-current="page"':""}>${icon(glyph)}<span class="nav-label">${label}</span></button>`).join("");
     const apps = [...new Set((state?.profiles || []).map(appName))].sort();
-    $("#app-nav").innerHTML=apps.map(name=>`<button class="nav-item nav-app" style="${appTone(name)}" data-app-filter="${escape(name)}" title="${escape(name)}"><span class="app-mini"><span class="nav-app-dot" aria-hidden="true"></span></span><span class="nav-label">${escape(name)}</span></button>`).join("") || '<p class="small nav-label" style="padding:0 12px">Add your first profile</p>';
+    $("#app-nav").innerHTML=apps.map(name=>`<button class="nav-item nav-app" style="${appTone(name)}" data-app-filter="${escape(name)}" title="${escape(name)}"><span class="app-mini"><span class="nav-app-dot" aria-hidden="true"></span></span><span class="nav-label">${escape(name)}</span></button>`).join("") || `<p class="small nav-label" style="padding:0 12px">${state?.errors?.length?"Inventory unavailable":"Add your first profile"}</p>`;
     $$(".sidebar-foot [data-view]").forEach(el=>el.setAttribute("aria-current",view===el.dataset.view?"page":"false"));
     $("#version").textContent=state?.version ? `aidentity ${String(state.version).replace(/^aidentity\s*/,"")}`:"aidentity";
     $("#breadcrumb").textContent=navigation.find(item=>item[0]===view)?.[1] || "Command guide";
     const contextualApp=appFilter||state?.profiles.find(item=>item.name===selected)?.app;
     $("#header-add").style.cssText=contextualApp?appTone(contextualApp):"--app-color:#7c8cff;--app-color-secondary:#2fd4c0";
   }
+  function errorNotice(){return (state.errors||[]).length?`<div class="notice error">${state.errors.map(escape).join("<br>")}</div>`:"";}
+  function setupError(){return `<div class="empty-state"><h2>aidentity could not read your setup</h2>${errorNotice()}<div class="section-gap">${button("Retry","refresh",{primary:true,icon:"refresh"})}</div></div>`;}
   function title(name,description,actions=""){return `<div class="title-row"><div><h1>${escape(name)}</h1><p>${escape(description)}</p></div>${actions?`<div class="title-actions">${actions}</div>`:""}</div>`;}
   function searchField(placeholder){return `<div class="search-field">${icon("search")}<input id="workspace-search" class="input" type="search" aria-label="${escape(placeholder)}" placeholder="${escape(placeholder)}" value="${escape(query)}">${query?`<button class="icon-button" data-action="clear-search" aria-label="Clear search">${icon("x")}</button>`:""}</div>`;}
   // educalvolpz Animated Tabs translated to native tabs with measured sliding indicator.
@@ -189,16 +191,17 @@
   }
   function scopedProfiles(){return state.profiles.filter(item=>(!appFilter||appName(item)===appFilter)&&(!query||`${item.name} ${appName(item)} ${item.profile}`.toLowerCase().includes(query.toLowerCase())));}
   function renderProfiles(){
+    const chosen=profile(selected);
+    if(!chosen)mobileDetail=false;
     main.classList.toggle("profile-detail-mobile",mobileDetail);
     const scoped=scopedProfiles();
     const running=scoped.filter(item=>item.status==="running").length;
     const visible=scoped.filter(item=>statusFilter==="all"||(statusFilter==="running"?item.status==="running":statusFilter==="attention"?item.status==="app missing":item.status!=="running"));
-    const chosen=profile(selected);
     main.innerHTML=title(appFilter||"Profiles","Your accounts have their own space. Open one and pick up where you left off.")+
       `<div class="stat-line"><span class="metric metric-profiles"><strong class="num">${scoped.length}</strong><span>${scoped.length===1?"profile":"profiles"}</span></span><span class="metric metric-running ${running?"has-value":"is-zero"}"><strong class="num">${running}</strong><span>running</span></span><span class="metric metric-apps"><strong class="num">${new Set(scoped.map(appName)).size}</strong><span>apps</span></span></div>`+
       tabs([["all","All profiles",scoped.length],["running","Running",running],["idle","At rest",scoped.length-running],["attention","Needs repair",scoped.filter(item=>item.status==="app missing").length]],statusFilter)+
       `<div class="toolbar">${searchField("Search profiles")}<div class="toolbar-end">${appFilter?button("All apps","all-apps",{small:true}):""}<select id="app-filter" aria-label="Filter by application"><option value="">All apps</option>${[...new Set(state.profiles.map(appName))].sort().map(name=>`<option${name===appFilter?" selected":""}>${escape(name)}</option>`).join("")}</select><span class="small">${visible.length} ${visible.length===1?"profile":"profiles"}</span></div></div>`+
-      `<div class="profile-layout ${chosen?"":"no-selection"} ${mobileDetail?"mobile-detail":""}"><div class="profile-grid" data-count="${visible.length}">${visible.map(card).join("")||`<div class="empty-state"><h2>${state.profiles.length?"No matching profiles":"A new space for your next account"}</h2><p>${state.profiles.length?"Try another app or search.":"Choose an installed app, name the account, and create its own launcher."}</p>${button(state.profiles.length?"Clear filters":"Create your first profile",state.profiles.length?"reset-filters":"add",{primary:true,icon:state.profiles.length?"search":"plus"})}</div>`}</div>${chosen?detail(chosen):""}</div>`;
+      `<div class="profile-layout ${chosen?"":"no-selection"} ${mobileDetail?"mobile-detail":""}"><div class="profile-grid" data-count="${visible.length}">${visible.map(card).join("")||(!state.profiles.length&&state.errors?.length?setupError():`<div class="empty-state"><h2>${state.profiles.length?"No matching profiles":"A new space for your next account"}</h2><p>${state.profiles.length?"Try another app or search.":"Choose an installed app, name the account, and create its own launcher."}</p>${button(state.profiles.length?"Clear filters":"Create your first profile",state.profiles.length?"reset-filters":"add",{primary:true,icon:state.profiles.length?"search":"plus"})}</div>`)}</div>${chosen?detail(chosen):""}</div>`;
   }
   // ravikatiyar162 ProfileCard structure: cover, offset identity, role/meta and
   // full-width action. Account badge replaces human avatar; CLI fields replace stats.
@@ -210,7 +213,7 @@
   }
   function renderApps(){
     const apps=state.apps.filter(item=>!query||item.name.toLowerCase().includes(query.toLowerCase()));
-    main.innerHTML=title("Applications",`${state.apps.length} compatible ${state.apps.length===1?"app":"apps"} found on this Mac.`)+`<div class="toolbar">${searchField("Search installed apps")}</div><div class="apps-grid">${apps.map(item=>{const count=state.profiles.filter(p=>appName(p)===item.name).length;return `<article class="application-card app-tone" style="${appTone(item.name)}">${art(item.name)}<h2>${escape(item.name)}</h2><p>${count} ${count===1?"profile":"profiles"} configured</p>${button("Add account","add",{icon:"plus",app:item.name})}</article>`;}).join("")||'<div class="empty-state"><h2>No compatible apps found</h2><p>Install a Chromium or Electron app, then refresh this workspace.</p>'+button("Refresh apps","refresh",{icon:"refresh"})+"</div>"}</div>`;
+    main.innerHTML=title("Applications",!state.apps.length&&state.errors?.length?"Inventory unavailable.":`${state.apps.length} compatible ${state.apps.length===1?"app":"apps"} found on this Mac.`)+`<div class="toolbar">${searchField("Search installed apps")}</div><div class="apps-grid">${apps.map(item=>{const count=state.profiles.filter(p=>appName(p)===item.name).length;return `<article class="application-card app-tone" style="${appTone(item.name)}">${art(item.name)}<h2>${escape(item.name)}</h2><p>${count} ${count===1?"profile":"profiles"} configured</p>${button("Add account","add",{icon:"plus",app:item.name})}</article>`;}).join("")||(!state.apps.length&&state.errors?.length?setupError():'<div class="empty-state"><h2>No compatible apps found</h2><p>Install a Chromium or Electron app, then refresh this workspace.</p>'+button("Refresh apps","refresh",{icon:"refresh"})+"</div>")}</div>`;
   }
   function renderRecovery(){
     const entries=state.restorable||[];
@@ -220,7 +223,7 @@
   }
   function renderMaintenance(){
     main.innerHTML=title("Maintenance","Check your setup, repair launchers, and keep aidentity current.")+
-    `<div class="operation-grid"><section class="operation-card">${icon("shield")}<h2>Workspace health</h2><p>Check the setup and every profile for missing apps, stale launchers, and configuration issues.</p><div class="button-row">${button("Run doctor","doctor",{primary:true,icon:"shield"})}${button("Check & fix","doctor-fix",{icon:"tool"})}</div></section><section class="operation-card">${icon("download")}<h2>aidentity updates</h2><p>Installed version: <span class="num">${escape(state.version)}</span>. Check for a new release or install the latest one.</p><div class="button-row">${button("Check for updates","update-check",{icon:"refresh"})}${button("Update now","update",{icon:"download"})}</div></section><section class="operation-card">${icon("refresh")}<h2>Refresh launchers</h2><p>Rebuild every launcher using its recorded identity and current application path.</p><div class="button-row">${button("Rebuild all","rebuild-all",{icon:"refresh"})}</div></section><section class="operation-card">${icon("folder")}<h2>Local storage</h2><p>Launchers and their data are stored in these workspace locations.</p><div class="path-list"><span>Launchers<br><strong>${escape(state.paths?.launchers||"Not available")}</strong></span><span>Profile data<br><strong>${escape(state.paths?.data||"Not available")}</strong></span></div></section></div>${(state.errors||[]).length?`<div class="notice error">${state.errors.map(escape).join("<br>")}</div>`:""}`;
+    `<div class="operation-grid"><section class="operation-card">${icon("shield")}<h2>Workspace health</h2><p>Check the setup and every profile for missing apps, stale launchers, and configuration issues.</p><div class="button-row">${button("Run doctor","doctor",{primary:true,icon:"shield"})}${button("Check & fix","doctor-fix",{icon:"tool"})}</div></section><section class="operation-card">${icon("download")}<h2>aidentity updates</h2><p>Installed version: <span class="num">${escape(state.version)}</span>. Check for a new release or install the latest one.</p><div class="button-row">${button("Check for updates","update-check",{icon:"refresh"})}${button("Update now","update",{icon:"download"})}</div></section><section class="operation-card">${icon("refresh")}<h2>Refresh launchers</h2><p>Rebuild every launcher using its recorded identity and current application path.</p><div class="button-row">${button("Rebuild all","rebuild-all",{icon:"refresh"})}</div></section><section class="operation-card">${icon("folder")}<h2>Local storage</h2><p>Launchers and their data are stored in these workspace locations.</p><div class="path-list"><span>Launchers<br><strong>${escape(state.paths?.launchers||"Not available")}</strong></span><span>Profile data<br><strong>${escape(state.paths?.data||"Not available")}</strong></span></div></section></div>${errorNotice()}`;
   }
   function renderTransfer(){
     main.innerHTML=title("Import & export","Move your profile setup between Macs with a launcher recipe.")+
@@ -277,7 +280,7 @@
       await refresh({force:true});
       return result;
     }catch(error){
-      if(!quiet)toast("Operation failed",String(error.message).slice(0,180),true);
+      if(!quiet){toast("Operation failed",String(error.message).slice(0,180),true);error.reported=true;}
       $("#activity-summary").textContent=`${name} failed · View details`;
       throw error;
     }finally{busy=false;setBusy(element,false);}
@@ -331,8 +334,9 @@
     if(!state)return;
     const options=state.apps.map(item=>`<option value="${escape(item.name)}"${item.name===app?" selected":""}>${escape(item.name)}</option>`).join("");
     showDialog("Create a profile","Give another account its own launcher and profile folder.",`<div class="preview-row" id="identity-preview">${art(app||state.apps[0]?.name||"App","W",defaultBadgeColor)}<div><strong id="preview-name">${escape(app||state.apps[0]?.name||"App")} Work</strong><span class="small">Your new account launcher</span></div></div><div class="fields"><div class="field"><label for="field-app">Application</label><select name="app" id="field-app" required>${options||'<option value="">No compatible apps found</option>'}</select></div>${field("Application path (optional)","app_path","","Use a full .app path for an application outside discovery.","text",'placeholder="/Applications/Example.app"')}${field("Profile name","profile","","For example, Work, Personal, or Client.","text",'required maxlength="40" placeholder="Work"')}${identityFields()}${check("main","Open the original account","Create a Main launcher for the app’s existing account.")}<details class="advanced"><summary>Launch settings & advanced options</summary><div class="fields">${check("seed","Copy Claude’s MCP configuration","For Claude Desktop profiles only. Copies the existing configuration into the new profile.")}${area("Launch arguments","args","One allowed switch per line, for example --lang=de.")}${area("Environment variables","env","One allowed NAME=value per line. Values are never displayed in this dashboard.")}${check("own_extensions","Use a separate extensions folder","For VS Code-style applications.")}</div></details></div>`, "Create profile",async(data,el)=>{
-      const params={app:String(data.get("app_path")||"").trim()||data.get("app"),profile:data.get("profile"),color:data.get("color"),no_badge:data.has("no_badge"),main:data.has("main"),seed:data.has("seed"),args:lines(data.get("args")),env:lines(data.get("env")),own_extensions:data.has("own_extensions")};
+      const params={app:String(data.get("app_path")||"").trim()||data.get("app"),profile:data.get("profile"),no_badge:data.has("no_badge"),main:data.has("main"),seed:data.has("seed"),args:lines(data.get("args")),env:lines(data.get("env")),own_extensions:data.has("own_extensions")};
       if(data.get("badge")&&!params.no_badge)params.badge=data.get("badge");
+      if(data.get("color"))params.color=data.get("color");
       await action("add",params,el);showView("profiles",{app:""});
     });
     setupPreview();
@@ -381,7 +385,11 @@
     importDocument=null;
     showDialog("Import profile setup","Choose a JSON file created by aidentity export.",`<div class="field"><label for="import-file">Export file</label><input class="input file-input" type="file" id="import-file" accept=".json,application/json" required><p class="hint">Maximum file size: 4 MiB. Account sessions are not imported.</p></div><div id="import-preview" class="import-preview" hidden></div>`,"Build launchers",async(_,el)=>{
       if(!importDocument)throw new Error("Choose and review a valid aidentity export file first.");
-      await action("import",{document:importDocument,confirmed:true},el);showView("profiles",{app:""});
+      const result=await action("import",{document:importDocument,confirmed:true},el,{quiet:true});
+      // The CLI's own summary: "N created, N skipped, N failed." or "Nothing to create."/"Nothing to do." (exit 0).
+      const summary=String(result.stdout||"").split("\n").map(line=>line.trim()).filter(line=>/^\d+ created, |Nothing to (create|do)\./.test(line)).pop()||"The import finished.";
+      const made=Number(/^(\d+) created/.exec(summary)?.[1]||0);
+      toast(made?"Import complete":"Nothing imported",summary,!made);showView("profiles",{app:""});
     });
     $("#import-file").onchange=async event=>{
       importDocument=null;$("#import-preview").hidden=true;$("#form-error").hidden=true;
@@ -463,7 +471,7 @@
     const nav=event.target.closest("[data-view]");if(nav){query="";showView(nav.dataset.view);return;}
     const app=event.target.closest("[data-app-filter]");if(app){query="";statusFilter="all";showView("profiles",{app:app.dataset.appFilter});return;}
     const filter=event.target.closest("[data-filter]");if(filter){statusFilter=filter.dataset.filter;renderProfiles();positionTabs();return;}
-    const control=event.target.closest("[data-action]");if(control)handleAction(control.dataset.action,control).catch(error=>{if(!history[0]||history[0].ok)toast("Could not complete the action",error.message,true);});
+    const control=event.target.closest("[data-action]");if(control)handleAction(control.dataset.action,control).catch(error=>{if(!error.reported)toast("Could not complete the action",error.message,true);});
   });
   document.addEventListener("input",event=>{
     if(event.target.id!=="workspace-search")return;query=event.target.value;
