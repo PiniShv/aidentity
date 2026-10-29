@@ -21,9 +21,9 @@ Built for AI desktop apps like Claude and ChatGPT. Also tested with Slack, VS Co
 curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash
 ```
 
-<a href="https://aidentity.pinishv.com/assets/film.mp4"><img src="assets/film-poster.jpg" alt="Play the 20-second film, with sound: the same chat app open three times at once, one window for each account, each one signed in" width="800"></a>
+<a href="https://aidentity.pinishv.com/assets/film.mp4"><img src="assets/film-poster.jpg" alt="Play the 31-second film, with sound: signing out and in again to switch accounts, then the same chat app open three times at once, one window for each account, each one signed in" width="800"></a>
 
-<sub>A 20-second film, with sound. Click to play.</sub>
+<sub>A 31-second film, with sound. Click to play.</sub>
 
 </div>
 
