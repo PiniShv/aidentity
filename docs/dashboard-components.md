@@ -12,12 +12,14 @@ The dashboard adapts retrieved 21st.dev component source to dependency-free vani
 | Buttons | [Button by Origin UI](https://21st.dev/@originui/components/button), demo 146 | Primary, outline, secondary and destructive variants with a loading overlay that preserves button size. |
 | Loading | [Button Spinner by uiable](https://21st.dev/@uiable/components/uiable-spinner-button), demo 19975 | CSS border spinner inside pending actions with visible text and `aria-busy`. |
 | Notifications | [Toast by cnippet-dev](https://21st.dev/@cnippet-dev/components/toast), demo 24297 | Stacked status notifications, entrance/exit transitions, hover pause, timed dismissal, dismiss and activity actions. |
-| Explore preview | [Works Wheel by crafterui](https://21st.dev/@crafterui/components/works-wheel), demo 28371 | Spring-driven depth preview follows native scrolling through the real app/account list. Actions are visible immediately; the wheel never intercepts scrolling. |
+| Explore preview | [Works Wheel by crafterui](https://21st.dev/@crafterui/components/works-wheel), demo 28371 | Spring-driven depth preview follows the app/account list. Scrolling inside In focus switches apps independently; scrolling outside it moves the page normally. |
 
 The workspace uses near-black surfaces (`#060606`, `#0c0c0c`), warm-white text
 (`#f3f2ee`), muted gray (`#8d8b84`) and mint/cyan/blue accents. These color values
 are bundled; no external board or configuration file is read at runtime.
-Actual account badge colors remain user-controlled.
+Each app has a consistent color pair used in its navigation marker, card
+highlights, preview and contextual controls. Actual account badge colors remain
+user-controlled.
 Placement, sizing and motion were refined using the
 [Apple design skill](https://github.com/dickwu/apple-design-skill), particularly
 Apple's [Motion](https://developer.apple.com/design/human-interface-guidelines/motion)

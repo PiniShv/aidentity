@@ -489,6 +489,8 @@ Opens the visual account manager in your default browser at `127.0.0.1`, using
 an available port. It shows your existing profiles and installed compatible
 apps. Explore groups those apps and their accounts into an actionable list.
 Normal page scrolling moves a 3D preview adapted from 21st.dev's Works Wheel.
+Scrolling inside In focus switches apps without moving the page, including at
+the first and last app. Its arrows and app picker also leave the page in place.
 Open and Manage are available beside each account, and Add account beside each
 installed app. The preview's selection matches the list; reduced motion keeps
 the same actions with a static preview.

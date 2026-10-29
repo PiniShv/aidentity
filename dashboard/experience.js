@@ -5,7 +5,7 @@
  * https://21st.dev/@crafterui/components/works-wheel
  * Retains Works Wheel's 3D drum/bow geometry and spring feedback. The former
  * tunnel introduction is replaced by real app/account rows; native page scroll
- * selects the app shown in depth. No gesture interception or runtime dependency.
+ * selects the app shown in depth. The focus panel switches apps independently.
  */
 (() => {
   "use strict";
@@ -65,6 +65,13 @@
     }
     const groups = [...groupsByName.values()].sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    const palette = ["#5fe08a", "#7c8cff", "#2fd4c0", "#ff8a3d", "#ff6fb5", "#ffd166", "#4cc3ff", "#b26bff"];
+    for (let i = 0; i < groups.length; i++) {
+      const accent = callbacks.appAccent?.(groups[i].name) || {};
+      groups[i].color = /^#[0-9a-f]{6}$/i.test(accent.color || "") ? accent.color : palette[i % palette.length];
+      groups[i].secondary = /^#[0-9a-f]{6}$/i.test(accent.secondary || "") ? accent.secondary : palette[(i + 3) % palette.length];
+    }
+    const accentStyle = group => `--app-color:${group.color};--app-color-secondary:${group.secondary}`;
     for (const group of groups) group.profiles.sort((a, b) =>
       Number(Boolean(b.main)) - Number(Boolean(a.main)) ||
       String(a.profile || a.name).localeCompare(String(b.profile || b.name), undefined, { numeric: true, sensitivity: "base" }));
@@ -75,6 +82,7 @@
     const reducedQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     let reduced = reducedQuery.matches, active = 0, target = 0, frame = 0;
     let disposed = false, isVisible = true, lastFrame = 0, drumR = 0, bow = 0, chosenScrollY = null;
+    let wheelPixels = 0, wheelStepTime = 0, wheelEventTime = 0;
     const rotation = new Spring(0, 380, 26);
     const cleanup = [], launching = new Set();
     const listen = (element, event, handler, options) => {
@@ -89,7 +97,7 @@
         <div class="xp-account-actions"><button type="button" class="xp-button xp-open" data-xp-open="${index}" aria-label="Open ${esc(profile.name)}"${missing ? ' disabled title="Reinstall the app before opening this account"' : ""}>Open ${arrow}</button><button type="button" class="xp-button xp-manage" data-xp-manage="${index}" aria-label="Manage ${esc(profile.name)}">Manage</button></div>
       </li>`;
     }).join("");
-    const face = group => `<span class="xp-face"><span class="xp-card-top"><span class="xp-app-icon">${icon(group.name)}</span><span class="xp-card-count">${accountCount(group.profiles.length)}</span></span><strong class="xp-card-name">${esc(group.name)}</strong><span class="xp-card-foot">${group.profiles.length ? `${group.profiles.filter(profile => profile.status === "running").length} running` : "Ready for your first account"}</span></span>`;
+    const face = group => `<span class="xp-face" style="${accentStyle(group)}"><span class="xp-card-top"><span class="xp-app-icon">${icon(group.name)}</span><span class="xp-card-count">${accountCount(group.profiles.length)}</span></span><strong class="xp-card-name">${esc(group.name)}</strong><span class="xp-card-foot">${group.profiles.length ? `${group.profiles.filter(profile => profile.status === "running").length} running` : "Ready for your first account"}</span></span>`;
     root.innerHTML = `<div class="xp-wrap${reduced ? " xp-reduced" : ""}">
       <header class="xp-header"><div><h1>Explore</h1><p>Choose an app. Open an account or add another.</p></div><button type="button" class="xp-button xp-workspace">All profiles ${arrow}</button></header>
       ${groups.length ? `<div class="xp-layout">
@@ -97,11 +105,11 @@
           <div class="xp-preview-top"><span>In focus</span><span class="xp-position">1 / ${groups.length}</span></div>
           <div class="xp-wheel" aria-hidden="true"><div class="xp-wheel-plane">${groups.map((group, i) => `<div class="xp-wheel-card" data-xp-card="${i}">${face(group)}</div>`).join("")}</div></div>
           <div class="xp-preview-bottom"><button type="button" class="xp-button xp-primary"></button><div class="xp-navigation"><button type="button" class="xp-button xp-prev" aria-label="Previous app">←</button><label class="xp-jump-label"><span class="xp-sr-only">Choose app</span><select class="xp-jump" aria-label="Choose app">${groups.map((group, i) => `<option value="${i}">${esc(group.name)}</option>`).join("")}</select></label><button type="button" class="xp-button xp-next" aria-label="Next app">→</button></div></div>
-          <p class="xp-preview-hint">The preview follows the app list.</p>
+          <p class="xp-preview-hint">Scroll here to switch apps.</p>
         </aside>
         <div class="xp-app-list" aria-label="Apps and accounts">
           <div class="xp-list-summary"><span>${groups.length} ${groups.length === 1 ? "app" : "apps"}</span><span>${accountCount(profiles.length)}</span></div>
-          ${groups.map((group, i) => `<section class="xp-app-group" data-xp-row="${esc(group.name)}" data-xp-group="${i}" aria-labelledby="xp-app-${i}">
+          ${groups.map((group, i) => `<section class="xp-app-group" style="${accentStyle(group)}" data-xp-row="${esc(group.name)}" data-xp-group="${i}" aria-labelledby="xp-app-${i}">
             <header class="xp-app-header"><button type="button" class="xp-app-select" data-xp-select="${i}" aria-label="Preview ${esc(group.name)}" aria-current="${i === 0 ? "true" : "false"}"><span class="xp-list-icon" aria-hidden="true">${icon(group.name)}</span><span><h2 id="xp-app-${i}">${esc(group.name)}</h2><span class="xp-app-meta">${accountCount(group.profiles.length)}${group.installed ? "" : " · App not found"}</span></span></button><button type="button" class="xp-button xp-add" data-xp-add="${i}"${group.installed ? "" : ' disabled title="Install the app before adding an account"'}>+ Add account</button></header>
             ${group.profiles.length ? `<ul class="xp-accounts">${profileRows(group)}</ul>` : '<p class="xp-account-empty">No accounts yet. Add one to get started.</p>'}
             <p class="xp-inline-feedback" role="status" aria-live="polite" hidden></p>
@@ -126,6 +134,8 @@
       if (!preview) return;
       const group = groups[active], runnable = firstRunnable(group);
       preview.dataset.xpPreview = group.name;
+      preview.style.setProperty("--app-color", group.color);
+      preview.style.setProperty("--app-color-secondary", group.secondary);
       preview.setAttribute("aria-label", `${group.name} preview, ${accountCount(group.profiles.length)}`);
       position.textContent = `${active + 1} / ${groups.length}`;
       jump.value = String(active);
@@ -158,12 +168,29 @@
       if (active !== index) { active = index; updateSelection(); }
       wake();
     }
-    function choose(index) {
+    function choose(index, reveal = false) {
       setActive(index);
-      // Native scrolling is immediate; the spring provides the selection feedback.
-      // This avoids a competing scroll animation and lets the next gesture interrupt.
-      rows[index]?.scrollIntoView({ block: "start", behavior: "auto" });
+      // Panel controls change only the selection. A list-row action can reveal
+      // that row, while ordinary scrolling outside the panel still selects rows.
+      if (reveal) rows[index]?.scrollIntoView({ block: "start", behavior: "auto" });
       chosenScrollY = window.scrollY;
+    }
+    function focusWheel(event) {
+      // Preserve browser zoom and horizontal-only gestures. Vertical scrolling belongs
+      // to this switcher, including at its bounds; it must not chain to the page.
+      if (event.ctrlKey || event.defaultPrevented || !event.deltaY) return;
+      event.preventDefault();
+      const now = performance.now();
+      const pixels = event.deltaY * (event.deltaMode === 1 ? 16 :
+        event.deltaMode === 2 ? preview.clientHeight : 1);
+      if (now - wheelEventTime > 180 || Math.sign(pixels) !== Math.sign(wheelPixels)) wheelPixels = 0;
+      wheelEventTime = now;
+      wheelPixels += pixels;
+      if (Math.abs(wheelPixels) >= 48 && now - wheelStepTime >= 120) {
+        choose(clamp(active + Math.sign(wheelPixels), 0, groups.length - 1));
+        wheelPixels = 0;
+        wheelStepTime = now;
+      }
     }
     function scrollSelection() {
       if (!preview || disposed) return;
@@ -270,8 +297,9 @@
       listen(prev, "click", () => choose(active - 1));
       listen(next, "click", () => choose(active + 1));
       listen(jump, "change", () => choose(Number(jump.value)));
-      selectButtons.forEach(button => listen(button, "click", () => choose(Number(button.dataset.xpSelect))));
+      selectButtons.forEach(button => listen(button, "click", () => choose(Number(button.dataset.xpSelect), true)));
       cards.forEach((card, index) => listen(card, "click", () => choose(index)));
+      listen(preview, "wheel", focusWheel, { passive: false });
       listen(document, "scroll", scrollSelection, { passive: true, capture: true });
       listen(window, "resize", measure, { passive: true });
       listen(document, "visibilitychange", () => {

@@ -16,8 +16,9 @@ dashboard must feel finished, animate smoothly, and be tested end to end.
 - Listen only on `127.0.0.1`, choose an available port by default, support an
   explicit `--port`, and provide `--no-open` for headless use. Ctrl+C stops it.
 - Use 21st.dev component adaptations for the core UI, with a Works Wheel depth
-  preview linked to the real app/account list in Explore. Native scrolling must
-  remain intact and every account action must be visible without learning the
+  preview linked to the real app/account list in Explore. Scrolling inside the
+  focus panel switches apps without scrolling the page; normal page scrolling
+  remains available outside the panel. Every account action must be visible without learning the
   animation. Apply the Apple design
   skill's web-app principles to placement and motion, without a runtime skill
   dependency.

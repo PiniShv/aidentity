@@ -47,6 +47,33 @@
   const colors = [["Mint","5FE08A"],["Periwinkle","7C8CFF"],["Teal","2FD4C0"],["Orange","FF8A3D"],["Pink","FF6FB5"],["Gold","FFD166"],["Sky","4CC3FF"],["Violet","B26BFF"],["Gray","8D8B84"],["Graphite","262624"]];
   const cliColors = {blue:"2E7DF6",green:"2FB344",red:"E5484D",orange:"F76B15",purple:"8E4EC6",pink:"D6409F",teal:"12A594",yellow:"F5B400",gray:"6B7280",grey:"6B7280",graphite:"1F2430",black:"1F2430"};
   const defaultBadgeColor="5FE08A";
+  const appPalette=["#5fe08a","#7c8cff","#2fd4c0","#ff8a3d","#ff6fb5","#ffd166","#4cc3ff","#b26bff"];
+  const appAccentAssignments=new Map();
+  const appKey=name=>String(name||"App").trim().toLowerCase();
+  function appHash(name){
+    let hash=2166136261;
+    for(const character of appKey(name))hash=Math.imul(hash^character.codePointAt(0),16777619)>>>0;
+    return hash;
+  }
+  function registerAppAccents(data){
+    const names=[...new Set([...(data.apps||[]).map(item=>item.name),...(data.profiles||[]).map(item=>item.app||"Unknown app")])].sort((a,b)=>a.localeCompare(b));
+    const used=new Set(names.map(name=>appAccentAssignments.get(appKey(name))).filter(index=>index!==undefined));
+    for(const name of names){
+      const key=appKey(name);if(appAccentAssignments.has(key))continue;
+      const preferred=appHash(name)%appPalette.length;
+      let index=preferred;
+      for(let offset=0;offset<appPalette.length;offset++){
+        const candidate=(preferred+offset)%appPalette.length;
+        if(!used.has(candidate)){index=candidate;break;}
+      }
+      appAccentAssignments.set(key,index);used.add(index);
+    }
+  }
+  function appAccent(name){
+    const index=appAccentAssignments.get(appKey(name))??appHash(name)%appPalette.length;
+    return {color:appPalette[index],secondary:appPalette[(index+3)%appPalette.length]};
+  }
+  const appTone=name=>{const tone=appAccent(name);return `--app-color:${tone.color};--app-color-secondary:${tone.secondary}`;};
   const navigation = [
     ["explore","Explore","explore"],["profiles","Profiles","grid"],["apps","Applications","apps"],
     ["recovery","Recovery","recovery"],["maintenance","Maintenance","tool"],["transfer","Import & export","transfer"]
@@ -105,10 +132,12 @@
   function renderNav() {
     $("#primary-nav").innerHTML=navigation.map(([id,label,glyph])=>`<button class="nav-item" data-view="${id}" title="${label}"${view===id?' aria-current="page"':""}>${icon(glyph)}<span class="nav-label">${label}</span></button>`).join("");
     const apps = [...new Set((state?.profiles || []).map(appName))].sort();
-    $("#app-nav").innerHTML=apps.map(name=>`<button class="nav-item nav-app" data-app-filter="${escape(name)}" title="${escape(name)}"><span class="app-mini">${appGlyph(name)}</span><span class="nav-label">${escape(name)}</span></button>`).join("") || '<p class="small nav-label" style="padding:0 12px">Add your first profile</p>';
+    $("#app-nav").innerHTML=apps.map(name=>`<button class="nav-item nav-app" style="${appTone(name)}" data-app-filter="${escape(name)}" title="${escape(name)}"><span class="app-mini"><span class="nav-app-dot" aria-hidden="true"></span></span><span class="nav-label">${escape(name)}</span></button>`).join("") || '<p class="small nav-label" style="padding:0 12px">Add your first profile</p>';
     $$(".sidebar-foot [data-view]").forEach(el=>el.setAttribute("aria-current",view===el.dataset.view?"page":"false"));
     $("#version").textContent=state?.version ? `aidentity ${String(state.version).replace(/^aidentity\s*/,"")}`:"aidentity";
     $("#breadcrumb").textContent=navigation.find(item=>item[0]===view)?.[1] || "Command guide";
+    const contextualApp=appFilter||state?.profiles.find(item=>item.name===selected)?.app;
+    $("#header-add").style.cssText=contextualApp?appTone(contextualApp):"--app-color:#7c8cff;--app-color-secondary:#2fd4c0";
   }
   function title(name,description,actions=""){return `<div class="title-row"><div><h1>${escape(name)}</h1><p>${escape(description)}</p></div>${actions?`<div class="title-actions">${actions}</div>`:""}</div>`;}
   function searchField(placeholder){return `<div class="search-field">${icon("search")}<input id="workspace-search" class="input" type="search" aria-label="${escape(placeholder)}" placeholder="${escape(placeholder)}" value="${escape(query)}">${query?`<button class="icon-button" data-action="clear-search" aria-label="Clear search">${icon("x")}</button>`:""}</div>`;}
@@ -141,6 +170,7 @@
       main.innerHTML='<div id="experience-root"></div>';
       if(window.AidentityExperience)cleanupExperience=window.AidentityExperience.mount($("#experience-root"),state,{
         renderAppIcon:appGlyph,
+        appAccent,
         openProfile:item=>{query="";statusFilter="all";showView("profiles",{profile:typeof item==="string"?item:item.name,app:""});},
         addProfile:app=>addDialog(app || ""),
         showProfiles:(app="")=>{query="";statusFilter="all";selected="";showView("profiles",{app:app || ""});},
@@ -165,7 +195,7 @@
     const visible=scoped.filter(item=>statusFilter==="all"||(statusFilter==="running"?item.status==="running":statusFilter==="attention"?item.status==="app missing":item.status!=="running"));
     const chosen=profile(selected);
     main.innerHTML=title(appFilter||"Profiles","Your accounts have their own space. Open one and pick up where you left off.")+
-      `<div class="stat-line"><span><strong class="num">${scoped.length}</strong> ${scoped.length===1?"profile":"profiles"}</span><span><span class="running-dot"></span><strong class="num">${running}</strong> running</span><span><strong class="num">${new Set(scoped.map(appName)).size}</strong> apps</span></div>`+
+      `<div class="stat-line"><span class="metric metric-profiles"><strong class="num">${scoped.length}</strong><span>${scoped.length===1?"profile":"profiles"}</span></span><span class="metric metric-running ${running?"has-value":"is-zero"}"><strong class="num">${running}</strong><span>running</span></span><span class="metric metric-apps"><strong class="num">${new Set(scoped.map(appName)).size}</strong><span>apps</span></span></div>`+
       tabs([["all","All profiles",scoped.length],["running","Running",running],["idle","At rest",scoped.length-running],["attention","Needs repair",scoped.filter(item=>item.status==="app missing").length]],statusFilter)+
       `<div class="toolbar">${searchField("Search profiles")}<div class="toolbar-end">${appFilter?button("All apps","all-apps",{small:true}):""}<select id="app-filter" aria-label="Filter by application"><option value="">All apps</option>${[...new Set(state.profiles.map(appName))].sort().map(name=>`<option${name===appFilter?" selected":""}>${escape(name)}</option>`).join("")}</select><span class="small">${visible.length} ${visible.length===1?"profile":"profiles"}</span></div></div>`+
       `<div class="profile-layout ${chosen?"":"no-selection"} ${mobileDetail?"mobile-detail":""}"><div class="profile-grid" data-count="${visible.length}">${visible.map(card).join("")||`<div class="empty-state"><h2>${state.profiles.length?"No matching profiles":"A new space for your next account"}</h2><p>${state.profiles.length?"Try another app or search.":"Choose an installed app, name the account, and create its own launcher."}</p>${button(state.profiles.length?"Clear filters":"Create your first profile",state.profiles.length?"reset-filters":"add",{primary:true,icon:state.profiles.length?"search":"plus"})}</div>`}</div>${chosen?detail(chosen):""}</div>`;
@@ -173,14 +203,14 @@
   // ravikatiyar162 ProfileCard structure: cover, offset identity, role/meta and
   // full-width action. Account badge replaces human avatar; CLI fields replace stats.
   function card(item){
-    return `<article class="profile-card ${selected===item.name?"selected":""}"><div class="profile-cover"><button class="icon-button" data-action="select" data-name="${escape(item.name)}" aria-label="Details for ${escape(item.name)}" title="Profile details">${icon("more")}</button></div><div class="profile-body">${art(appName(item),item.badge,item.color)}<button class="profile-name" data-action="select" data-name="${escape(item.name)}" title="${escape(item.name)}">${escape(item.profile||item.name)}</button><div class="profile-app">${escape(appName(item))}</div>${statusMark(item)}<div class="profile-meta"><span>${item.main?"Original account":"Separate account"}</span><span>${item.own_extensions?"Own extensions":`${(item.args||[]).length} ${(item.args||[]).length===1?"flag":"flags"}`}</span></div><button class="button open-profile ${item.status==="running"?"":"button-secondary"}" data-action="${item.status==="running"?"quit":"open"}" data-name="${escape(item.name)}">${icon(item.status==="running"?"stop":"play")}<span>${item.status==="running"?"Quit profile":"Open profile"}</span></button></div></article>`;
+    return `<article class="profile-card app-tone ${selected===item.name?"selected":""}" style="${appTone(appName(item))}"><div class="profile-cover"><button class="icon-button" data-action="select" data-name="${escape(item.name)}" aria-label="Details for ${escape(item.name)}" title="Profile details">${icon("more")}</button></div><div class="profile-body">${art(appName(item),item.badge,item.color)}<button class="profile-name" data-action="select" data-name="${escape(item.name)}" title="${escape(item.name)}">${escape(item.profile||item.name)}</button><div class="profile-app">${escape(appName(item))}</div>${statusMark(item)}<div class="profile-meta"><span>${item.main?"Original account":"Separate account"}</span><span>${item.own_extensions?"Own extensions":`${(item.args||[]).length} ${(item.args||[]).length===1?"flag":"flags"}`}</span></div><button class="button open-profile ${item.status==="running"?"":"button-secondary"}" data-action="${item.status==="running"?"quit":"open"}" data-name="${escape(item.name)}">${icon(item.status==="running"?"stop":"play")}<span>${item.status==="running"?"Quit profile":"Open profile"}</span></button></div></article>`;
   }
   function detail(item){
-    return `<aside class="detail-panel" aria-label="Selected profile details">${button("Back to profiles","back-profiles",{small:true,icon:"back"}).replace('class="button ','class="button detail-back ')}<div class="detail-top">${art(appName(item),item.badge,item.color)}<button class="icon-button" data-action="close-detail" aria-label="Close details">${icon("x")}</button></div><h2>${escape(item.name)}</h2><p class="small">${item.main?"Opens the app’s original account":"An independent account launcher"}</p>${statusMark(item)}<div class="detail-actions">${button(item.status==="running"?"Quit profile":"Open profile",item.status==="running"?"quit":"open",{primary:true,icon:item.status==="running"?"stop":"play",name:item.name})}${item.status==="running"?button("Bring to front","open",{icon:"play",name:item.name}):""}${button("Settings","settings",{icon:"settings",name:item.name})}</div><dl class="details"><div><dt>Application</dt><dd>${escape(item.app_path||appName(item))}</dd></div><div><dt>Profile data</dt><dd>${escape(item.main?"The app’s own original account":item.data_dir||"No folder recorded")}</dd></div><div><dt>Launch arguments</dt><dd>${(item.args||[]).length?(item.args||[]).map(arg=>`<code>${escape(arg)}</code>`).join("<br>"):"No additional arguments"}</dd></div><div><dt>Environment variables</dt><dd>${(item.env||[]).length?escape(item.env.join(", "))+"<br><span class='small'>Values stay private</span>":"None configured"}</dd></div><div><dt>Extensions</dt><dd>${item.own_extensions?"Separate extensions folder":"App’s default extensions"}</dd></div><div><dt>Launcher version</dt><dd>${escape(item.built_by||"Not recorded")}</dd></div></dl><div class="detail-footer">${button("Rename","rename",{small:true,icon:"rename",name:item.name})}${button("Rebuild","rebuild",{small:true,icon:"refresh",name:item.name})}${button("Remove","remove",{small:true,danger:true,icon:"trash",name:item.name})}</div></aside>`;
+    return `<aside class="detail-panel app-tone" style="${appTone(appName(item))}" aria-label="Selected profile details">${button("Back to profiles","back-profiles",{small:true,icon:"back"}).replace('class="button ','class="button detail-back ')}<div class="detail-top">${art(appName(item),item.badge,item.color)}<button class="icon-button" data-action="close-detail" aria-label="Close details">${icon("x")}</button></div><h2>${escape(item.name)}</h2><p class="small">${item.main?"Opens the app’s original account":"An independent account launcher"}</p>${statusMark(item)}<div class="detail-actions">${button(item.status==="running"?"Quit profile":"Open profile",item.status==="running"?"quit":"open",{primary:true,icon:item.status==="running"?"stop":"play",name:item.name})}${item.status==="running"?button("Bring to front","open",{icon:"play",name:item.name}):""}${button("Settings","settings",{icon:"settings",name:item.name})}</div><dl class="details"><div><dt>Application</dt><dd>${escape(item.app_path||appName(item))}</dd></div><div><dt>Profile data</dt><dd>${escape(item.main?"The app’s own original account":item.data_dir||"No folder recorded")}</dd></div><div><dt>Launch arguments</dt><dd>${(item.args||[]).length?(item.args||[]).map(arg=>`<code>${escape(arg)}</code>`).join("<br>"):"No additional arguments"}</dd></div><div><dt>Environment variables</dt><dd>${(item.env||[]).length?escape(item.env.join(", "))+"<br><span class='small'>Values stay private</span>":"None configured"}</dd></div><div><dt>Extensions</dt><dd>${item.own_extensions?"Separate extensions folder":"App’s default extensions"}</dd></div><div><dt>Launcher version</dt><dd>${escape(item.built_by||"Not recorded")}</dd></div></dl><div class="detail-footer">${button("Rename","rename",{small:true,icon:"rename",name:item.name})}${button("Rebuild","rebuild",{small:true,icon:"refresh",name:item.name})}${button("Remove","remove",{small:true,danger:true,icon:"trash",name:item.name})}</div></aside>`;
   }
   function renderApps(){
     const apps=state.apps.filter(item=>!query||item.name.toLowerCase().includes(query.toLowerCase()));
-    main.innerHTML=title("Applications",`${state.apps.length} compatible ${state.apps.length===1?"app":"apps"} found on this Mac.`)+`<div class="toolbar">${searchField("Search installed apps")}</div><div class="apps-grid">${apps.map(item=>{const count=state.profiles.filter(p=>appName(p)===item.name).length;return `<article class="application-card">${art(item.name)}<h2>${escape(item.name)}</h2><p>${count} ${count===1?"profile":"profiles"} configured</p>${button("Add account","add",{icon:"plus",app:item.name})}</article>`;}).join("")||'<div class="empty-state"><h2>No compatible apps found</h2><p>Install a Chromium or Electron app, then refresh this workspace.</p>'+button("Refresh apps","refresh",{icon:"refresh"})+"</div>"}</div>`;
+    main.innerHTML=title("Applications",`${state.apps.length} compatible ${state.apps.length===1?"app":"apps"} found on this Mac.`)+`<div class="toolbar">${searchField("Search installed apps")}</div><div class="apps-grid">${apps.map(item=>{const count=state.profiles.filter(p=>appName(p)===item.name).length;return `<article class="application-card app-tone" style="${appTone(item.name)}">${art(item.name)}<h2>${escape(item.name)}</h2><p>${count} ${count===1?"profile":"profiles"} configured</p>${button("Add account","add",{icon:"plus",app:item.name})}</article>`;}).join("")||'<div class="empty-state"><h2>No compatible apps found</h2><p>Install a Chromium or Electron app, then refresh this workspace.</p>'+button("Refresh apps","refresh",{icon:"refresh"})+"</div>"}</div>`;
   }
   function renderRecovery(){
     const entries=state.restorable||[];
@@ -208,6 +238,7 @@
       const data=await response.json();
       if(!response.ok||!data.ok)throw new Error(data.error||"Could not read the workspace.");
       const firstLoad=!state;
+      registerAppAccents(data);
       state=data;loadedAt=new Date();$("#freshness").textContent=`Updated ${time(loadedAt)}`;
       const current=JSON.stringify({version:data.version,profiles:data.profiles,apps:data.apps,restorable:data.restorable,errors:data.errors});
       renderNav();
@@ -271,6 +302,7 @@
   function showDialog(titleText,description,body,submitText,submit,{danger=false}={}){
     clearTimeout(dialogCloseTimer);dialogRevision++;
     lastFocus=document.activeElement;dialogSubmit=submit;dialog.classList.remove("closing");
+    dialog.classList.add("app-tone");dialog.style.cssText=appTone(appFilter||profile(selected)?.app||"App");
     dialog.innerHTML=`<form id="dialog-form" class="dialog-inner"><header class="dialog-header"><h2 id="dialog-title">${escape(titleText)}</h2><p id="dialog-description">${escape(description)}</p><button type="button" class="icon-button" data-close-dialog aria-label="Close dialog">${icon("x")}</button></header><div class="dialog-body">${body}<div id="form-error" class="form-error" role="alert" hidden></div></div><footer class="dialog-footer"><button type="button" class="button" data-close-dialog>Cancel</button><button type="submit" class="button ${danger?"button-danger":"button-primary"}" id="dialog-submit">${escape(submitText)}</button></footer></form>`;
     dialog.showModal();
     animateMotion($(".dialog-header",dialog),[{opacity:0,translate:"0 5px"},{opacity:1,translate:"0 0"}],"surface",{duration:420,delay:25});
@@ -319,6 +351,7 @@
     const name=$('[name="profile"]',dialog)?.value||preview.dataset.profile||"Work";
     const badge=$('[name="no_badge"]',dialog)?.checked?null:$('[name="badge"]',dialog)?.value||[...name][0]?.toUpperCase();
     const raw=$('[name="color"]',dialog)?.value||defaultBadgeColor;const hex=cliColors[raw.toLowerCase()]||raw;
+    preview.classList.add("app-tone");preview.style.cssText=appTone(app);dialog.style.cssText=appTone(app);
     preview.innerHTML=art(app,badge,hex)+`<div><strong>${escape(app)} ${escape(name)}</strong><span class="small">Your account launcher</span></div>`;
   }
   function settingsDialog(item){
