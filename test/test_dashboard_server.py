@@ -33,6 +33,8 @@ class DashboardTests(unittest.TestCase):
             "import json, os, sys, time\n"
             "a=sys.argv[1:]\n"
             "with open(os.environ['DASHBOARD_TEST_LOG'],'a') as f: f.write(json.dumps(a)+'\\n')\n"
+            "d=os.path.join(os.environ['HOME'],'delay')\n"
+            "if os.path.exists(d): time.sleep(float(open(d).read()))\n"
             "if a == ['list','--json']:\n"
             " print(json.dumps([{'name':'Claude Work','app':'Claude','app_path':'/Apps/Claude.app',"
             "'profile':'Work','data_dir':'/Data/claude-work','main':False,'status':'running',"
@@ -49,9 +51,10 @@ class DashboardTests(unittest.TestCase):
             "elif a == ['doctor','--fix']:\n"
             " print('Cannot repair this fixture',file=sys.stderr); sys.exit(2)\n"
             "elif a == ['help','slow']: time.sleep(5)\n"
-            "elif a == ['help','cleanup']:\n"
+            "elif a in (['help','cleanup'],['help','slowcleanup']):\n"
             " import signal\n"
             " def cleanup(sig, frame):\n"
+            "  time.sleep(1.5 if a[1] == 'slowcleanup' else 0)\n"
             "  with open(os.environ['DASHBOARD_TEST_CLEANUP'],'w') as f: f.write('cleaned')\n"
             "  sys.exit(143)\n"
             " signal.signal(signal.SIGTERM,cleanup); time.sleep(5)\n"
@@ -146,6 +149,20 @@ class DashboardTests(unittest.TestCase):
             "--env", "HTTPS_PROXY=https://alice:private@proxy.example"])
         self.assertNotIn("private", result["stdout"])
 
+    def test_short_env_values_do_not_corrupt_output(self):
+        status, _, result = self.action({
+            "action": "add", "app": "Claude", "profile": "Work",
+            "env": ["LANG=de", "LC_ALL=C", "TZ=UTC", "API_TOKEN=hunter2", "PROXY_TOKEN=s3cr3t-value"]})
+        self.assertEqual(status, 200)
+        argv = json.loads(result["stdout"])
+        self.assertEqual(argv[:4], ["add", "Claude", "--profile", "Work"])
+        self.assertEqual(argv[5::2], ["LANG=[hidden]", "LC_ALL=[hidden]", "TZ=[hidden]",
+                                      "API_TOKEN=[hidden]", "PROXY_TOKEN=[hidden]"])
+        self.assertEqual(self.module.redact("Created launcher Claude Work", ["LANG=de"]),
+                         "Created launcher Claude Work")
+        self.assertEqual(self.module.redact("token s3cr3t-value", ["PROXY_TOKEN=s3cr3t-value"]),
+                         "token [hidden]")
+
     def test_set_only_sends_requested_settings(self):
         _, _, result = self.action({
             "action": "set", "name": "Claude Work", "clear_args": True,
@@ -201,6 +218,18 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(self.calls(), [["import", "/dev/stdin", "--yes"]])
         self.assertEqual(set(self.root.iterdir()) - before, {self.log})
 
+    def test_import_rejects_out_of_range_numbers(self):
+        for raw in (
+            b'{"action":"import","confirmed":true,"document":{"launchers":[],"n":1e999}}',
+            json.dumps({"action": "import", "confirmed": True,
+                        "document": '{"launchers":[],"n":NaN}'}).encode(),
+        ):
+            with self.subTest(raw=raw):
+                status, _, result = self.request("POST", "/api/action", raw=raw)
+                self.assertEqual(status, 400)
+                self.assertEqual(result["error"], "The import document contains an invalid number.")
+        self.assertEqual(self.calls(), [])
+
     def test_export_is_valid_recipe_output(self):
         _, _, result = self.action({"action": "export"})
         self.assertEqual(json.loads(result["stdout"])["aidentity_export"], 1)
@@ -226,6 +255,36 @@ class DashboardTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertNotIn("alice:private", result["stdout"])
         self.assertIn("proxy.example:8080", result["stdout"])
+
+    def test_proxy_passwords_with_separators_are_hidden(self):
+        cases = {
+            "--proxy-server=user:p=ss@host:1080": "--proxy-server=[hidden]@host:1080",
+            "--proxy-server=user:pa;ss@host:1080": "--proxy-server=[hidden]@host:1080",
+            "--proxy-server=user:pa@ss@host:1080": "--proxy-server=[hidden]@host:1080",
+            "--proxy-server=user:pa:ss@host:1080": "--proxy-server=[hidden]@host:1080",
+            "--proxy-server=https=user:p;a=s@s:s@host:443": "--proxy-server=https=[hidden]@host:443",
+            "--proxy-server=socks5://user:pa/ss@host:1080": "--proxy-server=socks5://[hidden]@host:1080",
+            "--proxy-server=http=ann:one@a:80;https=bob:two@b:443": "--proxy-server=http=[hidden]@b:443",
+        }
+        for value, expected in cases.items():
+            with self.subTest(value=value):
+                self.assertEqual(self.module.redact(value), expected)
+
+    def test_terminal_escape_stripping_is_linear(self):
+        self.assertEqual(self.module.redact(
+            "\x1b[31mred\x1b[0m \x1b]8;;https://x\x1b\\link\x1b]8;;\x07"), "red link")
+        started = time.monotonic()
+        self.module.redact("\x1b]" * 50000)
+        self.assertLess(time.monotonic() - started, 1)
+
+    def test_state_reads_inventory_concurrently(self):
+        self.backend.timeout = 5
+        (self.root / "delay").write_text("0.5")
+        started = time.monotonic()
+        state = self.backend.state()
+        self.assertLess(time.monotonic() - started, 1.5)
+        self.assertEqual(state["errors"], [])
+        self.assertEqual(state["version"], "1.6.1")
 
     def test_output_limit_reports_failure(self):
         _, _, result = self.action({"action": "help", "command": "flood"})
@@ -253,6 +312,33 @@ class DashboardTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("timed out", result["error"])
         self.assertTrue((self.root / "cleaned").exists(), "The CLI cleanup trap never ran.")
+
+    def test_timeout_gives_slow_rollback_trap_time_to_finish(self):
+        _, _, result = self.action({"action": "help", "command": "slowcleanup"})
+        self.assertIn("timed out", result["error"])
+        self.assertTrue((self.root / "cleaned").exists(), "The CLI cleanup trap was killed.")
+
+    def test_bulk_actions_use_the_long_timeout(self):
+        self.backend.timeout = 0.1
+        self.backend.bulk_timeout = 5
+        (self.root / "delay").write_text("0.3")
+        for payload in (
+            {"action": "restore", "all": True}, {"action": "rebuild", "all": True},
+            {"action": "doctor", "fix": True}, {"action": "update"},
+            {"action": "import", "document": {"launchers": []}, "confirmed": True},
+        ):
+            with self.subTest(payload=payload):
+                _, _, result = self.action(payload)
+                self.assertNotIn("error", result)
+        _, _, result = self.action({"action": "update", "check": True})
+        self.assertIn("timed out", result["error"])
+
+    def test_incomplete_body_times_out_with_408(self):
+        self.server.RequestHandlerClass.timeout = 0.3
+        status, _, result = self.request("POST", "/api/action", raw=b'{"action":"help"}',
+                                         headers={"Content-Length": "100"})
+        self.assertEqual(status, 408)
+        self.assertFalse(result["ok"])
 
     def test_foreign_host_origin_and_fetch_site_cannot_run_actions(self):
         for headers in (

@@ -1,5 +1,6 @@
 """Optional, loopback-only dashboard; all operations use the existing CLI."""
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -9,6 +10,7 @@ from pathlib import Path
 import re
 import secrets
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -18,9 +20,13 @@ from urllib.parse import urlsplit
 MAX_BODY = 5 * 1024 * 1024
 MAX_DOCUMENT = 4 * 1024 * 1024
 MAX_OUTPUT = 4 * 1024 * 1024
-ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
+MIN_SECRET = 8
+TERM_GRACE = 10
+BULK_COMMANDS = (["restore", "--all"], ["rebuild", "--all"], ["doctor", "--fix"], ["update"])
+ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
 URL_CREDENTIALS = re.compile(r"\b([a-zA-Z][a-zA-Z0-9+.-]{0,31}://)[^\s/\"']*@")
 PROXY_ARGUMENT = re.compile(r"(--proxy-server=)([^\s\"']+)")
+PROXY_PREFIX = re.compile(r"(?:(?:https?|ftp|socks)=)?(?:[a-zA-Z][a-zA-Z0-9+.-]{0,31}://)?")
 
 
 class RequestError(Exception):
@@ -53,25 +59,25 @@ def flag(payload, key):
 
 def redact(value, hidden=()):
     value = ANSI.sub("", value)
-    for secret_value in sorted(set(hidden), key=len, reverse=True):
-        if secret_value:
-            value = value.replace(secret_value, "[hidden]")
+    patterns = set()
+    for entry in hidden:
+        name, secret_value = entry.split("=", 1)
+        # A short value such as LANG=de also occurs inside words, so it is hidden only after its name.
+        if len(secret_value) >= MIN_SECRET:
+            patterns.add((len(secret_value), re.escape(secret_value)))
+        elif secret_value:
+            patterns.add((len(secret_value), "(?<=" + re.escape(name + "=") + ")" + re.escape(secret_value)))
+    if patterns:
+        # One pass, so a shorter value cannot match inside an earlier [hidden] marker.
+        value = re.sub("|".join(pattern for _, pattern in sorted(patterns, reverse=True)), "[hidden]", value)
     value = URL_CREDENTIALS.sub(r"\1[hidden]@", value)
 
     def proxy(match):
-        segments = []
-        for segment in match[2].split(";"):
-            if "@" in segment:
-                prefix = ""
-                if "=" in segment:
-                    prefix, segment = segment.split("=", 1)
-                    prefix += "="
-                if "://" in segment:
-                    scheme, segment = segment.split("://", 1)
-                    prefix += scheme + "://"
-                segment = prefix + "[hidden]@" + segment.rsplit("@", 1)[1]
-            segments.append(segment)
-        return match[1] + ";".join(segments)
+        # A password may contain ; = @ and :, so everything up to the last @ is hidden.
+        rules = match[2]
+        if "@" not in rules:
+            return match[0]
+        return match[1] + rules[:PROXY_PREFIX.match(rules).end()] + "[hidden]" + rules[rules.rindex("@"):]
 
     return PROXY_ARGUMENT.sub(proxy, value)
 
@@ -93,7 +99,7 @@ def terminate(process):
     except ProcessLookupError:
         return
     try:
-        process.wait(timeout=1)
+        process.wait(timeout=TERM_GRACE)
     except subprocess.TimeoutExpired:
         pass
     # A child may ignore TERM even after the CLI itself has exited.
@@ -139,10 +145,11 @@ def same_user_peer(peer, local):
 
 
 class Dashboard:
-    def __init__(self, cli, env=None, timeout=120):
+    def __init__(self, cli, env=None, timeout=120, bulk_timeout=1800):
         self.cli = os.path.abspath(cli)
         self.env = dict(os.environ if env is None else env)
         self.timeout = timeout
+        self.bulk_timeout = bulk_timeout
         self.csrf_token = secrets.token_urlsafe(32)
         self.lock = threading.RLock()
         self.process_lock = threading.Lock()
@@ -157,7 +164,7 @@ class Dashboard:
         for process in active:
             terminate(process)
 
-    def run(self, argv, stdin=None):
+    def run(self, argv, stdin=None, timeout=None):
         """Bound output and kill the complete CLI process group on timeout."""
         try:
             with self.process_lock:
@@ -214,7 +221,7 @@ class Dashboard:
             writer.start()
         error = None
         try:
-            code = process.wait(timeout=self.timeout)
+            code = process.wait(timeout=self.timeout if timeout is None else timeout)
         except subprocess.TimeoutExpired:
             stop()
             code = process.wait()
@@ -236,11 +243,10 @@ class Dashboard:
         return result
 
     def state(self):
-        with self.lock:
-            listing = self.run(["list", "--json"])
-            apps = self.run(["__complete", "apps"])
-            restorable = self.run(["__complete", "restorable"])
-            version = self.run(["version"])
+        commands = (["list", "--json"], ["__complete", "apps"], ["__complete", "restorable"], ["version"])
+        # The reads are independent; the lock still keeps them and every action apart.
+        with self.lock, ThreadPoolExecutor(len(commands)) as pool:
+            listing, apps, restorable, version = pool.map(self.run, commands)
         errors = []
         for label, result in (("Profiles", listing), ("Installed apps", apps),
                               ("Restorable profiles", restorable), ("Version", version)):
@@ -324,7 +330,7 @@ class Dashboard:
                     if key == "env":
                         if "=" not in value:
                             raise RequestError("Each environment setting must use NAME=value.")
-                        hidden.append(value.split("=", 1)[1])
+                        hidden.append(value)
                     argv += [option, value]
         elif action in {"open", "quit", "rename", "remove"}:
             argv.append(text(payload.get("name"), "name", maximum=255))
@@ -362,13 +368,15 @@ class Dashboard:
                     raise RequestError("The import document is not valid JSON.")
             if not isinstance(document, dict):
                 raise RequestError("The import document must be an exported JSON object.")
-            stdin = json.dumps(document, ensure_ascii=False, allow_nan=False).encode("utf-8")
+            try:
+                stdin = json.dumps(document, ensure_ascii=False, allow_nan=False).encode("utf-8")
+            except ValueError:
+                raise RequestError("The import document contains an invalid number.")
             if len(stdin) > MAX_DOCUMENT:
                 raise RequestError("The import document exceeds the 4 MB limit.", 413)
             for launcher in document.get("launchers", []) if isinstance(document.get("launchers"), list) else []:
                 if isinstance(launcher, dict) and isinstance(launcher.get("env"), list):
-                    hidden += [value.split("=", 1)[1] for value in launcher["env"]
-                               if isinstance(value, str) and "=" in value]
+                    hidden += [value for value in launcher["env"] if isinstance(value, str) and "=" in value]
             argv += ["/dev/stdin", "--yes"]
         elif action == "update":
             if flag(payload, "check"):
@@ -385,8 +393,9 @@ class Dashboard:
 
     def action(self, payload):
         action, argv, stdin, hidden = self.command(payload)
+        timeout = self.bulk_timeout if action == "import" or argv in BULK_COMMANDS else self.timeout
         with self.lock:
-            result = self.run(argv, stdin)
+            result = self.run(argv, stdin, timeout)
         result["action"] = action
         # The deliberate export download retains the CLI's complete recipe.
         if action != "export":
@@ -400,10 +409,7 @@ def make_server(dashboard, port=0, assets=None):
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.0"
-
-        def setup(self):
-            super().setup()
-            self.connection.settimeout(10)
+        timeout = 10
 
         def log_message(self, format, *args):
             # Request bodies, query strings and command output may contain secrets.
@@ -502,7 +508,7 @@ def make_server(dashboard, port=0, assets=None):
                 self.respond(exc.status, {"ok": False, "error": str(exc)})
             except (BrokenPipeError, ConnectionResetError):
                 pass
-            except TimeoutError:
+            except (TimeoutError, socket.timeout):
                 self.respond(408, {"ok": False, "error": "The request body timed out."})
             except Exception:
                 self.respond(500, {"ok": False, "error": "Could not complete the dashboard action."})
