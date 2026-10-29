@@ -9,8 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A 20-second film, at the top of the README and in the first section of the
-  site. On the site it plays muted while it is on screen. **Watch with sound**
+- A 31-second film, at the top of the README and in the first section of the
+  site. It shows the problem first: to switch accounts, you sign out and sign in
+  again, and you lose your open chats. Then it shows every account open at
+  once. On the site it plays muted while it is on screen. **Watch with sound**
   starts it again from the beginning, with the narration, and a button turns
   its captions on.
   `assets/film/` holds its source, and `assets/film/build.sh` makes it again
