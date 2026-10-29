@@ -12,10 +12,12 @@ The dashboard adapts retrieved 21st.dev component source to dependency-free vani
 | Buttons | [Button by Origin UI](https://21st.dev/@originui/components/button), demo 146 | Primary, outline, secondary and destructive variants with a loading overlay that preserves button size. |
 | Loading | [Button Spinner by uiable](https://21st.dev/@uiable/components/uiable-spinner-button), demo 19975 | CSS border spinner inside pending actions with visible text and `aria-busy`. |
 | Notifications | [Toast by cnippet-dev](https://21st.dev/@cnippet-dev/components/toast), demo 24297 | Stacked status notifications, entrance/exit transitions, hover pause, timed dismissal, dismiss and activity actions. |
-| Explore tunnel | [Perspective Tunnel Hero by daiwiikharihar](https://21st.dev/@daiwiikharihar/components/perspective-tunnel-hero), demo 39043 | See `experience.js` and `experience.css` for the scroll-driven visual adaptation. |
-| Explore wheel | [Works Wheel by crafterui](https://21st.dev/@crafterui/components/works-wheel), demo 28371 | See `experience.js` and `experience.css` for the profile wheel adaptation. |
+| Explore preview | [Works Wheel by crafterui](https://21st.dev/@crafterui/components/works-wheel), demo 28371 | Spring-driven depth preview follows native scrolling through the real app/account list. Actions are visible immediately; the wheel never intercepts scrolling. |
 
-The workspace uses a warm near-black ground and actual account badge colors.
+The workspace uses near-black surfaces (`#060606`, `#0c0c0c`), warm-white text
+(`#f3f2ee`), muted gray (`#8d8b84`) and mint/cyan/blue accents. These color values
+are bundled; no external board or configuration file is read at runtime.
+Actual account badge colors remain user-controlled.
 Placement, sizing and motion were refined using the
 [Apple design skill](https://github.com/dickwu/apple-design-skill), particularly
 Apple's [Motion](https://developer.apple.com/design/human-interface-guidelines/motion)
@@ -23,7 +25,7 @@ and [Layout](https://developer.apple.com/design/human-interface-guidelines/layou
 guidance. That skill is a design reference, not a build or runtime dependency.
 
 Controls use a short sampled spring; panels use a softer spring. The Explore
-camera and wheel use time-based damped springs that retain velocity when gestures
-change direction, and stop requesting frames at rest. These spring parameters
+preview uses a time-based damped spring that retains velocity when selection
+changes, and stops requesting frames at rest. These spring parameters
 are design choices rather than Apple-prescribed values. Reduced motion replaces
 the spatial scenes with static, keyboard-accessible content.

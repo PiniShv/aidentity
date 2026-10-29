@@ -487,8 +487,11 @@ aidentity dashboard
 
 Opens the visual account manager in your default browser at `127.0.0.1`, using
 an available port. It shows your existing profiles and installed compatible
-apps. The Explore view adds the Perspective Tunnel Hero and Works Wheel from
-21st.dev, adapted to browse those actual identities.
+apps. Explore groups those apps and their accounts into an actionable list.
+Normal page scrolling moves a 3D preview adapted from 21st.dev's Works Wheel.
+Open and Manage are available beside each account, and Add account beside each
+installed app. The preview's selection matches the list; reduced motion keeps
+the same actions with a static preview.
 
 The workspace can create, open, quit, rename and customize profiles, including
 Main accounts, Claude seeding, badges, launch switches, environment settings

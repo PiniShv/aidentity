@@ -15,12 +15,14 @@ dashboard must feel finished, animate smoothly, and be tested end to end.
   distribution. Source remains editable separately under `dashboard/`.
 - Listen only on `127.0.0.1`, choose an available port by default, support an
   explicit `--port`, and provide `--no-open` for headless use. Ctrl+C stops it.
-- Use 21st.dev component adaptations for the core UI, with the requested
-  Perspective Tunnel Hero and Works Wheel in Explore. Apply the Apple design
+- Use 21st.dev component adaptations for the core UI, with a Works Wheel depth
+  preview linked to the real app/account list in Explore. Native scrolling must
+  remain intact and every account action must be visible without learning the
+  animation. Apply the Apple design
   skill's web-app principles to placement and motion, without a runtime skill
   dependency.
-- Use a neutral dark account workspace, warm white text and a restrained coral
-  accent. Profile badge colors retain their meaning. Transitions respect reduced
+- Use near-black surfaces, warm white text, muted gray and mint/cyan/blue accents.
+  Profile badge colors retain their meaning. Transitions respect reduced
   motion. Search, filters, dialogs and navigation work with a keyboard.
 
 ## Scope

@@ -3,19 +3,18 @@
  * https://21st.dev/@daiwiikharihar/components/perspective-tunnel-hero
  * Works Wheel — crafterui, demo 28371
  * https://21st.dev/@crafterui/components/works-wheel
- * Retains their golden-angle/Z-depth and ring-to-drum geometry; replaces React
- * with a disposable DOM controller, real local profiles and accessible controls.
+ * Retains Works Wheel's 3D drum/bow geometry and spring feedback. The former
+ * tunnel introduction is replaced by real app/account rows; native page scroll
+ * selects the app shown in depth. No gesture interception or runtime dependency.
  */
 (() => {
   "use strict";
   const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
-  const lerp = (a, b, t) => a + (b - a) * t;
   const rad = degrees => degrees * Math.PI / 180;
   const esc = value => String(value ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const color = value => /^[0-9a-f]{6}$/i.test(value || "") ? `#${value}` : "#e3a17e";
+  const profileColor = value => /^[0-9a-f]{6}$/i.test(value || "") ? `#${value}` : "var(--accent)";
   const arrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
-
   // An analytic damped spring keeps gesture velocity when its target changes.
   // Values are design choices; Apple HIG Motion calls for brief, realistic,
   // interruptible feedback, not a prescribed stiffness or damping.
@@ -53,126 +52,151 @@
   }
 
   function mount(root, state, callbacks = {}) {
-    const all = state.profiles.length
-      ? state.profiles.map(p => ({ title: p.name, app: p.app || "App", sub: p.profile,
-        color: color(p.color), badge: p.badge || p.app?.slice(0, 1) || "A", profile: p,
-        status: p.status }))
-      : state.apps.map(a => ({ title: a.name, app: a.name, sub: "Create your first profile",
-        color: "#e3a17e", badge: a.name.slice(0, 1), status: "Available on this Mac" }));
-    const items = all.slice(0, 12);
+    const profiles = Array.isArray(state.profiles) ? state.profiles : [];
+    const discovered = Array.isArray(state.apps) ? state.apps : [];
+    const groupsByName = new Map();
+    for (const app of discovered) {
+      if (app?.name) groupsByName.set(app.name, { name: app.name, installed: true, profiles: [] });
+    }
+    for (const profile of profiles) {
+      const name = profile.app || "Unknown app";
+      if (!groupsByName.has(name)) groupsByName.set(name, { name, installed: false, profiles: [] });
+      groupsByName.get(name).profiles.push(profile);
+    }
+    const groups = [...groupsByName.values()].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
+    for (const group of groups) group.profiles.sort((a, b) =>
+      Number(Boolean(b.main)) - Number(Boolean(a.main)) ||
+      String(a.profile || a.name).localeCompare(String(b.profile || b.name), undefined, { numeric: true, sensitivity: "base" }));
+    const icon = name => typeof callbacks.renderAppIcon === "function"
+      ? callbacks.renderAppIcon(name) : `<span aria-hidden="true">${esc([...name][0] || "A")}</span>`;
+    const accountCount = count => `${count} ${count === 1 ? "account" : "accounts"}`;
+    const firstRunnable = group => group.profiles.find(profile => profile.status !== "app missing");
     const reducedQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let reduced = reducedQuery.matches;
-    let frame = 0, disposed = false, settling = 0, turn = 0, target = 0;
-    let progress = 0.2, targetProgress = 0.2, px = 0, py = 0, tx = 0, ty = 0;
-    let stageW = 0, stageH = 0, wheelW = 0, wheelH = 0, active = 0, drag = null;
-    let isVisible = true;
-    let lastFrame = 0, drumR = 0, ringR = 0, bow = 0, ringScale = 1;
-    const camera = new Spring(progress, 180, 28);
-    const rotation = new Spring(turn, 380, 26);
-    const pointerX = new Spring(0, 500, 30), pointerY = new Spring(0, 500, 30);
-    const cleanup = [];
-    const listen = (el, type, handler, options) => {
-      el.addEventListener(type, handler, options);
-      cleanup.push(() => el.removeEventListener(type, handler, options));
+    let reduced = reducedQuery.matches, active = 0, target = 0, frame = 0;
+    let disposed = false, isVisible = true, lastFrame = 0, drumR = 0, bow = 0, chosenScrollY = null;
+    const rotation = new Spring(0, 380, 26);
+    const cleanup = [], launching = new Set();
+    const listen = (element, event, handler, options) => {
+      element.addEventListener(event, handler, options);
+      cleanup.push(() => element.removeEventListener(event, handler, options));
     };
-    const face = (item, index) => `<span class="xp-face" style="--identity:${item.color}">
-      <span class="xp-card-top"><span>${esc(item.app)}</span><span class="xp-dot"></span></span>
-      <span class="xp-monogram">${esc(item.badge)}</span>
-      <span class="xp-card-foot"><span>${esc(item.sub)}</span><span class="xp-card-number">${String(index + 1).padStart(2, "0")}</span></span>
-    </span>`;
+    const profileRows = group => group.profiles.map(profile => {
+      const index = profiles.indexOf(profile), missing = profile.status === "app missing";
+      return `<li class="xp-account">
+        <span class="xp-badge" style="--identity:${profileColor(profile.color)}" aria-hidden="true">${esc(profile.badge || (profile.profile || profile.name || "A").slice(0, 1))}</span>
+        <div class="xp-account-info"><strong>${esc(profile.profile || profile.name)}</strong><span class="xp-account-status${profile.status === "running" ? " xp-running" : missing ? " xp-missing" : ""}">${esc(profile.status || "Status unavailable")}${profile.main ? " · Original account" : ""}</span></div>
+        <div class="xp-account-actions"><button type="button" class="xp-button xp-open" data-xp-open="${index}" aria-label="Open ${esc(profile.name)}"${missing ? ' disabled title="Reinstall the app before opening this account"' : ""}>Open ${arrow}</button><button type="button" class="xp-button xp-manage" data-xp-manage="${index}" aria-label="Manage ${esc(profile.name)}">Manage</button></div>
+      </li>`;
+    }).join("");
+    const face = group => `<span class="xp-face"><span class="xp-card-top"><span class="xp-app-icon">${icon(group.name)}</span><span class="xp-card-count">${accountCount(group.profiles.length)}</span></span><strong class="xp-card-name">${esc(group.name)}</strong><span class="xp-card-foot">${group.profiles.length ? `${group.profiles.filter(profile => profile.status === "running").length} running` : "Ready for your first account"}</span></span>`;
     root.innerHTML = `<div class="xp-wrap${reduced ? " xp-reduced" : ""}">
-      <div class="xp-topline"><span>Your apps. Your space.</span><button type="button" class="xp-jump">Go to profiles ${arrow}</button></div>
-      <section class="xp-tunnel" aria-label="Perspective tunnel">
-        <div class="xp-stage">
-          <div class="xp-depth-rings" aria-hidden="true"><i></i><i></i><i></i></div>
-          <div class="xp-anchor"><span class="xp-eyebrow">aidentity / on your Mac</span><h1>One app.<br><em>Every you.</em></h1><p>All your accounts, open at once.<br>Make room for every side of you.</p></div>
-          <div class="xp-tunnel-plane" aria-hidden="true">${items.map((item, i) =>
-            `<div class="xp-tunnel-card">${face(item, i)}</div>`).join("")}</div>
-          <div class="xp-scroll-cue"><span>Scroll to step inside</span><span class="xp-scroll-stem"></span></div>
-          <span class="xp-stage-counter">${items.length ? String(all.length).padStart(2, "0") : "00"} ${state.profiles.length ? "profiles" : "available apps"} / one Mac</span>
+      <header class="xp-header"><div><h1>Explore</h1><p>Choose an app. Open an account or add another.</p></div><button type="button" class="xp-button xp-workspace">All profiles ${arrow}</button></header>
+      ${groups.length ? `<div class="xp-layout">
+        <aside class="xp-preview" data-xp-preview="${esc(groups[0].name)}" aria-label="Selected app preview">
+          <div class="xp-preview-top"><span>In focus</span><span class="xp-position">1 / ${groups.length}</span></div>
+          <div class="xp-wheel" aria-hidden="true"><div class="xp-wheel-plane">${groups.map((group, i) => `<div class="xp-wheel-card" data-xp-card="${i}">${face(group)}</div>`).join("")}</div></div>
+          <div class="xp-preview-bottom"><button type="button" class="xp-button xp-primary"></button><div class="xp-navigation"><button type="button" class="xp-button xp-prev" aria-label="Previous app">←</button><label class="xp-jump-label"><span class="xp-sr-only">Choose app</span><select class="xp-jump" aria-label="Choose app">${groups.map((group, i) => `<option value="${i}">${esc(group.name)}</option>`).join("")}</select></label><button type="button" class="xp-button xp-next" aria-label="Next app">→</button></div></div>
+          <p class="xp-preview-hint">The preview follows the app list.</p>
+        </aside>
+        <div class="xp-app-list" aria-label="Apps and accounts">
+          <div class="xp-list-summary"><span>${groups.length} ${groups.length === 1 ? "app" : "apps"}</span><span>${accountCount(profiles.length)}</span></div>
+          ${groups.map((group, i) => `<section class="xp-app-group" data-xp-row="${esc(group.name)}" data-xp-group="${i}" aria-labelledby="xp-app-${i}">
+            <header class="xp-app-header"><button type="button" class="xp-app-select" data-xp-select="${i}" aria-label="Preview ${esc(group.name)}" aria-current="${i === 0 ? "true" : "false"}"><span class="xp-list-icon" aria-hidden="true">${icon(group.name)}</span><span><h2 id="xp-app-${i}">${esc(group.name)}</h2><span class="xp-app-meta">${accountCount(group.profiles.length)}${group.installed ? "" : " · App not found"}</span></span></button><button type="button" class="xp-button xp-add" data-xp-add="${i}"${group.installed ? "" : ' disabled title="Install the app before adding an account"'}>+ Add account</button></header>
+            ${group.profiles.length ? `<ul class="xp-accounts">${profileRows(group)}</ul>` : '<p class="xp-account-empty">No accounts yet. Add one to get started.</p>'}
+            <p class="xp-inline-feedback" role="status" aria-live="polite" hidden></p>
+          </section>`).join("")}
         </div>
-      </section>
-      <section class="xp-collection" aria-labelledby="xp-collection-title">
-        <header class="xp-section-header"><div><span class="xp-eyebrow">A different perspective</span><h2 id="xp-collection-title">Your ${state.profiles.length ? "identities" : "apps"}, in orbit.</h2></div><p>Scroll, drag, or use the arrows.<br>Pick an ${state.profiles.length ? "account" : "app"} to make it yours.</p></header>
-        ${items.length ? `<div class="xp-wheel" tabindex="0" role="region" aria-label="Identity wheel. Use arrow keys to choose an item.">
-          <div class="xp-wheel-plane">${items.map((item, i) =>
-            `<button type="button" class="xp-wheel-card" data-index="${i}" aria-label="Select ${esc(item.title)}">${face(item, i)}</button>`).join("")}</div>
-          <div class="xp-ring-label">All together.<br><span>Entirely yours.</span></div>
-          <div class="xp-wheel-caption"><span class="xp-eyebrow">In focus</span><h3></h3><p></p></div>
-          <ol class="xp-index">${items.map((item, i) => `<li><button type="button" data-index="${i}"><span>${String(i + 1).padStart(2, "0")}</span>${esc(item.title)}</button></li>`).join("")}</ol>
-          <div class="xp-wheel-controls"><button type="button" class="xp-prev" aria-label="Previous identity">←</button><span class="xp-position" aria-live="polite"></span><button type="button" class="xp-next" aria-label="Next identity">→</button></div>
-        </div>
-        <div class="xp-selection"><div><span class="xp-selection-label">Selected ${state.profiles.length ? "profile" : "app"}</span><strong class="xp-selection-title"></strong></div><button type="button" class="xp-launch"></button></div>`
-          : `<div class="xp-no-apps"><h3>A little space for a new identity.</h3><p>Install a Chromium or Electron app, then add its first profile.</p><button type="button" class="xp-empty-add">Create a profile ${arrow}</button></div>`}
-        ${all.length > items.length ? `<p class="xp-more">Showing ${items.length} of ${all.length}. All profiles are available in your workspace.</p>` : ""}
-      </section>
-      <footer class="xp-end"><span class="xp-end-symbol" aria-hidden="true">a<span>i</span></span><h2>Less switching.<br>More being you.</h2><button type="button" class="xp-jump">Back to your workspace ${arrow}</button><p>Local to this Mac. Your original apps stay untouched.</p></footer>
+      </div>` : `<section class="xp-empty"><h2>No compatible apps found</h2><p>Install a Chromium or Electron app, then add an account.</p><button type="button" class="xp-button xp-primary xp-empty-add">Add an account ${arrow}</button></section>`}
     </div>`;
     const wrap = root.firstElementChild;
-    const tunnel = root.querySelector(".xp-tunnel");
-    const stage = root.querySelector(".xp-stage");
-    const anchor = root.querySelector(".xp-anchor");
-    const prompt = root.querySelector(".xp-scroll-cue");
-    const tunnelCards = [...root.querySelectorAll(".xp-tunnel-card")];
+    const preview = root.querySelector(".xp-preview");
     const wheel = root.querySelector(".xp-wheel");
-    const wheelPlane = root.querySelector(".xp-wheel-plane");
-    const wheelCards = [...root.querySelectorAll(".xp-wheel-card")];
-    const ringLabel = root.querySelector(".xp-ring-label");
-    const caption = root.querySelector(".xp-wheel-caption");
-    const indices = [...root.querySelectorAll(".xp-index button")];
-    const last = Math.max(items.length - 1, 0);
-    const to = next => { target = clamp(next, 0, last + 1); wake(); };
-    const launch = () => {
-      const item = items[active];
-      if (item?.profile) callbacks.openProfile?.(item.profile);
-      else callbacks.addProfile?.(item?.app || "");
-    };
-    root.querySelectorAll(".xp-jump").forEach(button =>
-      listen(button, "click", () => callbacks.showProfiles?.()));
-    const emptyAdd = root.querySelector(".xp-empty-add");
-    if (emptyAdd) listen(emptyAdd, "click", () => callbacks.addProfile?.(""));
+    const plane = root.querySelector(".xp-wheel-plane");
+    const cards = [...root.querySelectorAll(".xp-wheel-card")];
+    const rows = [...root.querySelectorAll(".xp-app-group")];
+    const primary = root.querySelector(".xp-preview .xp-primary");
+    const jump = root.querySelector(".xp-jump");
+    const prev = root.querySelector(".xp-prev"), next = root.querySelector(".xp-next");
+    const position = root.querySelector(".xp-position");
+    const selectButtons = [...root.querySelectorAll("[data-xp-select]")];
+    const openButtons = [...root.querySelectorAll("[data-xp-open]")];
 
     function updateSelection() {
-      if (!wheel) return;
-      const item = items[active];
-      caption.querySelector("h3").textContent = item.title;
-      caption.querySelector("p").textContent = item.status;
-      root.querySelector(".xp-selection-title").textContent = item.title;
-      root.querySelector(".xp-launch").textContent = item.profile ? "Manage profile ↗" : "Create profile ↗";
-      root.querySelector(".xp-position").textContent = `${active + 1} / ${items.length}`;
-      for (let i = 0; i < indices.length; i++) {
-        indices[i].setAttribute("aria-current", i === active ? "true" : "false");
-        wheelCards[i].setAttribute("aria-pressed", i === active ? "true" : "false");
+      if (!preview) return;
+      const group = groups[active], runnable = firstRunnable(group);
+      preview.dataset.xpPreview = group.name;
+      preview.setAttribute("aria-label", `${group.name} preview, ${accountCount(group.profiles.length)}`);
+      position.textContent = `${active + 1} / ${groups.length}`;
+      jump.value = String(active);
+      prev.disabled = active === 0;
+      next.disabled = active === groups.length - 1;
+      if (group.profiles.length > 1 && runnable) {
+        primary.textContent = "Choose account";
+        primary.setAttribute("aria-label", `Choose an account for ${group.name}`);
+        primary.disabled = false;
+      } else if (runnable) {
+        primary.textContent = launching.has(runnable.name) ? "Opening…" : `Open ${runnable.profile || runnable.name}`;
+        primary.setAttribute("aria-label", `Open ${runnable.name}`);
+        primary.disabled = launching.has(runnable.name);
+      } else {
+        primary.textContent = group.profiles.length ? "Manage accounts" : "Add account";
+        primary.setAttribute("aria-label", `${group.profiles.length ? "Manage accounts for" : "Add account to"} ${group.name}`);
+        primary.disabled = !group.profiles.length && !group.installed;
       }
-      root.querySelector(".xp-prev").disabled = target === 0;
-      root.querySelector(".xp-next").disabled = target >= last + 1;
+      rows.forEach((row, i) => {
+        row.classList.toggle("xp-selected", i === active);
+        selectButtons[i].setAttribute("aria-current", i === active ? "true" : "false");
+        // Preview artwork carries no tab stops. The stable native controls below it
+        // keep keyboard focus even when scroll changes the displayed app.
+        cards[i].style.pointerEvents = i === active ? "auto" : "none";
+      });
     }
-    function measure() {
-      stageW = stage.clientWidth;
-      stageH = stage.clientHeight;
-      if (wheel) {
-        wheelW = wheel.clientWidth; wheelH = wheel.clientHeight;
-        const cardW = Math.min(wheelH * 0.38 * 1.45, wheelW * (wheelW < 700 ? 0.56 : 0.34));
-        const cardH = cardW / 1.45;
-        drumR = cardH * 2.22; ringR = cardH * 1.14; bow = cardH * 1.82;
-        ringScale = clamp((2 * Math.PI * ringR / items.length * 0.82) / (cardW || 1), 0.16, 1);
-        wheel.style.perspective = `${cardH * 2.7}px`;
-        for (const card of wheelCards) {
-          card.style.width = `${cardW}px`; card.style.height = `${cardH}px`;
-          card.style.marginLeft = `${-cardW / 2}px`; card.style.marginTop = `${-cardH / 2}px`;
-        }
-      }
-      scroll();
-    }
-    function scroll() {
-      if (reduced) return;
-      const bounds = tunnel.getBoundingClientRect();
-      targetProgress = 0.2 + clamp(-bounds.top / Math.max(1, tunnel.offsetHeight - stageH)) * 0.8;
+    function setActive(index) {
+      index = clamp(index, 0, groups.length - 1);
+      target = index;
+      if (active !== index) { active = index; updateSelection(); }
       wake();
     }
+    function choose(index) {
+      setActive(index);
+      // Native scrolling is immediate; the spring provides the selection feedback.
+      // This avoids a competing scroll animation and lets the next gesture interrupt.
+      rows[index]?.scrollIntoView({ block: "start", behavior: "auto" });
+      chosenScrollY = window.scrollY;
+    }
+    function scrollSelection() {
+      if (!preview || disposed) return;
+      // Keep an explicit choice when a short final row cannot align at the top.
+      // A new native page-scroll position immediately resumes row selection.
+      if (chosenScrollY !== null && Math.abs(window.scrollY - chosenScrollY) < 1) return;
+      chosenScrollY = null;
+      const rect = preview.getBoundingClientRect();
+      const anchor = window.innerWidth > 767 ? Math.max(100, rect.top + 94) : 92;
+      let index = 0;
+      for (let i = 0; i < rows.length; i++) {
+        if (rows[i].getBoundingClientRect().top <= anchor) index = i;
+        else break;
+      }
+      const atBottom = window.scrollY > 0 && window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+      if (atBottom) index = rows.length - 1;
+      setActive(index);
+    }
+    function measure() {
+      if (!wheel) return;
+      const cardWidth = Math.min(wheel.clientWidth * 0.72, window.innerWidth <= 767 ? 164 : 238);
+      const cardHeight = cardWidth / 1.45;
+      drumR = cardHeight * 2.22; bow = cardHeight * 1.82;
+      wheel.style.perspective = `${cardHeight * 2.7}px`;
+      for (const card of cards) {
+        card.style.width = `${cardWidth}px`; card.style.height = `${cardHeight}px`;
+        card.style.marginLeft = `${-cardWidth / 2}px`; card.style.marginTop = `${-cardHeight / 2}px`;
+      }
+      scrollSelection(); wake();
+    }
     function wake() {
-      if (!frame && !disposed && !document.hidden && isVisible) {
-        if (!lastFrame) lastFrame = performance.now();
+      if (!frame && !disposed && !document.hidden && isVisible && wheel) {
+        lastFrame = performance.now();
         frame = requestAnimationFrame(draw);
       }
     }
@@ -181,127 +205,99 @@
       if (disposed) return;
       const dt = clamp((now - lastFrame) / 1000, 0.001, 0.032);
       lastFrame = now;
-      progress = reduced ? 0.35 : camera.step(targetProgress, dt);
-      turn = reduced ? Math.max(1, target) : rotation.step(target, dt);
-      px = reduced ? 0 : pointerX.step(tx, dt);
-      py = reduced ? 0 : pointerY.step(ty, dt);
-      if (!reduced) {
-        const mobile = stageW < 700;
-        for (let i = 0; i < tunnelCards.length; i++) {
-          const card = tunnelCards[i];
-          const local = clamp((progress - i / tunnelCards.length * 0.45) / 0.55);
-          const z = lerp(mobile ? -1200 : -1700, mobile ? 350 : 500, local);
-          const angle = rad(i * 137.5);
-          const x = Math.cos(angle) * stageW * (0.28 + i % 3 * 0.08) - px * 35;
-          const y = Math.sin(angle) * stageH * (0.26 + i % 2 * 0.09) - py * 35;
-          card.style.transform = `translate3d(calc(-50% + ${x}px),calc(-50% + ${y}px),${z}px) rotateZ(${(i % 2 ? -1 : 1) * (3 + i % 5 * 2)}deg)`;
-          card.style.opacity = String(clamp(local / 0.18) * clamp((0.98 - local) / 0.16));
+      const turn = reduced ? target : rotation.step(target, dt);
+      plane.style.transform = reduced ? "none" : `translateZ(${-drumR}px)`;
+      for (let i = 0; i < cards.length; i++) {
+        const card = cards[i], distance = i - turn, drumDegrees = distance * 40;
+        if (reduced) {
+          card.style.transform = "none";
+          card.style.opacity = i === active ? "1" : "0";
+          card.style.visibility = i === active ? "visible" : "hidden";
+        } else {
+          // Works Wheel source geometry: bowed X position, 40-degree drum steps,
+          // and translate-Z radius. Its position now means a real app selection.
+          card.style.transform = `translateX(${-bow * (1 - Math.cos(rad(drumDegrees)))}px) rotateX(${drumDegrees}deg) translateZ(${drumR}px)`;
+          card.style.opacity = String(clamp(1 - Math.abs(distance) * 0.36));
+          card.style.visibility = Math.abs(distance) < 1.6 ? "visible" : "hidden";
         }
-        anchor.style.transform = `scale(${lerp(0.86, 1.22, progress)})`;
-        anchor.style.opacity = String(clamp((1 - progress) / 0.18));
-        prompt.style.opacity = String(clamp(1 - (progress - 0.2) * 7));
+        card.style.zIndex = String(Math.round(100 - Math.abs(distance) * 2));
       }
-      if (wheel && !reduced) {
-        const m = clamp(turn), pos = Math.max(0, turn - 1);
-        wheelPlane.style.transform = `translateZ(${-m * drumR}px)`;
-        for (let i = 0; i < wheelCards.length; i++) {
-          const card = wheelCards[i], d = i - pos, drumDeg = d * 40;
-          card.style.transform = `translateX(${-m * bow * (1 - Math.cos(rad(drumDeg)))}px) rotateZ(${(1 - m) * d * 360 / items.length}deg) translateY(${-(1 - m) * ringR}px) rotateX(${m * drumDeg}deg) translateZ(${m * drumR}px)`;
-          const hidden = m > 0.5 && Math.abs(d) > 1.6;
-          card.style.opacity = hidden ? "0" : "1";
-          card.style.pointerEvents = hidden ? "none" : "auto";
-          card.tabIndex = hidden ? -1 : 0;
-          card.style.zIndex = String(Math.round(100 - Math.abs(d) * 2));
-          card.firstElementChild.style.transform = `scale(${lerp(ringScale, 1, m)})`;
-        }
-        ringLabel.style.opacity = String(1 - m);
-        caption.style.opacity = String(m);
-      }
-      const near = clamp(Math.round(Math.max(0, turn - 1)), 0, last);
-      if (near !== active) { active = near; updateSelection(); }
-      const moving = camera.moving(targetProgress) || rotation.moving(target) ||
-        pointerX.moving(tx) || pointerY.moving(ty);
-      if (moving && !reduced && !document.hidden && isVisible) frame = requestAnimationFrame(draw);
+      if (!reduced && rotation.moving(target) && !document.hidden && isVisible) frame = requestAnimationFrame(draw);
       else lastFrame = 0;
     }
-    if (wheel) {
+    async function launch(profile) {
+      if (!profile || profile.status === "app missing" || launching.has(profile.name)) return;
+      const groupIndex = groups.findIndex(group => group.profiles.includes(profile));
+      const feedback = rows[groupIndex]?.querySelector(".xp-inline-feedback");
+      if (feedback) { feedback.textContent = ""; feedback.hidden = true; }
+      launching.add(profile.name);
+      for (const button of openButtons) if (profiles[Number(button.dataset.xpOpen)] === profile) {
+        button.disabled = true; button.textContent = "Opening…";
+      }
       updateSelection();
-      listen(root.querySelector(".xp-launch"), "click", launch);
-      listen(root.querySelector(".xp-prev"), "click", () => { to(Math.round(target) - 1); updateSelection(); });
-      listen(root.querySelector(".xp-next"), "click", () => { to(Math.round(target) + 1); updateSelection(); });
-      [...wheelCards, ...indices].forEach(button => listen(button, "click", () => {
-        to(Number(button.dataset.index) + 1); updateSelection();
-      }));
-      listen(wheel, "keydown", e => {
-        if (["ArrowDown", "ArrowRight"].includes(e.key)) to(Math.round(target) + 1);
-        else if (["ArrowUp", "ArrowLeft"].includes(e.key)) to(Math.round(target) - 1);
-        else if (e.key === "Home") to(1);
-        else if (e.key === "End") to(last + 1);
-        else return;
-        e.preventDefault();
-        wheel.focus({ preventScroll: true });
-        updateSelection();
-      });
-      listen(wheel, "wheel", e => {
-        if (reduced || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-        const amount = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? wheelH : 1);
-        const next = target + amount / 900;
-        if (next > 0 && next < last + 1) e.preventDefault();
-        to(next); clearTimeout(settling);
-        settling = setTimeout(() => { to(Math.round(target)); updateSelection(); }, 140);
-      }, { passive: false });
-      listen(wheel, "pointerdown", e => {
-        if (reduced || e.pointerType !== "mouse" || e.target.closest("button")) return;
-        drag = e.clientY; wheel.setPointerCapture(e.pointerId);
-      });
-      listen(wheel, "pointermove", e => {
-        if (drag === null) return;
-        to(target + (drag - e.clientY) / 420); drag = e.clientY;
-      });
-      const endDrag = () => { drag = null; if (target > 1) to(Math.round(target)); updateSelection(); };
-      listen(wheel, "pointerup", endDrag); listen(wheel, "pointercancel", endDrag);
-      listen(wheel, "lostpointercapture", endDrag);
-    }
-    listen(stage, "pointermove", e => {
-      if (reduced || e.pointerType !== "mouse") return;
-      const rect = stage.getBoundingClientRect();
-      tx = (e.clientX - rect.left) / stageW * 2 - 1;
-      ty = (e.clientY - rect.top) / stageH * 2 - 1;
-      wake();
-    });
-    listen(stage, "pointerleave", () => { tx = 0; ty = 0; wake(); });
-    listen(document, "scroll", scroll, { passive: true, capture: true });
-    listen(window, "resize", measure, { passive: true });
-    listen(document, "visibilitychange", wake);
-    listen(reducedQuery, "change", () => {
-      reduced = reducedQuery.matches;
-      wrap.classList.toggle("xp-reduced", reduced);
-      camera.reset(targetProgress); rotation.reset(target);
-      pointerX.reset(0); pointerY.reset(0);
-      if (reduced) {
-        for (const el of [...tunnelCards, ...wheelCards, ...wheelCards.map(c => c.firstElementChild), anchor, prompt, wheelPlane, caption, ringLabel]) {
-          if (el) el.removeAttribute("style");
+      try {
+        if (typeof callbacks.launchProfile === "function") await callbacks.launchProfile(profile);
+        else callbacks.openProfile?.(profile);
+      } catch (error) {
+        if (!disposed && feedback) {
+          feedback.textContent = `Couldn’t open ${profile.profile || profile.name}. ${error?.message || "Try again or use Manage to check the account."}`;
+          feedback.hidden = false;
         }
-        for (let i = 0; i < wheelCards.length; i++) {
-          wheelCards[i].firstElementChild.style.setProperty("--identity", items[i].color);
-          wheelCards[i].tabIndex = 0;
+      } finally {
+        launching.delete(profile.name);
+        if (!disposed) {
+          for (const button of openButtons) if (profiles[Number(button.dataset.xpOpen)] === profile) {
+            button.disabled = false; button.innerHTML = `Open ${arrow}`;
+          }
+          updateSelection();
         }
       }
-      measure(); wake();
-    });
-    const resizeObserver = new ResizeObserver(measure);
-    resizeObserver.observe(stage);
-    if (wheel) resizeObserver.observe(wheel);
-    const observer = new IntersectionObserver(entries => {
-      isVisible = entries[0].isIntersecting;
-      if (isVisible) wake();
-    });
-    observer.observe(root);
-    measure(); wake();
+    }
+    listen(root.querySelector(".xp-workspace"), "click", () => callbacks.showProfiles?.(""));
+    const emptyAdd = root.querySelector(".xp-empty-add");
+    if (emptyAdd) listen(emptyAdd, "click", () => callbacks.addProfile?.(""));
+    for (const button of openButtons) listen(button, "click", () => launch(profiles[Number(button.dataset.xpOpen)]));
+    root.querySelectorAll("[data-xp-manage]").forEach(button => listen(button, "click", () => callbacks.openProfile?.(profiles[Number(button.dataset.xpManage)])));
+    root.querySelectorAll("[data-xp-add]").forEach(button => listen(button, "click", () => callbacks.addProfile?.(groups[Number(button.dataset.xpAdd)].name)));
+    if (preview) {
+      listen(primary, "click", () => {
+        const group = groups[active], runnable = firstRunnable(group);
+        if (group.profiles.length > 1 && runnable) callbacks.showProfiles?.(group.name);
+        else if (runnable) launch(runnable);
+        else if (group.profiles.length) callbacks.showProfiles?.(group.name);
+        else callbacks.addProfile?.(group.name);
+      });
+      listen(prev, "click", () => choose(active - 1));
+      listen(next, "click", () => choose(active + 1));
+      listen(jump, "change", () => choose(Number(jump.value)));
+      selectButtons.forEach(button => listen(button, "click", () => choose(Number(button.dataset.xpSelect))));
+      cards.forEach((card, index) => listen(card, "click", () => choose(index)));
+      listen(document, "scroll", scrollSelection, { passive: true, capture: true });
+      listen(window, "resize", measure, { passive: true });
+      listen(document, "visibilitychange", () => {
+        if (document.hidden) { cancelAnimationFrame(frame); frame = 0; lastFrame = 0; }
+        else wake();
+      });
+      listen(reducedQuery, "change", () => {
+        reduced = reducedQuery.matches;
+        wrap.classList.toggle("xp-reduced", reduced);
+        rotation.reset(target); wake();
+      });
+      const resizeObserver = new ResizeObserver(measure);
+      resizeObserver.observe(wheel);
+      cleanup.push(() => resizeObserver.disconnect());
+      const observer = new IntersectionObserver(entries => {
+        isVisible = entries[0].isIntersecting;
+        if (isVisible) wake();
+        else { cancelAnimationFrame(frame); frame = 0; lastFrame = 0; }
+      });
+      observer.observe(root);
+      cleanup.push(() => observer.disconnect());
+      updateSelection(); measure(); wake();
+    }
     return () => {
-      disposed = true; cancelAnimationFrame(frame); clearTimeout(settling);
-      resizeObserver.disconnect(); observer.disconnect();
-      cleanup.forEach(fn => fn());
+      disposed = true; cancelAnimationFrame(frame);
+      cleanup.forEach(dispose => dispose());
     };
   }
   window.AidentityExperience = { mount };

@@ -44,7 +44,9 @@
   };
   const icon = name => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name] || iconPaths.grid}</svg>`;
   const button = (label, action, opts = {}) => `<button class="button ${opts.primary ? "button-primary" : ""} ${opts.danger ? "button-danger" : ""} ${opts.small ? "button-small" : ""}" data-action="${escape(action)}"${opts.name ? ` data-name="${escape(opts.name)}"` : ""}${opts.app ? ` data-app="${escape(opts.app)}"` : ""}${opts.disabled ? " disabled" : ""}>${opts.icon ? icon(opts.icon) : ""}<span>${escape(label)}</span></button>`;
-  const colors = [["Blue","2E7DF6"],["Green","2FB344"],["Orange","F76B15"],["Purple","8E4EC6"],["Teal","12A594"],["Pink","D6409F"],["Red","E5484D"],["Yellow","F5B400"],["Gray","6B7280"],["Graphite","1F2430"]];
+  const colors = [["Mint","5FE08A"],["Periwinkle","7C8CFF"],["Teal","2FD4C0"],["Orange","FF8A3D"],["Pink","FF6FB5"],["Gold","FFD166"],["Sky","4CC3FF"],["Violet","B26BFF"],["Gray","8D8B84"],["Graphite","262624"]];
+  const cliColors = {blue:"2E7DF6",green:"2FB344",red:"E5484D",orange:"F76B15",purple:"8E4EC6",pink:"D6409F",teal:"12A594",yellow:"F5B400",gray:"6B7280",grey:"6B7280",graphite:"1F2430",black:"1F2430"};
+  const defaultBadgeColor="5FE08A";
   const navigation = [
     ["explore","Explore","explore"],["profiles","Profiles","grid"],["apps","Applications","apps"],
     ["recovery","Recovery","recovery"],["maintenance","Maintenance","tool"],["transfer","Import & export","transfer"]
@@ -97,7 +99,7 @@
     if(paths) return `<svg class="app-vector" viewBox="0 0 32 32" fill="none" aria-hidden="true">${paths}</svg>`;
     return `<span aria-hidden="true">${escape([...String(name || "A")][0].toUpperCase())}</span>`;
   };
-  const art = (name, badge = null, color = "") => `<span class="app-art">${appGlyph(name)}${badge ? `<span class="identity-badge" style="--identity-color:#${/^[0-9a-f]{6}$/i.test(color) ? color : "F76B15"}">${escape(badge)}</span>` : ""}</span>`;
+  const art = (name, badge = null, color = "") => `<span class="app-art">${appGlyph(name)}${badge ? `<span class="identity-badge" style="--identity-color:#${/^[0-9a-f]{6}$/i.test(color) ? color : defaultBadgeColor}">${escape(badge)}</span>` : ""}</span>`;
   const statusMark = item => `<span class="profile-state ${item.status === "running" ? "status-running" : item.status === "app missing" ? "status-missing" : ""}">${item.status === "running" ? '<span class="running-dot"></span>' : ""}${escape(item.status)}</span>`;
   function hydrateIcons(root=document) { $$("[data-icon]",root).forEach(el => {el.innerHTML=icon(el.dataset.icon);el.removeAttribute("data-icon");}); }
   function renderNav() {
@@ -137,7 +139,13 @@
     if(view==="explore"){
       if(cleanupExperience)return;
       main.innerHTML='<div id="experience-root"></div>';
-      if(window.AidentityExperience)cleanupExperience=window.AidentityExperience.mount($("#experience-root"),state,{openProfile:item=>showView("profiles",{profile:typeof item==="string"?item:item.name,app:""}),addProfile:app=>addDialog(app || ""),showProfiles:()=>showView("profiles",{app:""})});
+      if(window.AidentityExperience)cleanupExperience=window.AidentityExperience.mount($("#experience-root"),state,{
+        renderAppIcon:appGlyph,
+        openProfile:item=>{query="";statusFilter="all";showView("profiles",{profile:typeof item==="string"?item:item.name,app:""});},
+        addProfile:app=>addDialog(app || ""),
+        showProfiles:(app="")=>{query="";statusFilter="all";selected="";showView("profiles",{app:app || ""});},
+        launchProfile:async item=>action("open",{name:typeof item==="string"?item:item.name}),
+      });
       else main.innerHTML=title("Every account, together","Create a separate launcher for each account.")+button("Open workspace","workspace",{primary:true,icon:"arrow"});
       return;
     }
@@ -285,12 +293,12 @@
   const check=(name,label,description="",checked=false)=>`<label class="check-row"><input type="checkbox" name="${name}" ${checked?"checked":""}><span>${label}${description?`<span>${description}</span>`:""}</span></label>`;
   const area=(label,name,hint="")=>`<div class="field"><label for="field-${name}">${label}</label><textarea id="field-${name}" name="${name}" rows="3" spellcheck="false" autocomplete="off"></textarea>${hint?`<p class="hint">${hint}</p>`:""}</div>`;
   function identityFields(p=null){
-    return `<div class="field-pair">${field("Badge character","badge",p?.badge||"","One character displayed on the app icon.","text",'maxlength="4"')}${field("Badge color","color",p?.color||"F76B15","Color name or six hex digits.")}</div><div class="color-options" aria-label="Badge color presets">${colors.map(([name,color])=>`<button type="button" class="color-swatch" style="--swatch:#${color}" data-color="${color}" title="${name}" aria-label="${name}" aria-pressed="${(p?.color||"F76B15").toUpperCase()===color}"></button>`).join("")}</div>${check("no_badge","Use the original app icon","Hide the colored account badge.",p?.badge===null)}`;
+    return `<div class="field-pair">${field("Badge character","badge",p?.badge||"","One character displayed on the app icon.","text",'maxlength="4"')}${field("Badge color","color",p?.color||defaultBadgeColor,"Choose a preset, a CLI color name, or six hex digits.")}</div><div class="color-options" aria-label="Badge color presets">${colors.map(([name,color])=>`<button type="button" class="color-swatch" style="--swatch:#${color}" data-color="${color}" title="${name}: ${color}" aria-label="${name}" aria-pressed="${(p?.color||defaultBadgeColor).toUpperCase()===color}"></button>`).join("")}</div>${check("no_badge","Use the original app icon","Hide the colored account badge.",p?.badge===null)}`;
   }
   function addDialog(app=""){
     if(!state)return;
     const options=state.apps.map(item=>`<option value="${escape(item.name)}"${item.name===app?" selected":""}>${escape(item.name)}</option>`).join("");
-    showDialog("Create a profile","Give another account its own launcher and profile folder.",`<div class="preview-row" id="identity-preview">${art(app||state.apps[0]?.name||"App","W","F76B15")}<div><strong id="preview-name">${escape(app||state.apps[0]?.name||"App")} Work</strong><span class="small">Your new account launcher</span></div></div><div class="fields"><div class="field"><label for="field-app">Application</label><select name="app" id="field-app" required>${options||'<option value="">No compatible apps found</option>'}</select></div>${field("Application path (optional)","app_path","","Use a full .app path for an application outside discovery.","text",'placeholder="/Applications/Example.app"')}${field("Profile name","profile","","For example, Work, Personal, or Client.","text",'required maxlength="40" placeholder="Work"')}${identityFields()}${check("main","Open the original account","Create a Main launcher for the app’s existing account.")}<details class="advanced"><summary>Launch settings & advanced options</summary><div class="fields">${check("seed","Copy Claude’s MCP configuration","For Claude Desktop profiles only. Copies the existing configuration into the new profile.")}${area("Launch arguments","args","One allowed switch per line, for example --lang=de.")}${area("Environment variables","env","One allowed NAME=value per line. Values are never displayed in this dashboard.")}${check("own_extensions","Use a separate extensions folder","For VS Code-style applications.")}</div></details></div>`, "Create profile",async(data,el)=>{
+    showDialog("Create a profile","Give another account its own launcher and profile folder.",`<div class="preview-row" id="identity-preview">${art(app||state.apps[0]?.name||"App","W",defaultBadgeColor)}<div><strong id="preview-name">${escape(app||state.apps[0]?.name||"App")} Work</strong><span class="small">Your new account launcher</span></div></div><div class="fields"><div class="field"><label for="field-app">Application</label><select name="app" id="field-app" required>${options||'<option value="">No compatible apps found</option>'}</select></div>${field("Application path (optional)","app_path","","Use a full .app path for an application outside discovery.","text",'placeholder="/Applications/Example.app"')}${field("Profile name","profile","","For example, Work, Personal, or Client.","text",'required maxlength="40" placeholder="Work"')}${identityFields()}${check("main","Open the original account","Create a Main launcher for the app’s existing account.")}<details class="advanced"><summary>Launch settings & advanced options</summary><div class="fields">${check("seed","Copy Claude’s MCP configuration","For Claude Desktop profiles only. Copies the existing configuration into the new profile.")}${area("Launch arguments","args","One allowed switch per line, for example --lang=de.")}${area("Environment variables","env","One allowed NAME=value per line. Values are never displayed in this dashboard.")}${check("own_extensions","Use a separate extensions folder","For VS Code-style applications.")}</div></details></div>`, "Create profile",async(data,el)=>{
       const params={app:String(data.get("app_path")||"").trim()||data.get("app"),profile:data.get("profile"),color:data.get("color"),no_badge:data.has("no_badge"),main:data.has("main"),seed:data.has("seed"),args:lines(data.get("args")),env:lines(data.get("env")),own_extensions:data.has("own_extensions")};
       if(data.get("badge")&&!params.no_badge)params.badge=data.get("badge");
       await action("add",params,el);showView("profiles",{app:""});
@@ -310,7 +318,7 @@
     const app=path?path.replace(/\/+$/,"").split("/").pop().replace(/\.app$/i,""):appSelect?.value||preview.dataset.app||"App";
     const name=$('[name="profile"]',dialog)?.value||preview.dataset.profile||"Work";
     const badge=$('[name="no_badge"]',dialog)?.checked?null:$('[name="badge"]',dialog)?.value||[...name][0]?.toUpperCase();
-    const raw=$('[name="color"]',dialog)?.value||"F76B15";const hex=colors.find(([name])=>name.toLowerCase()===raw.toLowerCase())?.[1]||raw;
+    const raw=$('[name="color"]',dialog)?.value||defaultBadgeColor;const hex=cliColors[raw.toLowerCase()]||raw;
     preview.innerHTML=art(app,badge,hex)+`<div><strong>${escape(app)} ${escape(name)}</strong><span class="small">Your account launcher</span></div>`;
   }
   function settingsDialog(item){
@@ -416,6 +424,7 @@
     if(open)animateMotion(panel,[{opacity:0,translate:"0 10px"},{opacity:1,translate:"0 0"}]);
   }
   document.addEventListener("click",event=>{
+    if(event.target.closest("#experience-root"))return;
     const close=event.target.closest("[data-close-dialog]");if(close){closeDialog();return;}
     const swatch=event.target.closest("[data-color]");if(swatch){$('[name="color"]',dialog).value=swatch.dataset.color;$$(".color-swatch",dialog).forEach(el=>el.setAttribute("aria-pressed",el===swatch));setupPreviewUpdate();return;}
     const nav=event.target.closest("[data-view]");if(nav){query="";showView(nav.dataset.view);return;}

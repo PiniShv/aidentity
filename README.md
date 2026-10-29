@@ -78,13 +78,13 @@ aidentity help rm                                  # options for one command (al
 Moving to another Mac? `aidentity export > profiles.json` saves how each launcher looks and starts, and `aidentity import profiles.json` builds them there. The file holds no account data, so each profile starts signed out. It does hold launch settings such as proxy values, so keep it private. `export` warns on standard error when it finds variable values, or a password in a switch. [More](docs/guide.md#aidentity-export)
 
 Prefer a browser? Run `aidentity dashboard`. It opens a local visual workspace
-with account cards, launch settings, maintenance, import/export and an animated
-Explore view. Everything uses the same CLI operations. The dashboard needs
+with account cards, launch settings, maintenance, import/export and an Explore
+app browser. Scroll the app list to move its 3D preview; Open, Manage and Add
+account are available immediately. Everything uses the same CLI operations. The dashboard needs
 Python 3.9+ with no extra packages. Keep its terminal open and press Ctrl+C to
 stop it. [Dashboard guide](docs/guide.md#aidentity-dashboard).
 The UI adapts [these 21st.dev components](docs/dashboard-components.md), including
-[Perspective Tunnel Hero](https://21st.dev/@daiwiikharihar/components/perspective-tunnel-hero)
-and [Works Wheel](https://21st.dev/@crafterui/components/works-wheel).
+[Works Wheel](https://21st.dev/@crafterui/components/works-wheel).
 
 Prefer a terminal menu? `aidentity ui` shows every profile on one screen; pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it.
 
