@@ -5,6 +5,7 @@
 .xp-wrap button:disabled{opacity:.55;cursor:default}
 .xp-wrap button:focus-visible,.xp-wrap select:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}
 .xp-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:28px}
+.xp-wrap>.notice{margin-bottom:28px}
 .xp-header h1{font-size:30px;font-weight:600;letter-spacing:-.045em;line-height:1.15;margin:0}
 .xp-header p{color:var(--muted,#8d8b84);font-size:14px;line-height:1.5;margin:10px 0 0}
 .xp-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--control,#262624);border-radius:8px;background:var(--surface,#0c0c0c);font-size:12px!important;font-weight:500;white-space:nowrap;transition:background-color 160ms ease,border-color 160ms ease,transform 360ms var(--spring-control,cubic-bezier(.2,.8,.2,1))}

@@ -50,10 +50,17 @@
       return this.value;
     }
   }
+  // A data refresh remounts Explore in the same task as cleanup. Only that
+  // rebuild inherits the chosen app and focused control; a later mount starts fresh.
+  let carried = null;
 
   function mount(root, state, callbacks = {}) {
     const profiles = Array.isArray(state.profiles) ? state.profiles : [];
     const discovered = Array.isArray(state.apps) ? state.apps : [];
+    // A failed inventory read leaves apps empty; say so instead of "no apps found".
+    const errors = Array.isArray(state.errors) ? state.errors : [];
+    const errorNotice = errors.length ? `<div class="notice error">${errors.map(esc).join("<br>")}</div>` : "";
+    const inventoryFailed = errors.length > 0 && !discovered.length;
     const groupsByName = new Map();
     for (const app of discovered) {
       if (app?.name) groupsByName.set(app.name, { name: app.name, installed: true, profiles: [] });
@@ -80,10 +87,13 @@
     const accountCount = count => `${count} ${count === 1 ? "account" : "accounts"}`;
     const firstRunnable = group => group.profiles.find(profile => profile.status !== "app missing");
     const reducedQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let reduced = reducedQuery.matches, active = 0, target = 0, frame = 0;
-    let disposed = false, isVisible = true, lastFrame = 0, drumR = 0, bow = 0, chosenScrollY = null;
+    const kept = carried; carried = null;
+    const keptIndex = kept ? groups.findIndex(group => group.name === kept.app) : -1;
+    let reduced = reducedQuery.matches, active = Math.max(0, keptIndex), target = active, frame = 0;
+    let disposed = false, isVisible = true, lastFrame = 0, drumR = 0, bow = 0;
+    let chosenScrollY = keptIndex >= 0 ? kept.chosenScrollY : null, focusKey = null;
     let wheelPixels = 0, wheelStepTime = 0, wheelEventTime = 0;
-    const rotation = new Spring(0, 380, 26);
+    const rotation = new Spring(active, 380, 26);
     const cleanup = [], launching = new Set();
     const listen = (element, event, handler, options) => {
       element.addEventListener(event, handler, options);
@@ -99,7 +109,7 @@
     }).join("");
     const face = group => `<span class="xp-face" style="${accentStyle(group)}"><span class="xp-card-top"><span class="xp-app-icon">${icon(group.name)}</span><span class="xp-card-count">${accountCount(group.profiles.length)}</span></span><strong class="xp-card-name">${esc(group.name)}</strong><span class="xp-card-foot">${group.profiles.length ? `${group.profiles.filter(profile => profile.status === "running").length} running` : "Ready for your first account"}</span></span>`;
     root.innerHTML = `<div class="xp-wrap${reduced ? " xp-reduced" : ""}">
-      <header class="xp-header"><div><h1>Explore</h1><p>Choose an app. Open an account or add another.</p></div><button type="button" class="xp-button xp-workspace">All profiles ${arrow}</button></header>
+      <header class="xp-header"><div><h1>Explore</h1><p>Choose an app. Open an account or add another.</p></div><button type="button" class="xp-button xp-workspace">All profiles ${arrow}</button></header>${errorNotice}
       ${groups.length ? `<div class="xp-layout">
         <aside class="xp-preview" data-xp-preview="${esc(groups[0].name)}" aria-label="Selected app preview">
           <div class="xp-preview-top"><span>In focus</span><span class="xp-position">1 / ${groups.length}</span></div>
@@ -110,12 +120,12 @@
         <div class="xp-app-list" aria-label="Apps and accounts">
           <div class="xp-list-summary"><span>${groups.length} ${groups.length === 1 ? "app" : "apps"}</span><span>${accountCount(profiles.length)}</span></div>
           ${groups.map((group, i) => `<section class="xp-app-group" style="${accentStyle(group)}" data-xp-row="${esc(group.name)}" data-xp-group="${i}" aria-labelledby="xp-app-${i}">
-            <header class="xp-app-header"><button type="button" class="xp-app-select" data-xp-select="${i}" aria-label="Preview ${esc(group.name)}" aria-current="${i === 0 ? "true" : "false"}"><span class="xp-list-icon" aria-hidden="true">${icon(group.name)}</span><span><h2 id="xp-app-${i}">${esc(group.name)}</h2><span class="xp-app-meta">${accountCount(group.profiles.length)}${group.installed ? "" : " · App not found"}</span></span></button><button type="button" class="xp-button xp-add" data-xp-add="${i}"${group.installed ? "" : ' disabled title="Install the app before adding an account"'}>+ Add account</button></header>
+            <header class="xp-app-header"><button type="button" class="xp-app-select" data-xp-select="${i}" aria-label="Preview ${esc(group.name)}" aria-current="${i === 0 ? "true" : "false"}"><span class="xp-list-icon" aria-hidden="true">${icon(group.name)}</span><span><h2 id="xp-app-${i}">${esc(group.name)}</h2><span class="xp-app-meta">${accountCount(group.profiles.length)}${group.installed ? "" : inventoryFailed ? " · Inventory unavailable" : " · App not found"}</span></span></button><button type="button" class="xp-button xp-add" data-xp-add="${i}"${group.installed ? "" : ` disabled title="${inventoryFailed ? "The app list could not be read" : "Install the app before adding an account"}"`}>+ Add account</button></header>
             ${group.profiles.length ? `<ul class="xp-accounts">${profileRows(group)}</ul>` : '<p class="xp-account-empty">No accounts yet. Add one to get started.</p>'}
             <p class="xp-inline-feedback" role="status" aria-live="polite" hidden></p>
           </section>`).join("")}
         </div>
-      </div>` : `<section class="xp-empty"><h2>No compatible apps found</h2><p>Install a Chromium or Electron app, then add an account.</p><button type="button" class="xp-button xp-primary xp-empty-add">Add an account ${arrow}</button></section>`}
+      </div>` : errorNotice ? "" : `<section class="xp-empty"><h2>No compatible apps found</h2><p>Install a Chromium or Electron app, then add an account.</p><button type="button" class="xp-button xp-primary xp-empty-add">Add an account ${arrow}</button></section>`}
     </div>`;
     const wrap = root.firstElementChild;
     const preview = root.querySelector(".xp-preview");
@@ -129,6 +139,9 @@
     const position = root.querySelector(".xp-position");
     const selectButtons = [...root.querySelectorAll("[data-xp-select]")];
     const openButtons = [...root.querySelectorAll("[data-xp-open]")];
+    // Names, not list indexes, identify a control across a rebuild.
+    const controlKey = element => element?.matches?.("button, select") && root.contains(element)
+      ? element.getAttribute("aria-label") || `${element.className}|${element.closest("[data-xp-row]")?.dataset.xpRow || ""}` : null;
 
     function updateSelection() {
       if (!preview) return;
@@ -323,7 +336,16 @@
       cleanup.push(() => observer.disconnect());
       updateSelection(); measure(); wake();
     }
+    // A disabled Open button drops focus to the body, so remember the last control.
+    listen(root, "focusin", event => { focusKey = controlKey(event.target); });
+    listen(root, "focusout", event => { if (event.relatedTarget && !root.contains(event.relatedTarget)) focusKey = null; });
+    if (kept?.focus) [...root.querySelectorAll("button, select")]
+      .find(element => controlKey(element) === kept.focus)?.focus({ preventScroll: true });
     return () => {
+      const focused = document.activeElement;
+      carried = { app: groups[active]?.name, chosenScrollY,
+        focus: root.contains(focused) ? controlKey(focused) : !focused || focused === document.body ? focusKey : null };
+      queueMicrotask(() => { carried = null; });
       disposed = true; cancelAnimationFrame(frame);
       cleanup.forEach(dispose => dispose());
     };
