@@ -1,0 +1,498 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-31T19:35:54+00:00",
+  "title": "Design System: aidentity dashboard",
+  "extensions": {
+    "colorMeta": {
+      "lampblack": {
+        "role": "neutral",
+        "displayName": "Lampblack",
+        "canonical": "oklch(12.2% 0.000 89.9)",
+        "tonalRamp": [
+          "oklch(15.0% 0.000 89.9)",
+          "oklch(25.0% 0.000 89.9)",
+          "oklch(35.0% 0.000 89.9)",
+          "oklch(48.0% 0.000 89.9)",
+          "oklch(60.0% 0.000 89.9)",
+          "oklch(72.0% 0.000 89.9)",
+          "oklch(84.0% 0.000 89.9)",
+          "oklch(95.0% 0.000 89.9)"
+        ]
+      },
+      "bone": {
+        "role": "neutral",
+        "displayName": "Bone",
+        "canonical": "oklch(96.1% 0.005 95.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.005 95.1)",
+          "oklch(25.0% 0.005 95.1)",
+          "oklch(35.0% 0.005 95.1)",
+          "oklch(48.0% 0.005 95.1)",
+          "oklch(60.0% 0.005 95.1)",
+          "oklch(72.0% 0.005 95.1)",
+          "oklch(84.0% 0.005 95.1)",
+          "oklch(95.0% 0.005 95.1)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "oklch(63.6% 0.011 93.6)",
+        "tonalRamp": [
+          "oklch(15.0% 0.011 93.6)",
+          "oklch(25.0% 0.011 93.6)",
+          "oklch(35.0% 0.011 93.6)",
+          "oklch(48.0% 0.011 93.6)",
+          "oklch(60.0% 0.011 93.6)",
+          "oklch(72.0% 0.011 93.6)",
+          "oklch(84.0% 0.011 93.6)",
+          "oklch(95.0% 0.011 93.6)"
+        ]
+      },
+      "mint": {
+        "role": "primary",
+        "displayName": "Mint",
+        "canonical": "oklch(81.3% 0.167 151.8)",
+        "tonalRamp": [
+          "oklch(15.0% 0.061 151.8)",
+          "oklch(25.0% 0.084 151.8)",
+          "oklch(35.0% 0.108 151.8)",
+          "oklch(48.0% 0.139 151.8)",
+          "oklch(60.0% 0.167 151.8)",
+          "oklch(72.0% 0.139 151.8)",
+          "oklch(84.0% 0.110 151.8)",
+          "oklch(95.0% 0.084 151.8)"
+        ]
+      },
+      "periwinkle": {
+        "role": "primary",
+        "displayName": "Periwinkle",
+        "canonical": "oklch(68.1% 0.169 275.0)",
+        "tonalRamp": [
+          "oklch(15.0% 0.061 275.0)",
+          "oklch(25.0% 0.085 275.0)",
+          "oklch(35.0% 0.109 275.0)",
+          "oklch(48.0% 0.140 275.0)",
+          "oklch(60.0% 0.169 275.0)",
+          "oklch(72.0% 0.140 275.0)",
+          "oklch(84.0% 0.112 275.0)",
+          "oklch(95.0% 0.085 275.0)"
+        ]
+      },
+      "teal": {
+        "role": "primary",
+        "displayName": "Teal",
+        "canonical": "oklch(78.5% 0.132 182.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.048 182.5)",
+          "oklch(25.0% 0.066 182.5)",
+          "oklch(35.0% 0.085 182.5)",
+          "oklch(48.0% 0.109 182.5)",
+          "oklch(60.0% 0.132 182.5)",
+          "oklch(72.0% 0.109 182.5)",
+          "oklch(84.0% 0.087 182.5)",
+          "oklch(95.0% 0.066 182.5)"
+        ]
+      },
+      "orange": {
+        "role": "primary",
+        "displayName": "Orange",
+        "canonical": "oklch(75.0% 0.167 50.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.060 50.5)",
+          "oklch(25.0% 0.084 50.5)",
+          "oklch(35.0% 0.108 50.5)",
+          "oklch(48.0% 0.138 50.5)",
+          "oklch(60.0% 0.167 50.5)",
+          "oklch(72.0% 0.138 50.5)",
+          "oklch(84.0% 0.110 50.5)",
+          "oklch(95.0% 0.084 50.5)"
+        ]
+      },
+      "pink": {
+        "role": "primary",
+        "displayName": "Pink",
+        "canonical": "oklch(73.6% 0.189 352.4)",
+        "tonalRamp": [
+          "oklch(15.0% 0.069 352.4)",
+          "oklch(25.0% 0.095 352.4)",
+          "oklch(35.0% 0.122 352.4)",
+          "oklch(48.0% 0.157 352.4)",
+          "oklch(60.0% 0.189 352.4)",
+          "oklch(72.0% 0.157 352.4)",
+          "oklch(84.0% 0.125 352.4)",
+          "oklch(95.0% 0.095 352.4)"
+        ]
+      },
+      "gold": {
+        "role": "primary",
+        "displayName": "Gold",
+        "canonical": "oklch(88.0% 0.135 86.1)",
+        "tonalRamp": [
+          "oklch(15.0% 0.049 86.1)",
+          "oklch(25.0% 0.068 86.1)",
+          "oklch(35.0% 0.087 86.1)",
+          "oklch(48.0% 0.112 86.1)",
+          "oklch(60.0% 0.135 86.1)",
+          "oklch(72.0% 0.112 86.1)",
+          "oklch(84.0% 0.089 86.1)",
+          "oklch(95.0% 0.068 86.1)"
+        ]
+      },
+      "sky": {
+        "role": "primary",
+        "displayName": "Sky",
+        "canonical": "oklch(77.5% 0.135 234.5)",
+        "tonalRamp": [
+          "oklch(15.0% 0.049 234.5)",
+          "oklch(25.0% 0.068 234.5)",
+          "oklch(35.0% 0.087 234.5)",
+          "oklch(48.0% 0.112 234.5)",
+          "oklch(60.0% 0.135 234.5)",
+          "oklch(72.0% 0.112 234.5)",
+          "oklch(84.0% 0.089 234.5)",
+          "oklch(95.0% 0.068 234.5)"
+        ]
+      },
+      "violet": {
+        "role": "primary",
+        "displayName": "Violet",
+        "canonical": "oklch(67.2% 0.214 303.2)",
+        "tonalRamp": [
+          "oklch(15.0% 0.078 303.2)",
+          "oklch(25.0% 0.108 303.2)",
+          "oklch(35.0% 0.138 303.2)",
+          "oklch(48.0% 0.178 303.2)",
+          "oklch(60.0% 0.214 303.2)",
+          "oklch(72.0% 0.178 303.2)",
+          "oklch(84.0% 0.141 303.2)",
+          "oklch(95.0% 0.108 303.2)"
+        ]
+      },
+      "negative": {
+        "role": "status",
+        "displayName": "Negative",
+        "canonical": "oklch(70.9% 0.184 28.7)",
+        "tonalRamp": [
+          "oklch(15.0% 0.067 28.7)",
+          "oklch(25.0% 0.093 28.7)",
+          "oklch(35.0% 0.119 28.7)",
+          "oklch(48.0% 0.152 28.7)",
+          "oklch(60.0% 0.184 28.7)",
+          "oklch(72.0% 0.152 28.7)",
+          "oklch(84.0% 0.121 28.7)",
+          "oklch(95.0% 0.093 28.7)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface"
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised"
+      },
+      "active": {
+        "role": "neutral",
+        "displayName": "Active"
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border"
+      },
+      "control": {
+        "role": "neutral",
+        "displayName": "Control"
+      },
+      "card-top": {
+        "role": "neutral",
+        "displayName": "Card Top"
+      },
+      "card-bottom": {
+        "role": "neutral",
+        "displayName": "Card Bottom"
+      },
+      "tip": {
+        "role": "neutral",
+        "displayName": "Tip"
+      },
+      "field-border": {
+        "role": "neutral",
+        "displayName": "Field Border"
+      },
+      "negative-bg": {
+        "role": "status",
+        "displayName": "Negative Ground"
+      },
+      "warning-bg": {
+        "role": "status",
+        "displayName": "Warning Ground"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles on every view."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card and section headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Base text size."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, tabs, form labels, page subtitles, the stat line."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Profile metadata, state rows, counts, help text."
+      },
+      "headline-compact": {
+        "displayName": "Headline compact",
+        "purpose": "Every page title below 768px."
+      },
+      "card": {
+        "displayName": "Card",
+        "purpose": "Dialog, empty-state and Explore reel card titles."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Command output blocks."
+      }
+    },
+    "shadows": [
+      {
+        "name": "dialog",
+        "value": "0 24px 70px #0008",
+        "purpose": "Modal dialogs and the mobile bottom sheet."
+      },
+      {
+        "name": "toast",
+        "value": "0 10px 30px #0005",
+        "purpose": "The stacked toast column."
+      },
+      {
+        "name": "input-focus",
+        "value": "0 0 0 3px color-mix(in srgb,var(--app-color) 15%,transparent)",
+        "purpose": "Focused inputs in app context; --ring-accent outside it."
+      },
+      {
+        "name": "identity-dot-glow",
+        "value": "0 0 12px color-mix(in srgb,var(--app-color) 48%,transparent)",
+        "purpose": "The 8px app dot in the sidebar, the In focus dot, and a running key on Explore."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(.2,0,0,1)",
+        "purpose": "Default easing for fades, exits and layout shifts."
+      },
+      {
+        "name": "spring-control",
+        "value": "linear() curve, peaks 1.058 at 52.5%; cubic-bezier(.16,1,.3,1) fallback",
+        "purpose": "Buttons, tabs and small controls."
+      },
+      {
+        "name": "spring-surface",
+        "value": "linear() curve, peaks 1.060 at 42.5%; cubic-bezier(.16,1,.3,1) fallback",
+        "purpose": "Cards, dialogs and panels."
+      },
+      {
+        "name": "motion-press",
+        "value": "85ms",
+        "purpose": "Press scale to 0.97."
+      },
+      {
+        "name": "motion-control",
+        "value": "360ms",
+        "purpose": "Control springs."
+      },
+      {
+        "name": "motion-surface",
+        "value": "520ms",
+        "purpose": "Surface springs."
+      },
+      {
+        "name": "motion-dialog",
+        "value": "420ms",
+        "purpose": "Dialog entry."
+      },
+      {
+        "name": "motion-exit",
+        "value": "200ms",
+        "purpose": "Dialog, sheet and toast exits."
+      },
+      {
+        "name": "motion-fade",
+        "value": "140ms",
+        "purpose": "Opacity fades."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "xs",
+        "value": "390px"
+      },
+      {
+        "name": "mobile",
+        "value": "767px"
+      },
+      {
+        "name": "compact",
+        "value": "900px"
+      },
+      {
+        "name": "explore-stack",
+        "value": "1100px"
+      },
+      {
+        "name": "narrow",
+        "value": "1150px"
+      },
+      {
+        "name": "medium",
+        "value": "1200px"
+      },
+      {
+        "name": "desktop",
+        "value": "1201px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Bone fill, Lampblack text; the one main action on a neutral screen.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Launch</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--control,#262624);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-primary{background:var(--text,#f3f2ee);border-color:var(--text,#f3f2ee);color:var(--ground,#060606)}.ds-btn-primary:hover{background:#f3f2ee;border-color:#f3f2ee}"
+    },
+    {
+      "name": "App Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary-app",
+      "description": "Primary action on an app's screens: the app hue with Lampblack text.",
+      "html": "<button class=\"ds-btn ds-btn-app\">Add profile</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--control,#262624);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-app{--app-color:#7c8cff;background:var(--app-color);border-color:var(--app-color);color:#060606}.ds-btn-app:hover{background:color-mix(in srgb,var(--app-color) 90%,#f3f2ee)}.ds-btn-app:focus-visible{outline-color:var(--app-color)}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Raised fill, no border; quieter actions beside a primary.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Settings</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--control,#262624);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-secondary{background:var(--raised,#141413);border-color:transparent}.ds-btn-secondary:hover{border-color:var(--muted,#8d8b84)}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Negative text on a tinted border; destructive actions, always confirmed.",
+      "html": "<button class=\"ds-btn ds-btn-danger\">Remove</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--control,#262624);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-danger{color:var(--negative,#ff6b5b);border-color:var(--badbg,#2a1210)}.ds-btn-danger:hover{background:var(--badbg,#2a1210);border-color:var(--negative,#ff6b5b)}"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "40px field with a leading search icon; the border and ring take the accent on focus.",
+      "html": "<label class=\"ds-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"10.5\" cy=\"10.5\" r=\"6.5\"/><path d=\"m16 16 5 5\"/></svg><input class=\"ds-input\" placeholder=\"Search profiles\"></label>",
+      "css": ".ds-search{position:relative;display:flex;align-items:center;width:280px;color:var(--muted,#8d8b84)}.ds-search svg{position:absolute;left:12px;pointer-events:none}.ds-input{width:100%;min-height:40px;padding:9px 12px 9px 37px;border:1px solid var(--field-border,#6f6d66);border-radius:8px;background:var(--raised,#141413);color:var(--text,#f3f2ee);font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:border-color .16s,box-shadow .16s}.ds-input::placeholder{color:var(--muted,#8d8b84)}.ds-input:focus{outline:0;border-color:var(--accent,#5fe08a);box-shadow:0 0 0 3px #5fe08a1a}"
+    },
+    {
+      "name": "Sidebar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "40px rows in Muted; the current page is Bone on Raised; app rows carry a glowing hue dot.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" aria-current=\"page\" href=\"#\">Profiles</a><a class=\"ds-nav-item\" href=\"#\">Applications</a><a class=\"ds-nav-item ds-nav-app\" href=\"#\" style=\"--app-color:#ff8a3d\"><span class=\"ds-dot\"></span>Claude</a></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;width:216px;gap:2px;font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-nav-item{display:flex;align-items:center;gap:11px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--muted,#8d8b84);text-decoration:none;transition:background .2s,color .2s}.ds-nav-item:hover{color:var(--text,#f3f2ee);background:var(--surface,#0c0c0c)}.ds-nav-item[aria-current=page]{color:var(--text,#f3f2ee);background:var(--raised,#141413)}.ds-nav-app:hover{background:color-mix(in srgb,var(--app-color) 11%,#060606)}.ds-dot{width:8px;height:8px;border-radius:50%;background:var(--app-color);box-shadow:0 0 12px color-mix(in srgb,var(--app-color) 48%,transparent)}.ds-nav-item:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}"
+    },
+    {
+      "name": "Tabs",
+      "kind": "nav",
+      "refersTo": "tab",
+      "description": "12px labels with a 2px Bone underline that springs to the selected tab.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button role=\"tab\" aria-selected=\"true\">All <span>4</span></button><button role=\"tab\" aria-selected=\"false\">Running <span>2</span></button></div>",
+      "css": ".ds-tabs{display:flex;gap:22px;border-bottom:1px solid var(--border,#1c1c1b);font:400 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-tabs button{position:relative;min-height:44px;padding:0 1px 11px;border:0;background:none;color:var(--muted,#8d8b84);font:inherit;cursor:pointer}.ds-tabs button[aria-selected=true]{color:var(--text,#f3f2ee)}.ds-tabs button[aria-selected=true]::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--text,#f3f2ee)}.ds-tabs span{color:var(--muted,#8d8b84);padding-left:6px;font-variant-numeric:tabular-nums}.ds-tabs button:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}"
+    },
+    {
+      "name": "Profile Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Signature: cover strip, cut-in app tile, app-tinted border and bottom glow; lifts 3px on hover without a shadow.",
+      "html": "<article class=\"ds-profile\" style=\"--app-color:#7c8cff\"><div class=\"ds-cover\"></div><div class=\"ds-body\"><div class=\"ds-art\">W</div><strong class=\"ds-name\">Work</strong><div class=\"ds-meta\"><span>ChatGPT</span><span>2 days ago</span></div><div class=\"ds-state\"><i></i>Running</div><button class=\"ds-open\">Open</button></div></article>",
+      "css": ".ds-profile{position:relative;isolation:isolate;width:230px;overflow:hidden;border-radius:16px;background:linear-gradient(180deg,#0f0f0f,#090909);border:1px solid color-mix(in srgb,var(--app-color) 32%,#1c1c1b);outline:1px solid transparent;color:var(--text,#f3f2ee);font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:transform var(--motion-surface,520ms) var(--spring-surface,cubic-bezier(.16,1,.3,1)),outline-color .2s}.ds-profile::after{content:'';position:absolute;z-index:-1;inset:auto 0 0;height:160px;background:radial-gradient(ellipse 105% 110% at 50% 118%,color-mix(in srgb,var(--app-color) 14%,transparent),transparent 72%)}.ds-profile:hover{transform:translateY(-3px);outline-color:var(--app-color);border-color:color-mix(in srgb,var(--app-color) 65%,#1c1c1b)}.ds-cover{height:58px;background:linear-gradient(115deg,color-mix(in srgb,var(--app-color) 48%,#090909),color-mix(in srgb,#2fd4c0 30%,#090909))}.ds-body{padding:0 16px 16px}.ds-art{display:flex;align-items:center;justify-content:center;width:54px;height:54px;margin-top:-26px;border-radius:14px;border:4px solid var(--surface,#0c0c0c);background:#1f1f1d;font-weight:650;font-size:23px}.ds-name{display:block;padding:16px 0 4px;font-size:17px;font-weight:550}.ds-meta{display:flex;justify-content:space-between;padding:10px 0 14px;font-size:12px;color:var(--muted,#8d8b84);border-top:1px solid var(--border,#1c1c1b)}.ds-state{display:flex;align-items:center;gap:6px;margin-bottom:14px;font-size:12px;color:var(--muted,#8d8b84)}.ds-state i{width:5px;height:5px;border-radius:50%;background:var(--positive,#5fe08a)}.ds-open{width:100%;min-height:40px;border:0;border-radius:8px;background:var(--app-color);color:#060606;font:500 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}.ds-open:focus-visible{outline:2px solid var(--app-color);outline-offset:4px}@media(prefers-reduced-motion:reduce){.ds-profile,.ds-profile:hover{transition:none;transform:none}}"
+    },
+    {
+      "name": "Toast",
+      "kind": "custom",
+      "refersTo": "toast",
+      "description": "Floating status message: Tip ground, Control border, Toast shadow.",
+      "html": "<div class=\"ds-toast\" role=\"status\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 5 5 9-10\"/></svg><div><strong>Profile launched</strong><span>Work is running.</span></div></div>",
+      "css": ".ds-toast{display:flex;align-items:flex-start;gap:11px;width:340px;padding:15px;background:var(--tip,#050505);border:1px solid var(--control,#262624);border-radius:12px;box-shadow:0 10px 30px #0005;color:var(--text,#f3f2ee);font:400 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-toast>svg{color:var(--positive,#5fe08a);margin-top:1px}.ds-toast strong{display:block;font-size:13px;font-weight:550;margin-bottom:3px}.ds-toast span{color:var(--muted,#8d8b84)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Keyring",
+    "overview": "The dashboard is one dark ring that holds every account. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: each app gets one color from a fixed eight-hue palette, and that app's account cards, primary action, focus ring and glow all carry it. Apart from status, nothing else on screen is colored.\n\nDensity is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.\n\nMotion is soft and springy. Controls press to 0.97 and spring back, cards rise 3px under the pointer, and desktop dialogs scale in from 0.96 and settle with a small overshoot. With reduced motion on, the springs and spatial scenes are gone, replaced by static, keyboard-reachable content. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.",
+    "keyCharacteristics": [
+      "Warm black ground, warm off-white text, graphite steps in between.",
+      "One hue per app, assigned once and kept for that app everywhere.",
+      "Flat tonal cards; shadow only on floating layers.",
+      "Spring motion with a full reduced-motion path.",
+      "Platform UI font only; nothing loads from the network.",
+      "The exact `aidentity` command behind every action, shown before and after it runs."
+    ],
+    "rules": [
+      {
+        "name": "The Identity-Only Rule",
+        "body": "Hue means an app or a status. Everything else stays on the Lampblack-to-Bone ramp. Stat counts and operation cards are neutral.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink Rule",
+        "body": "Text on an app-colored fill is Lampblack. A badge picks whichever of Lampblack (#060606) and white (#ffffff) contrasts more with its saved color; every preset clears 4.83:1.",
+        "section": "colors"
+      },
+      {
+        "name": "The System Voice Rule",
+        "body": "One family: the platform UI font. The dashboard loads no webfonts.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Count Rule",
+        "body": "Counts, tab totals and reel positions use tabular numerals.",
+        "section": "typography"
+      },
+      {
+        "name": "The Floating-Only Shadow Rule",
+        "body": "A shadow means the layer floats above the page (dialogs, toasts). Resting cards and keys never get one; a glow marks identity or a running account, never height.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do give each app exactly one hue through `--app-color`, and use it for that app's primary action, focus ring, hover outline and bottom glow.",
+      "Do define a new hue only as a `--hue-*` token; both scripts read the palette from CSS.",
+      "Do put Lampblack (#060606) text on any app-colored fill; every hue clears 6.2:1.",
+      "Do keep text at Muted (#8d8b84) or brighter and at 12px or larger. Muted on Raised (5.4:1) is the lowest text pairing in use.",
+      "Do show keyboard focus as a 2px outline in the current accent, offset 4px (swatches use Bone at 3px; controls inside clipping boxes use an inset ring).",
+      "Do give every spring and spatial scene a reduced-motion path that keeps the feedback.",
+      "Do keep controls at least 36px tall on desktop and 44px below 768px.",
+      "Do show the server's command for every action (Runs line, Activity); never build it in the browser."
+    ],
+    "donts": [
+      "Don't add a light theme. The dashboard is dark-only.",
+      "Don't bring the site's blue or its light/dark switch into the dashboard. The site is a separate world owned upstream.",
+      "Don't put a shadow on a resting card. Shadows belong to dialogs and toasts.",
+      "Don't color anything that is neither an app's identity nor a status.",
+      "Don't write hex values outside `:root`; use the tokens. The one exception is the `dialog::backdrop` scrim, which mirrors `--scrim` because older browsers don't pass custom properties to `::backdrop`.",
+      "Don't load webfonts or any other remote asset.",
+      "Don't show a secret anywhere, including a command line; masked values read `•••`."
+    ]
+  }
+}
