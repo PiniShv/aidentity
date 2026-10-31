@@ -12,7 +12,7 @@ The dashboard adapts retrieved 21st.dev component source to dependency-free vani
 | Buttons | [Button by Origin UI](https://21st.dev/@originui/components/button), demo 146 | Primary, outline, secondary and destructive variants with a loading overlay that preserves button size. |
 | Loading | [Button Spinner by uiable](https://21st.dev/@uiable/components/uiable-spinner-button), demo 19975 | CSS border spinner inside pending actions with visible text and `aria-busy`. |
 | Notifications | [Toast by cnippet-dev](https://21st.dev/@cnippet-dev/components/toast), demo 24297 | Stacked status notifications, entrance/exit transitions, hover pause, timed dismissal, dismiss and activity actions. |
-| Explore preview | [Works Wheel by crafterui](https://21st.dev/@crafterui/components/works-wheel), demo 28371 | Spring-driven depth preview follows the app/account list. Scrolling inside In focus switches apps independently; scrolling outside it moves the page normally. |
+| Explore preview | [Works Wheel by crafterui](https://21st.dev/@crafterui/components/works-wheel), demo 28371 | The Works Wheel drum turns as a short identity reel between apps; at rest the focus panel shows the selected app's accounts side by side as keys (badge, status, Original mark, Open or Bring to front). With a mouse or trackpad, scrolling over the panel switches apps, except over a ring that scrolls; on touch screens, and anywhere outside it, scrolling moves the page. |
 
 The workspace uses near-black surfaces (`#060606`, `#0c0c0c`), warm-white text
 (`#f3f2ee`), muted gray (`#8d8b84`) and mint/cyan/blue accents. These color values

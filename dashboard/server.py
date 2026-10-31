@@ -9,12 +9,14 @@ import os
 from pathlib import Path
 import re
 import secrets
+import shlex
 import signal
 import socket
 import subprocess
 import sys
 import threading
-from urllib.parse import urlsplit
+import time
+from urllib.parse import parse_qs, urlsplit
 
 
 MAX_BODY = 5 * 1024 * 1024
@@ -22,42 +24,56 @@ MAX_DOCUMENT = 4 * 1024 * 1024
 MAX_OUTPUT = 4 * 1024 * 1024
 MIN_SECRET = 8
 TERM_GRACE = 10
+STATE_TTL = 2  # seconds a poll may reuse the last inventory read
 BULK_COMMANDS = (["restore", "--all"], ["rebuild", "--all"], ["doctor", "--fix"], ["update"])
 ANSI = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
 URL_CREDENTIALS = re.compile(r"\b([a-zA-Z][a-zA-Z0-9+.-]{0,31}://)[^\s/\"']*@")
 PROXY_ARGUMENT = re.compile(r"(--proxy-server=)([^\s\"']+)")
 PROXY_PREFIX = re.compile(r"(?:(?:https?|ftp|socks)=)?(?:[a-zA-Z][a-zA-Z0-9+.-]{0,31}://)?")
+SECRET = "•••"  # what a shown command prints in place of a hidden value
+BUSY = "Another action is still running. Wait for it to finish."
+DOCTOR_FACT = re.compile(r"  (macOS|aidentity|bash|launcher dir|codesign|compatible apps|profiles) {2,}(.*)")
+DOCTOR_MARK = re.compile(r" {0,2}([✓!✗]) (.*)")
+DOCTOR_VERDICT = re.compile(r"No problems found\.|\d+ problem\(s\) found\.")
+DOCTOR_LEVEL = {"✓": "ok", "!": "warn", "✗": "error"}
 
 
 class RequestError(Exception):
-    def __init__(self, message, status=400):
+    def __init__(self, message, status=400, field=None):
         super().__init__(message)
         self.status = status
+        self.field = field  # the payload key at fault, so the form can mark that input
+
+
+class Busy(RequestError):
+    """Answered with 409 and "busy": true so the page can wait instead of reporting a failure."""
+    def __init__(self):
+        super().__init__(BUSY, 409)
 
 
 def text(value, field, maximum=1024, option_value=False, allow_path=False):
     if not isinstance(value, str) or not value or len(value) > maximum:
-        raise RequestError(field + " must be nonempty text within the size limit.")
+        raise RequestError(field + " must be nonempty text within the size limit.", field=field)
     if any(ord(ch) < 32 or 127 <= ord(ch) <= 159 for ch in value):
-        raise RequestError(field + " contains a control character.")
+        raise RequestError(field + " contains a control character.", field=field)
     if not option_value and value.startswith("-"):
-        raise RequestError(field + " cannot begin with a dash.")
+        raise RequestError(field + " cannot begin with a dash.", field=field)
     # The CLI recognizes these tokens globally, even as an option's value.
     if value in ("-h", "--help"):
-        raise RequestError(field + " cannot be a help option.")
+        raise RequestError(field + " cannot be a help option.", field=field)
     if not allow_path and ("/" in value or "\\" in value):
-        raise RequestError(field + " cannot contain a path separator.")
+        raise RequestError(field + " cannot contain a path separator.", field=field)
     return value
 
 
 def flag(payload, key):
     value = payload.get(key, False)
     if type(value) is not bool:
-        raise RequestError(key + " must be true or false.")
+        raise RequestError(key + " must be true or false.", field=key)
     return value
 
 
-def redact(value, hidden=()):
+def redact(value, hidden=(), marker="[hidden]"):
     value = ANSI.sub("", value)
     patterns = set()
     for entry in hidden:
@@ -69,17 +85,62 @@ def redact(value, hidden=()):
             patterns.add((len(secret_value), "(?<=" + re.escape(name + "=") + ")" + re.escape(secret_value)))
     if patterns:
         # One pass, so a shorter value cannot match inside an earlier [hidden] marker.
-        value = re.sub("|".join(pattern for _, pattern in sorted(patterns, reverse=True)), "[hidden]", value)
-    value = URL_CREDENTIALS.sub(r"\1[hidden]@", value)
+        value = re.sub("|".join(pattern for _, pattern in sorted(patterns, reverse=True)), marker, value)
+    value = URL_CREDENTIALS.sub(lambda match: match[1] + marker + "@", value)
 
     def proxy(match):
         # A password may contain ; = @ and :, so everything up to the last @ is hidden.
         rules = match[2]
         if "@" not in rules:
             return match[0]
-        return match[1] + rules[:PROXY_PREFIX.match(rules).end()] + "[hidden]" + rules[rules.rindex("@"):]
+        return match[1] + rules[:PROXY_PREFIX.match(rules).end()] + marker + rules[rules.rindex("@"):]
 
     return PROXY_ARGUMENT.sub(proxy, value)
+
+
+def shown(argv, hidden=(), stdin=None):
+    """The CLI line an action runs, ready to paste, with every hidden value as •••."""
+    words = ["aidentity"]
+    for index, word in enumerate(argv):
+        if index and argv[index - 1] == "--env" and word in hidden:
+            words.append(shlex.quote(word.split("=", 1)[0] + "=") + SECRET)
+        else:
+            words.append(shlex.quote(redact(word, hidden, SECRET)))
+    # The import document travels over stdin; only a placeholder file name is shown.
+    return " ".join(words) + (" < recipe.json" if stdin is not None else "")
+
+
+def doctor_report(stdout, stderr):
+    """Sort redacted doctor output into findings; a line it does not know stays visible as a warning."""
+    findings, section = [], None
+    for line in stdout.splitlines() + [""] + stderr.splitlines():
+        if line.startswith("    "):
+            continue  # detail under the line above: an install hint or a --fix rebuild's output
+        if not line.strip():
+            section = None
+        elif line in ("aidentity doctor", "Profiles"):
+            section = line
+        elif fact := DOCTOR_FACT.fullmatch(line):
+            # System facts stay in stdout; only the one the CLI counts as a problem is a finding.
+            if fact[2].startswith("NOT WRITABLE"):
+                findings.append({"level": "error", "profile": None, "text": fact[1] + " " + fact[2]})
+        elif mark := DOCTOR_MARK.fullmatch(line):
+            if not DOCTOR_VERDICT.match(mark[2]):  # the closing tally is what summary counts
+                profile = mark[2].split(" — ", 1)[0] if section == "Profiles" else None
+                findings.append({"level": DOCTOR_LEVEL[mark[1]], "profile": profile, "text": mark[2]})
+        else:
+            findings.append({"level": "warn", "profile": None, "text": line.strip()})
+    summary = {level: sum(finding["level"] == level for finding in findings) for level in ("ok", "warn", "error")}
+    return {"summary": summary, "findings": findings}
+
+
+def update_versions(output):
+    """Versions as `update --check` states them; null when its output names none."""
+    if match := re.search(r"aidentity (\S+) is up to date\.", output):
+        return {"installed": match[1], "available": match[1]}
+    match = (re.search(r"aidentity (\S+) is newer than the latest release \((\S+)\)", output)
+             or re.search(r"(\S+) → (\S+) is available", output))
+    return {"installed": match[1] if match else None, "available": match[2] if match else None}
 
 
 def parse_port(value):
@@ -152,9 +213,11 @@ class Dashboard:
         self.bulk_timeout = bulk_timeout
         self.csrf_token = secrets.token_urlsafe(32)
         self.lock = threading.RLock()
+        self.action_lock = threading.Lock()  # one action at a time; a second one gets Busy, not a queue
         self.process_lock = threading.Lock()
         self.processes = set()
         self.stopped = False
+        self.state_cache = None
 
     def stop(self):
         """A terminal interrupt must also stop detached CLI operations."""
@@ -242,11 +305,19 @@ class Dashboard:
             result["error"] = error
         return result
 
-    def state(self):
+    def state(self, fresh=False):
         commands = (["list", "--json"], ["__complete", "apps"], ["__complete", "restorable"], ["version"])
         # The reads are independent; the lock still keeps them and every action apart.
-        with self.lock, ThreadPoolExecutor(len(commands)) as pool:
-            listing, apps, restorable, version = pool.map(self.run, commands)
+        # A poll can delay an action by up to ~1 s (four CLI reads); accepted so a read never sees a half-applied action.
+        with self.lock:
+            if not fresh and self.state_cache and time.monotonic() - self.state_cache[0] < STATE_TTL:
+                return self.state_cache[1]
+            with ThreadPoolExecutor(len(commands)) as pool:
+                listing, apps, restorable, version = pool.map(self.run, commands)
+            self.state_cache = (time.monotonic(), self.inventory(listing, apps, restorable, version))
+            return self.state_cache[1]
+
+    def inventory(self, listing, apps, restorable, version):
         errors = []
         for label, result in (("Profiles", listing), ("Installed apps", apps),
                               ("Restorable profiles", restorable), ("Version", version)):
@@ -391,16 +462,34 @@ class Dashboard:
             argv.append(shell)
         return action, argv, stdin, hidden
 
+    def preview(self, payload):
+        """Validate like action and name the command it would run; never runs or waits for anything."""
+        _, argv, stdin, hidden = self.command(payload)
+        return {"ok": True, "command": shown(argv, hidden, stdin)}
+
     def action(self, payload):
         action, argv, stdin, hidden = self.command(payload)
         timeout = self.bulk_timeout if action == "import" or argv in BULK_COMMANDS else self.timeout
-        with self.lock:
-            result = self.run(argv, stdin, timeout)
+        if not self.action_lock.acquire(blocking=False):
+            raise Busy()
+        try:
+            with self.lock:
+                try:
+                    result = self.run(argv, stdin, timeout)
+                finally:
+                    self.state_cache = None  # the next read must show what the action changed
+        finally:
+            self.action_lock.release()
         result["action"] = action
+        result["command"] = shown(argv, hidden, stdin)
         # The deliberate export download retains the CLI's complete recipe.
         if action != "export":
             result["stdout"] = redact(result["stdout"], hidden)
         result["stderr"] = redact(result["stderr"], hidden)
+        if action == "doctor":
+            result.update(doctor_report(result["stdout"], result["stderr"]))
+        elif argv == ["update", "--check"]:
+            result.update(update_versions(result["stdout"] + "\n" + result["stderr"]))
         return result
 
 
@@ -461,17 +550,18 @@ def make_server(dashboard, port=0, assets=None):
         def do_GET(self):
             try:
                 self.check_request()
-                path = urlsplit(self.path).path
+                url = urlsplit(self.path)
+                path = url.path
                 if path == "/api/state":
                     self.check_owner()
-                    self.respond(200, dashboard.state())
+                    self.respond(200, dashboard.state(fresh=parse_qs(url.query).get("fresh") == ["1"]))
                 elif path in registered:
                     mime = "text/html" if path == "/" else mimetypes.guess_type(path)[0] or "text/plain"
                     self.respond(200, registered[path], mime + "; charset=utf-8")
                 else:
                     self.respond(404, {"ok": False, "error": "This dashboard page does not exist."})
             except RequestError as exc:
-                self.respond(exc.status, {"ok": False, "error": str(exc)})
+                self.respond(exc.status, {"ok": False, "error": str(exc), **({"field": exc.field} if exc.field else {})})
             except (BrokenPipeError, ConnectionResetError):
                 pass
             except Exception:
@@ -480,7 +570,8 @@ def make_server(dashboard, port=0, assets=None):
         def do_POST(self):
             try:
                 self.check_request(write=True)
-                if urlsplit(self.path).path != "/api/action":
+                path = urlsplit(self.path).path
+                if path not in ("/api/action", "/api/preview"):
                     raise RequestError("This dashboard action endpoint does not exist.", 404)
                 self.check_owner()
                 if self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != "application/json":
@@ -503,9 +594,10 @@ def make_server(dashboard, port=0, assets=None):
                                          parse_constant=lambda value: (_ for _ in ()).throw(ValueError()))
                 except (ValueError, UnicodeError):
                     raise RequestError("The request body is not valid JSON.")
-                self.respond(200, dashboard.action(payload))
+                self.respond(200, dashboard.preview(payload) if path == "/api/preview" else dashboard.action(payload))
             except RequestError as exc:
-                self.respond(exc.status, {"ok": False, "error": str(exc)})
+                self.respond(exc.status, {"ok": False, "error": str(exc), **({"field": exc.field} if exc.field else {}),
+                                          **({"busy": True} if isinstance(exc, Busy) else {})})
             except (BrokenPipeError, ConnectionResetError):
                 pass
             except (TimeoutError, socket.timeout):
