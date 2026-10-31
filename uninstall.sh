@@ -42,7 +42,7 @@
 #                           launchers (default: /Applications:~/Applications)
 #   AIDENTITY_DATA_ROOT     where profile data lives
 #
-# MIT licensed. https://github.com/PiniShv/aidentity — contact@pinishv.com
+# Apache-2.0 licensed. https://github.com/PiniShv/aidentity — contact@pinishv.com
 
 set -euo pipefail
 
