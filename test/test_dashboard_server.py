@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -22,12 +23,9 @@ class DashboardTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("dashboard_server", SERVER_PATH)
         cls.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.module)
-
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.root = Path(self.tmp.name)
-        self.log = self.root / "calls.jsonl"
-        cli = self.root / "aidentity"
+        # One shared CLI, run once here: macOS spends ~1s on a new executable's first exec, past the 0.5s timeout.
+        cls.cli_dir = tempfile.TemporaryDirectory()
+        cli = Path(cls.cli_dir.name) / "aidentity"
         cli.write_text(
             "#!/usr/bin/env python3\n"
             "import json, os, sys, time\n"
@@ -59,10 +57,25 @@ class DashboardTests(unittest.TestCase):
             "  sys.exit(143)\n"
             " signal.signal(signal.SIGTERM,cleanup); time.sleep(5)\n"
             "elif a == ['help','flood']: print('x' * (5 * 1024 * 1024))\n"
+            "elif os.path.exists(os.path.join(os.environ['HOME'],'reply')):\n"
+            " r=json.load(open(os.path.join(os.environ['HOME'],'reply')))\n"
+            " sys.stdout.write(r['stdout']); sys.stderr.write(r['stderr'])\n"
             "else: print(json.dumps(a))\n",
             encoding="utf-8",
         )
         cli.chmod(0o700)
+        subprocess.run([str(cli)], env=dict(os.environ, HOME=cls.cli_dir.name, DASHBOARD_TEST_LOG=os.devnull),
+                       stdout=subprocess.DEVNULL, timeout=30, check=True)
+        cls.cli = str(cli)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.cli_dir.cleanup()
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.log = self.root / "calls.jsonl"
         env = dict(os.environ)
         env.update(
             HOME=str(self.root),
@@ -73,7 +86,7 @@ class DashboardTests(unittest.TestCase):
             AIDENTITY_DATA_ROOT=str(self.root / "Data"),
             AIDENTITY_APP_DIRS=str(self.root / "Installed"),
         )
-        self.backend = self.module.Dashboard(str(cli), env=env, timeout=0.5)
+        self.backend = self.module.Dashboard(self.cli, env=env, timeout=0.5)
         self.server = self.module.make_server(
             self.backend, port=0,
             assets={"/": "<!doctype html><title>Accounts</title>",
@@ -109,6 +122,13 @@ class DashboardTests(unittest.TestCase):
 
     def action(self, payload, **kwargs):
         return self.request("POST", "/api/action", payload, **kwargs)
+
+    def preview(self, payload, **kwargs):
+        return self.request("POST", "/api/preview", payload, **kwargs)
+
+    def reply(self, stdout, stderr=""):
+        """Make the fixture CLI answer the next unrecognized command with recorded output."""
+        (self.root / "reply").write_text(json.dumps({"stdout": stdout, "stderr": stderr}))
 
     def calls(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
@@ -286,6 +306,22 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(state["errors"], [])
         self.assertEqual(state["version"], "1.6.1")
 
+    def test_state_is_cached_briefly_and_dropped_by_an_action(self):
+        inventory = lambda: [c for c in self.calls() if c in (["list", "--json"], ["version"])]
+        self.backend.state()
+        self.backend.state()
+        self.assertEqual(len(inventory()), 2)
+        self.backend.action({"action": "open", "name": "Claude Work"})
+        self.backend.state()
+        self.assertEqual(len(inventory()), 4)
+        with mock.patch.object(self.module.time, "monotonic", return_value=time.monotonic() + 2.5):
+            self.backend.state()
+        self.assertEqual(len(inventory()), 6)
+
+    def test_invalid_field_is_named_so_the_form_can_mark_it(self):
+        status, _, result = self.action({"action": "rename", "name": "Claude Work", "new_name": "-x"})
+        self.assertEqual((status, result["field"]), (400, "new_name"))
+
     def test_output_limit_reports_failure(self):
         _, _, result = self.action({"action": "help", "command": "flood"})
         self.assertFalse(result["ok"])
@@ -354,6 +390,18 @@ class DashboardTests(unittest.TestCase):
                 self.assertEqual(status, 403)
                 self.assertFalse(result["ok"])
         self.assertEqual(self.calls(), [])
+
+    def test_fresh_state_request_bypasses_the_cache_but_not_the_origin_check(self):
+        inventory = lambda: [c for c in self.calls() if c in (["list", "--json"], ["version"])]
+        self.assertEqual(self.request("GET", "/api/state")[0], 200)
+        self.assertEqual(self.request("GET", "/api/state")[0], 200)
+        self.assertEqual(len(inventory()), 2)
+        status, _, state = self.request("GET", "/api/state?fresh=1")
+        self.assertEqual((status, state["ok"]), (200, True))
+        self.assertEqual(len(inventory()), 4)
+        status, _, _ = self.request("GET", "/api/state?fresh=1", headers={"Origin": "https://evil.example"})
+        self.assertEqual(status, 403)
+        self.assertEqual(len(inventory()), 4)
 
     def test_foreign_origin_cannot_read_session_token(self):
         status, _, _ = self.request("GET", "/api/state", headers={"Origin": "https://evil.example"})
@@ -467,6 +515,155 @@ class DashboardTests(unittest.TestCase):
         for path in ("/../server.py", "/server.py", "/api/action"):
             status, _, _ = self.request("GET", path)
             self.assertEqual(status, 404)
+
+    def test_action_reports_the_cli_command_it_ran(self):
+        for payload in (
+            {"action": "add", "app": "/Applications/Claude.app", "profile": "Work Two",
+             "color": "blue", "seed": True},
+            {"action": "rename", "name": "Claude Work", "new_name": "Client's"},
+            {"action": "remove", "name": "Claude Work", "purge": True, "confirmed": True},
+            {"action": "doctor"},
+        ):
+            with self.subTest(payload=payload):
+                status, _, result = self.action(payload)
+                self.assertEqual(status, 200)
+                self.assertEqual(shlex.split(result["command"]), ["aidentity"] + self.calls()[-1])
+
+    def test_command_never_shows_env_values_or_proxy_credentials(self):
+        payload = {"action": "add", "app": "Claude", "profile": "Work",
+                   "args": ["--proxy-server=https://bob:s3cret-pass@proxy.example:8080"],
+                   "env": ["HTTPS_PROXY=https://alice:private@proxy.example", "API_TOKEN=hunter2"]}
+        _, _, preview = self.preview(payload)
+        _, _, result = self.action(payload)
+        for command in (preview["command"], result["command"]):
+            for secret in ("alice", "private", "bob", "s3cret-pass", "hunter2"):
+                self.assertNotIn(secret, command)
+            self.assertIn("--env HTTPS_PROXY=••• --env API_TOKEN=•••", command)
+            self.assertIn("--proxy-server=https://•••@proxy.example:8080", command)
+
+    def test_preview_matches_the_command_each_action_runs(self):
+        for payload in (
+            {"action": "add", "app": "Claude", "profile": "Work", "badge": "W", "env": ["TOKEN=abcdefgh123"]},
+            {"action": "set", "name": "Claude Work", "clear_args": True, "args": ["--lang=fr"]},
+            {"action": "remove", "name": "Claude Work", "confirmed": True},
+            {"action": "rename", "name": "Claude Work", "new_name": "Client"},
+            {"action": "restore", "all": True}, {"action": "restore", "name": "Claude Personal"},
+            {"action": "rebuild", "all": True}, {"action": "rebuild", "name": "Claude Work"},
+            {"action": "prune", "confirmed": True}, {"action": "doctor", "fix": True},
+            {"action": "export"},
+            {"action": "import", "confirmed": True,
+             "document": {"launchers": [{"name": "Claude Work", "env": ["KEY=topsecret99"]}]}},
+            {"action": "update", "check": True}, {"action": "update"},
+        ):
+            with self.subTest(payload=payload):
+                before = len(self.calls())
+                status, _, preview = self.preview(payload)
+                self.assertEqual((status, preview["ok"]), (200, True))
+                self.assertEqual(len(self.calls()), before)
+                _, _, result = self.action(payload)
+                self.assertEqual(preview["command"], result["command"])
+        self.assertEqual(result["command"], "aidentity update")
+        _, _, imported = self.preview({"action": "import", "confirmed": True,
+                                       "document": {"launchers": [{"env": ["KEY=topsecret99"]}]}})
+        self.assertEqual(imported["command"], "aidentity import /dev/stdin --yes < recipe.json")
+
+    def test_preview_of_an_invalid_payload_names_the_field_and_runs_nothing(self):
+        status, _, result = self.preview({"action": "rename", "name": "Claude Work", "new_name": "-x"})
+        self.assertEqual((status, result["ok"], result["field"]), (400, False, "new_name"))
+        status, _, result = self.preview({"action": "open", "name": "Claude Work"},
+                                         headers={"X-AIdentity-CSRF": "wrong"})
+        self.assertEqual((status, result["ok"]), (403, False))
+        self.assertEqual(self.calls(), [])
+
+    def test_preview_spawns_nothing_and_never_waits_for_a_running_action(self):
+        with mock.patch.object(self.module.subprocess, "Popen", side_effect=AssertionError) as popen:
+            self.assertEqual(self.backend.preview({"action": "doctor"}),
+                             {"ok": True, "command": "aidentity doctor"})
+        popen.assert_not_called()
+        with self.backend.lock, self.backend.action_lock:
+            started = time.monotonic()
+            status, _, result = self.preview({"action": "prune", "confirmed": True})
+            self.assertLess(time.monotonic() - started, 1)
+        self.assertEqual((status, result["command"]), (200, "aidentity prune --yes"))
+
+    def test_second_action_while_one_runs_is_reported_busy(self):
+        self.backend.timeout = 5
+        (self.root / "delay").write_text("1")
+        first = threading.Thread(target=self.action, args=({"action": "open", "name": "Claude Work"},))
+        first.start()
+        deadline = time.monotonic() + 2
+        while not self.calls() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        status, _, result = self.action({"action": "quit", "name": "Claude Work"})
+        first.join(timeout=4)
+        self.assertEqual((status, result), (409, {
+            "ok": False, "busy": True, "error": "Another action is still running. Wait for it to finish."}))
+        self.assertEqual(self.calls(), [["open", "Claude Work"]])
+
+    def test_doctor_reports_summary_and_findings(self):
+        # The ✓ and folder lines are a recorded sandbox run; the others use doctor's own format strings.
+        self.reply(
+            "aidentity doctor\n\n"
+            "  macOS               27.2\n"
+            "  aidentity           1.6.1\n"
+            "  bash                5.3.20(1)-release\n"
+            "  launcher dir        ok /Users/me/Applications\n"
+            "  codesign            absent — launchers work, just unsigned\n"
+            "                      install with: xcode-select --install\n"
+            "  compatible apps     4 found\n"
+            "  profiles            3\n\n"
+            "Profiles\n"
+            "  ✓ ChatGPT Research\n"
+            "  ! Claude Work — built by aidentity 1.5.0; a rebuild picks up 1.6.1\n"
+            "  ✓ Visual Studio Code Side\n\n"
+            "  ! 1 profile folder(s) have no launcher — see: aidentity restore, aidentity prune\n\n",
+            "! 2 problem(s) found. 1 can be fixed with: aidentity doctor --fix\n")
+        status, _, result = self.action({"action": "doctor"})
+        self.assertEqual(status, 200)
+        self.assertIn("aidentity doctor", result["stdout"])
+        self.assertEqual(result["summary"], {"ok": 2, "warn": 2, "error": 0})
+        self.assertEqual(result["findings"], [
+            {"level": "ok", "profile": "ChatGPT Research", "text": "ChatGPT Research"},
+            {"level": "warn", "profile": "Claude Work",
+             "text": "Claude Work — built by aidentity 1.5.0; a rebuild picks up 1.6.1"},
+            {"level": "ok", "profile": "Visual Studio Code Side", "text": "Visual Studio Code Side"},
+            {"level": "warn", "profile": None,
+             "text": "1 profile folder(s) have no launcher — see: aidentity restore, aidentity prune"},
+        ])
+
+    def test_doctor_keeps_unknown_lines_as_warnings_and_redacts_them(self):
+        self.reply(
+            "  launcher dir        NOT WRITABLE /Apps\n"
+            "  compatible apps     0 found\n"
+            "proxy https://alice:private@proxy.example refused\n",
+            "! No Chromium/Electron apps detected.\n! 2 problem(s) found.\n")
+        _, _, result = self.action({"action": "doctor"})
+        self.assertEqual(result["summary"], {"ok": 0, "warn": 2, "error": 1})
+        self.assertEqual(result["findings"], [
+            {"level": "error", "profile": None, "text": "launcher dir NOT WRITABLE /Apps"},
+            {"level": "warn", "profile": None, "text": "proxy https://[hidden]@proxy.example refused"},
+            {"level": "warn", "profile": None, "text": "No Chromium/Electron apps detected."},
+        ])
+
+    def test_update_check_reports_installed_and_available_versions(self):
+        cases = [
+            ("Checking for the latest release of aidentity …\n✓ aidentity 1.6.1 is up to date.\n", "",
+             ("1.6.1", "1.6.1")),
+            ("Checking for the latest release of aidentity …\n1.6.1 → 1.7.0 is available.\n"
+             "  What changed: https://github.com/PiniShv/aidentity/releases/tag/v1.7.0\n", "",
+             ("1.6.1", "1.7.0")),
+            ("✓ aidentity 1.8.0 is newer than the latest release (1.7.0). Nothing to update.\n", "",
+             ("1.8.0", "1.7.0")),
+            ("Checking for the latest release of aidentity …\n",
+             "✗ Could not get the latest release from GitHub (curl's reason is above).\n", (None, None)),
+        ]
+        for stdout, stderr, expected in cases:
+            with self.subTest(stdout=stdout):
+                self.reply(stdout, stderr)
+                _, _, result = self.action({"action": "update", "check": True})
+                self.assertEqual((result["installed"], result["available"]), expected)
+        _, _, result = self.action({"action": "update"})
+        self.assertNotIn("installed", result)
 
     def test_port_parser_rejects_out_of_range_and_non_numeric(self):
         self.assertEqual(self.module.parse_port("0"), 0)
