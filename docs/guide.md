@@ -1250,6 +1250,6 @@ Please follow the [Code of Conduct](../CODE_OF_CONDUCT.md). Release notes are in
 
 ## Licence
 
-MIT. See [LICENSE](../LICENSE).
+Apache-2.0. See [LICENSE](../LICENSE).
 
 Built by [Pini Shvartsman](https://pinishv.com).

@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The licence is now Apache-2.0, in place of MIT. It adds a patent grant, an
+  explicit limit on liability and a clause that gives no rights to the
+  project's name. A `NOTICE` file carries the copyright line. Versions released
+  before this change stay under MIT for the people who already have them.
 - The site's front page is new, in the style of a product page: one idea per
   section, the film full width at the top, and the uses told as "One Mac, many
   uses". Every fact and command from the old page is still there. The

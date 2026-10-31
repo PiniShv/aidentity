@@ -25,7 +25,7 @@
 #
 # https://github.com/PiniShv/aidentity
 #
-# MIT licensed. Requires macOS. No dependencies beyond what ships with the OS.
+# Apache-2.0 licensed. Requires macOS. No dependencies beyond what ships with the OS.
 #
 # This file is built from the src/ folder of the repository by
 # scripts/build.sh. To change it, edit those files and run `make build`.

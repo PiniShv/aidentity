@@ -33,7 +33,7 @@
 #
 # Uninstall:  https://raw.githubusercontent.com/PiniShv/aidentity/main/uninstall.sh
 #
-# MIT licensed. https://github.com/PiniShv/aidentity — contact@pinishv.com
+# Apache-2.0 licensed. https://github.com/PiniShv/aidentity — contact@pinishv.com
 
 set -euo pipefail
 
