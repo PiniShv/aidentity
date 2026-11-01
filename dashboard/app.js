@@ -432,8 +432,8 @@
     if(!lastDoctor)return "";
     const {result,at}=lastDoctor,sum=result.summary,findings=Array.isArray(result.findings)?result.findings:null;
     const words={error:"Error",warn:"Warning",ok:"OK"},order={error:0,warn:1,ok:2};
-    const count=(n,one)=>`<span><strong class="num">${n||0}</strong> ${n===1||one==="OK"?one:`${one}s`}</span>`;
-    const head=`<p class="health-summary">${sum?count(sum.ok,"OK")+count(sum.warn,"warning")+count(sum.error,"error"):""}<time>Checked ${time(at)}</time></p>`;
+    const count=(n,one,tone)=>`<span${n>0?` class="${tone}"`:""}><strong class="num">${n||0}</strong> ${n===1||one==="OK"?one:`${one}s`}</span>`;
+    const head=`<p class="health-summary">${sum?count(sum.ok,"OK","positive")+count(sum.warn,"warning","warning")+count(sum.error,"error","negative"):""}<time>Checked ${time(at)}</time></p>`;
     const body=findings?`<ul class="health-findings">${[...findings].sort((a,b)=>(order[a.level]??3)-(order[b.level]??3)).map(item=>`<li data-level="${escape(item.level)}">${icon(item.level==="ok"?"check":"alert")}<span class="finding-level">${words[item.level]||escape(item.level)}</span><span>${!item.profile?escape(item.text):item.text===item.profile?`<strong>${escape(item.profile)}</strong>`:`<strong>${escape(item.profile)}:</strong> ${escape(item.text)}`}</span></li>`).join("")}</ul>`:`<pre class="output">${escape([result.stdout,result.stderr].filter(Boolean).join("\n")||"No output.")}</pre>`;
     return `<div class="health-result">${head}${body}${healthIssues()?'<p class="health-next">Next step: <strong>Check and repair</strong> rebuilds the launchers it can fix.</p>':""}</div>`;
   }
