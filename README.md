@@ -13,7 +13,7 @@ Built for AI desktop apps like Claude and ChatGPT. Also tested with Slack, VS Co
 ![macOS only](https://img.shields.io/badge/macOS-only-111?logo=apple&logoColor=white)
 ![Latest version](https://img.shields.io/github/v/tag/PiniShv/aidentity?label=version&sort=semver)
 ![No dependencies](https://img.shields.io/badge/dependencies-none-2FB344)
-![MIT licence](https://img.shields.io/badge/license-MIT-2E7DF6)
+![Apache-2.0 licence](https://img.shields.io/badge/license-Apache--2.0-2E7DF6)
 
 [Install](#30-seconds) · [How it works](#how-it-works) · [Which apps work](#which-apps-work) · [FAQ](#frequently-asked) · [Full guide](docs/guide.md)
 
@@ -21,9 +21,9 @@ Built for AI desktop apps like Claude and ChatGPT. Also tested with Slack, VS Co
 curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash
 ```
 
-<a href="https://aidentity.pinishv.com/assets/film.mp4"><img src="assets/film-poster.jpg" alt="Play the 20-second film, with sound: the same chat app open three times at once, one window for each account, each one signed in" width="800"></a>
+<a href="https://aidentity.pinishv.com/assets/film.mp4"><img src="assets/film-poster.jpg" alt="Play the 31-second film, with sound: signing out and in again to switch accounts, then the same chat app open three times at once, one window for each account, each one signed in" width="800"></a>
 
-<sub>A 20-second film, with sound. Click to play.</sub>
+<sub>A 31-second film, with sound. Click to play.</sub>
 
 </div>
 
@@ -173,7 +173,7 @@ No. It works with desktop apps. Command-line tools keep their sign-in in other w
 
 [Full guide](docs/guide.md) · [Security policy](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Licence](LICENSE)
 
-Built by [Pini Shvartsman](https://pinishv.com). MIT licence.
+Built by [Pini Shvartsman](https://pinishv.com). Apache-2.0 licence.
 
 <sub>Not affiliated with Anthropic, OpenAI or the makers of the other apps named here.</sub>
 

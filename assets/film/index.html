@@ -27,6 +27,7 @@
   .h1 { font-size: 72px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.05; }
   .h2 { font-size: 48px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
   .grad { background: linear-gradient(90deg, #4F8DFB 0%, #38BDF8 45%, #A78BFA 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .dim { color: var(--muted); }
 
   /* A window, drawn with depth: glass, a fine edge, a long soft shadow. */
   .win { position: absolute; width: 520px; height: 340px; border-radius: 16px; overflow: hidden;
@@ -39,7 +40,7 @@
   .side { position: absolute; left: 0; top: 44px; bottom: 0; width: 36%; border-right: 1px solid rgba(255,255,255,.06); padding: 18px 16px; }
   .main { position: absolute; left: 36%; right: 0; top: 44px; bottom: 0; padding: 20px; }
   .who { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
-  .av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 19px; color: #fff; }
+  .av { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 19px; color: #fff; }
   .av.w { background: var(--blue); } .av.p { background: var(--green); } .av.c { background: var(--purple); }
   .who .n { font-size: 20px; font-weight: 600; }
   .row { height: 11px; border-radius: 6px; background: rgba(255,255,255,.10); margin: 14px 0; }
@@ -47,6 +48,36 @@
   .bub.me { background: rgba(56,189,248,.28); margin-left: auto; }
   .pill { position: absolute; right: 14px; top: 8px; font-size: 19px; font-weight: 600; color: var(--ok);
     background: rgba(74,222,128,.12); border: 1px solid rgba(74,222,128,.35); border-radius: 999px; padding: 2px 12px; opacity: 0; }
+
+  /* The open chat: its row marked in the list, and a side panel next to it. */
+  .row.on { background: rgba(255,255,255,.24); box-shadow: 0 0 0 7px rgba(255,255,255,.06); }
+  .main.withp { right: 23%; }
+  .panel { position: absolute; right: 0; top: 44px; bottom: 0; width: 23%; border-left: 1px solid rgba(255,255,255,.06); padding: 18px 12px; }
+  .doc { height: 70px; border-radius: 8px; background: rgba(255,255,255,.07); margin-bottom: 4px; }
+  /* No chat open: a new, empty one. */
+  .hello { position: absolute; left: 22%; right: 22%; top: 38%; height: 12px; border-radius: 6px; background: rgba(255,255,255,.10); }
+  .composer { position: absolute; left: 18px; right: 18px; bottom: 18px; height: 40px; border-radius: 20px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.04); }
+
+  /* The loop: one window, signed out and in again, in muted colour. Each
+     state is a layer over the window; the menu sits on top. */
+  #mw { filter: saturate(.25); }
+  #cam { position: absolute; inset: 0; transform-origin: 0 0; }
+  .st { position: absolute; inset: 0; }
+  .menu { position: absolute; left: 12px; top: 106px; width: 184px; padding: 6px; border-radius: 12px; opacity: 0;
+    background: rgba(44,52,72,.98); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 24px 50px -12px rgba(0,0,0,.8); }
+  .mi { height: 36px; border-radius: 8px; padding: 0 12px; display: flex; align-items: center; font-size: 18px; font-weight: 500; color: #C9D1DE; }
+  #so { color: var(--text); background-color: rgba(255,255,255,0); }
+  .form { position: absolute; left: 0; right: 0; top: 44px; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+  .ftitle { font-size: 21px; font-weight: 600; color: #C9D1DE; margin-bottom: 2px; }
+  .field { width: 240px; height: 40px; border-radius: 10px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04);
+    display: flex; align-items: center; padding: 0 14px; overflow: hidden; }
+  .fbar { height: 10px; width: 0; border-radius: 5px; background: rgba(255,255,255,.34); }
+  .fdots { width: 0; overflow: hidden; white-space: nowrap; font-size: 18px; letter-spacing: 3px; color: #C9D1DE; }
+  .btn { width: 240px; height: 42px; margin-top: 6px; border-radius: 10px; background: var(--blue); display: grid; place-items: center;
+    font-size: 19px; font-weight: 600; color: #fff; filter: brightness(1); }
+  #ghost { position: absolute; left: 90px; top: 262px; width: 540px; height: 340px; border-radius: 16px; border: 2px dashed rgba(255,255,255,.32); opacity: 0; }
+  #cur { position: absolute; left: 0; top: 0; width: 24px; height: 30px; transform: translate(234px, 484.5px); transform-origin: 2px 1.5px;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.55)); }
 
   .term { position: absolute; left: 290px; top: 300px; width: 700px; border-radius: 16px; overflow: hidden; opacity: 0;
     background: rgba(18,22,32,.92); border: 1px solid rgba(255,255,255,.10); box-shadow: 0 50px 110px -30px rgba(0,0,0,.85); }
@@ -57,56 +88,82 @@
 </style>
 </head>
 <body>
-<div id="root" data-composition-id="root" data-width="1280" data-height="720" data-start="0" data-duration="19.5">
+<div id="root" data-composition-id="root" data-width="1280" data-height="720" data-start="0" data-duration="31.4">
  <div class="aura" id="aura1"></div><div class="aura" id="aura2"></div><div class="aura" id="aura3"></div>
  <div id="stage">
 
-  <!-- 1. Meet aidentity -->
-  <div id="s1" class="clip" data-start="0" data-duration="3.1">
-    <img id="logo" src="logo.svg" alt="" style="position:absolute; left:50%; width:132px; height:132px; margin-left:-66px; top:200px">
-    <div class="abs center h1" id="name" style="top:356px"><span class="grad">aidentity</span></div>
+  <!-- 0. The hook -->
+  <div id="s0" class="clip" data-start="0" data-duration="3.4">
+    <div class="abs center h2" id="hk1" style="top:64px; opacity:0">You know this button…</div>
+    <div class="abs center h2 dim" id="hk2" style="top:122px; opacity:0">too well!</div>
   </div>
 
-  <!-- 2. Every account, open at once -->
-  <div id="s2" class="clip" data-start="2.9" data-duration="3.4">
-    <div class="abs center h2" id="l2a" style="top:64px; opacity:0">Every account you use.</div>
-    <div class="abs center h2 grad" id="l2b" style="top:122px; opacity:0">Open at once.</div>
-    <div class="win" id="wC" style="left:150px; top:262px; opacity:0">
+  <!-- 1. The problem: to switch, you sign out and sign in again -->
+  <div id="s1" class="clip" data-start="2.9" data-duration="10">
+    <div class="abs center h2" id="q1a" style="top:64px; opacity:0">To switch, you sign out.</div>
+    <div class="abs center h2 dim" id="q1b" style="top:122px; opacity:0">Then sign in again.</div>
+    <div class="abs center h2" id="q2a" style="top:64px; opacity:0">Sign out.</div>
+    <div class="abs center h2 dim" id="q2b" style="top:122px; opacity:0">Sign in again.</div>
+    <div class="abs center h2" id="q3" style="top:64px; opacity:0">You lose your open chats.</div>
+    <div id="ghost"></div>
+  </div>
+
+  <!-- 3. Every account, open at once. Each one signed in. -->
+  <div id="s3" class="clip" data-start="14.5" data-duration="7.5">
+    <div class="abs center h2" id="l3a" style="top:64px; opacity:0">Every account you use.</div>
+    <div class="abs center h2 grad" id="l3b" style="top:122px; opacity:0">Open at once.</div>
+    <div class="abs center h2" id="l4a" style="top:64px; opacity:0">Each in its own window.</div>
+    <div class="abs center h2 grad" id="l4b" style="top:122px; opacity:0">Each one signed in.</div>
+    <div class="win" id="wC" style="left:370px; top:200px; width:540px; opacity:0">
       <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat Client</span></div>
       <div class="side"><div class="who"><div class="av c">C</div><div class="n">Client</div></div><div class="row" style="width:80%"></div><div class="row" style="width:62%"></div></div>
       <div class="main"><div class="bub" style="width:66%"></div><div class="bub me" style="width:44%"></div></div>
     </div>
-    <div class="win" id="wP" style="left:610px; top:262px; opacity:0">
-      <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat Personal</span></div>
-      <div class="side"><div class="who"><div class="av p">P</div><div class="n">Personal</div></div><div class="row" style="width:58%"></div><div class="row" style="width:84%"></div></div>
-      <div class="main"><div class="bub" style="width:54%"></div><div class="bub me" style="width:48%"></div></div>
-    </div>
-    <div class="win" id="wW" style="left:380px; top:330px; opacity:0">
-      <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat</span></div>
-      <div class="side"><div class="who"><div class="av w">W</div><div class="n">Work</div></div><div class="row" style="width:88%"></div><div class="row" style="width:70%"></div><div class="row" style="width:76%"></div></div>
-      <div class="main"><div class="bub" style="width:62%"></div><div class="bub me" style="width:50%"></div><div class="bub" style="width:70%"></div></div>
-    </div>
-  </div>
-
-  <!-- 3. Each in its own window -->
-  <div id="s3" class="clip" data-start="6.1" data-duration="3.9">
-    <div class="abs center h2" id="l3a" style="top:64px; opacity:0">Each in its own window.</div>
-    <div class="abs center h2 grad" id="l3b" style="top:122px; opacity:0">Each one signed in.</div>
-    <div class="win" id="sW" style="left:90px; top:262px; width:540px; opacity:0">
-      <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat</span><span class="pill" id="pW">● Signed in</span></div>
-      <div class="side"><div class="who"><div class="av w">W</div><div class="n">Work</div></div><div class="row" style="width:88%"></div><div class="row" style="width:70%"></div><div class="row" style="width:76%"></div></div>
-      <div class="main"><div class="bub" style="width:62%"></div><div class="bub me" style="width:50%"></div><div class="bub" style="width:70%"></div></div>
-    </div>
-    <div class="win" id="sP" style="left:650px; top:262px; width:540px; opacity:0">
+    <div class="win" id="wP" style="left:650px; top:262px; width:540px; opacity:0">
       <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat Personal</span><span class="pill" id="pP">● Signed in</span></div>
       <div class="side"><div class="who"><div class="av p">P</div><div class="n">Personal</div></div><div class="row" style="width:58%"></div><div class="row" style="width:84%"></div></div>
       <div class="main"><div class="bub" style="width:54%"></div><div class="bub me" style="width:48%"></div><div class="bub" style="width:60%"></div></div>
     </div>
   </div>
 
+  <!-- The Work window: the one in the loop, and the same one, in colour, after the turn.
+       The camera (#cam) holds the window and the pointer; it moves only in the hook and at the turn.
+       Stacking order matters: the windows in s3 sit under the camera, so the pointer crosses
+       them, and the turn (s2) sits over it. -->
+  <div id="cam">
+  <div class="win" id="mw" style="left:90px; top:262px; width:540px; height:340px">
+    <div class="bar"><span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span><span class="t">Chat</span><span class="pill" id="pW">● Signed in</span></div>
+    <div class="st" id="workOpen">
+      <div class="side"><div class="who"><div class="av w">W</div><div class="n">Work</div></div><div class="row on" style="width:88%"></div><div class="row" style="width:70%"></div><div class="row" style="width:76%"></div></div>
+      <div class="main withp"><div class="bub" style="width:62%"></div><div class="bub me" style="width:50%"></div><div class="bub" style="width:70%"></div><div class="bub me" id="newb" style="width:44%; opacity:0"></div></div>
+      <div class="panel"><div class="doc"></div><div class="row" style="width:86%"></div><div class="row" style="width:64%"></div></div>
+    </div>
+    <div class="st" id="signin" style="opacity:0">
+      <div class="form" id="form"><div class="ftitle">Sign in</div><div class="field"><div class="fbar" id="f1"></div></div><div class="field"><span class="fdots" id="f2">•••••••••</span></div><div class="btn" id="btn">Continue</div></div>
+    </div>
+    <div class="st" id="persNew" style="opacity:0">
+      <div class="side"><div class="who"><div class="av p">P</div><div class="n">Personal</div></div><div class="row" style="width:58%"></div><div class="row" style="width:84%"></div><div class="row" style="width:66%"></div></div>
+      <div class="main"><div class="hello"></div><div class="composer"></div></div>
+    </div>
+    <div class="st" id="workNew" style="opacity:0">
+      <div class="side"><div class="who"><div class="av w">W</div><div class="n">Work</div></div><div class="row" style="width:88%"></div><div class="row" style="width:70%"></div><div class="row" style="width:76%"></div></div>
+      <div class="main"><div class="hello"></div><div class="composer"></div></div>
+    </div>
+    <div class="menu" id="menu" style="opacity:1"><div class="mi">Settings</div><div class="mi" id="so">Sign out</div></div>
+  </div>
+
+  <svg id="cur" viewBox="0 0 24 30" aria-hidden="true"><path d="M2 1.5 L2 22.5 L7 17.8 L10.6 26 L14 24.5 L10.6 16.4 L17.4 16.4 Z" fill="#fff" stroke="#0B0D12" stroke-width="1.4" stroke-linejoin="round"/></svg>
+  </div>
+
+  <!-- 2. The turn: Meet aidentity -->
+  <div id="s2" class="clip" data-start="12.2" data-duration="2.8">
+    <img id="logo" src="logo.svg" alt="" style="position:absolute; left:50%; width:132px; height:132px; margin-left:-66px; top:200px; opacity:0">
+    <div class="abs center h1" id="name" style="top:356px; opacity:0"><span class="grad">aidentity</span></div>
+  </div>
+
   <!-- 4. One command -->
-  <div id="s4" class="clip" data-start="9.9" data-duration="3.0">
-    <div class="abs center h2" id="l4" style="top:150px; opacity:0">Set it up with <span class="grad">one command.</span></div>
+  <div id="s4" class="clip" data-start="21.8" data-duration="3.0">
+    <div class="abs center h2" id="l5" style="top:150px; opacity:0">Set it up with <span class="grad">one command.</span></div>
     <div class="term" id="term">
 <pre><span class="ps">$ </span><span class="typed" id="typed">aidentity add Chat --profile Personal</span>
 <span class="okline" id="ok">✓ Created Chat Personal</span></pre>
@@ -114,13 +171,13 @@
   </div>
 
   <!-- 5. No copies. No signing out. -->
-  <div id="s5" class="clip" data-start="12.7" data-duration="2.9">
-    <div class="abs center h1" id="l5a" style="top:240px; opacity:0">No copies.</div>
-    <div class="abs center h1 grad" id="l5b" style="top:330px; opacity:0">No signing out.</div>
+  <div id="s5" class="clip" data-start="24.6" data-duration="2.9">
+    <div class="abs center h1" id="l6a" style="top:240px; opacity:0">No copies.</div>
+    <div class="abs center h1 grad" id="l6b" style="top:330px; opacity:0">No signing out.</div>
   </div>
 
   <!-- 6. End card -->
-  <div id="s6" class="clip" data-start="15.3" data-duration="4.2">
+  <div id="s6" class="clip" data-start="27.2" data-duration="4.2">
     <img id="logo2" src="logo.svg" alt="" style="position:absolute; left:50%; width:116px; height:116px; margin-left:-58px; top:150px; opacity:0">
     <div class="abs center h1" id="name2" style="top:290px; opacity:0"><span class="grad">aidentity</span></div>
     <div class="abs center h2" id="tag" style="top:388px; opacity:0">Free, for your Mac.</div>
@@ -131,57 +188,152 @@
 </div>
 <script src="vendor/gsap.min.js"></script>
 <script>
-  const tl = gsap.timeline({ paused: true });
+  // Two timelines: the hook runs on root; the film after it runs on tl, in its
+  // own time, and starts HOOK seconds in.
+  const HOOK = 2.9, LEN = 28.5;
+  const root = gsap.timeline({ paused: true });
+  const tl = gsap.timeline();
   const rise = (sel, at, d = 0.8) => tl.fromTo(sel, { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: d, ease: "power3.out" }, at);
   const leave = (sel, at, d = 0.5) => tl.to(sel, { opacity: 0, y: -12, duration: d, ease: "power2.in" }, at);
+  const show = (sel, at, d = 0.3) => tl.to(sel, { opacity: 1, duration: d, ease: "power1.out" }, at);
+  const hide = (sel, at, d = 0.25) => tl.to(sel, { opacity: 0, duration: d, ease: "power1.in" }, at);
+
+  // The pointer: its tip goes to (x, y), and a click presses it briefly.
+  const tip = (x, y) => ({ x: x - 2, y: y - 1.5 });
+  const move = (x, y, at, d = 0.4, ease = "power2.inOut") => tl.to("#cur", { ...tip(x, y), duration: d, ease }, at);
+  const click = at => tl.to("#cur", { scale: 0.85, duration: 0.07, yoyo: true, repeat: 1, ease: "power1.out" }, at);
+  // The account menu opens under the avatar; "Sign out" lights up under the pointer.
+  const openMenu = at => tl.fromTo("#menu", { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: 0.2, ease: "power2.out", immediateRender: false }, at);
+  const hover = at => tl.to("#so", { backgroundColor: "rgba(255,255,255,0.14)", duration: 0.1 }, at);
+  const closeMenu = at => {
+    hide("#menu", at, 0.16);
+    tl.set("#so", { backgroundColor: "rgba(255,255,255,0)" }, at + 0.2);
+  };
+  // The sign-in panel: it rises, the name and the password are typed, the button is pressed.
+  const signIn = (at, name, dots, press) => {
+    tl.set(["#f1", "#f2"], { width: 0 }, at - 0.05);
+    tl.fromTo("#form", { y: 10 }, { y: 0, duration: 0.35, ease: "power2.out", immediateRender: false }, at);
+    show("#signin", at, 0.3);
+    tl.to("#f1", { width: 120, duration: name[1], ease: "steps(10)" }, name[0]);
+    tl.to("#f2", { width: 118, duration: dots[1], ease: "steps(9)" }, dots[0]);
+    tl.to("#btn", { filter: "brightness(0.75)", duration: 0.08, yoyo: true, repeat: 1 }, press);
+    click(press);
+    hide("#signin", press + 0.1, 0.2);
+  };
+
+  // Where things are on screen. The Work window starts at 90,262 (540x340);
+  // signed out, it goes to its default size, 460x300, in the middle.
+  const SO_BIG = [200, 433];
+  const AV_SMALL = [448, 374], SO_SMALL = [520, 461], BUTTON = [632, 533];
 
   // The aura drifts slowly for the whole film.
-  tl.fromTo("#aura1", { x: 0, y: 0 }, { x: 220, y: 90, duration: 19.5, ease: "sine.inOut" }, 0);
-  tl.fromTo("#aura2", { x: 0, y: 0 }, { x: -260, y: 120, duration: 19.5, ease: "sine.inOut" }, 0);
-  tl.fromTo("#aura3", { x: 0, y: 0, scale: 0.9 }, { x: 140, y: -80, scale: 1.1, duration: 19.5, ease: "sine.inOut" }, 0);
+  root.fromTo("#aura1", { x: 0, y: 0 }, { x: 220, y: 90, duration: HOOK + LEN, ease: "sine.inOut" }, 0);
+  root.fromTo("#aura2", { x: 0, y: 0 }, { x: -260, y: 120, duration: HOOK + LEN, ease: "sine.inOut" }, 0);
+  root.fromTo("#aura3", { x: 0, y: 0, scale: 0.9 }, { x: 140, y: -80, scale: 1.1, duration: HOOK + LEN, ease: "sine.inOut" }, 0);
 
-  // 1. Meet aidentity: on screen from the first frame, settling in.
-  tl.fromTo("#logo", { opacity: 1, scale: 0.92, y: 10 }, { scale: 1, y: 0, duration: 1.4, ease: "power3.out" }, 0);
-  tl.fromTo("#name", { opacity: 1, y: 12 }, { y: 0, duration: 1.4, ease: "power3.out" }, 0);
-  tl.to(["#logo", "#name"], { opacity: 0, scale: 0.97, duration: 0.6, ease: "power2.in" }, 2.5);
+  // 0. You know this button... too well! A close look at "Sign out": the pointer
+  // comes to rest on it, then the camera pulls back to the Work window, where a
+  // chat is open and a reply comes in. The menu stays open into the loop.
+  root.to("#cur", { ...tip(...SO_BIG), duration: 1.2, ease: "sine.inOut" }, 0);
+  root.to("#so", { backgroundColor: "rgba(255,255,255,0.14)", duration: 0.12 }, 1.18);
+  root.fromTo("#hk1", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 0.25);
+  root.fromTo("#hk2", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 1.42);
+  root.fromTo("#cam", { x: 211, y: -359, scale: 2.2 }, { x: 0, y: 0, scale: 1, duration: 1.5, ease: "power2.inOut" }, 1.45);
+  root.to(["#hk1", "#hk2"], { opacity: 0, y: -12, duration: 0.45, ease: "power2.in" }, 2.45);
+  root.fromTo("#newb", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 2.7);
 
-  // 2. Every account you use. Open at once.
-  rise("#l2a", 3.05);
-  tl.fromTo("#wW", { opacity: 0, y: 70, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 1.0, ease: "power3.out" }, 3.3);
-  tl.fromTo("#wP", { opacity: 0, y: 70, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 1.0, ease: "power3.out" }, 3.5);
-  tl.fromTo("#wC", { opacity: 0, y: 70, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 1.0, ease: "power3.out" }, 3.7);
-  rise("#l2b", 4.4);
-  leave(["#l2a", "#l2b", "#wC", "#wP", "#wW"], 5.8);
+  // 1. To switch, you sign out. Then sign in again. The menu is open from the hook.
+  rise("#q1a", 0.62, 0.7);
+  click(1.62); closeMenu(1.64); hide("#workOpen", 1.64, 0.26);
+  tl.to("#mw", { left: 410, top: 290, width: 460, height: 300, duration: 0.6, ease: "power2.inOut" }, 1.8);
+  rise("#q1b", 2.05, 0.7);
+  move(...BUTTON, 2.45, 0.7);
+  signIn(2.25, [2.4, 0.4], [2.8, 0.35], 3.25);
+  show("#persNew", 3.45, 0.3);
+  leave(["#q1a", "#q1b"], 3.85, 0.45);
 
-  // 3. Each in its own window. Each one signed in.
-  rise("#l3a", 6.2);
-  tl.fromTo("#sW", { opacity: 0, x: -50 }, { opacity: 1, x: 0, duration: 1.0, ease: "power3.out" }, 6.25);
-  tl.fromTo("#sP", { opacity: 0, x: 50 }, { opacity: 1, x: 0, duration: 1.0, ease: "power3.out" }, 6.35);
-  rise("#l3b", 7.6);
-  tl.fromTo("#pW", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.8)" }, 7.65);
-  tl.fromTo("#pP", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.8)" }, 7.8);
-  leave(["#l3a", "#l3b", "#sW", "#sP"], 9.6);
+  // Sign out. Sign in again. Back to Work, the same way, a little slower.
+  move(...AV_SMALL, 3.8, 0.4); click(4.22);
+  openMenu(4.24);
+  rise("#q2a", 4.25, 0.6);
+  move(...SO_SMALL, 4.32, 0.24); hover(4.54);
+  click(4.66); closeMenu(4.68); hide("#persNew", 4.68, 0.22);
+  rise("#q2b", 4.92, 0.6);
+  move(...BUTTON, 5.3, 1.1, "sine.inOut");
+  signIn(4.9, [5.15, 0.6], [5.8, 0.65], 6.55);
+  show("#workNew", 6.75, 0.3);
+  leave(["#q2a", "#q2b"], 6.8, 0.4);
+
+  // You lose your open chats. Work is back, smaller, in the middle, with no
+  // chat open; a dashed outline shows where it was, then fades.
+  show("#ghost", 6.95, 0.5);
+  rise("#q3", 7.12, 0.7);
+  hide("#ghost", 7.6, 0.8);
+
+  // 2. The third time, the pointer rests on "Sign out", the camera moves in as
+  // close as at the start, and the click never comes. The window sinks back,
+  // and the name rises.
+  move(...AV_SMALL, 7.95, 0.36); click(8.31);
+  openMenu(8.35);
+  move(...SO_SMALL, 8.43, 0.22, "power2.out"); hover(8.65);
+  tl.to("#cam", { scale: 2.2, x: -490.8, y: -418.4, duration: 0.9, ease: "sine.inOut" }, 8.45);
+  leave("#q3", 9.3, 0.45);
+  tl.to("#mw", { opacity: 0, scale: 0.96, y: 10, duration: 0.3, ease: "sine.inOut" }, 9.75);
+  hide("#cur", 9.75, 0.2);
+  tl.fromTo("#logo", { opacity: 0, scale: 0.9, y: 14 }, { opacity: 1, scale: 1, y: 0, duration: 1.1, ease: "power3.out" }, 10.05);
+  tl.fromTo("#name", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 1.1, ease: "power3.out" }, 10.2);
+  tl.to(["#logo", "#name"], { opacity: 0, scale: 0.97, y: -16, duration: 0.5, ease: "power2.in" }, 11.4);
+
+  // 3. Every account you use. The first frame comes back as it was, in colour,
+  // with the chat still open. Open at once: Personal and Client rise beside it.
+  tl.set("#mw", { left: 90, top: 262, width: 540, height: 340, scale: 0.985, y: 0, filter: "saturate(1)" }, 10.4);
+  tl.set("#workOpen", { opacity: 1 }, 10.4);
+  tl.set("#workNew", { opacity: 0 }, 10.4);
+  tl.set("#menu", { opacity: 0 }, 10.4);
+  tl.set("#cam", { scale: 1, x: 0, y: 0 }, 10.4);
+  tl.set("#so", { backgroundColor: "rgba(255,255,255,0)" }, 10.4);
+  tl.set("#cur", tip(160, 372), 10.4);
+  tl.to("#mw", { opacity: 1, scale: 1, duration: 0.6, ease: "power2.out" }, 11.95);
+  show("#cur", 12.1, 0.3);
+  rise("#l3a", 12.05);
+  tl.fromTo("#wP", { opacity: 0, y: 60, scale: 0.95 }, { opacity: 1, y: 0, scale: 1, duration: 1.0, ease: "power3.out" }, 13.25);
+  tl.fromTo("#wC", { opacity: 0, y: 60, scale: 0.86 }, { opacity: 0.9, y: 0, scale: 0.9, duration: 1.0, ease: "power3.out" }, 13.4);
+  rise("#l3b", 13.4);
+  leave(["#l3a", "#l3b"], 14.8);
+
+  // Each in its own window. Each one signed in. Client steps back; the pointer
+  // goes to Personal and back to Work, and nothing signs out.
+  tl.to("#wC", { opacity: 0, scale: 0.84, y: -16, duration: 0.9, ease: "power2.inOut" }, 14.8);
+  rise("#l4a", 15.2);
+  move(930, 480, 15.55, 0.7);
+  rise("#l4b", 16.6);
+  tl.fromTo("#pW", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.8)" }, 16.65);
+  tl.fromTo("#pP", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.8)" }, 16.8);
+  move(370, 480, 17.05, 0.6);
+  leave(["#l4a", "#l4b", "#mw", "#wP"], 18.6);
+  hide("#cur", 18.6, 0.4);
 
   // 4. Set it up with one command.
-  rise("#l4", 10.1);
-  tl.fromTo("#term", { opacity: 0, y: 40, scale: 0.97 }, { opacity: 1, y: 0, scale: 1, duration: 0.9, ease: "power3.out" }, 10.2);
-  tl.to("#typed", { width: 515, duration: 1.0, ease: "steps(38)" }, 10.55);
-  tl.to("#ok", { opacity: 1, duration: 0.4 }, 11.7);
-  leave(["#l4", "#term"], 12.45);
+  rise("#l5", 19.1);
+  tl.fromTo("#term", { opacity: 0, y: 40, scale: 0.97 }, { opacity: 1, y: 0, scale: 1, duration: 0.9, ease: "power3.out" }, 19.2);
+  tl.to("#typed", { width: 515, duration: 1.0, ease: "steps(38)" }, 19.55);
+  tl.to("#ok", { opacity: 1, duration: 0.4 }, 20.7);
+  leave(["#l5", "#term"], 21.45);
 
   // 5. No copies. No signing out.
-  rise("#l5a", 12.85, 0.7);
-  rise("#l5b", 13.8, 0.7);
-  leave(["#l5a", "#l5b"], 15.0);
+  rise("#l6a", 21.85, 0.7);
+  rise("#l6b", 22.8, 0.7);
+  leave(["#l6a", "#l6b"], 24.0);
 
   // 6. End card.
-  tl.fromTo("#logo2", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 1.0, ease: "power3.out" }, 15.4);
-  rise("#name2", 15.55, 0.9);
-  rise("#tag", 16.45, 0.8);
-  rise("#foot", 17.0, 0.8);
-  tl.set({}, {}, 19.5);
+  tl.fromTo("#logo2", { opacity: 0, scale: 0.9 }, { opacity: 1, scale: 1, duration: 1.0, ease: "power3.out" }, 24.4);
+  rise("#name2", 24.55, 0.9);
+  rise("#tag", 25.45, 0.8);
+  rise("#foot", 26.0, 0.8);
+  tl.set({}, {}, LEN);
+  root.add(tl, HOOK);
   window.__timelines = window.__timelines || {};
-  window.__timelines["root"] = tl;
+  window.__timelines["root"] = root;
 </script>
 </body>
 </html>

@@ -15,8 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a 3D preview adapted from 21st.dev's Works Wheel. The optional dashboard needs Python 3.9+ without extra
   packages and is bundled into the same single-file install.
 
-- A 20-second film, at the top of the README and in the first section of the
-  site. On the site it plays muted while it is on screen. **Watch with sound**
+- A 31-second film, at the top of the README and in the first section of the
+  site. It shows the problem first: to switch accounts, you sign out and sign in
+  again, and you lose your open chats. Then it shows every account open at
+  once. On the site it plays muted while it is on screen. **Watch with sound**
   starts it again from the beginning, with the narration, and a button turns
   its captions on.
   `assets/film/` holds its source, and `assets/film/build.sh` makes it again
@@ -24,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The licence is now Apache-2.0, in place of MIT. It adds a patent grant, an
+  explicit limit on liability and a clause that gives no rights to the
+  project's name. A `NOTICE` file carries the copyright line. Versions released
+  before this change stay under MIT for the people who already have them.
 - The site's front page is new, in the style of a product page: one idea per
   section, the film full width at the top, and the uses told as "One Mac, many
   uses". Every fact and command from the old page is still there. The
@@ -46,7 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `rm --purge` do. It left out a launcher kept outside your home folder
   and the app folders, listed that launcher's profile data as data no
   launcher uses, and moved it to the Trash. The launcher then opened signed
-  out. Such a launcher is now listed with the others and removed with them.
+  out. Such a launcher, in a shared folder, on another disk or in a backup
+  copy, is now listed as found elsewhere and not removed, and its data stays
+  where it is.
 - `add` refuses `--` like any other option it does not know. It used to read
   `--` as the end of its options and ignore every word after it without
   saying so.

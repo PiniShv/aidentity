@@ -1,9 +1,13 @@
 # The narration of the film: one file per line, made offline with Kokoro.
 # Usage: narration.py WORKDIR     (or set AIDENTITY_FILM_WORK)
-# Writes WORKDIR/vo1-raw.wav ... vo6-raw.wav, 24 kHz, and prints each length.
+# Writes WORKDIR/vo1-raw.wav ... vo10-raw.wav, 24 kHz, and prints each length.
 import os, sys, soundfile as sf
 from kokoro_onnx import Kokoro
 LINES = [
+    "You know this button... too well!",
+    "To switch, you sign out. Then sign in again.",
+    "Sign out. Sign in again.",
+    "You lose your open chats.",
     "Meet Eye-dentity.",
     "Every account you use. Open at once.",
     "Each in its own window. Each one signed in.",

@@ -7,7 +7,7 @@
 #
 # Reads this folder and ../logo.svg (the repository is mounted read-only).
 # Writes to /out (or $OUT):
-#   film.mp4  film.webm        the film, 1280x720, 19.5 s, with sound
+#   film.mp4  film.webm        the film, 1280x720, 31.4 s, with sound
 #   film-poster.jpg            the poster the site shows before play
 #   readme-poster.jpg          the README poster, with a play button
 #   og.png                     the card shown when a link to the site is shared
@@ -32,7 +32,7 @@ done
 export PYTHONDONTWRITEBYTECODE=1
 PY=/opt/tts/bin/python
 HF=/opt/hf/node_modules/.bin/hyperframes
-LENGTH=19.5
+LENGTH=31.4
 step() { printf '\n== %s\n' "$*"; }
 ff() { ffmpeg -nostdin -hide_banner -y -loglevel error "$@"; }
 
@@ -48,7 +48,7 @@ mkdir -p "$A" "$P/fonts" "$P/vendor"
 echo "ffmpeg: $(ffmpeg -version | head -n 1)"
 echo "hyperframes: $("$HF" --version)"
 
-# 1. Narration: Kokoro, six lines, 24 kHz.
+# 1. Narration: Kokoro, one file per line, 24 kHz.
 step "Narration"
 "$PY" "$HERE/narration.py" "$A"
 
@@ -57,10 +57,10 @@ step "Narration"
 # add a little clarity at 3 kHz, band-limit, compress lightly, a short fade in,
 # a short fade out, then 0.3 s of silence.
 step "Voice chain"
-for n in 1 2 3 4 5 6; do
-  ff -i "$A/vo$n-raw.wav" \
+for raw in "$A"/vo[0-9]*-raw.wav; do
+  ff -i "$raw" \
     -af "deesser=i=0.36:m=0.5:f=0.5,aresample=48000:filter_size=64:phase_shift=10:cutoff=0.95,highpass=f=120:p=2,highpass=f=120:p=2,equalizer=f=220:t=q:w=1:g=-3,equalizer=f=3000:t=q:w=1:g=2,lowpass=f=10500:p=2,acompressor=threshold=-24dB:ratio=2:attack=15:release=220:makeup=1.5,afade=t=in:d=0.012,areverse,afade=t=in:d=0.04,areverse,apad=pad_dur=0.3" \
-    -ar 48000 -ac 1 "$A/vo$n.wav"
+    -ar 48000 -ac 1 "${raw%-raw.wav}.wav"
 done
 
 # 3. Music, and the narration laid over it.
@@ -117,11 +117,11 @@ ff -i "$P/film-silent.mp4" "${clean[@]}" -an -pix_fmt yuv420p -c:v libvpx-vp9 -b
 ff -i "$A/film-mix.wav" "${clean[@]}" -c:a libopus -b:a 128k -ar 48000 audio.opus
 ff -i video.webm -i audio.opus "${clean[@]}" -map 0:v -map 1:a -c copy -t "$LENGTH" film.webm
 
-# 7. The site poster: the frame at 8.9 s, with both lines and both windows on screen.
+# 7. The site poster: the frame at 20.8 s, with both lines and both windows on screen.
 step "Posters"
-ff -ss 8.9 -i film.mp4 "${clean[@]}" -frames:v 1 -q:v 4 film-poster.jpg
+ff -ss 20.8 -i film.mp4 "${clean[@]}" -frames:v 1 -q:v 4 film-poster.jpg
 
-# 8. The README poster: the frame at 8.9 s with a play button over it.
+# 8. The README poster: the frame at 20.8 s with a play button over it.
 cat > play.svg <<'SVG'
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
   <circle cx="640" cy="560" r="46" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
@@ -129,7 +129,7 @@ cat > play.svg <<'SVG'
 </svg>
 SVG
 rsvg-convert -w 1280 -h 720 play.svg -o play.png
-ff -ss 8.9 -i film.mp4 -i play.png -filter_complex "overlay=0:0" "${clean[@]}" \
+ff -ss 20.8 -i film.mp4 -i play.png -filter_complex "overlay=0:0" "${clean[@]}" \
   -frames:v 1 -q:v 3 readme-poster.jpg
 
 # 9. The card shown when a link to the site is shared: og.html at 1200x630,

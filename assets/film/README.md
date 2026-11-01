@@ -1,6 +1,6 @@
 # The product film
 
-The source of the 19.5-second film on the site, with its sound, its two
+The source of the 31.4-second film on the site, with its sound, its two
 posters and the card shown when a link to the site is shared. It is a build
 tool for the repository, not part of the installed tool: `aidentity`,
 `install.sh` and the Homebrew formula never fetch or run anything from this
@@ -45,7 +45,7 @@ commit them.
 |---|---|
 | `index.html` | The film: a 1280x720 page, animated with a GSAP timeline |
 | `og.html` | The card for shared links: a 1200x630 page |
-| `narration.py` | The six spoken lines, made with Kokoro, offline |
+| `narration.py` | The ten spoken lines, made with Kokoro, offline |
 | `music.py` | The music, written in code from fixed seeds, and the mix with the narration |
 | `master.py` | Gain and a true-peak limiter |
 | `render.sh` | Runs in the container: all the steps below |
@@ -58,7 +58,7 @@ page.
 
 The steps in `render.sh`:
 
-1. Narration: six lines with Kokoro, 24 kHz.
+1. Narration: ten lines with Kokoro, 24 kHz.
 2. Voice chain, per line, with ffmpeg: de-ess, resample to 48 kHz, cut the low
    end a laptop speaker cannot play, a little more clarity, band-limit, light
    compression, short fades, 0.3 s of silence at the end.
@@ -68,8 +68,8 @@ The steps in `render.sh`:
 5. Render the page to video with HyperFrames, 30 frames per second.
 6. Encode: MP4 (H.264 and AAC) and WebM (VP9 and Opus), with no encoder
    settings, versions or dates.
-7. The site poster: the frame at 8.9 s.
-8. The README poster: the frame at 8.9 s, with a play button on it.
+7. The site poster: the frame at 20.8 s.
+8. The README poster: the frame at 20.8 s, with a play button on it.
 9. The card for shared links: `og.html`, drawn by the same Chromium.
 
 ## What is pinned, and why
