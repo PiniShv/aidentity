@@ -185,7 +185,7 @@ The dashboard is one dark ring that holds every profile. The ground is Lampblack
 
 Density is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.
 
-Motion is brief and springy, and it never overshoots: every surface opens on a click, not a flick, so every spring is critically damped. Controls press to 0.97 on pointer-down and spring back, dialogs rise and scale in from 0.96, and panels leave the way they came. Hover moves nothing; it changes fill and border. With reduced motion on, the springs and the short Explore crossfade become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.
+Motion is brief and springy, and it never overshoots: every surface opens on a click, not a flick, so every spring is critically damped. Controls press to 0.97 on pointer-down and spring back, dialogs rise and scale in from 0.96, panels leave the way they came, pages crossfade, and the sidebar highlight slides to the new page. Hover moves nothing; it changes fill and border. With reduced motion on, the springs and both crossfades become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.
 
 **Key Characteristics:**
 - Warm black ground, warm off-white text, graphite steps in between.
@@ -328,10 +328,11 @@ Every button presses to 0.97 in 85ms on pointer-down and springs back on release
 - **Error:** a `negative-bg` form-error block above the actions, and `aria-invalid` on the field the server rejected.
 
 ### Navigation
-- **Sidebar:** a `<nav aria-label="Main">` landmark. 40px items, 8px radius, Muted text. Hover shows Bone on Surface; the current page shows Bone on Raised. Under the nav, "Your apps" lists only apps that have profiles, each with an 8px dot in its hue (36px rows, 12px text); "No profiles yet" shows only once data has loaded and there are none. Help and Collapse sit at the foot. Above the nav, one compact status row: a 6px Mint dot (Negative when offline) and "Connected · this Mac".
+- **Sidebar:** a `<nav aria-label="Main">` landmark. 40px items, 8px radius, Muted text. Hover shows Bone on Surface; the current page shows Bone on Raised. On a page change the Raised fill slides from the item it left, or from where it is mid-slide, over 340ms on the control spring; under reduced motion it jumps. Under the nav, "Your apps" lists only apps that have profiles, each with an 8px dot in its hue (36px rows, 12px text); "No profiles yet" shows only once data has loaded and there are none. Help and Collapse sit at the foot. Above the nav, one compact status row: a 6px Mint dot (Negative when offline) and "Connected · this Mac".
 - **Collapsed rail:** 72px; labels hide, the status row shows only its dot, and each app shows its initial as a 24px rounded tile in its hue with Lampblack ink, named by a tooltip that appears beside the rail for keyboard focus, with a divider where "Your apps" was. As a mobile drawer the full labels return.
 - **Tabs:** 13px labels in Muted, Bone when selected, 44px tall, with a 2px Bone underline that springs between tabs. Profiles tabs are All, Running, Not running and Needs repair, with the counts on the tabs only (Needs repair shows a muted dash until a check has run). Arrow, Home and End move between tabs. When the strip overflows on a narrow phone, its right edge fades and the selected tab scrolls into view.
 - **Mobile:** the top bar names the page, and the sidebar becomes a drawer from the left behind a 60% black scrim; Tab stays inside it and the page behind is inert.
+- **Page change:** the old page fades out in place over 200ms while the new one fades in and rises 8px over 480ms on the surface spring; the activity bar, its panel and the toasts stay still. Without the View Transitions API, or while the phone drawer is open, only the new page animates, from 50% opacity and 8px down. Under reduced motion the swap is instant.
 - **Focus on navigation:** the new view's `h1` takes focus (no ring; it is not a control) and the document title becomes "<View> · aidentity". There is no breadcrumb.
 
 ### Dialogs
@@ -381,7 +382,7 @@ When a poll or action can't reach the dashboard server, a banner says "The dashb
 - **Do** put Lampblack (#060606) text on any app-colored fill; every hue clears 6.2:1.
 - **Do** keep text at Muted (#8d8b84) or brighter and at 12px or larger. Muted on Raised (5.4:1) is the lowest text pairing in use.
 - **Do** show keyboard focus as a 2px outline in the current accent, offset 4px (swatches use Bone at 3px; controls inside clipping boxes use an inset ring).
-- **Do** give every spring and the Explore crossfade a reduced-motion path that keeps the feedback.
+- **Do** give every spring and crossfade a reduced-motion path that keeps the feedback.
 - **Do** keep controls at least 36px tall on desktop (swatches 32px) and 44px below 768px.
 - **Do** show the server's command for every action (Runs line, Activity); never build it in the browser.
 - **Do** name the primary action Open, or Bring to front when the profile is running, on every surface; Open is always the Secondary (Raised fill, 1px Field border) and Bring to front the hue fill.

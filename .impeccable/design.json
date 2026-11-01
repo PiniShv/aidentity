@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-01T01:12:09+00:00",
+  "generatedAt": "2026-11-01T13:17:28+00:00",
   "title": "Design System: aidentity dashboard",
   "extensions": {
     "colorMeta": {
@@ -338,6 +338,16 @@
         "name": "explore-crossfade",
         "value": "160ms cubic-bezier(.16,1,.3,1)",
         "purpose": "App identity change in Explore; a static swap under reduced motion."
+      },
+      {
+        "name": "page-crossfade",
+        "value": "out 200ms var(--ease); in 480ms var(--spring-surface), rising 8px",
+        "purpose": "View changes; chrome (activity bar, panel, toasts) stays still. Instant under reduced motion."
+      },
+      {
+        "name": "nav-highlight",
+        "value": "340ms var(--spring-control)",
+        "purpose": "The current sidebar item's Raised fill sliding from the item it left. Jumps under reduced motion."
       }
     ],
     "breakpoints": [
@@ -412,7 +422,7 @@
       "name": "Sidebar Navigation",
       "kind": "nav",
       "refersTo": "nav-item",
-      "description": "40px rows in Muted; the current page is Bone on Raised; app rows carry a plain 8px hue dot.",
+      "description": "40px rows in Muted; the current page is Bone on Raised, and that fill slides to the new page on the control spring; app rows carry a plain 8px hue dot.",
       "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" aria-current=\"page\" href=\"#\">Profiles</a><a class=\"ds-nav-item\" href=\"#\">Applications</a><a class=\"ds-nav-item ds-nav-app\" href=\"#\" style=\"--app-color:#ff8a3d\"><span class=\"ds-dot\"></span>Claude</a></nav>",
       "css": ".ds-nav{display:flex;flex-direction:column;width:216px;gap:2px;font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-nav-item{display:flex;align-items:center;gap:11px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--muted,#8d8b84);text-decoration:none;transition:background .2s,color .2s}.ds-nav-item:hover{color:var(--text,#f3f2ee);background:var(--surface,#0c0c0c)}.ds-nav-item[aria-current=page]{color:var(--text,#f3f2ee);background:var(--raised,#141413)}.ds-nav-app{min-height:36px;font-size:12px}.ds-dot{width:8px;height:8px;border-radius:50%;background:var(--app-color)}.ds-nav-item:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}"
     },
@@ -459,7 +469,7 @@
   ],
   "narrative": {
     "northStar": "The Keyring",
-    "overview": "The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: an app that has profiles gets one color from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Apart from status, nothing else on screen is colored. There is no second hue, no gradient in a hue and no glow.\n\nDensity is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.\n\nMotion is brief and springy, and it never overshoots: every surface opens on a click, not a flick, so every spring is critically damped. Controls press to 0.97 on pointer-down and spring back, dialogs rise and scale in from 0.96, and panels leave the way they came. Hover moves nothing; it changes fill and border. With reduced motion on, the springs and the short Explore crossfade become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.",
+    "overview": "The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: an app that has profiles gets one color from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Apart from status, nothing else on screen is colored. There is no second hue, no gradient in a hue and no glow.\n\nDensity is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.\n\nMotion is brief and springy, and it never overshoots: every surface opens on a click, not a flick, so every spring is critically damped. Controls press to 0.97 on pointer-down and spring back, dialogs rise and scale in from 0.96, panels leave the way they came, pages crossfade, and the sidebar highlight slides to the new page. Hover moves nothing; it changes fill and border. With reduced motion on, the springs and both crossfades become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.",
     "keyCharacteristics": [
       "Warm black ground, warm off-white text, graphite steps in between.",
       "One flat hue per app with profiles, assigned once and kept for that app everywhere; apps without profiles stay neutral.",
@@ -511,7 +521,7 @@
       "Do put Lampblack (#060606) text on any app-colored fill; every hue clears 6.2:1.",
       "Do keep text at Muted (#8d8b84) or brighter and at 12px or larger. Muted on Raised (5.4:1) is the lowest text pairing in use.",
       "Do show keyboard focus as a 2px outline in the current accent, offset 4px (swatches use Bone at 3px; controls inside clipping boxes use an inset ring).",
-      "Do give every spring and the Explore crossfade a reduced-motion path that keeps the feedback.",
+      "Do give every spring and crossfade a reduced-motion path that keeps the feedback.",
       "Do keep controls at least 36px tall on desktop (swatches 32px) and 44px below 768px.",
       "Do show the server's command for every action (Runs line, Activity); never build it in the browser.",
       "Do name the primary action Open, or Bring to front when the profile is running, on every surface; Open is always the Secondary (Raised fill, 1px Field border) and Bring to front the hue fill.",
