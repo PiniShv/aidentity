@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-11-01T13:17:28+00:00",
+  "generatedAt": "2026-11-01T13:43:29+00:00",
   "title": "Design System: aidentity dashboard",
   "extensions": {
     "colorMeta": {
@@ -235,6 +235,141 @@
       "danger-edge": {
         "role": "neutral",
         "displayName": "Danger Edge"
+      },
+      "warning": {
+        "role": "status",
+        "displayName": "Amber",
+        "canonical": "oklch(84% 0.13 80)",
+        "tonalRamp": [
+          "#1d0e00",
+          "#3b2400",
+          "#5c3b00",
+          "#7f5400",
+          "#a57713",
+          "#c39e5e",
+          "#e2c699",
+          "#feeccf"
+        ]
+      },
+      "tile-explore": {
+        "role": "secondary",
+        "displayName": "Indigo",
+        "canonical": "oklch(52% 0.17 280)",
+        "tonalRamp": [
+          "#0d0c2d",
+          "#222055",
+          "#383681",
+          "#504eaf",
+          "#7072da",
+          "#969bef",
+          "#bfc5ff",
+          "#e6ebff"
+        ]
+      },
+      "tile-profiles": {
+        "role": "secondary",
+        "displayName": "Plum",
+        "canonical": "oklch(52% 0.17 330)",
+        "tonalRamp": [
+          "#20041f",
+          "#41133e",
+          "#642460",
+          "#8a3685",
+          "#b259ac",
+          "#cf88c9",
+          "#ecb6e6",
+          "#ffe1ff"
+        ]
+      },
+      "tile-apps": {
+        "role": "secondary",
+        "displayName": "Cobalt",
+        "canonical": "oklch(52% 0.14 250)",
+        "tonalRamp": [
+          "#001228",
+          "#022a4d",
+          "#0a4475",
+          "#1660a0",
+          "#3c84c9",
+          "#73a9e1",
+          "#a7cff9",
+          "#d8f2ff"
+        ]
+      },
+      "tile-recovery": {
+        "role": "secondary",
+        "displayName": "Deep Teal",
+        "canonical": "oklch(52% 0.088 195)",
+        "tonalRamp": [
+          "#001616",
+          "#003030",
+          "#054d4d",
+          "#106b6b",
+          "#3b8f8f",
+          "#74b1b1",
+          "#a9d4d4",
+          "#d9f5f4"
+        ]
+      },
+      "tile-maintenance": {
+        "role": "secondary",
+        "displayName": "Rust",
+        "canonical": "oklch(54% 0.135 50)",
+        "tonalRamp": [
+          "#230900",
+          "#451b00",
+          "#693005",
+          "#91450f",
+          "#ba6735",
+          "#d6936d",
+          "#f1bea2",
+          "#ffe7d4"
+        ]
+      },
+      "tile-transfer": {
+        "role": "secondary",
+        "displayName": "Forest",
+        "canonical": "oklch(52% 0.13 152)",
+        "tonalRamp": [
+          "#001706",
+          "#023216",
+          "#0c5028",
+          "#196f3b",
+          "#40945c",
+          "#77b688",
+          "#abd8b5",
+          "#daf7e0"
+        ]
+      },
+      "tile-help": {
+        "role": "secondary",
+        "displayName": "Slate",
+        "canonical": "oklch(50% 0.035 255)",
+        "tonalRamp": [
+          "#0e1218",
+          "#232932",
+          "#3a4350",
+          "#525f6f",
+          "#748294",
+          "#9aa6b5",
+          "#c3cbd6",
+          "#e9eff6"
+        ]
+      },
+      "tile-danger": {
+        "role": "secondary",
+        "displayName": "Brick",
+        "canonical": "oklch(52% 0.17 25)",
+        "tonalRamp": [
+          "#280203",
+          "#4d0e0f",
+          "#761e1e",
+          "#a12f2f",
+          "#cd534f",
+          "#e7857d",
+          "#ffb5ae",
+          "#ffe1dc"
+        ]
       }
     },
     "typographyMeta": {
@@ -422,9 +557,17 @@
       "name": "Sidebar Navigation",
       "kind": "nav",
       "refersTo": "nav-item",
-      "description": "40px rows in Muted; the current page is Bone on Raised, and that fill slides to the new page on the control spring; app rows carry a plain 8px hue dot.",
+      "description": "40px rows in Muted, each led by a 24px section tile; the current page is Bone on its section color mixed 28% into Raised, and that fill slides to the new page on the control spring; app rows carry a plain 8px hue dot.",
       "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" aria-current=\"page\" href=\"#\">Profiles</a><a class=\"ds-nav-item\" href=\"#\">Applications</a><a class=\"ds-nav-item ds-nav-app\" href=\"#\" style=\"--app-color:#ff8a3d\"><span class=\"ds-dot\"></span>Claude</a></nav>",
       "css": ".ds-nav{display:flex;flex-direction:column;width:216px;gap:2px;font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-nav-item{display:flex;align-items:center;gap:11px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--muted,#8d8b84);text-decoration:none;transition:background .2s,color .2s}.ds-nav-item:hover{color:var(--text,#f3f2ee);background:var(--surface,#0c0c0c)}.ds-nav-item[aria-current=page]{color:var(--text,#f3f2ee);background:var(--raised,#141413)}.ds-nav-app{min-height:36px;font-size:12px}.ds-dot{width:8px;height:8px;border-radius:50%;background:var(--app-color)}.ds-nav-item:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}"
+    },
+    {
+      "name": "Section Tile",
+      "kind": "custom",
+      "refersTo": "section-tile",
+      "description": "A deep section-colored rounded square with a Bone glyph: 36px beside page titles and on operation cards, 24px in the sidebar.",
+      "html": "<div class=\"ds-tiles\"><span class=\"ds-tile\" style=\"--section:var(--tile-maintenance,#aa5212)\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14.7 6.3a4 4 0 0 0 5 5L22 13.6 13.6 22l-2.3-2.3a4 4 0 0 0-5-5L4 12.4 12.4 4z\"/></svg></span><span class=\"ds-tile ds-tile-sm\" style=\"--section:var(--tile-explore,#5a56c7)\"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"m15.5 8.5-2 5-5 2 2-5z\"/></svg></span><span class=\"ds-tile\" style=\"--section:var(--tile-danger,#b63132)\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\"><path d=\"M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3\"/></svg></span></div>",
+      "css": ".ds-tiles{display:flex;gap:12px;align-items:center}.ds-tile{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:10px;background:var(--section);color:var(--text,#f3f2ee)}.ds-tile-sm{width:24px;height:24px;border-radius:7px}"
     },
     {
       "name": "Tabs",
@@ -469,10 +612,11 @@
   ],
   "narrative": {
     "northStar": "The Keyring",
-    "overview": "The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: an app that has profiles gets one color from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Apart from status, nothing else on screen is colored. There is no second hue, no gradient in a hue and no glow.\n\nDensity is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.\n\nMotion is brief and springy, and it never overshoots: every surface opens on a click, not a flick, so every spring is critically damped. Controls press to 0.97 on pointer-down and spring back, dialogs rise and scale in from 0.96, panels leave the way they came, pages crossfade, and the sidebar highlight slides to the new page. Hover moves nothing; it changes fill and border. With reduced motion on, the springs and both crossfades become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.",
+    "overview": "The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Color comes in two layers that never share a form. Apps: an app that has profiles gets one bright hue from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Sections: each part of the dashboard owns one deep tile color, a rounded square with a Bone glyph, as in macOS System Settings. Apart from those two layers and status, nothing on screen is colored. There is no second hue for an app, no gradient in a hue and no glow.\n\nDensity is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.\n\nMotion is brief and springy, and it never overshoots: every surface opens on a click, not a flick, so every spring is critically damped. Controls press to 0.97 on pointer-down and spring back, dialogs rise and scale in from 0.96, panels leave the way they came, pages crossfade, and the sidebar highlight slides to the new page. Hover moves nothing; it changes fill and border. With reduced motion on, the springs and both crossfades become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.",
     "keyCharacteristics": [
       "Warm black ground, warm off-white text, graphite steps in between.",
       "One flat hue per app with profiles, assigned once and kept for that app everywhere; apps without profiles stay neutral.",
+      "One deep tile color per section, on its sidebar row, its page title and its operation cards.",
       "Flat tonal cards; shadow only on floating layers.",
       "Spring motion with a full reduced-motion path.",
       "Platform UI font only; nothing loads from the network.",
@@ -480,8 +624,13 @@
     ],
     "rules": [
       {
-        "name": "The Identity-Only Rule",
-        "body": "Hue means an app that has profiles, or a status. Everything else stays on the Lampblack-to-Bone ramp. Operation cards, counts and apps without profiles are neutral.",
+        "name": "The Two Layers Rule",
+        "body": "A bright hue means an app that has profiles; a deep tile color means a section of the dashboard; Mint, Amber and Negative mean status. Everything else stays on the Lampblack-to-Bone ramp: card surfaces, text, apps without profiles and the counts that are not status.",
+        "section": "colors"
+      },
+      {
+        "name": "The Section Rule",
+        "body": "A page's tiles take its section's color, except a destructive operation's tile, which is Brick. A section color is only ever a tile fill or the current-page highlight, never text, a border or a card surface.",
         "section": "colors"
       },
       {
@@ -518,6 +667,7 @@
     "dos": [
       "Do give each app that has profiles exactly one hue through `--app-color`, and use it only for that app's primary fill, app tile, dots, 1px borders and focus ring.",
       "Do define a new hue only as a `--hue-*` token; both scripts read the palette from CSS.",
+      "Do give a new section a `--tile-*` token and a `.section-<view>` class, and give a destructive operation the Brick tile.",
       "Do put Lampblack (#060606) text on any app-colored fill; every hue clears 6.2:1.",
       "Do keep text at Muted (#8d8b84) or brighter and at 12px or larger. Muted on Raised (5.4:1) is the lowest text pairing in use.",
       "Do show keyboard focus as a 2px outline in the current accent, offset 4px (swatches use Bone at 3px; controls inside clipping boxes use an inset ring).",
@@ -535,7 +685,8 @@
       "Don't use a hue as a gradient, a glow, text color, a tinted background or secondary button, or an accent stripe, and don't add a second hue to an app.",
       "Don't give an app with no profiles a hue, and don't use Mint as an app hue; it is status, the logo and the default accent.",
       "Don't recolor the header Add button; it is always Bone.",
-      "Don't color anything that is neither an app's identity nor a status.",
+      "Don't color anything that is not an app's identity, a section tile or a status.",
+      "Don't use a section color as text, a border, a card fill or a gradient, and don't put Lampblack ink on a section tile.",
       "Don't write hex values outside `:root`; use the tokens. The one exception is the `dialog::backdrop` scrim, which mirrors `--scrim` because older browsers don't pass custom properties to `::backdrop`.",
       "Don't load webfonts or any other remote asset.",
       "Don't show a secret anywhere, including a command line; masked values read `•••`."

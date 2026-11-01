@@ -18,8 +18,9 @@ The workspace uses near-black surfaces (`#060606`, `#0c0c0c`), warm-white text
 (`#f3f2ee`), muted gray (`#8d8b84`) and mint/cyan/blue accents. These color values
 are bundled; no external board or configuration file is read at runtime.
 Each app that has profiles gets one color, used in its navigation marker, card
-highlights, preview and contextual controls. Apps with no profiles stay gray. Actual account badge colors remain
-user-controlled.
+highlights, preview and contextual controls. Apps with no profiles stay gray. Each section of the dashboard also has its own deep
+tile color, on its sidebar row, beside its page title and on its operation cards.
+Actual account badge colors remain user-controlled.
 Placement, sizing and motion were refined using the
 [Apple design skill](https://github.com/dickwu/apple-design-skill), particularly
 Apple's [Motion](https://developer.apple.com/design/human-interface-guidelines/motion)

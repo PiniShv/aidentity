@@ -26,7 +26,16 @@ colors:
   negative: "#ff6b5b"
   negative-bg: "#2a1210"
   danger-edge: "#8a2f26"
+  warning: "#f7c15f"
   warning-bg: "#2a2412"
+  tile-explore: "#5a56c7"
+  tile-profiles: "#9c3b96"
+  tile-apps: "#116bb5"
+  tile-recovery: "#047879"
+  tile-maintenance: "#aa5212"
+  tile-transfer: "#137d41"
+  tile-help: "#566577"
+  tile-danger: "#b63132"
 typography:
   headline:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
@@ -71,6 +80,9 @@ typography:
     lineHeight: 1.7
 rounded:
   control: "8px"
+  section-tile-nav: "7px"
+  section-tile-phone: "9px"
+  section-tile: "10px"
   toast: "12px"
   tile: "12px"
   card: "16px"
@@ -150,6 +162,16 @@ components:
     backgroundColor: "{colors.active}"
     rounded: "{rounded.tile}"
     size: "44px"
+  section-tile:
+    backgroundColor: "{colors.tile-maintenance}"
+    textColor: "{colors.bone}"
+    rounded: "{rounded.section-tile}"
+    size: "36px"
+  section-tile-nav:
+    backgroundColor: "{colors.tile-maintenance}"
+    textColor: "{colors.bone}"
+    rounded: "{rounded.section-tile-nav}"
+    size: "24px"
   badge:
     textColor: "{colors.lampblack}"
     rounded: "{rounded.control}"
@@ -181,7 +203,7 @@ components:
 
 **Creative North Star: "The Keyring"**
 
-The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: an app that has profiles gets one color from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Apart from status, nothing else on screen is colored. There is no second hue, no gradient in a hue and no glow.
+The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Color comes in two layers that never share a form. Apps: an app that has profiles gets one bright hue from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Sections: each part of the dashboard owns one deep tile color, a rounded square with a Bone glyph, as in macOS System Settings. Apart from those two layers and status, nothing on screen is colored. There is no second hue for an app, no gradient in a hue and no glow.
 
 Density is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.
 
@@ -190,6 +212,7 @@ Motion is brief and springy, and it never overshoots: every surface opens on a c
 **Key Characteristics:**
 - Warm black ground, warm off-white text, graphite steps in between.
 - One flat hue per app with profiles, assigned once and kept for that app everywhere; apps without profiles stay neutral.
+- One deep tile color per section, on its sidebar row, its page title and its operation cards.
 - Flat tonal cards; shadow only on floating layers.
 - Spring motion with a full reduced-motion path.
 - Platform UI font only; nothing loads from the network.
@@ -197,7 +220,7 @@ Motion is brief and springy, and it never overshoots: every surface opens on a c
 
 ## Colors
 
-A warm graphite ramp from Lampblack to Bone, lit only by seven app hues and the status colors.
+A warm graphite ramp from Lampblack to Bone, lit only by seven app hues, eight section tiles and the status colors.
 
 ### Primary
 The seven app hues, defined once in CSS as `--hue-periwinkle` … `--hue-violet`. `app.js` and `experience.js` read them from those tokens (with a frozen fallback and a console warning if one is missing). Only apps that have at least one profile get a hue: `app.js` hashes each app name into the palette, resolves collisions so no two such apps share a hue while one is free, and keeps the hue an app got first. An app with no profiles has no hue and renders in graphite with Bone ink. Every hue clears 6.2:1 against Lampblack, so app-colored fills always take Lampblack text.
@@ -210,6 +233,20 @@ The seven app hues, defined once in CSS as `--hue-periwinkle` … `--hue-violet`
 Hue appears in exactly five forms: a solid fill with Lampblack ink (the primary button of an app scope, the app tile), a plain dot, a 1px border (hover, running, the chosen navigator row), a focus ring, and the 15% ring on a focused field. The header Add button is always Bone. A selected profile card is marked on the neutral ramp instead: a 2px Bone outline at a 2px offset.
 
 Saved profile badges are a separate, user-chosen set of ten swatches: Mint, the seven app hues, Gray (#8d8b84) and Graphite. A badge keeps its saved color; it never follows the app hue. A new profile's default badge is the first swatch, in that order, that is neither its app's hue nor worn by another profile of that app.
+
+### Secondary
+The section tiles, defined once in CSS as `--tile-*` and applied through a `.section-<view>` class that sets `--section`. Each is a deep fill that carries a Bone glyph at 4.6:1 or more, so a section tile never reads as an app tile (bright fill, Lampblack ink).
+
+- **Indigo** (`tile-explore`): Explore.
+- **Plum** (`tile-profiles`): Profiles.
+- **Cobalt** (`tile-apps`): Applications.
+- **Deep Teal** (`tile-recovery`): Recovery.
+- **Rust** (`tile-maintenance`): Maintenance.
+- **Forest** (`tile-transfer`): Import & export.
+- **Slate** (`tile-help`): Help.
+- **Brick** (`tile-danger`): the tile of a destructive operation, on any page.
+
+A section color appears in four places only: its sidebar tile, its current-page highlight (the section color mixed 28% into Raised), the tile beside its page title and the tile on each of its operation cards.
 
 ### Neutral
 - **Lampblack** (`lampblack`): page ground, and the ink on any app-colored fill.
@@ -229,13 +266,16 @@ Saved profile badges are a separate, user-chosen set of ten swatches: Mint, the 
 - **Positive**: Mint (the running mark, success toasts).
 - **Negative** (`negative`): errors and destructive buttons, on `negative-bg`.
 - **Danger edge** (`danger-edge`): the 1px edge of a destructive button at rest, at least 2.2:1 on the same surfaces as the Button edge.
-- **Warning**: danger callouts use `warning-bg` with Bone text.
+- **Warning** (`warning`, Amber): the icon and level of a warning finding, the warning toast icon, the alert icon that leads every callout and danger callout, and the Needs repair count while it is above zero. Callouts use `warning-bg` with Bone text. Amber clears 9.3:1 on every surface it sits on.
+- The Running tab count turns Mint while it is above zero; a finding marked ok has a Mint check.
 
 ### Increased contrast
 Under `prefers-contrast: more`, Muted becomes #b4b2aa (7.3:1 on Warning bg, 8.7:1 on Raised, 9.5:1 on Lampblack), Border takes the Button edge, Control the Field border, the Button edge becomes Muted, the Field border #9a988f, the Danger edge Negative, and every material turns solid. Hues and Bone stay as they are.
 
 ### Named Rules
-**The Identity-Only Rule.** Hue means an app that has profiles, or a status. Everything else stays on the Lampblack-to-Bone ramp. Operation cards, counts and apps without profiles are neutral.
+**The Two Layers Rule.** A bright hue means an app that has profiles; a deep tile color means a section of the dashboard; Mint, Amber and Negative mean status. Everything else stays on the Lampblack-to-Bone ramp: card surfaces, text, apps without profiles and the counts that are not status.
+
+**The Section Rule.** A page's tiles take its section's color, except a destructive operation's tile, which is Brick. A section color is only ever a tile fill or the current-page highlight, never text, a border or a card surface.
 
 **The One Running Mark Rule.** Running is an 8px Mint dot plus "Running" in Mint, on cards, the detail panel, Explore keys and the navigator alike, and the running card or key also keeps its 1px hue border. A profile that is not running shows no dot.
 
@@ -296,7 +336,7 @@ The fixed chrome that content passes under is a translucent layer, not a shadow:
 
 ## Shapes
 
-Soft rectangles, nested by size. Controls, nav items, icon buttons, Explore key badges and navigator tiles, and the file-picker button are 8px; Explore keys, navigator rows and toasts 12px; the app tile 12px (10px in the Explore panel); the Explore panel 14px; cards and panels 16px; dialogs 20px, and 20px on the top corners only as a mobile sheet. The badge on a profile tile and the rail initial are 6px. Status and app dots and the color swatches are full circles (8px running dot, 8px app dot, 6px connection dot, 32px swatch, 44px on mobile).
+Soft rectangles, nested by size. Controls, nav items, icon buttons, Explore key badges and navigator tiles, and the file-picker button are 8px; Explore keys, navigator rows and toasts 12px; the app tile 12px (10px in the Explore panel); the Explore panel 14px; section tiles 10px at 36px (9px at 32px on phones) and 7px at 24px in the sidebar; cards and panels 16px; dialogs 20px, and 20px on the top corners only as a mobile sheet. The badge on a profile tile and the rail initial are 6px. Status and app dots and the color swatches are full circles (8px running dot, 8px app dot, 6px connection dot, 32px swatch, 44px on mobile).
 
 A badge is always a filled rounded square in its saved color, with no stripe or shadow: 34px on an Explore key, 20px at the corner of a profile tile, where it overlaps the tile by 6px. A badge on a tile carries a 2px ring in the surface it sits on (the card gradient's top, Raised in a dialog preview), so even a badge in the tile's own color reads as a separate chip.
 
@@ -319,8 +359,11 @@ Every button presses to 0.97 in 85ms on pointer-down and springs back on release
 - **Corner Style:** 16px.
 - **Background:** the card gradient (#0f0f0f to #090909).
 - **Shadow Strategy:** none at rest; see Elevation & Depth.
-- **Border:** 1px Border; on app cards hover draws the app hue (Muted on a neutral card), and a running profile card draws it in full. Selection never takes the hue: a selected profile card adds a 2px Bone outline at a 2px offset. Operation cards stay neutral.
+- **Border:** 1px Border; on app cards hover draws the app hue (Muted on a neutral card), and a running profile card draws it in full. Selection never takes the hue: a selected profile card adds a 2px Bone outline at a 2px offset. Operation card surfaces stay neutral; each card, and Recovery's restore panel, leads with a 36px section tile.
 - **Internal Padding:** 24px for panels and operation cards, 20px for profile and application cards, 22px on mobile.
+
+### Section tile
+A flat rounded square in its section's deep color with a Bone glyph, no border, shadow or gradient. 36px with a 20px glyph beside every page title (32px with an 18px glyph below 768px), centered on the title's capitals, with the subtitle aligned under the title text, not the tile; 36px above the heading of an operation card; 24px with a 15px glyph in the sidebar. It is decorative (`aria-hidden`); the label beside it names the section. Under forced colors it gains a 1px CanvasText border.
 
 ### Inputs / Fields
 - **Style:** 40px, Raised fill, 1px Field border, 8px radius, 9px × 12px padding. The search field has a 16px leading icon and a 36px clear button. Search appears on Profiles from seven profiles, and on Applications always.
@@ -328,8 +371,8 @@ Every button presses to 0.97 in 85ms on pointer-down and springs back on release
 - **Error:** a `negative-bg` form-error block above the actions, and `aria-invalid` on the field the server rejected.
 
 ### Navigation
-- **Sidebar:** a `<nav aria-label="Main">` landmark. 40px items, 8px radius, Muted text. Hover shows Bone on Surface; the current page shows Bone on Raised. On a page change the Raised fill slides from the item it left, or from where it is mid-slide, over 340ms on the control spring; under reduced motion it jumps. Under the nav, "Your apps" lists only apps that have profiles, each with an 8px dot in its hue (36px rows, 12px text); "No profiles yet" shows only once data has loaded and there are none. Help and Collapse sit at the foot. Above the nav, one compact status row: a 6px Mint dot (Negative when offline) and "Connected · this Mac".
-- **Collapsed rail:** 72px; labels hide, the status row shows only its dot, and each app shows its initial as a 24px rounded tile in its hue with Lampblack ink, named by a tooltip that appears beside the rail for keyboard focus, with a divider where "Your apps" was. As a mobile drawer the full labels return.
+- **Sidebar:** a `<nav aria-label="Main">` landmark. 40px items, 8px radius, Muted text, each led by its 24px section tile. Hover shows Bone on Surface; the current page shows Bone on its section color mixed 28% into Raised. On a page change that fill slides from the item it left, or from where it is mid-slide, over 340ms on the control spring; under reduced motion it jumps. Under the nav, "Your apps" lists only apps that have profiles, each with an 8px dot in its hue (36px rows, 12px text); "No profiles yet" shows only once data has loaded and there are none. Help and Collapse sit at the foot. Above the nav, one compact status row: a 6px Mint dot (Negative when offline) and "Connected · this Mac".
+- **Collapsed rail:** 72px; labels hide, the section tiles stay centered, the status row shows only its dot, and each app shows its initial as a 24px rounded tile in its hue with Lampblack ink, named by a tooltip that appears beside the rail for keyboard focus, with a divider where "Your apps" was. As a mobile drawer the full labels return.
 - **Tabs:** 13px labels in Muted, Bone when selected, 44px tall, with a 2px Bone underline that springs between tabs. Profiles tabs are All, Running, Not running and Needs repair, with the counts on the tabs only (Needs repair shows a muted dash until a check has run). Arrow, Home and End move between tabs. When the strip overflows on a narrow phone, its right edge fades and the selected tab scrolls into view.
 - **Mobile:** the top bar names the page, and the sidebar becomes a drawer from the left behind a 60% black scrim; Tab stays inside it and the page behind is inert.
 - **Page change:** the old page fades out in place over 200ms while the new one fades in and rises 8px over 480ms on the surface spring; the activity bar, its panel and the toasts stay still. Without the View Transitions API, or while the phone drawer is open, only the new page animates, from 50% opacity and 8px down. Under reduced motion the swap is instant.
@@ -342,7 +385,7 @@ Every button presses to 0.97 in 85ms on pointer-down and springs back on release
 - **Motion:** on desktop, enter rises 14px and scales from 0.96 over 420ms on the critically damped spring, with no overshoot; exit falls 14px to 0.96 over 200ms. Below 768px a dialog becomes a bottom sheet that slides up on `--ease`, with no overshoot.
 
 ### Toasts
-Titles say what happened in plain words ("Opened Claude Work", "Brought Claude Work to the front"), never "<Action> complete". A 340px column at the bottom of the workspace, 32px in from the sidebar (24px at 1200px and below), above the activity bar. Each toast is Tip on a Control border, 12px radius, with a status icon in Mint or Negative. The front toast is expanded; the rest stack behind it and fan out on hover.
+Titles say what happened in plain words ("Opened Claude Work", "Brought Claude Work to the front"), never "<Action> complete". A 340px column at the bottom of the workspace, 32px in from the sidebar (24px at 1200px and below), above the activity bar. Each toast is Tip on a Control border, 12px radius, with a status icon in Mint, Amber or Negative. The front toast is expanded; the rest stack behind it and fan out on hover.
 
 ### Profile card (signature)
 The Profiles grid's unit. A 44px app tile in the app's hue (graphite for an app with no hue), carrying the profile's 20px badge at its corner, sits beside an `h2` whose name is a button (Title) over the app name (13px Muted). Clicking the card or pressing Enter on the name selects it; only the visible Open button launches, and O opens only while focus is inside the selected card or the detail panel. Below: a state row with the status label (an 8px Mint dot and Mint text when running), plus small Repair and Quit actions when they apply; a Meta line of "Original account · Own extensions · N launch options"; then one full-width, 40px primary action: Open (the Secondary), or Bring to front (the hue fill) when the profile is running. Quit is a small outlined button beside the state, never in the primary slot. There is no cover strip. Hue shows only in the tile, the Bring to front fill, and the hover and running borders; selection is a 2px Bone outline at a 2px offset.
@@ -379,6 +422,7 @@ When a poll or action can't reach the dashboard server, a banner says "The dashb
 ### Do:
 - **Do** give each app that has profiles exactly one hue through `--app-color`, and use it only for that app's primary fill, app tile, dots, 1px borders and focus ring.
 - **Do** define a new hue only as a `--hue-*` token; both scripts read the palette from CSS.
+- **Do** give a new section a `--tile-*` token and a `.section-<view>` class, and give a destructive operation the Brick tile.
 - **Do** put Lampblack (#060606) text on any app-colored fill; every hue clears 6.2:1.
 - **Do** keep text at Muted (#8d8b84) or brighter and at 12px or larger. Muted on Raised (5.4:1) is the lowest text pairing in use.
 - **Do** show keyboard focus as a 2px outline in the current accent, offset 4px (swatches use Bone at 3px; controls inside clipping boxes use an inset ring).
@@ -396,7 +440,8 @@ When a poll or action can't reach the dashboard server, a banner says "The dashb
 - **Don't** use a hue as a gradient, a glow, text color, a tinted background or secondary button, or an accent stripe, and don't add a second hue to an app.
 - **Don't** give an app with no profiles a hue, and don't use Mint as an app hue; it is status, the logo and the default accent.
 - **Don't** recolor the header Add button; it is always Bone.
-- **Don't** color anything that is neither an app's identity nor a status.
+- **Don't** color anything that is not an app's identity, a section tile or a status.
+- **Don't** use a section color as text, a border, a card fill or a gradient, and don't put Lampblack ink on a section tile.
 - **Don't** write hex values outside `:root`; use the tokens. The one exception is the `dialog::backdrop` scrim, which mirrors `--scrim` because older browsers don't pass custom properties to `::backdrop`.
 - **Don't** load webfonts or any other remote asset.
 - **Don't** show a secret anywhere, including a command line; masked values read `•••`.
