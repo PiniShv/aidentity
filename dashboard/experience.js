@@ -1,5 +1,5 @@
 /* Explore: the focus panel shows one app's profiles as a ring of keys, which hold every profile action.
- * The list beside it only chooses the app; apps without profiles fold into one disclosure.
+ * The list beside it only chooses the app: one row per app, including apps with no profiles yet.
  * A change of app crossfades the app identity in 160ms (a static swap under reduced motion).
  */
 (() => {
@@ -42,13 +42,13 @@
       groupsByName.get(name).profiles.push(profile);
     }
     const runningCount = group => group.profiles.filter(profile => profile.status === "running").length;
-    // Apps with profiles first: running ones, then by profile count, then by name. The rest fold into one disclosure.
+    // Apps with profiles first: running ones, then by profile count, then by name.
     const groups = [...groupsByName.values()].sort((a, b) =>
       Math.sign(b.profiles.length) - Math.sign(a.profiles.length) ||
       Math.sign(runningCount(b)) - Math.sign(runningCount(a)) || b.profiles.length - a.profiles.length ||
       a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-    // The navigator, Prev/Next, the counter and the jump select cover only apps with profiles, which lead the sort.
-    const nav = groups.filter(group => group.profiles.length);
+    // The navigator, Prev/Next, the counter and the jump select cover every app, in that order.
+    const nav = groups;
     // app.js owns the hues and gives none to an app without profiles; such an app renders neutral.
     for (const group of groups) {
       const color = callbacks.appAccent?.(group.name)?.color;
@@ -115,10 +115,6 @@
       </li>`;
     };
     const navRow = (group, i) => `<li><button type="button" class="xp-nav-item" data-xp-app="${esc(group.name)}" data-xp-select="${i}" style="${accentStyle(group)}" aria-describedby="xp-select-hint" aria-current="${i === active}"><span class="xp-list-icon" aria-hidden="true">${icon(group.name)}</span><span class="xp-nav-text"><span class="xp-app-name">${esc(group.name)}</span><span class="xp-app-meta"><span>${profileCount(group.profiles.length)}${group.installed ? "" : inventoryFailed ? " · Inventory unavailable" : " · App not found"}</span>${appRunning(group)}</span></span></button></li>`;
-    const others = groups.slice(nav.length);
-    const otherHtml = others.length ? `<details class="xp-other"${(kept?.otherOpen ?? !nav.length) ? " open" : ""}><summary class="xp-other-summary">${nav.length ? "Other compatible apps" : "Compatible apps"} (${others.length})</summary>
-      <ul class="xp-other-list">${others.map((group, j) => `<li class="xp-other-row"><span class="xp-other-name">${esc(group.name)}</span><button type="button" class="xp-button xp-add" data-xp-run data-xp-add="${nav.length + j}" aria-label="Add profile, ${esc(group.name)}">Add profile</button></li>`).join("")}</ul>
-    </details>` : "";
     root.innerHTML = `<div class="xp-wrap">
       <header class="xp-header"><h1 tabindex="-1">Explore</h1><p>Choose an app. Open a profile or add another.</p></header>${errorNotice}
       ${nav.length ? `<div class="xp-layout">
@@ -126,29 +122,29 @@
           <div class="xp-pager"${nav.length > 1 ? "" : " hidden"}><button type="button" class="xp-button xp-prev" aria-label="Previous app">${uiIcon("back")}</button><span class="xp-position" aria-live="polite" aria-atomic="true" data-at="${active}">${positionHtml(active)}</span><button type="button" class="xp-button xp-next" aria-label="Next app">${uiIcon("arrow")}</button><label class="xp-jump-label"><span class="xp-sr-only">Choose app</span><select class="xp-jump" aria-label="Choose app">${nav.map((group, i) => `<option value="${i}">${esc(group.name)}</option>`).join("")}</select></label></div>
           <div class="xp-ident">${face(nav[active])}</div>
           <ul class="xp-keys"></ul>
+          <div class="xp-empty" data-xp-none hidden><p></p></div>
           <p class="xp-inline-feedback" role="status" aria-live="polite" hidden></p>
           <button type="button" class="xp-button xp-key-add" data-xp-run>${uiIcon("plus")}Add profile</button>
           <p class="xp-help" id="xp-add-help" hidden></p>
           <p class="xp-sr-only" role="status" data-xp-live></p>
         </section>
-        <div class="xp-app-list" role="region" aria-label="Apps with profiles">
+        <div class="xp-app-list" role="region" aria-label="Apps">
           <span id="xp-select-hint" hidden>Shows this app's profiles</span>
           <div class="xp-list-summary"><span>${nav.length} ${nav.length === 1 ? "app" : "apps"}</span><span>${profileCount(profiles.length)}</span></div>
           <ul class="xp-nav">${nav.map(navRow).join("")}</ul>
-          ${otherHtml}
         </div>
-      </div>` : groups.length ? `<div class="xp-start"><section class="xp-empty"><h2>No profiles yet</h2><p>Each profile keeps its own sign-in. Choose an app below to add the first one.</p></section>${otherHtml}</div>`
-      : errorNotice ? "" : `<section class="xp-empty"><h2>No compatible apps found</h2><p>Install a Chromium or Electron app, then add a profile.</p><button type="button" class="xp-button xp-primary xp-empty-add" data-xp-run>Add profile ${uiIcon("arrow")}</button></section>`}
+      </div>` : errorNotice ? "" : `<section class="xp-empty"><h2>No AI apps found</h2><p>Install Claude or ChatGPT, then refresh this workspace.</p><button type="button" class="xp-button xp-primary xp-empty-add" data-xp-run>Add profile ${uiIcon("arrow")}</button></section>`}
     </div>`;
     const preview = root.querySelector(".xp-preview"), ident = root.querySelector(".xp-ident");
     const keys = root.querySelector(".xp-keys"), feedback = root.querySelector(".xp-inline-feedback");
+    const none = root.querySelector("[data-xp-none]");
     const addKey = root.querySelector(".xp-key-add"), addHelp = root.querySelector("#xp-add-help"), live = root.querySelector("[data-xp-live]");
     const jump = root.querySelector(".xp-jump");
     const prev = root.querySelector(".xp-prev"), next = root.querySelector(".xp-next");
     const position = root.querySelector(".xp-position");
     const navButtons = [...root.querySelectorAll("[data-xp-select]")];
     // Names, not list indexes or labels that change with status, identify a control across a rebuild.
-    const controlKey = element => element?.matches?.("button, select, summary") && root.contains(element)
+    const controlKey = element => element?.matches?.("button, select") && root.contains(element)
       ? element.dataset.xpKey ? `key|${element.dataset.xpKey}` : element.dataset.xpApp ? `app|${element.dataset.xpApp}` : element === addKey ? "xp-key-add" : element.getAttribute("aria-label") || element.className : null;
     // place: the control's app; that app's navigator row takes focus if the control is gone after a rebuild.
     const focusMark = element => {
@@ -171,6 +167,9 @@
         keys.dataset.app = group.name;
         keys.setAttribute("aria-label", `${group.name} profiles`);
         keys.innerHTML = group.profiles.map(keyHtml).join("");
+        // An app with no profiles yet shows the empty-state words instead of an empty ring.
+        keys.hidden = !group.profiles.length; none.hidden = !keys.hidden;
+        none.firstElementChild.textContent = `No ${group.name} profiles yet. Each profile keeps its own sign-in. Add the first one below.`;
       }
       addKey.setAttribute("aria-label", `Add profile, ${group.name}`);
       block(addKey, !group.installed);
@@ -231,7 +230,6 @@
     }
     const emptyAdd = root.querySelector(".xp-empty-add");
     if (emptyAdd) listen(emptyAdd, "click", () => { if (!blocked(emptyAdd)) callbacks.addProfile?.(""); });
-    root.querySelectorAll("[data-xp-add]").forEach(button => listen(button, "click", () => { if (!blocked(button)) callbacks.addProfile?.(groups[Number(button.dataset.xpAdd)].name); }));
     if (preview) {
       listen(addKey, "click", () => { if (!blocked(addKey)) callbacks.addProfile?.(nav[active].name); });
       listen(keys, "click", event => {
@@ -260,11 +258,11 @@
     // Remember the last focused control in case focus falls to the body before a rebuild.
     listen(root, "focusin", event => { focusKey = focusMark(event.target); });
     listen(root, "focusout", event => { if (event.relatedTarget && !root.contains(event.relatedTarget)) focusKey = null; });
-    if (kept?.focus) ([...root.querySelectorAll("button, select, summary")].find(element => !element.disabled && element.getClientRects().length && controlKey(element) === kept.focus.key)
+    if (kept?.focus) ([...root.querySelectorAll("button, select")].find(element => !element.disabled && element.getClientRects().length && controlKey(element) === kept.focus.key)
       || navButtons.find(button => button.dataset.xpApp === kept.focus.place) || root.querySelector("h1"))?.focus({ preventScroll: true });
     return () => {
       const focused = document.activeElement;
-      carried = { app: nav[active]?.name, otherOpen: root.querySelector(".xp-other")?.open, statuses: Object.fromEntries(profiles.map(profile => [profile.name, profile.status])),
+      carried = { app: nav[active]?.name, statuses: Object.fromEntries(profiles.map(profile => [profile.name, profile.status])),
         focus: root.contains(focused) ? focusMark(focused) : !focused || focused === document.body ? focusKey : null };
       queueMicrotask(() => { carried = null; });
       disposed = true;

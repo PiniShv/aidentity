@@ -6,7 +6,7 @@ The dashboard adapts retrieved 21st.dev component source to dependency-free vani
 | --- | --- | --- |
 | Navigation | [Animated Sidebar by starc007](https://21st.dev/@starc007/components/animated-sidebar), demo 29334 | Desktop collapsed rail, animated labels, keyboard shortcut, mobile sheet, focus trap, Escape and focus restoration. |
 | Dialogs | [Animated Dialog by rmahammad](https://21st.dev/@rmahammad/components/animated-dialog), demo 26905 | Native modal dialog with scale/slide animation, fixed header/footer, scrollable body, mobile bottom sheet and reduced motion. |
-| Profile cards | [Animated Profile Card by ravikatiyar162](https://21st.dev/@ravikatiyar162/components/animated-profile-card), demo 8206 | App tile with the profile badge at its corner, name/app line, state, configuration metadata, subtle hover lift and full-width action. Human profile data and photographs replaced by actual launcher identities. |
+| Profile cards | [Animated Profile Card by ravikatiyar162](https://21st.dev/@ravikatiyar162/components/animated-profile-card), demo 8206 | App tile with the profile badge at its corner, name/app line, state, configuration metadata, a hover border in the app's hue (no lift) and full-width action. Human profile data and photographs replaced by actual launcher identities. |
 | Tabs | [Animated Tabs by educalvolpz](https://21st.dev/@educalvolpz/components/animated-tabs), demo 24930 | Sliding underline measured from the active tab, Arrow/Home/End navigation and roving keyboard focus. |
 | Inputs/search | [Input by Origin UI](https://21st.dev/@originui/components/input), demo 159 | Leading search icon, trailing clear action, focus ring, input sizing and accessible labels. |
 | Buttons | [Button by Origin UI](https://21st.dev/@originui/components/button), demo 146 | Primary, outline, secondary and destructive variants with a loading overlay that preserves button size. |
@@ -26,7 +26,15 @@ Apple's [Motion](https://developer.apple.com/design/human-interface-guidelines/m
 and [Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
 guidance. That skill is a design reference, not a build or runtime dependency.
 
-Controls use a short sampled spring; panels use a softer spring. Explore changes
-app with a 160ms crossfade. These spring parameters
-are design choices rather than Apple-prescribed values. Reduced motion replaces
-springs and the crossfade with static, keyboard-accessible content.
+Every spring is critically damped (damping 1.0, a `linear()` curve sampled from
+the spring), so nothing overshoots: controls settle in 340ms (a 0.25s response),
+dialogs in 420ms and panels in 480ms (0.35s). The press is the only movement on a
+control; hover changes fill and border. The activity panel leaves along the path it
+entered by, and a click mid-flight reverses it from where it is. A re-targeted tab
+underline or sidebar slide starts from its on-screen position. Explore changes app
+with a 160ms crossfade. The fixed activity bar and panel and the phone top bar are a
+translucent layer that turns solid under reduced transparency and increased
+contrast. Reduced motion replaces springs and the crossfade with static,
+keyboard-accessible content, and a press dims instead of scaling. These parameters
+follow Emil Kowalski's apple-design motion skill and Apple's HIG Motion page; they
+are aidentity's choices, not platform timings.

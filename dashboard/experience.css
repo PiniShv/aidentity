@@ -1,5 +1,5 @@
 /* Explore: a focus panel with the chosen app's profiles as keys (every profile action lives there), beside a navigator of apps. */
-.xp-wrap{background:var(--ground);color:var(--text);padding:32px;min-width:0}
+.xp-wrap{background:var(--ground);color:var(--text);min-width:0} /* no padding: #main's gutters, the same in every view */
 /* Zero-specificity reset, so .xp-* classes win without important flags. Disabled Explore buttons only dim:
    the base button:disabled colour skips .xp-wrap (styles.css), so filled buttons keep their colour. */
 :where(.xp-wrap) button,:where(.xp-wrap) select{font:inherit;color:inherit}
@@ -14,7 +14,7 @@
 .xp-header p{color:var(--muted);font-size:13px;line-height:1.5;margin:10px 0 0}
 
 /* Buttons: neutral by default. Only a running key's Bring to front takes the app hue. */
-.xp-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--control);border-radius:8px;background:var(--surface);font-size:13px;white-space:nowrap;transition:background-color 160ms ease,border-color 160ms ease,transform 360ms var(--spring-control)}
+.xp-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--control);border-radius:8px;background:var(--surface);font-size:13px;white-space:nowrap;transition:background-color 160ms ease,border-color 160ms ease,transform var(--motion-control) var(--spring-control)}
 .xp-button svg{width:15px;height:15px;flex-shrink:0}
 .xp-button:hover:not(:disabled,[aria-disabled="true"]){background:var(--raised);border-color:var(--muted)}
 .xp-button:active:not(:disabled,[aria-disabled="true"]){transform:scale(.97);transition-duration:80ms}
@@ -30,7 +30,7 @@
 .xp-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,300px);align-items:start;gap:28px}
 .xp-preview{position:sticky;top:24px;display:flex;flex-direction:column;gap:16px;padding:18px;border:1px solid var(--border);border-radius:14px;min-width:0;background:var(--card);scroll-margin-top:24px;container:xp-panel/inline-size}
 .xp-preview.xp-tall{position:relative;top:auto}
-/* Pager: Prev, "N of M", Next and the jump select; hidden when only one app has profiles. */
+/* Pager: Prev, "N of M", Next and the jump select; hidden when only one app is listed. */
 .xp-pager{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;line-height:16px}
 .xp-position{min-width:6ch;text-align:center;font-variant-numeric:tabular-nums}
 .xp-prev,.xp-next{width:36px;flex:none;padding:0}
@@ -79,7 +79,7 @@
 /* One badge everywhere: a filled rounded square in the saved colour, ink by the Ink Rule. */
 .xp-key-badge{grid-area:badge;display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:var(--identity);color:var(--identity-ink);font-size:13px;font-weight:600}
 
-/* Navigator: one row per app with profiles. A row chooses the app; profile actions live only on the keys. */
+/* Navigator: one row per app, apps with profiles first. A row chooses the app; profile actions live only on the keys. */
 .xp-list-summary{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:12px;line-height:16px;margin:0 0 10px;padding:0 12px}
 .xp-nav{display:grid;gap:4px;margin:0 0 16px;padding:0;list-style:none}
 .xp-nav-item{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:10px 12px;border:1px solid transparent;border-radius:12px;background:none;text-align:left;transition:background-color 160ms ease,border-color 160ms ease}
@@ -90,35 +90,24 @@
 .xp-app-meta{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;margin-top:2px;color:var(--muted);font-size:12px;line-height:1.5}
 .xp-list-icon{width:36px;height:36px;border-radius:8px;font-size:16px;font-weight:600}
 .xp-list-icon svg{width:20px;height:20px}
-.xp-add{flex:none;padding:0 10px}
 .xp-help{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin:0}
 .xp-inline-feedback{font-size:12px;line-height:1.5;color:var(--negative);margin:0}
-/* Apps with no profiles yet: one disclosure of one-line neutral rows. */
-.xp-other{border:1px solid var(--border);border-radius:12px;background:var(--card)}
-.xp-other-summary{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 18px;border-radius:12px;color:var(--muted);font-size:13px;cursor:pointer;list-style:none}
-.xp-other-summary::-webkit-details-marker{display:none}
-.xp-other-summary:hover{color:var(--text)}
-.xp-other-summary:before{content:"";width:6px;height:6px;margin:0 2px 0 1px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg);transition:transform 160ms var(--ease)}
-.xp-other[open]>.xp-other-summary:before{transform:rotate(45deg)}
-.xp-other-list{list-style:none;margin:0;padding:0 18px 6px}
-.xp-other-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--border)}
-.xp-other-name{min-width:0;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
 
 /* Empty states */
-.xp-start{display:grid;gap:16px;max-width:640px}
 .xp-empty{padding:32px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
 .xp-empty h2{font-size:22px;font-weight:550;letter-spacing:-.03em;margin:0 0 10px}
 .xp-empty p{color:var(--muted);font-size:14px;line-height:1.5;margin:0}
 .xp-empty-add{width:auto;margin-top:20px}
+/* Inside the panel the no-profiles words are a placeholder, drawn like every other one (dashed Control, no fill): never a card in a card. */
+.xp-preview>.xp-empty{padding:20px;background:none;border-style:dashed;border-color:var(--control)}
+.xp-preview>.xp-empty p{font-size:13px}
 .xp-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 /* Breakpoints */
 @media(max-width:1100px) and (min-width:768px){
-  .xp-wrap{padding:28px 24px}
   .xp-layout{gap:20px;grid-template-columns:minmax(0,1fr) minmax(220px,260px)}
 }
 @media(max-width:767px){
-  .xp-wrap{padding:24px 18px}
   .xp-header{margin-bottom:18px}
   .xp-header h1{font-size:24px}
   .xp-layout{grid-template-columns:minmax(0,1fr);gap:22px}
@@ -128,11 +117,9 @@
   .xp-app-icon{width:40px;height:40px;font-size:17px}
   .xp-app-icon svg{width:22px;height:22px}
   .xp-card-name{font-size:19px}
-  .xp-key-action,.xp-key-add,.xp-add{min-height:44px}
-  .xp-other-summary{min-height:48px;padding:0 16px}
-  .xp-other-list{padding:0 16px 6px}
+  .xp-key-action,.xp-key-add{min-height:44px}
 }
 @media(prefers-reduced-motion:reduce){
   .xp-wrap *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-  .xp-wrap .xp-button:active:not(:disabled,[aria-disabled="true"]){transform:none}
+  .xp-wrap .xp-button:active:not(:disabled,[aria-disabled="true"]){transform:none;opacity:.78} /* the press stays visible without movement */
 }

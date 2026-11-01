@@ -17,10 +17,13 @@
   --app-ink:var(--ground); /* --app-color is set only on an app-toned element (app.js); everything else stays neutral */
   --scrim:#0009; --ring-accent:#5fe08a26;
   --shadow-dialog:0 24px 70px #0008; --shadow-toast:0 10px 30px #0005;
-  /* Motion: Apple HIG-inspired springs; the parameters are aidentity choices, not platform timings. */
+  /* Floating chrome (activity bar and panel, phone top bar): a translucent layer content scrolls under; solid where blur is off. */
+  --material-bar:#060606e0; --material-panel:#0c0c0ceb; --material-blur:blur(20px) saturate(140%);
+  /* Motion: critically damped springs (damping 1.0). Every surface here opens on a click, not a flick, so nothing overshoots.
+     The duration sets the response: 340ms is 0.25s (controls), 480ms is 0.35s (surfaces), 420ms is 0.3s (dialogs). */
   --ease:cubic-bezier(.2,0,0,1);
   --spring-control:cubic-bezier(.16,1,.3,1); --spring-surface:cubic-bezier(.16,1,.3,1);
-  --motion-press:85ms; --motion-control:360ms; --motion-surface:520ms;
+  --motion-press:85ms; --motion-control:340ms; --motion-surface:480ms;
   --motion-dialog:420ms; --motion-exit:200ms; --motion-fade:140ms;
   --font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
   --sidebar-width:216px; --activity-height:45dvh; --activity-open:0px;
@@ -28,8 +31,9 @@
   color:var(--text); background:var(--ground); font-size:14px; color-scheme:dark;
   caret-color:var(--accent); scrollbar-color:var(--field-border) transparent;
 }
+/* x(t) = 1 - (1 + wt)e^(-wt) sampled to wt = 8.6, so it is 99.8% settled at the end: one shape for both tokens. */
 @supports(transition-timing-function:linear(0,1)){
-  :root{--spring-control:linear(0.00000 0%, 0.01848 2.5%, 0.06731 5%, 0.13758 7.5%, 0.22173 10%, 0.31349 12.5%, 0.40783 15%, 0.50079 17.5%, 0.58942 20%, 0.67160 22.5%, 0.74595 25%, 0.81169 27.5%, 0.86854 30%, 0.91659 32.5%, 0.95621 35%, 0.98802 37.5%, 1.01272 40%, 1.03112 42.5%, 1.04407 45%, 1.05240 47.5%, 1.05690 50%, 1.05832 52.5%, 1.05735 55%, 1.05458 57.5%, 1.05053 60%, 1.04565 62.5%, 1.04031 65%, 1.03481 67.5%, 1.02938 70%, 1.02420 72.5%, 1.01938 75%, 1.01502 77.5%, 1.01116 80%, 1.00782 82.5%, 1.00499 85%, 1.00266 87.5%, 1.00078 90%, 0.99932 92.5%, 0.99823 95%, 0.99746 97.5%, 1.00000 100%);--spring-surface:linear(0.00000 0%, 0.02863 2.5%, 0.10170 5%, 0.20250 7.5%, 0.31762 10%, 0.43671 12.5%, 0.55217 15%, 0.65879 17.5%, 0.75333 20%, 0.83412 22.5%, 0.90074 25%, 0.95362 27.5%, 0.99386 30%, 1.02288 32.5%, 1.04235 35%, 1.05393 37.5%, 1.05927 40%, 1.05986 42.5%, 1.05704 45%, 1.05194 47.5%, 1.04549 50%, 1.03842 52.5%, 1.03129 55%, 1.02452 57.5%, 1.01835 60%, 1.01296 62.5%, 1.00842 65%, 1.00472 67.5%, 1.00183 70%, 0.99966 72.5%, 0.99814 75%, 0.99715 77.5%, 0.99660 80%, 0.99640 82.5%, 0.99644 85%, 0.99667 87.5%, 0.99701 90%, 0.99742 92.5%, 0.99785 95%, 0.99827 97.5%, 1.00000 100%)}
+  :root{--spring:linear(0 0%, 0.07 5%, 0.2135 10%, 0.3705 15%, 0.514 20%, 0.6341 25%, 0.7297 30%, 0.8032 35%, 0.8584 40%, 0.899 45%, 0.9286 50%, 0.9498 55%, 0.9649 60%, 0.9756 65%, 0.9831 70%, 0.9884 75%, 0.992 80%, 0.9945 85%, 0.9962 90%, 0.9974 95%, 1 100%);--spring-control:var(--spring);--spring-surface:var(--spring)}
 }
 @property --tabs-fade{syntax:"<length>";inherits:false;initial-value:0px}
 @property --detail-fade{syntax:"<length>";inherits:false;initial-value:0px}
@@ -76,7 +80,9 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
 .is-offline .connection-dot{background:var(--negative)}
 .nav-item{position:relative;display:flex;gap:11px;align-items:center;width:100%;min-height:40px;margin:2px 0;padding:0 12px;border-radius:8px;text-align:left;color:var(--muted);white-space:nowrap}
 .nav-item:hover{color:var(--text);background:var(--surface)}
-.nav-item[aria-current=page]{color:var(--text);background:var(--raised)}
+/* The current item's fill is a ::before that app.js slides from the item it left. Lighten keeps every label above it in flight. */
+.nav-item[aria-current=page]{color:var(--text);background:transparent}
+.nav-item[aria-current=page]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--raised);mix-blend-mode:lighten}
 .nav-item>.nav-label{overflow:hidden;text-overflow:ellipsis}
 .nav-apps{flex:none;max-height:40dvh;margin:28px -8px 0;padding:0 8px 6px;overflow-y:auto}
 .nav-group-title{padding:0 12px 10px;font-size:12px;color:var(--muted)}
@@ -108,7 +114,6 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
 /* Focus scrolls content clear of the fixed activity bar (and the open panel). Scroll-margin, not root
    scroll-padding: the sticky sidebar and topbar take none, so focusing them never jumps the page. */
 #main *{scroll-margin-bottom:calc(var(--activity-open) + 56px)}
-#main:has(#experience-root){padding:0}
 
 /* Collapsed sidebar */
 .sidebar-collapsed{--sidebar-width:72px}
@@ -168,6 +173,8 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .tabs button[aria-selected=true]{color:var(--text)}
 .tab-indicator{position:absolute;left:0;bottom:0;height:2px;background:var(--text);width:0;pointer-events:none;transform-origin:left center;transition:none}
 .tabs .tab-count{color:var(--muted);padding-left:2px;font-variant-numeric:tabular-nums}
+/* Without a toolbar the grid follows the tabs directly: keep the toolbar's 20px so a card's outline never meets the tab line. */
+.tabs+.profile-layout{margin-top:20px}
 
 /* Profiles: layout, grid, card and detail panel. The grid fills by width, never by selection. */
 .profile-layout{display:grid;align-items:start;gap:24px;grid-template-columns:minmax(0,1fr) 320px}
@@ -238,11 +245,6 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .app-head>div{min-width:0}
 .app-head h2{overflow-wrap:anywhere}
 .application-card .app-count{margin:0 -4px;color:var(--muted)}
-/* Apps without profiles: one disclosure of rows, each with its own Add profile. */
-.apps-other{margin-top:24px}
-.apps-other>.other-list{list-style:none;margin:0;padding:12px 0 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:0 24px}
-.other-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--border)}
-.other-name{min-width:0;font-size:13px;overflow-wrap:anywhere}
 .application-card .button{width:100%;margin-top:auto}
 .panel{border-radius:16px;padding:24px;background:var(--card);border:1px solid var(--border)}
 .panel-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}
@@ -334,6 +336,7 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
 .color-options{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .color-swatch{width:32px;height:32px;border-radius:50%;background:var(--swatch);border:3px solid var(--surface);outline:1px solid transparent}
 .color-swatch[aria-pressed=true]{outline-color:var(--text)}
+.color-swatch:hover:not([aria-pressed=true]){outline-color:var(--muted)}
 .color-swatch:focus-visible{outline:2px solid var(--text);outline-offset:3px}
 .color-swatch[data-color="262624"]{box-shadow:inset 0 0 0 1px var(--field-border)} /* Graphite is 1.3:1 on the dialog surface */
 .color-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;margin-top:8px;font-size:13px}
@@ -387,13 +390,13 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .toast-viewport:not(:hover)>.toast:nth-child(3){transform:scale(.96);opacity:1}
 
 /* Activity bar */
-.activity-toggle{position:fixed;bottom:0;right:0;left:var(--sidebar-width);height:40px;background:var(--ground);border-top:1px solid var(--border);display:flex;gap:9px;align-items:center;padding:0 32px;font-size:12px;color:var(--muted);z-index:20}
+.activity-toggle{position:fixed;bottom:0;right:0;left:var(--sidebar-width);height:40px;background:var(--material-bar);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur);border-top:1px solid var(--border);display:flex;gap:9px;align-items:center;padding:0 32px;font-size:12px;color:var(--muted);z-index:20}
 .activity-toggle:focus-visible{outline-offset:-2px}
 /* index.html icons are hydrated inside their <span>, so the spans are the toggle's first and last children. */
 .activity-toggle>:first-child .icon,.activity-toggle>:last-child .icon{width:14px}
 .activity-toggle>:last-child{margin-left:auto;transition:transform var(--motion-fade) ease-out}
 .activity-toggle[aria-expanded=true]>:last-child{transform:rotate(180deg)}
-.activity-panel{position:fixed;bottom:40px;right:0;left:var(--sidebar-width);background:var(--surface);border-top:1px solid var(--control);padding:20px 32px;max-height:var(--activity-height);overflow:auto;z-index:25;animation:none}
+.activity-panel{position:fixed;bottom:40px;right:0;left:var(--sidebar-width);background:var(--material-panel);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur);border-top:1px solid var(--control);padding:20px 32px;max-height:var(--activity-height);overflow:auto;z-index:25;animation:none}
 :root:has(#activity-panel:not([hidden])){--activity-open:var(--activity-height)}
 .activity-entry{margin-bottom:17px}
 .activity-entry-title{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12px;margin-bottom:9px}
@@ -402,16 +405,28 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .activity-error{color:var(--negative)}
 .activity-command{display:block;margin-bottom:8px;font-family:var(--font-mono);font-size:12px;line-height:1.7;user-select:text} /* .command-word spans: breaks at spaces only */
 
-/* Motion: shared springs for pressable controls and cards */
+/* Motion: the press is the one spatial feedback on controls. It lands on pointer-down in 85ms and springs back on release.
+   Hover is frequent, so it changes fill and border only, never position (HIG Motion: avoid motion on frequent interactions). */
 .nav-label{transition:opacity var(--motion-fade) ease-out}
 .button,.icon-button,.nav-item,.color-swatch{transition:transform var(--motion-control) var(--spring-control),background-color var(--motion-fade) ease-out,color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
 .button:active,.icon-button:active,.nav-item:active,.color-swatch:active{transform:scale(.97);transition-duration:var(--motion-press);transition-timing-function:ease-out}
-.button:hover:not(:disabled){transform:translateY(-1px)}
-.button:active:hover{transform:translateY(0) scale(.97)}
-.profile-card,.application-card{transition:transform var(--motion-surface) var(--spring-surface),outline-color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
-.profile-card:hover,.application-card:hover{transform:translateY(-3px);border-color:var(--muted)}
-.color-swatch:hover{transform:scale(1.08)}
+.profile-card,.application-card{transition:outline-color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
+.profile-card:hover,.application-card:hover{border-color:var(--muted)}
 .tabs button:active{transform:scale(.97);transition-duration:var(--motion-press)}
+/* Page change (app.js showView): only #main crossfades; the old page fades out faster than the new one rises 8px in.
+   The root takes no snapshot, so the sidebar and top bar stay live and clickable: clicks pass through the snapshots, and the
+   next click starts the next change. Snapshots draw above everything, so the layers floating over the page are captured too
+   (unanimated, on top; a captured element takes no clicks until the change ends), and main's is clipped at its own top edge. */
+:root{view-transition-name:none}
+#main{view-transition-name:main}
+.activity-toggle,.activity-panel,.toast-viewport{view-transition-name:match-element;view-transition-class:chrome}
+::view-transition{pointer-events:none}
+/* No slide from the old scroll position: the old page is offset to where it was, and nothing shows above main's top. */
+::view-transition-group(main){animation:none;clip-path:polygon(0 0,100% 0,100% calc(100% + 100vh),0 calc(100% + 100vh))}
+::view-transition-old(main){translate:0 calc(var(--page-scroll,0px) * -1);animation:page-out var(--motion-exit) var(--ease) both}
+::view-transition-new(main){animation:page-in var(--motion-surface) var(--spring-surface) both}
+::view-transition-group(*.chrome),::view-transition-new(*.chrome){animation:none}
+::view-transition-old(*.chrome){display:none}
 
 /* App tone. An app with profiles has one hue (app.js sets --app-color on .app-tone). It appears only as a solid fill
    with Lampblack ink (the scope's primary button, the app tile), a plain dot, a 1px border (hover, running)
@@ -431,6 +446,8 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 @keyframes dialog-in{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes dialog-out{to{opacity:0;transform:translateY(14px) scale(.96)}}
 @keyframes toast-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes page-out{to{opacity:0}}
+@keyframes page-in{from{opacity:0;transform:translateY(8px)}}
 
 /* Breakpoints, widest first; min-width and reduced-motion blocks last */
 @media(max-width:1200px){
@@ -508,7 +525,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .field-pair{gap:12px}
   .initial-loading{min-height:300px;text-align:center}
   .initial-loading p{font-size:12px}
-  .topbar{height:64px;padding:0 16px;position:sticky;top:0;z-index:30;background:var(--ground)}
+  .topbar{height:64px;padding:0 16px;position:sticky;top:0;z-index:30;background:var(--material-bar);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur)}
   .topbar .button,.topbar .icon-button{min-height:44px}
   .topbar .button{font-size:13px;padding:0 13px}
   .topbar #refresh{width:40px}
@@ -521,6 +538,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
      1px under the tabs, not the border); the right edge fades only while more tabs sit off-screen. */
   .tabs{gap:16px;overflow-x:auto;scrollbar-width:none;padding:6px 6px 7px;margin:-6px;border-bottom:0;background:linear-gradient(var(--border) 0 0) left bottom 6px/100% 1px no-repeat;mask-image:linear-gradient(90deg,black calc(100% - var(--tabs-fade)),transparent);animation:tabs-fade linear both;animation-timeline:scroll(self inline)}
   .tab-indicator{bottom:7px}
+  .tabs+.profile-layout{margin-top:16px}
   .toolbar{margin:16px 0;gap:10px;flex-wrap:nowrap}
   .toolbar .input,.toolbar select{min-height:44px}
   .toolbar select{max-width:116px}
@@ -584,10 +602,22 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 }
 @media(prefers-reduced-motion:reduce){
   *:not(.spinner),*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
-  .button:hover:not(:disabled),.button:active:hover,.icon-button:active,.nav-item:active,.color-swatch:hover,.color-swatch:active,.profile-card:hover,.application-card:hover,.tabs button:active{transform:none}
+  .button:active,.icon-button:active,.nav-item:active,.color-swatch:active,.tabs button:active{transform:none;opacity:.78} /* the press stays visible without movement */
   .toast-viewport:not(:hover)>.toast:nth-child(2),.toast-viewport:not(:hover)>.toast:nth-child(3){transform:none}
   .toast.dismiss{transform:none}
   .spinner{animation:pulse 1.2s ease-in-out infinite} /* busy buttons keep a non-spatial progress cue */
+}
+/* The floating chrome turns solid when blur is unavailable or transparency is reduced. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  :root{--material-bar:var(--ground);--material-panel:var(--surface)}
+}
+@media(prefers-reduced-transparency:reduce){
+  :root{--material-bar:var(--ground);--material-panel:var(--surface);--material-blur:none}
+}
+/* Increased contrast: Muted reaches 7.3:1 or more on every surface (#b4b2aa), and hairlines and edges move up one step. */
+@media(prefers-contrast:more){
+  :root{--muted:#b4b2aa;--border:#4d4c48;--control:#6f6d66;--button-edge:#8d8b84;--field-border:#9a988f;--danger-edge:var(--negative);
+    --material-bar:var(--ground);--material-panel:var(--surface);--material-blur:none}
 }
 /* Forced colours drop box-shadow and non-system colours, so focus and selection get system-colour outlines. */
 @media(forced-colors:active){

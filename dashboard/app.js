@@ -106,10 +106,25 @@
   function animateMotion(element,frames,kind="surface",options={}){
     if(!element||reducedMotion.matches||!element.animate)return null;
     motionAnimations.get(element)?.cancel();
-    const animation=element.animate(frames,{duration:kind==="control"?360:520,easing:motionCurve(kind),fill:"backwards",...options});
+    const animation=element.animate(frames,{duration:kind==="control"?340:480,easing:motionCurve(kind),fill:"backwards",...options});// --motion-control / --motion-surface
     motionAnimations.set(element,animation);
     animation.finished.catch(()=>{}).finally(()=>{if(motionAnimations.get(element)===animation)motionAnimations.delete(element);});
     return animation;
+  }
+  // A shown/hidden layer that enters and leaves on the same path. One animation plays forward to show and in reverse to hide,
+  // so a toggle mid-flight turns around from where the layer is on screen, on the mirrored curve. hidden is set when it ends.
+  const presences=new WeakMap();
+  function present(element,show,frames){
+    let animation=presences.get(element);
+    if(reducedMotion.matches||!element.animate){animation?.cancel();element.hidden=!show;return;}
+    if(animation){if((animation.playbackRate>0)!==show)animation.reverse();return;}
+    if(element.hidden===!show)return;
+    element.hidden=false;
+    animation=element.animate(frames,{duration:340,easing:motionCurve("control"),fill:"both"});
+    if(!show)animation.reverse();
+    presences.set(element,animation);
+    animation.oncancel=()=>presences.delete(element);
+    animation.onfinish=()=>{presences.delete(element);const hide=animation.playbackRate<0;animation.cancel();if(hide)element.hidden=true;};
   }
   function animateWorkspaceChange(){
     if(view==="explore"||reducedMotion.matches)return;
@@ -127,7 +142,7 @@
     });
   }
   const initialRoute=location.hash.slice(1);
-  let state = null, view = [...navigation.map(item=>item[0]),"guide"].includes(initialRoute)?initialRoute:"explore", query = "", appFilter = "", statusFilter = "all", selected = "", mobileDetail = false;
+  let state = null, inventory = null, view = [...navigation.map(item=>item[0]),"guide"].includes(initialRoute)?initialRoute:"explore", query = "", appFilter = "", statusFilter = "all", selected = "", mobileDetail = false;
   let cleanupExperience = null, lastData = "", loadedAt = null, loading = false, busy = false, dialogSubmit = null, lastFocus = null;
   let history = [], guideText = "", importDocument = null, tabPosition=null, tabScroll=0;
   // Activity survives a reload in this tab (sessionStorage); outputs and commands are already redacted by the server.
@@ -138,6 +153,8 @@
   const time = date => new Intl.DateTimeFormat(undefined,{hour:"2-digit",minute:"2-digit"}).format(date);
   const profile = name => state?.profiles.find(item => item.name === name);
   const appName = item => item.app || "Unknown app";
+  // The dashboard shows only these apps (exact names) and their profiles.
+  const AI_APPS = ["Claude","ChatGPT"];
   // Display words for CLI statuses, shared with Explore; the CLI values themselves stay as they are.
   const statusLabels={"running":"Running","in use":"Not running","not running":"Not running","signed out / new":"Not opened yet","app missing":"App missing"};
   const statusLabel=status=>statusLabels[status]||status;
@@ -214,7 +231,11 @@
     const appsKey=JSON.stringify([apps.map(name=>[name,appAccent(name).color]),Boolean(state?.errors?.length),Boolean(state)]);
     // Expanded: an 8px dot in the app's hue. Collapsed rail: the app's initial on its hue, named by the focus tooltip.
     if(appsKey!==navApps){navApps=appsKey;keepFocus(()=>{$("#app-nav").innerHTML=apps.map(name=>{const t=tone(name);return `<button class="nav-item nav-app${t.cls}"${t.style} data-app-filter="${escape(name)}" title="${escape(name)}"><span class="app-mini" aria-hidden="true"><span class="nav-app-dot"></span><span class="nav-app-initial">${escape([...name][0].toUpperCase())}</span></span><span class="nav-label">${escape(name)}</span></button>`;}).join("") || (state?`<p class="small nav-label" style="padding:0 12px">${state.errors?.length?"Inventory unavailable":"No profiles yet"}</p>`:"");});}
-    $$("#sidebar [data-view]").forEach(el=>view===el.dataset.view?el.setAttribute("aria-current","page"):el.removeAttribute("aria-current"));
+    // The highlight (the current item's ::before) slides in from where the old one is on screen, mid-slide included.
+    const was=$("#sidebar [data-view][aria-current]"),now=$(`#sidebar [data-view="${view}"]`),top=el=>el.getBoundingClientRect().top+(parseFloat(getComputedStyle(el,"::before").translate.split(" ")[1])||0);
+    const from=was&&now&&was!==now?top(was)-now.getBoundingClientRect().top:0;
+    $$("#sidebar [data-view]").forEach(el=>el===now?el.setAttribute("aria-current","page"):el.removeAttribute("aria-current"));
+    if(from)animateMotion(now,[{translate:`0 ${from}px`},{translate:"0 0"}],"control",{pseudoElement:"::before"});
     $("#version").textContent=state?.version ? `aidentity ${String(state.version).replace(/^aidentity\s*/,"")}`:"aidentity";
     const viewName=navigation.find(item=>item[0]===view)?.[1] || "Help";
     document.title=`${viewName} · aidentity`;$("#topbar-title").textContent=viewName;
@@ -236,13 +257,19 @@
   // educalvolpz Animated Tabs translated to native tabs with measured sliding indicator.
   // count null: not counted yet, so a muted dash and the tab's title say why.
   function tabs(items,active){return `<div class="tabs" role="tablist" aria-label="Profile status">${items.map(([id,label,count,unknown=""])=>`<button id="status-${id}" role="tab" aria-selected="${active===id}" aria-controls="profile-results" tabindex="${active===id?0:-1}" data-filter="${id}"${count===null&&unknown?` title="${escape(unknown)}"`:""}>${label}${count===null?(unknown?' <span class="tab-count" aria-hidden="true">–</span>':""):` <span class="tab-count">${count}</span>`}</button>`).join("")}<span class="tab-indicator"></span></div>`;}
+  let tabMotion=null;
   function positionTabs(){
     const tab=$('.tabs [aria-selected=true]'),line=$(".tab-indicator");if(!tab||!line)return;
     const scope=`${appFilter}:${query}`,next={left:tab.offsetLeft,width:tab.offsetWidth,scope,id:tab.id},moved=tabPosition?.id!==tab.id;
     const transform=`translateX(${next.left}px) scaleX(${next.width})`;
     line.style.width="1px";line.style.transform=transform;
     if(tabPosition?.scope===scope&&(tabPosition.left!==next.left||tabPosition.width!==next.width)){
-      animateMotion(line,[{transform:`translateX(${tabPosition.left}px) scaleX(${tabPosition.width})`},{transform}],"control");
+      // Start where the line is on screen, also mid-flight (a re-render replaced the element), never from the last target.
+      const running=tabMotion?.animation.playState==="running",p=running?tabMotion.animation.effect.getComputedTiming().progress:null;
+      const from=p===null?tabPosition:{left:tabMotion.from.left+(tabMotion.to.left-tabMotion.from.left)*p,width:tabMotion.from.width+(tabMotion.to.width-tabMotion.from.width)*p};
+      tabMotion?.animation.cancel();
+      const animation=animateMotion(line,[{transform:`translateX(${from.left}px) scaleX(${from.width})`},{transform}],"control");
+      tabMotion=animation&&{animation,from,to:next};
     }
     tabPosition=next;
     // A re-render resets the strip to scrollLeft 0: restore the user's sideways scroll, and reveal the selected tab
@@ -250,16 +277,26 @@
     const strip=tab.parentElement,pad=strip.firstElementChild.offsetLeft;
     strip.scrollLeft=moved?Math.min(tab.offsetLeft-pad,Math.max(tabScroll,tab.offsetLeft+tab.offsetWidth+pad-strip.clientWidth)):tabScroll;
   }
+  // A page change crossfades #main alone (styles.css names it; the sidebar and top bar stay put). A change started mid-flight
+  // skips the running one, which applies its update at once, so the last click wins. Reduced motion and options.instant swap in place.
   function showView(next,options={}){
-    if(cleanupExperience){cleanupExperience();cleanupExperience=null;}
-    if(next!==view)query="";// each view starts unfiltered; its own query survives only while you stay on it
-    view=next;mobileDetail=false;
-    window.history.replaceState(null,"",`#${next}`);
-    if(options.app!==undefined)appFilter=options.app;
-    if(options.profile){selected=options.profile;mobileDetail=true;}
-    renderNav();renderView();// the staggered entrance runs on first load only (refresh)
-    closeNavigation();window.scrollTo({top:0,behavior:"instant"});
-    if(options.focus){const heading=(options.profile&&$("#detail-title",main))||$("h1",main)||main;heading.tabIndex=-1;heading.focus({preventScroll:true});}
+    const update=()=>{
+      if(cleanupExperience){cleanupExperience();cleanupExperience=null;}
+      if(next!==view)query="";// each view starts unfiltered; its own query survives only while you stay on it
+      view=next;mobileDetail=false;
+      window.history.replaceState(null,"",`#${next}`);
+      if(options.app!==undefined)appFilter=options.app;
+      if(options.profile){selected=options.profile;mobileDetail=true;}
+      renderNav();renderView();// the staggered entrance runs on first load only (refresh)
+      closeNavigation();window.scrollTo({top:0,behavior:"instant"});
+      if(options.focus){const heading=(options.profile&&$("#detail-title",main))||$("h1",main)||main;heading.tabIndex=-1;heading.focus({preventScroll:true});}
+    };
+    if(options.instant||reducedMotion.matches)return update();
+    // No API, or the phone drawer is open (its slide is the motion; snapshots would cover it): enter only, never from blank.
+    if(!document.startViewTransition||document.body.classList.contains("mobile-nav-open")){update();animateMotion(main,[{opacity:.5,translate:"0 8px"},{opacity:1,translate:"0 0"}]);return;}
+    // The old page stays where it was on screen while it fades, though the update scrolls to the top.
+    document.documentElement.style.setProperty("--page-scroll",`${window.scrollY}px`);
+    document.startViewTransition(update);
   }
   function renderView(){
     if(!state)return;
@@ -334,7 +371,7 @@
   const emptyState=(heading,text,actions="")=>`<div class="empty-state"><h2>${heading}</h2><p>${text}</p>${actions}</div>`;
   // Search-empty, filter-empty and each status tab get their own words: an empty Running tab is not a failed search.
   function profilesEmpty(scoped){
-    if(!state.profiles.length)return state.errors?.length?setupError():emptyState("No profiles yet","Choose an installed app and name the profile. It keeps its own sign-in, apart from the app’s original account.",button("Create your first profile","add",{primary:true,icon:"plus"}));
+    if(!state.profiles.length)return state.errors?.length?setupError():emptyState("No Claude or ChatGPT profiles yet","Choose an installed app and name the profile. It keeps its own sign-in, apart from the app’s original account.",button("Create your first profile","add",{primary:true,icon:"plus"}));
     if(!scoped.length)return query?emptyState(`No profiles match “${escape(query)}”`,"Check the spelling or clear the search.",button("Clear search","clear-search",{primary:true,icon:"x"})):emptyState("No matching profiles","Try another app.",button("Clear filters","reset-filters",{primary:true,icon:"search"}));
     const all=button("Show all profiles","show-all",{icon:"grid"});
     if(statusFilter==="running")return emptyState("Nothing is running","Open a profile and it shows up here.",all);
@@ -372,15 +409,12 @@
   const profileCount=name=>state.profiles.filter(item=>appName(item)===name).length;
   // Apps with profiles first, then by name: Applications and the Add dialog's select share this order.
   const sortedApps=()=>[...state.apps].sort((a,b)=>(profileCount(b.name)>0)-(profileCount(a.name)>0)||byName(a.name,b.name));
-  // Apps with profiles are cards whose count opens Profiles for that app; the rest fold into one disclosure, open while searching.
-  let appsOtherOpen=false;
+  // Every listed app is a card, apps with profiles first; its count opens Profiles for that app.
   function renderApps(){
     const apps=sortedApps().filter(item=>!query||item.name.toLowerCase().includes(query.toLowerCase()));
-    const used=apps.filter(item=>profileCount(item.name)),other=apps.filter(item=>!profileCount(item.name));
-    const cards=used.map(item=>{const t=tone(item.name),count=plural(profileCount(item.name),"profile");return `<article class="application-card${t.cls}"${t.style}><div class="app-head">${art(item.name)}<div><h2>${escape(item.name)}</h2><button class="link-button app-count" data-app-filter="${escape(item.name)}" aria-label="${escape(`${count} for ${item.name}`)}">${count}</button></div></div>${button("Add profile","add",{icon:"plus",app:item.name,label:`Add profile for ${item.name}`})}</article>`;}).join("");
-    const fold=other.length?`<details class="advanced apps-other"${appsOtherOpen||query||!used.length?" open":""}><summary>${icon("chevron")}<span>Other compatible apps (${other.length})</span></summary><ul class="other-list">${other.map(item=>`<li class="other-row"><span class="other-name">${escape(item.name)}</span>${button("Add profile","add",{small:true,icon:"plus",app:item.name,label:`Add profile for ${item.name}`})}</li>`).join("")}</ul></details>`:"";
-    const empty=!state.apps.length&&state.errors?.length?setupError():state.apps.length?`<div class="empty-state"><h2>No apps match “${escape(query)}”</h2><p>Check the spelling or clear the search to see ${state.apps.length===1?"the 1 app":`all ${state.apps.length} apps`}.</p>${button("Clear search","clear-search",{primary:true,icon:"x"})}</div>`:'<div class="empty-state"><h2>No compatible apps found</h2><p>Install a Chromium or Electron app, then refresh this workspace.</p>'+button("Refresh apps","refresh",{icon:"refresh"})+"</div>";
-    paint(title("Applications",!state.apps.length&&state.errors?.length?"Inventory unavailable.":`${state.apps.length} compatible ${state.apps.length===1?"app":"apps"} found on this Mac.`)+`<div class="toolbar">${searchField("Search installed apps")}</div><div class="apps-body">${apps.length?`${cards?`<div class="apps-grid">${cards}</div>`:""}${fold}`:`<div class="apps-grid">${empty}</div>`}</div>`);
+    const cards=apps.map(item=>{const t=tone(item.name),count=plural(profileCount(item.name),"profile");return `<article class="application-card${t.cls}"${t.style}><div class="app-head">${art(item.name)}<div><h2>${escape(item.name)}</h2><button class="link-button app-count" data-app-filter="${escape(item.name)}" aria-label="${escape(`${count} for ${item.name}`)}">${count}</button></div></div>${button("Add profile","add",{icon:"plus",app:item.name,label:`Add profile for ${item.name}`})}</article>`;}).join("");
+    const empty=!state.apps.length&&state.errors?.length?setupError():state.apps.length?`<div class="empty-state"><h2>No apps match “${escape(query)}”</h2><p>Check the spelling or clear the search to see ${state.apps.length===1?"the 1 app":`all ${state.apps.length} apps`}.</p>${button("Clear search","clear-search",{primary:true,icon:"x"})}</div>`:'<div class="empty-state"><h2>No AI apps found</h2><p>Install Claude or ChatGPT, then refresh this workspace.</p>'+button("Refresh apps","refresh",{icon:"refresh"})+"</div>";
+    paint(title("Applications",!state.apps.length&&state.errors?.length?"Inventory unavailable.":`${state.apps.length} AI ${state.apps.length===1?"app":"apps"} found on this Mac.`)+`<div class="toolbar">${searchField("Search installed apps")}</div><div class="apps-body"><div class="apps-grid">${apps.length?cards:empty}</div></div>`);
   }
   function renderRecovery(){
     const entries=state.restorable||[],unclaimed=state.unclaimed||[];
@@ -413,7 +447,7 @@
   }
   function renderTransfer(){
     main.innerHTML=title("Import & export","Move your profiles to another Mac. Sign-ins and profile data stay on this one.")+
-    `<div class="operation-grid"><section class="operation-card">${icon("download")}<h2>Export</h2><p>Save the names, badges, colors and launch settings of ${plural(state.profiles.length,"profile")} to a file.</p><p class="callout">The file can hold private environment or proxy values. Keep it private.</p><div class="button-row">${button("Export profiles","export",{primary:true,icon:"download"})}</div></section><section class="operation-card">${icon("upload")}<h2>Import</h2><p>Choose an aidentity export file and review it. Each profile is made with the apps installed here.</p><p>Imported profiles start signed out unless their data is already on this Mac.</p><div class="button-row">${button("Import profiles","import",{icon:"upload"})}</div></section></div>`;
+    `<div class="operation-grid"><section class="operation-card">${icon("download")}<h2>Export</h2><p>Save the names, badges, colors and launch settings of ${plural(inventory.profiles.length,"profile")} to a file.</p><p class="callout">The file can hold private environment or proxy values. Keep it private.</p><div class="button-row">${button("Export profiles","export",{primary:true,icon:"download"})}</div></section><section class="operation-card">${icon("upload")}<h2>Import</h2><p>Choose an aidentity export file and review it. Each profile is made with the apps installed here.</p><p>Imported profiles start signed out unless their data is already on this Mac.</p><div class="button-row">${button("Import profiles","import",{icon:"upload"})}</div></section></div>`;
   }
   const terms=[["Profile","An app opened with its own sign-in and data. You add, open and remove profiles."],["Launcher","The small app aidentity makes to open a profile."],["Original account","The app’s own account, opened through aidentity."],["Doctor","Checks your setup and every profile for problems."],["Unclaimed data","Profile data that no launcher uses. Clearing it moves it to the Trash."],["Restore","Makes a removed profile’s launcher again from its kept data."]];
   function renderGuide(){
@@ -429,8 +463,11 @@
       const data=await response.json();
       if(!response.ok||!data.ok)throw Object.assign(new Error(data.error||"Could not read the workspace."),{server:true});
       const firstLoad=!state;
-      registerAppAccents(data);
-      state=data;loadedAt=new Date();$("#freshness").textContent=`Updated ${time(loadedAt)}`;
+      // inventory keeps every entry for counts of CLI-wide actions and the import preview; recovery lists stay whole in state too.
+      inventory=data;
+      state={...data,apps:data.apps.filter(item=>AI_APPS.includes(item.name)),profiles:data.profiles.filter(item=>AI_APPS.includes(appName(item)))};
+      registerAppAccents(state);
+      loadedAt=new Date();$("#freshness").textContent=`Updated ${time(loadedAt)}`;
       setOffline(false);
       const current=JSON.stringify({version:data.version,profiles:data.profiles,apps:data.apps,restorable:data.restorable,unclaimed:data.unclaimed,errors:data.errors});
       changed=current!==lastData;
@@ -488,7 +525,7 @@
       if(!quiet){toast(busy?"Still working":"Disconnected",error.message,busy?"info":true);error.reported=true;}
       throw error;
     }
-    const before=state,from=focusOrigin(element);let note=null,entry=null;
+    const before=state,beforeAll=inventory,from=focusOrigin(element);let note=null,entry=null;
     busy=name;setBusy(element,true);syncControls();
     $("#activity-toggle").hidden=false;$("#activity-summary").textContent=name==="update"&&params.check?"Checking for updates…":doing[name]||"Working…";
     try{
@@ -505,7 +542,7 @@
       if(name==="rebuild"){if(params.all)doctorFlags.clear();else doctorFlags.delete(params.name);saveDoctor();}
       if(name!=="add")note=describe(name,params,result,before);
       await refresh({force:true});
-      if(name==="add"){result.created=state.profiles.find(item=>!before.profiles.some(old=>old.name===item.name))?.name||`${params.app} ${params.profile}`;note=describe(name,params,result,before);}
+      if(name==="add"){result.created=inventory.profiles.find(item=>!beforeAll.profiles.some(old=>old.name===item.name))?.name||`${params.app} ${params.profile}`;note=describe(name,params,result,before);}
       entry.title=note.title;renderActivity();
       if(!quiet)toast(note.title,note.text,note.kind,note.extra);
       return result;
@@ -520,7 +557,8 @@
   // Plain-words toast for a finished action. Runs before the post-action refresh (add after it, to learn the new name).
   function describe(name,params,result,before){
     const who=params.name||"",was=before?.profiles.find(item=>item.name===who);
-    if(name==="add")return {title:`${result.created} is ready`,text:"Find it in Profiles, or open it now.",extra:{label:"Open it",run:()=>action("open",{name:result.created})}};
+    // A profile added by path for another app is created but hidden; say so only when the fresh full list has it.
+    if(name==="add")return {title:`${result.created} is ready`,text:!profile(result.created)&&inventory.profiles.some(item=>item.name===result.created)?"The dashboard lists only Claude and ChatGPT, so it is not shown here. Open it now.":"Find it in Profiles, or open it now.",extra:{label:"Open it",run:()=>action("open",{name:result.created})}};
     if(name==="open"){
       if(was?.status==="running")return {title:`Brought ${who} to the front`};
       const key=`aidentity.signin-hint.${who}`,first=was?.status==="signed out / new"&&!stored.get(key);
@@ -530,7 +568,7 @@
     if(name==="quit")return {title:`Closed ${who}`};
     if(name==="remove")return {title:`${who} removed`,text:params.purge?"Its profile data is in the Trash.":"Its profile data stays on this Mac.",extra:params.purge||was?.main?null:{label:"Restore",run:()=>action("restore",{name:who})}};
     if(name==="restore")return params.all?{title:`Restored ${plural(before.restorable?.length||0,"profile")}`,text:"Each one opens with its existing data."}:{title:`${who} restored`,text:"It opens with its existing data."};
-    if(name==="rebuild")return params.all?{title:`Rebuilt ${plural(before.profiles.length,"launcher")}`,text:"Profile data was not touched."}:{title:`${who} rebuilt`,text:"Its profile data was not touched."};
+    if(name==="rebuild")return params.all?{title:`Rebuilt ${plural(inventory.profiles.length,"launcher")}`,text:"Profile data was not touched."}:{title:`${who} rebuilt`,text:"Its profile data was not touched."};
     if(name==="rename")return {title:`Renamed ${who}`,text:`It is now ${appName(was||{})} ${params.new_name}.`};
     if(name==="set")return {title:`${who} settings saved`};
     if(name==="prune")return {title:"Unclaimed data cleared",text:lastLine(result.stdout)};
@@ -667,7 +705,7 @@
       if(hexValue(data.get("color")))params.color=hexValue(data.get("color"));
       return ["add",params];
     };
-    showDialog("Create a profile","Each profile opens the app with its own sign-in and data.",`<div class="preview-row"><div class="preview-identity" id="identity-preview"></div></div><div class="fields"><div class="field"><label for="field-app">Application</label><select name="app" id="field-app" required>${options||'<option value="">No compatible apps found</option>'}</select></div>${field("Profile name","profile","","For example, Work, Personal, or Client.","text",'required maxlength="40"')}${check("main","Use the original account","Opens the app’s own account through aidentity instead of a new, separate one.")}${disclosure("Appearance",identityFields(null,badgeDefault(chosen)))}${disclosure("App location & launch settings",`${field("Application path (optional)","app_path","","Use a full .app path for an application outside discovery.","text",'placeholder="/Applications/Example.app"')}<div id="seed-option">${check("seed","Copy Claude’s MCP configuration","Copies the existing Claude Desktop configuration into the new profile.")}</div>${area("Launch arguments","args","One allowed switch per line, for example --lang=de.")}${area("Environment variables","env","One allowed NAME=value per line. Values are never displayed in this dashboard.")}${check("own_extensions","Use a separate extensions folder","For VS Code-style applications.")}`)}</div>`,"Create profile",async(data,el)=>{
+    showDialog("Create a profile","Each profile opens the app with its own sign-in and data.",`<div class="preview-row"><div class="preview-identity" id="identity-preview"></div></div><div class="fields"><div class="field"><label for="field-app">Application</label><select name="app" id="field-app" required>${options||'<option value="">No AI apps found</option>'}</select></div>${field("Profile name","profile","","For example, Work, Personal, or Client.","text",'required maxlength="40"')}${check("main","Use the original account","Opens the app’s own account through aidentity instead of a new, separate one.")}${disclosure("Appearance",identityFields(null,badgeDefault(chosen)))}${disclosure("App location & launch settings",`${field("Application path (optional)","app_path","","Use a full .app path for an application outside discovery.","text",'placeholder="/Applications/Example.app"')}<div id="seed-option">${check("seed","Copy Claude’s MCP configuration","Copies the existing Claude Desktop configuration into the new profile.")}</div>${area("Launch arguments","args","One allowed switch per line, for example --lang=de.")}${area("Environment variables","env","One allowed NAME=value per line. Values are never displayed in this dashboard.")}${check("own_extensions","Use a separate extensions folder","For VS Code-style applications.")}`)}</div>`,"Create profile",async(data,el)=>{
       const result=await action(...build(data),el);
       stored.set("aidentity.last-app",data.get("app"));
       revealProfile(result.created);
@@ -679,7 +717,7 @@
   // After Add: Profiles, the new card selected, scrolled into view, one gentle ring, and focus on its name once the dialog closes.
   function revealProfile(name){
     query="";statusFilter="all";selected=name||"";if(name)stored.set("aidentity.last-profile",name);
-    showView("profiles",{app:""});
+    showView("profiles",{app:"",instant:true});// the card is looked up right after, so the page swaps now
     const target=$$(".profile-name",main).find(el=>el.dataset.name===name);if(!target)return;
     const cardNode=target.closest(".profile-card");
     cardNode.scrollIntoView({block:"center",behavior:reducedMotion.matches?"instant":"smooth"});
@@ -780,7 +818,7 @@
         const data=JSON.parse(await file.text());if(data.aidentity_export!==1||!Array.isArray(data.launchers))throw new Error("Choose a format 1 aidentity export file.");
         importDocument=data;$("#import-preview").hidden=false;
         // An estimate from the dashboard's own lists: the CLI matches apps by bundle ID and checks again when it runs.
-        const owned=new Set(state.profiles.map(item=>item.name)),apps=new Set(state.apps.map(item=>item.name));
+        const owned=new Set(inventory.profiles.map(item=>item.name)),apps=new Set(inventory.apps.map(item=>item.name));
         const fates={create:"will create",exists:"already exists (skipped)",missing:"app not installed (skipped)"};
         const rows=data.launchers.map(item=>{const name=String(item?.name||[item?.app,item?.profile].filter(Boolean).join(" ")||"Unnamed profile");return {name,fate:owned.has(name)?"exists":(item?.app?!apps.has(item.app):!item?.bundle_id)?"missing":"create"};});
         const count=fate=>rows.filter(row=>row.fate===fate).length,create=count("create");
@@ -814,7 +852,7 @@
     if(name==="workspace")return showView("profiles",{app:"",focus:true});
     if(name==="refresh")return refresh({notify:true,force:true});
     if(name==="add")return addDialog(el.dataset.app);
-    if(name==="select"){selected=el.dataset.name;stored.set(LAST_PROFILE,selected);mobileDetail=true;renderNav();renderProfiles();positionTabs();animateMotion($(".detail-panel"),[{opacity:0,translate:"8px 0"},{opacity:1,translate:"0 0"}]);if(mobile.matches)window.scrollTo({top:0,behavior:"instant"});$("#detail-title")?.focus();return;}
+    if(name==="select"){selected=el.dataset.name;stored.set(LAST_PROFILE,selected);mobileDetail=true;renderNav();renderProfiles();positionTabs();animateMotion($(".detail-panel"),[{opacity:0},{opacity:1}],"surface",{duration:140,easing:"ease-out"});if(mobile.matches)window.scrollTo({top:0,behavior:"instant"});$("#detail-title")?.focus();return;}
     if(name==="close-detail"||name==="back-profiles"){const was=selected;selected="";stored.set(LAST_PROFILE,"");mobileDetail=false;renderNav();renderProfiles();positionTabs();$$(".profile-name",main).find(el=>el.dataset.name===was)?.focus();return;}
     if(name==="clear-search"){query="";renderView();$("#workspace-search")?.focus();return;}
     if(name==="all-apps"){appFilter="";renderView();return;}
@@ -831,7 +869,7 @@
     if(name==="remove"&&item)return removeDialog(item);
     if(name==="open"||name==="quit"||name==="restore"||name==="rebuild")return action(name,{name:el.dataset.name},el);
     if(name==="restore-all")return confirmAction("Restore all launchers?","Reconnect every restorable profile.",`${plural(state.restorable.length,"recorded profile")} will get new launchers using their existing profile data.`,"Restore all","restore",{all:true},false,targetList(state.restorable.map(entry=>entry.name)));
-    if(name==="rebuild-all")return confirmAction("Rebuild all launchers?","Refresh launcher bundles for every profile.",`${plural(state.profiles.length,"launcher")} will be rebuilt. Each profile keeps its data.`,"Rebuild all","rebuild",{all:true});
+    if(name==="rebuild-all")return confirmAction("Rebuild all launchers?","Refresh launcher bundles for every profile.",`${plural(inventory.profiles.length,"launcher")} will be rebuilt. Each profile keeps its data.`,"Rebuild all","rebuild",{all:true});
     if(name==="prune"){
       const names=(state.unclaimed||[]).map(entry=>entry.name);
       return confirmAction("Clear unclaimed data?","Unclaimed data is profile data that no launcher uses. Clearing moves it to the Trash.",`${plural(names.length,"profile folder")} will move to the Trash. Restore the ones you want to keep first.`,"Clear unclaimed data","prune",{confirmed:true},true,targetList(names));
@@ -872,8 +910,8 @@
   }
   function toggleNavigation(){
     if(!matchMedia("(max-width:767px)").matches){
-      const oldLeft=main.getBoundingClientRect().left;
-      document.body.classList.toggle("sidebar-collapsed");const label=document.body.classList.contains("sidebar-collapsed")?"Expand sidebar":"Collapse sidebar";$("#collapse-nav").setAttribute("aria-label",label);$("#collapse-nav").title=label;
+      const oldLeft=main.getBoundingClientRect().left;// on screen, including a slide still in flight
+      document.body.classList.toggle("sidebar-collapsed");[main,$(".topbar")].forEach(element=>motionAnimations.get(element)?.cancel());const label=document.body.classList.contains("sidebar-collapsed")?"Expand sidebar":"Collapse sidebar";$("#collapse-nav").setAttribute("aria-label",label);$("#collapse-nav").title=label;
       const delta=oldLeft-main.getBoundingClientRect().left;
       [main,$(".topbar")].forEach(element=>animateMotion(element,[{translate:`${delta}px 0`},{translate:"0 0"}]));
       if(!document.body.classList.contains("sidebar-collapsed"))$$(".nav-label",$("#sidebar")).forEach((element,index)=>animateMotion(element,[{opacity:0,translate:"-5px 0"},{opacity:1,translate:"0 0"}],"control",{delay:Math.min(index,5)*12}));
@@ -884,10 +922,11 @@
     document.body.classList.add("mobile-nav-open");$(".main-shell").inert=true;$("#nav-scrim").hidden=false;$("#mobile-nav").setAttribute("aria-expanded","true");$("#sidebar").inert=false;$(".brand").focus();
     animateMotion($("#nav-scrim"),[{opacity:0},{opacity:1}],"control",{duration:180,easing:"ease-out"});
   }
+  // aria-expanded is the panel's state: while it animates out it is still shown, but already closed.
   function showActivity(open){
-    const panel=$("#activity-panel");if(panel.hidden===!open)return;
-    panel.hidden=!open;$("#activity-toggle").setAttribute("aria-expanded",String(open));
-    if(open)animateMotion(panel,[{opacity:0,translate:"0 10px"},{opacity:1,translate:"0 0"}]);
+    const toggle=$("#activity-toggle");if((toggle.getAttribute("aria-expanded")==="true")===open)return;
+    toggle.setAttribute("aria-expanded",String(open));
+    present($("#activity-panel"),open,[{opacity:0,translate:"0 10px"},{opacity:1,translate:"0 0"}]);
   }
   document.addEventListener("click",event=>{
     if(event.target.closest("#experience-root"))return;
@@ -906,9 +945,8 @@
     if(event.target.id!=="workspace-search")return;query=event.target.value;keepFocus(renderView);
   });
   document.addEventListener("change",event=>{if(event.target.id==="app-filter"){appFilter=event.target.value;keepFocus(renderView);}});
-  // Disclosures keep their state across re-renders: Applications' other apps, and the selected profile's Details (Rebuild launcher lives there).
+  // The selected profile's Details disclosure keeps its state across re-renders (Rebuild launcher lives there).
   document.addEventListener("toggle",event=>{
-    if(event.target.matches?.(".apps-other")&&!query)appsOtherOpen=event.target.open;
     if(event.target.matches?.(".detail-more"))detailMore=event.target.open?selected:"";
   },true);
   document.addEventListener("keydown",event=>{
@@ -937,7 +975,7 @@
   $("#collapse-nav").onclick=toggleNavigation;
   $("#nav-scrim").onclick=$("#nav-close").onclick=()=>{closeNavigation();$("#mobile-nav").focus();};
   wide.addEventListener("change",()=>{if(view==="profiles"&&state)keepFocus(renderProfiles);});
-  $("#activity-toggle").onclick=()=>showActivity($("#activity-panel").hidden);
+  $("#activity-toggle").onclick=()=>showActivity($("#activity-toggle").getAttribute("aria-expanded")!=="true");
   $("#activity-close").onclick=()=>showActivity(false);
   reducedMotion.addEventListener("change",()=>{
     if(reducedMotion.matches)document.getAnimations().forEach(animation=>{

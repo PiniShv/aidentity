@@ -486,12 +486,12 @@ aidentity dashboard
 ```
 
 Opens the visual account manager in your default browser at `127.0.0.1`, using
-an available port. It shows your existing profiles and installed compatible
+an available port. It shows only Claude and ChatGPT and your profiles for those
 apps. Explore shows one app at a time with its profiles. The list beside it
-has one row per app that has profiles; choose a row, or use the arrows and the
-app picker, to switch apps. Each profile has Open there, or Bring to front when
-it is running. Apps with no profiles sit under Other compatible apps, each with
-Add profile. The page never moves when you switch apps. Reduced motion swaps
+has one row per app, apps with profiles first; choose a row, or use the arrows
+and the app picker, to switch apps. Each profile has Open there, or Bring to
+front when it is running. An app with no profiles yet shows Add profile in its
+panel. The page never moves when you switch apps. Reduced motion swaps
 the app without the short fade.
 
 The workspace can create, open, quit, rename and customize profiles, including

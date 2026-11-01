@@ -296,13 +296,13 @@
       },
       {
         "name": "spring-control",
-        "value": "linear() curve, peaks 1.058 at 52.5%; cubic-bezier(.16,1,.3,1) fallback",
-        "purpose": "Buttons, tabs and small controls."
+        "value": "linear() sampled from a critically damped spring (damping 1.0, no overshoot); cubic-bezier(.16,1,.3,1) fallback",
+        "purpose": "Buttons, tabs and small controls; at 340ms a 0.25s response."
       },
       {
         "name": "spring-surface",
-        "value": "linear() curve, peaks 1.060 at 42.5%; cubic-bezier(.16,1,.3,1) fallback",
-        "purpose": "Cards, dialogs and panels."
+        "value": "the same critically damped linear() shape; cubic-bezier(.16,1,.3,1) fallback",
+        "purpose": "Dialogs, toasts, panels and the phone drawer; at 480ms a 0.35s response."
       },
       {
         "name": "motion-press",
@@ -311,12 +311,12 @@
       },
       {
         "name": "motion-control",
-        "value": "360ms",
+        "value": "340ms",
         "purpose": "Control springs."
       },
       {
         "name": "motion-surface",
-        "value": "520ms",
+        "value": "480ms",
         "purpose": "Surface springs."
       },
       {
@@ -459,7 +459,7 @@
   ],
   "narrative": {
     "northStar": "The Keyring",
-    "overview": "The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: an app that has profiles gets one color from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Apart from status, nothing else on screen is colored. There is no second hue, no gradient in a hue and no glow.\n\nDensity is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.\n\nMotion is soft and springy. Controls press to 0.97 and spring back, cards rise 3px under the pointer, and desktop dialogs scale in from 0.96 and settle with a small overshoot. With reduced motion on, the springs and the short Explore crossfade become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.",
+    "overview": "The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: an app that has profiles gets one color from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Apart from status, nothing else on screen is colored. There is no second hue, no gradient in a hue and no glow.\n\nDensity is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.\n\nMotion is brief and springy, and it never overshoots: every surface opens on a click, not a flick, so every spring is critically damped. Controls press to 0.97 on pointer-down and spring back, dialogs rise and scale in from 0.96, and panels leave the way they came. Hover moves nothing; it changes fill and border. With reduced motion on, the springs and the short Explore crossfade become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.",
     "keyCharacteristics": [
       "Warm black ground, warm off-white text, graphite steps in between.",
       "One flat hue per app with profiles, assigned once and kept for that app everywhere; apps without profiles stay neutral.",
