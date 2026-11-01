@@ -267,7 +267,7 @@ A section color appears in four places only: its sidebar tile, its current-page 
 - **Negative** (`negative`): errors and destructive buttons, on `negative-bg`.
 - **Danger edge** (`danger-edge`): the 1px edge of a destructive button at rest, at least 2.2:1 on the same surfaces as the Button edge.
 - **Warning** (`warning`, Amber): the icon and level of a warning finding, the warning toast icon, the alert icon that leads every callout and danger callout, and the Needs repair count while it is above zero. Callouts use `warning-bg` with Bone text. Amber clears 9.3:1 on every surface it sits on.
-- The Running tab count turns Mint while it is above zero; a finding marked ok has a Mint check.
+- The Running tab count turns Mint while it is above zero; a finding marked ok has a Mint check. In the Workspace health summary, the OK, warning and error numbers take Mint, Amber and Negative while above zero; their words stay Muted.
 
 ### Increased contrast
 Under `prefers-contrast: more`, Muted becomes #b4b2aa (7.3:1 on Warning bg, 8.7:1 on Raised, 9.5:1 on Lampblack), Border takes the Button edge, Control the Field border, the Button edge becomes Muted, the Field border #9a988f, the Danger edge Negative, and every material turns solid. Hues and Bone stay as they are.
@@ -442,6 +442,6 @@ When a poll or action can't reach the dashboard server, a banner says "The dashb
 - **Don't** recolor the header Add button; it is always Bone.
 - **Don't** color anything that is not an app's identity, a section tile or a status.
 - **Don't** use a section color as text, a border, a card fill or a gradient, and don't put Lampblack ink on a section tile.
-- **Don't** write hex values outside `:root`; use the tokens. The one exception is the `dialog::backdrop` scrim, which mirrors `--scrim` because older browsers don't pass custom properties to `::backdrop`.
+- **Don't** write hex values outside `:root`; use the tokens. The two exceptions are the `dialog::backdrop` scrim, which mirrors `--scrim` because older browsers don't pass custom properties to `::backdrop`, and the favicon in `index.html`, the sidebar's brand mark in Mint on a Lampblack rounded square, because a favicon cannot read CSS variables.
 - **Don't** load webfonts or any other remote asset.
 - **Don't** show a secret anywhere, including a command line; masked values read `•••`.
