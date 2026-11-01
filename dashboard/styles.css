@@ -10,10 +10,13 @@
   --danger-edge:#8a2f26; /* danger button edge: at least 2.2:1 on the same surfaces */
   --card-top:#0f0f0f; --card-bottom:#090909; --card:linear-gradient(180deg,var(--card-top),var(--card-bottom));
   --text:#f3f2ee; --muted:#8d8b84;
-  --accent:#5fe08a; --positive:#5fe08a; --negative:#ff6b5b;
+  --accent:#5fe08a; --positive:#5fe08a; --negative:#ff6b5b; --warning:#f7c15f;
   --badbg:#2a1210; --warnbg:#2a2412;
   --hue-mint:#5fe08a; --hue-periwinkle:#7c8cff; --hue-teal:#2fd4c0; --hue-orange:#ff8a3d;
   --hue-pink:#ff6fb5; --hue-gold:#ffd166; --hue-sky:#4cc3ff; --hue-violet:#b26bff;
+  /* Section tiles: deep fills with Bone glyphs (at least 4.6:1); each section owns one; --tile-danger marks destructive operations. */
+  --tile-explore:#5a56c7; --tile-profiles:#9c3b96; --tile-apps:#116bb5; --tile-recovery:#047879;
+  --tile-maintenance:#aa5212; --tile-transfer:#137d41; --tile-help:#566577; --tile-danger:#b63132;
   --app-ink:var(--ground); /* --app-color is set only on an app-toned element (app.js); everything else stays neutral */
   --scrim:#0009; --ring-accent:#5fe08a26;
   --shadow-dialog:0 24px 70px #0008; --shadow-toast:0 10px 30px #0005;
@@ -65,6 +68,13 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
 .skip-link{position:fixed;left:20px;top:-70px;z-index:100;background:var(--text);color:var(--ground);padding:12px}
 .skip-link:focus{top:10px}
 
+/* Section tiles */
+.section-explore{--section:var(--tile-explore)} .section-profiles{--section:var(--tile-profiles)} .section-apps{--section:var(--tile-apps)}
+.section-recovery{--section:var(--tile-recovery)} .section-maintenance{--section:var(--tile-maintenance)} .section-transfer{--section:var(--tile-transfer)}
+.section-guide{--section:var(--tile-help)} .section-danger{--section:var(--tile-danger)}
+.tile{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;background:var(--section,var(--tile-help));color:var(--text)}
+.tile .icon{width:20px;height:20px}
+
 /* Shell and sidebar (starc007 animated sidebar). Desktop shell is 216px + a fluid canvas; workspace gutters are 32px.
    The sidebar scrolls on short viewports; the app list keeps min(content, 40dvh) and pads 8px so focus rings stay unclipped. */
 .app-shell{display:flex;min-height:100vh}
@@ -82,8 +92,10 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
 .nav-item:hover{color:var(--text);background:var(--surface)}
 /* The current item's fill is a ::before that app.js slides from the item it left. Lighten keeps every label above it in flight. */
 .nav-item[aria-current=page]{color:var(--text);background:transparent}
-.nav-item[aria-current=page]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--raised);mix-blend-mode:lighten}
+.nav-item[aria-current=page]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:color-mix(in srgb,var(--section) 28%,var(--raised));mix-blend-mode:lighten}
 .nav-item>.nav-label{overflow:hidden;text-overflow:ellipsis}
+.nav-item .tile{width:24px;height:24px;border-radius:7px}
+.nav-item .tile .icon{width:15px;height:15px}
 .nav-apps{flex:none;max-height:40dvh;margin:28px -8px 0;padding:0 8px 6px;overflow-y:auto}
 .nav-group-title{padding:0 12px 10px;font-size:12px;color:var(--muted)}
 /* Collapsed rail: a keyboard-focused item's name, beside the rail in the top layer (app.js positions it). */
@@ -149,6 +161,8 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
 
 /* Page header */
 .title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px}
+.title-main{display:flex;gap:14px;align-items:flex-start;min-width:0}
+.title-main>.tile{margin-top:-1px} /* centres the tile on the h1's capitals */
 .title-row p{margin-top:9px;color:var(--muted);font-size:13px;max-width:640px}
 .title-row p.title-hint{margin-top:4px;font-size:12px}
 .title-actions{display:flex;gap:8px;align-items:center}
@@ -173,6 +187,8 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .tabs button[aria-selected=true]{color:var(--text)}
 .tab-indicator{position:absolute;left:0;bottom:0;height:2px;background:var(--text);width:0;pointer-events:none;transform-origin:left center;transition:none}
 .tabs .tab-count{color:var(--muted);padding-left:2px;font-variant-numeric:tabular-nums}
+.tab-count.positive{color:var(--positive)}
+.tab-count.warning{color:var(--warning)}
 /* Without a toolbar the grid follows the tabs directly: keep the toolbar's 20px so a card's outline never meets the tab line. */
 .tabs+.profile-layout{margin-top:20px}
 
@@ -250,12 +266,15 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .panel-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}
 .operation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .operation-card{border-radius:16px;padding:24px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;border:1px solid var(--border);background:var(--card)}
-.operation-card>.icon{margin-bottom:6px;color:var(--muted)}
+.operation-card>.tile{margin-bottom:6px}
+.panel>.tile{margin-bottom:14px}
 .operation-card p{font-size:13px;color:var(--muted);max-width:440px}
 .operation-card .button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px}
 .operation-card.wide{grid-column:1/-1}
 .callout{padding:12px 14px;border-radius:8px;background:var(--warnbg);color:var(--text);font-size:13px;line-height:1.55}
 .operation-card p.callout{color:var(--text)}
+.callout,.danger-callout{display:flex;gap:10px;align-items:flex-start}
+.callout>.icon,.danger-callout>.icon{flex:none;width:16px;height:16px;margin-top:2px;color:var(--warning)}
 
 /* Views: recovery, maintenance, guide, notices, loading */
 .recovery-list{display:flex;flex-direction:column;gap:0}
@@ -273,6 +292,8 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .health-findings .icon{width:16px;height:16px;margin-top:1px}
 .health-findings li[data-level=warn],.health-findings li[data-level=error]{color:var(--text)}
 .health-findings li[data-level=error]>.icon,.health-findings li[data-level=error]>.finding-level{color:var(--negative)}
+.health-findings li[data-level=warn]>.icon,.health-findings li[data-level=warn]>.finding-level{color:var(--warning)}
+.health-findings li[data-level=ok]>.icon{color:var(--positive)}
 .health-findings strong,.finding-level{font-weight:500}
 .health-result .output{max-height:220px;padding:12px;background:var(--ground)}
 .operation-card .health-next,.operation-card .health-hint{font-size:12px}
@@ -377,7 +398,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .toast{position:relative;display:flex;align-items:flex-start;gap:11px;padding:15px;border:1px solid var(--control);border-radius:12px;box-shadow:var(--shadow-toast);pointer-events:auto;animation:toast-in var(--motion-surface) var(--spring-surface);transition:transform var(--motion-surface) var(--spring-surface),opacity var(--motion-fade) ease-out;background:var(--tip);border-color:var(--control)}
 .toast>.icon{color:var(--positive);width:17px;margin-top:1px}
 .toast.error>.icon{color:var(--negative)}
-.toast.warn>.icon{color:var(--text)}
+.toast.warn>.icon{color:var(--warning)}
 .toast.info>.icon{color:var(--muted)}
 .toast strong{display:block;font-weight:500;font-size:13px}
 .toast p{color:var(--muted);margin-top:5px;font-size:12px}
@@ -533,6 +554,8 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   #main{padding:24px 18px}
   #main *{scroll-margin-top:72px}
   .title-row h1{font-size:24px}
+  .title-main>.tile{width:32px;height:32px;border-radius:9px}
+  .title-main>.tile .icon{width:18px;height:18px}
   .title-row p{margin-top:8px}
   /* Scroller padded 6px for focus rings (a scroller clips at its padding box, so the strip line is a background
      1px under the tabs, not the border); the right edge fades only while more tabs sit off-screen. */
@@ -624,6 +647,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .input:focus,textarea:focus,select:focus{outline:2px solid Highlight}
   .tab-indicator{background:Highlight}
   .nav-item[aria-current=page],.profile-card.selected{outline:2px solid Highlight}
+  .tile{border:1px solid CanvasText}
 }
 /* Forced colours drop the gradient strip line on the mobile tab scroller; a border below the ring padding replaces it. */
 @media(forced-colors:active) and (max-width:767px){
