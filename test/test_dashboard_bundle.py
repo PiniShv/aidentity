@@ -58,7 +58,7 @@ class InstalledDashboardTests(unittest.TestCase):
                 for path, marker in (
                     ("/", b"aidentity"), ("/app.js", b"api/state"),
                     ("/styles.css", b"{"), ("/experience.js", b"AidentityExperience"),
-                    ("/experience.css", b"xp-wheel"),
+                    ("/experience.css", b"xp-keys"),
                 ):
                     with urlopen(address + path, timeout=10) as response:
                         self.assertEqual(response.status, 200)

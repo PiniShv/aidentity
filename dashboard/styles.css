@@ -6,14 +6,16 @@
 :root {
   --ground:#060606; --surface:#0c0c0c; --raised:#141413; --active:#1f1f1d;
   --border:#1c1c1b; --control:#262624; --field-border:#6f6d66; --tip:#050505;
+  --button-edge:#4d4c48; /* outlined button edge: at least 2.1:1 on ground, surface, card and raised */
+  --danger-edge:#8a2f26; /* danger button edge: at least 2.2:1 on the same surfaces */
   --card-top:#0f0f0f; --card-bottom:#090909; --card:linear-gradient(180deg,var(--card-top),var(--card-bottom));
   --text:#f3f2ee; --muted:#8d8b84;
   --accent:#5fe08a; --positive:#5fe08a; --negative:#ff6b5b;
   --badbg:#2a1210; --warnbg:#2a2412;
   --hue-mint:#5fe08a; --hue-periwinkle:#7c8cff; --hue-teal:#2fd4c0; --hue-orange:#ff8a3d;
   --hue-pink:#ff6fb5; --hue-gold:#ffd166; --hue-sky:#4cc3ff; --hue-violet:#b26bff;
-  --app-color:var(--hue-periwinkle); --app-color-secondary:var(--hue-teal); --app-ink:var(--ground);
-  --scrim:#0009; --ring-accent:#5fe08a1a;
+  --app-ink:var(--ground); /* --app-color is set only on an app-toned element (app.js); everything else stays neutral */
+  --scrim:#0009; --ring-accent:#5fe08a26;
   --shadow-dialog:0 24px 70px #0008; --shadow-toast:0 10px 30px #0005;
   /* Motion: Apple HIG-inspired springs; the parameters are aidentity choices, not platform timings. */
   --ease:cubic-bezier(.2,0,0,1);
@@ -30,6 +32,7 @@
   :root{--spring-control:linear(0.00000 0%, 0.01848 2.5%, 0.06731 5%, 0.13758 7.5%, 0.22173 10%, 0.31349 12.5%, 0.40783 15%, 0.50079 17.5%, 0.58942 20%, 0.67160 22.5%, 0.74595 25%, 0.81169 27.5%, 0.86854 30%, 0.91659 32.5%, 0.95621 35%, 0.98802 37.5%, 1.01272 40%, 1.03112 42.5%, 1.04407 45%, 1.05240 47.5%, 1.05690 50%, 1.05832 52.5%, 1.05735 55%, 1.05458 57.5%, 1.05053 60%, 1.04565 62.5%, 1.04031 65%, 1.03481 67.5%, 1.02938 70%, 1.02420 72.5%, 1.01938 75%, 1.01502 77.5%, 1.01116 80%, 1.00782 82.5%, 1.00499 85%, 1.00266 87.5%, 1.00078 90%, 0.99932 92.5%, 0.99823 95%, 0.99746 97.5%, 1.00000 100%);--spring-surface:linear(0.00000 0%, 0.02863 2.5%, 0.10170 5%, 0.20250 7.5%, 0.31762 10%, 0.43671 12.5%, 0.55217 15%, 0.65879 17.5%, 0.75333 20%, 0.83412 22.5%, 0.90074 25%, 0.95362 27.5%, 0.99386 30%, 1.02288 32.5%, 1.04235 35%, 1.05393 37.5%, 1.05927 40%, 1.05986 42.5%, 1.05704 45%, 1.05194 47.5%, 1.04549 50%, 1.03842 52.5%, 1.03129 55%, 1.02452 57.5%, 1.01835 60%, 1.01296 62.5%, 1.00842 65%, 1.00472 67.5%, 1.00183 70%, 0.99966 72.5%, 0.99814 75%, 0.99715 77.5%, 0.99660 80%, 0.99640 82.5%, 0.99644 85%, 0.99667 87.5%, 0.99701 90%, 0.99742 92.5%, 0.99785 95%, 0.99827 97.5%, 1.00000 100%)}
 }
 @property --tabs-fade{syntax:"<length>";inherits:false;initial-value:0px}
+@property --detail-fade{syntax:"<length>";inherits:false;initial-value:0px}
 
 /* Base */
 *{box-sizing:border-box}
@@ -46,13 +49,15 @@ h1{font-size:28px;line-height:1.2;letter-spacing:-.035em;font-weight:600}
 h2{font-size:17px;line-height:1.35;letter-spacing:-.015em;font-weight:550}
 h3{font-size:17px;font-weight:550}
 p{line-height:1.55;text-wrap:pretty}
+dd{text-wrap:pretty}
 svg{display:block;flex:none}
 .icon{width:18px;height:18px;stroke-width:1.7}
 :focus-visible{outline:2px solid var(--accent);outline-offset:4px}
-h1[tabindex="-1"]:focus{outline:none} /* focus target for navigation, not a control */
+h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for navigation, not controls */
 .muted{color:var(--muted)}
 .small{font-size:12px;color:var(--muted)}
 .num{font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 .skip-link{position:fixed;left:20px;top:-70px;z-index:100;background:var(--text);color:var(--ground);padding:12px}
 .skip-link:focus{top:10px}
 
@@ -64,25 +69,27 @@ h1[tabindex="-1"]:focus{outline:none} /* focus target for navigation, not a cont
 .brand-mark{width:29px;height:32px;color:var(--accent)}
 .brand>.nav-label{font-size:19px;letter-spacing:-.04em;font-weight:650}
 .brand-sub{display:block;font-size:12px;letter-spacing:0;font-weight:400;color:var(--muted);margin-top:5px}
-.scope{display:flex;align-items:center;gap:10px;padding:12px 12px;border-radius:8px;margin-bottom:24px;white-space:nowrap;background:var(--raised)}
-.scope .nav-label{font-size:12px;font-weight:500}
-.scope .nav-label>span{display:block;margin-top:4px;font-size:12px;color:var(--muted);font-weight:400}
+/* Connection status: one quiet row; in the collapsed rail only its dot. */
+.scope{display:flex;align-items:center;gap:10px;min-height:28px;padding:0 12px;margin-bottom:18px;white-space:nowrap;font-size:12px;color:var(--muted)}
+.scope #connection-state{color:var(--text);font-weight:500}
 .connection-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;flex:none}
 .is-offline .connection-dot{background:var(--negative)}
 .nav-item{position:relative;display:flex;gap:11px;align-items:center;width:100%;min-height:40px;margin:2px 0;padding:0 12px;border-radius:8px;text-align:left;color:var(--muted);white-space:nowrap}
 .nav-item:hover{color:var(--text);background:var(--surface)}
-.nav-item[aria-current=page]{color:var(--text);background:var(--active)}
+.nav-item[aria-current=page]{color:var(--text);background:var(--raised)}
 .nav-item>.nav-label{overflow:hidden;text-overflow:ellipsis}
 .nav-apps{flex:none;max-height:40dvh;margin:28px -8px 0;padding:0 8px 6px;overflow-y:auto}
 .nav-group-title{padding:0 12px 10px;font-size:12px;color:var(--muted)}
-.nav-app{min-height:35px;font-size:12px}
-.nav-app .app-mini .app-vector{width:18px;height:18px}
-.nav-app .app-mini{font-size:13px;width:18px;text-align:center;flex:none;color:var(--muted);display:grid;place-items:center}
-.nav-app-dot{display:block;width:8px;height:8px;border-radius:50%;background:var(--app-color);box-shadow:0 0 12px color-mix(in srgb,var(--app-color) 48%,transparent)}
-.nav-app:hover{background:color-mix(in srgb,var(--app-color) 11%,var(--ground))}
+/* Collapsed rail: a keyboard-focused item's name, beside the rail in the top layer (app.js positions it). */
+.rail-tip{position:fixed;inset:auto;margin:0;translate:0 -50%;padding:6px 10px;border:1px solid var(--control);border-radius:8px;background:var(--tip);color:var(--text);font-size:12px;white-space:nowrap;pointer-events:none}
+.nav-app{min-height:36px;font-size:12px}
+.nav-app .app-mini{width:18px;flex:none;display:grid;place-items:center}
+.nav-app-dot{display:block;width:8px;height:8px;border-radius:50%;background:var(--app-color,var(--muted))}
+.nav-app-initial{display:none;place-items:center;width:24px;height:24px;border-radius:6px;font-size:12px;font-weight:600;background:var(--app-color,var(--muted));color:var(--app-ink)}
+#nav-close{display:none}
 .sidebar-foot{margin-top:auto;padding-top:28px}
 .version-row{display:flex;align-items:center;justify-content:space-between;padding:14px 10px 0;color:var(--muted);font-size:12px}
-.icon-button{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;flex:none;color:var(--muted)}
+.icon-button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;flex:none;color:var(--muted)}
 .icon-button:hover{background:var(--raised);color:var(--text)}
 
 /* Topbar and main canvas. .main-shell clips so transform-only sidebar shifts stay inside the canvas. */
@@ -90,11 +97,12 @@ h1[tabindex="-1"]:focus{outline:none} /* focus target for navigation, not a cont
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 32px;border-bottom:1px solid var(--border);gap:15px;height:68px}
 .topbar-leading,.topbar-actions{display:flex;align-items:center}
 .topbar-leading{gap:12px;font-size:12px;color:var(--muted)}
+.topbar-title{display:none} /* the page name, on phones only: the desktop top bar carries no breadcrumb */
 .topbar-actions{gap:10px}
 .freshness{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 #mobile-nav{display:none}
 /* Shown while the local server is unreachable; app.js fills it and clears it on the next good poll. */
-.connection-banner{margin:16px 32px 0;padding:12px 16px;border-radius:8px;border-left:2px solid var(--negative);background:var(--badbg);color:var(--text);font-size:13px;line-height:1.55}
+.connection-banner{margin:16px 32px 0;padding:12px 16px;border-radius:8px;background:var(--badbg);color:var(--text);font-size:13px;line-height:1.55}
 .connection-banner code{font-family:var(--font-mono);font-size:12px;padding:1px 6px;border-radius:6px;background:var(--ground)}
 #main{outline:none;padding:30px 32px}
 /* Focus scrolls content clear of the fixed activity bar (and the open panel). Scroll-margin, not root
@@ -108,20 +116,24 @@ h1[tabindex="-1"]:focus{outline:none} /* focus target for navigation, not a cont
 .sidebar-collapsed .brand{padding:0 9px}
 .sidebar-collapsed .nav-label{opacity:0;pointer-events:none;width:0;overflow:hidden}
 .sidebar-collapsed .brand-sub{white-space:nowrap} /* a zero-width label must not wrap the tagline word by word */
-.sidebar-collapsed .scope{padding:15px 20px}
+.sidebar-collapsed .scope{padding:0;justify-content:center;gap:0}
+.sidebar-collapsed .nav-app-dot{display:none}
+.sidebar-collapsed .nav-app-initial{display:grid}
+.sidebar-collapsed .nav-app .app-mini{width:24px}
 .sidebar-collapsed .nav-group-title{height:18px}
 .sidebar-collapsed .version-row>span{display:none}
 .sidebar-collapsed .version-row{padding-left:7px}
 
 /* Buttons: Origin UI variants + loading content overlay; uiable spinner geometry. */
-.button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--control);border-radius:8px;font-weight:500;white-space:nowrap;background:transparent;font-size:13px}
+.button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--button-edge);border-radius:8px;font-weight:500;white-space:nowrap;background:transparent;font-size:13px}
 .button:hover{background:var(--raised);border-color:var(--muted)}
 .button-primary{background:var(--text);border-color:var(--text);color:var(--ground)}
 .button-primary:hover{background:var(--text);border-color:var(--text)}
-.button-secondary{border-color:transparent;background:var(--raised)}
-.button-danger{color:var(--negative);border-color:var(--badbg)}
+.button-secondary{border-color:var(--field-border);background:var(--raised)} /* Open, everywhere it is not running */
+.button-danger{color:var(--negative);border-color:var(--danger-edge)}
 .button-danger:hover{background:var(--badbg);border-color:var(--negative)}
-.button-small{min-height:30px;padding:0 10px}
+.button-small{min-height:36px;padding:0 10px}
+.link-button{min-height:36px;padding:0 4px;font-size:13px;font-weight:500;text-decoration:underline;text-underline-offset:3px;border-radius:6px}
 .button:disabled{opacity:.7;pointer-events:none}
 [data-locked]{opacity:.55;pointer-events:none} /* waits for a running action or a reconnect; aria-disabled carries it to AT */
 .button[data-loading=true]{opacity:1}
@@ -130,19 +142,17 @@ h1[tabindex="-1"]:focus{outline:none} /* focus target for navigation, not a cont
 .spinner{display:block;width:16px;height:16px;border:2px solid currentColor;border-left-color:transparent;border-radius:50%;animation:spin .75s linear infinite}
 .button .icon{width:16px;height:16px}
 
-/* Page header and stat line (one quiet text row) */
+/* Page header */
 .title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px}
 .title-row p{margin-top:9px;color:var(--muted);font-size:13px;max-width:640px}
+.title-row p.title-hint{margin-top:4px;font-size:12px}
 .title-actions{display:flex;gap:8px;align-items:center}
-.stat-line{display:flex;flex-wrap:wrap;gap:4px 20px;margin-bottom:20px;color:var(--muted);font-size:13px}
-.stat-line .running-dot{margin-right:6px}
-.stat-line strong{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}
 
 /* Inputs and toolbar: Origin UI input with leading search icon, clear action and focus ring. */
 .search-field{position:relative;display:flex;align-items:center;min-width:180px;width:320px}
 .search-field>.icon{position:absolute;left:12px;color:var(--muted);pointer-events:none;width:16px}
 .search-field input{padding-left:37px;padding-right:34px}
-.search-field .icon-button{position:absolute;right:2px;top:2px;width:32px;height:32px}
+.search-field .icon-button{position:absolute;right:2px;top:2px;width:36px;height:36px}
 .input,select,textarea{display:block;width:100%;min-height:40px;border:1px solid var(--field-border);border-radius:8px;color:var(--text);padding:9px 12px;transition:border-color .16s,box-shadow .16s;background:var(--raised)}
 .input::placeholder,textarea::placeholder{color:var(--muted)}
 .input:focus,textarea:focus,select:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring-accent)}
@@ -159,60 +169,81 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .tab-indicator{position:absolute;left:0;bottom:0;height:2px;background:var(--text);width:0;pointer-events:none;transform-origin:left center;transition:none}
 .tabs .tab-count{color:var(--muted);padding-left:2px;font-variant-numeric:tabular-nums}
 
-/* Profiles: layout, grid, card (ravikatiyar162 animated profile card) and detail panel */
+/* Profiles: layout, grid, card and detail panel. The grid fills by width, never by selection. */
 .profile-layout{display:grid;align-items:start;gap:24px;grid-template-columns:minmax(0,1fr) 320px}
+/* no-selection: no profiles at all. auto-fit: fewer cards than columns stretch instead of leaving an empty column before the
+   detail column; one or two cards stop at 360px rather than become banners. */
 .profile-layout.no-selection{grid-template-columns:1fr}
-.profile-grid{display:grid;align-items:stretch;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
-.profile-grid[data-count="1"]{grid-template-columns:1fr;max-width:440px}
-.profile-grid[data-count="2"],.profile-grid[data-count="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}
-.profile-layout:not(.no-selection) .profile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-.profile-card{border-radius:16px;overflow:hidden;outline:1px solid transparent;outline-offset:0;min-width:0;background:var(--card);border:1px solid var(--border);position:relative;isolation:isolate;border-color:color-mix(in srgb,var(--app-color) 32%,var(--border))}
+.profile-grid{display:grid;align-items:stretch;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:20px}
+.profile-grid:has(>.profile-card:first-child:nth-last-child(-n+2)){grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),360px))}
+.profile-card{position:relative;display:flex;flex-direction:column;min-width:0;padding:20px;border-radius:16px;background:var(--card);border:1px solid var(--border);outline:1px solid transparent;outline-offset:0}
 .profile-card:focus-within{outline-color:var(--muted)}
-.profile-cover{position:relative;height:58px;background:linear-gradient(115deg,color-mix(in srgb,var(--app-color) 48%,var(--card-bottom)),color-mix(in srgb,var(--app-color-secondary) 30%,var(--card-bottom)));border-bottom:1px solid color-mix(in srgb,var(--app-color) 42%,var(--border))}
-.profile-cover .icon-button{position:absolute;right:9px;top:10px;color:var(--text);background:color-mix(in srgb,var(--ground) 28%,transparent)}
-.profile-body{padding:0 24px 22px}
-.profile-cover .icon-button:hover{background:color-mix(in srgb,var(--ground) 65%,transparent)}
-.app-art{position:relative;display:flex;align-items:center;justify-content:center;width:54px;height:54px;flex:none;background:var(--active);border-radius:14px;border:4px solid var(--surface);margin-top:-26px;line-height:1;font-weight:650;font-size:23px}
-.app-art .app-vector{width:31px;height:31px}
-.identity-badge{position:absolute;right:-3px;bottom:-3px;display:grid;place-items:center;width:23px;height:23px;border:2px solid var(--surface);border-radius:50%;color:var(--identity-ink,var(--ground));font-size:12px;font-weight:600;background:var(--identity-color)}
-.profile-name{display:block;padding:16px 0 4px;text-align:left;width:100%;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px}
-.profile-app{color:var(--muted);font-size:13px}
-.profile-state{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;margin:20px 0 16px}
-.profile-state-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 10px}
-.profile-state-row>.profile-state{margin:0}
-.running-dot{width:5px;height:5px;border-radius:50%;display:inline-block;flex:none;background:var(--positive)}
+.profile-card.selected{outline:2px solid var(--text);outline-offset:2px} /* selection stays on the neutral ramp; the 1px hue edge means running */
+.profile-head{display:flex;align-items:center;gap:12px;min-width:0}
+.profile-title{flex:1;min-width:0}
+.profile-title h2{font:inherit;letter-spacing:normal}
+.profile-name{display:block;max-width:100%;min-height:36px;margin:0 -4px;padding:0 4px;border-radius:6px;text-align:left;font-size:17px;font-weight:550;letter-spacing:-.015em;line-height:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-name:focus-visible{outline-offset:0}
+.profile-app{color:var(--muted);font-size:13px;line-height:1.3;margin-top:3px} /* clears the name's focus ring */
+/* App tile: the app's hue as a solid fill with Lampblack ink; neutral graphite for an app with no hue. */
+.app-art{position:relative;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none;border-radius:12px;background:var(--active);color:var(--text);line-height:1;font-weight:650;font-size:20px}
+.app-tone .app-art{background:var(--app-color);color:var(--app-ink)}
+.app-art .app-vector{width:26px;height:26px}
+/* Profile badge: a filled rounded square in its saved color, ink by contrast; no stripe or shadow. A 2px ring in the surface
+   it sits on cuts it out of the tile, so even a badge in the tile's own color reads as a separate chip. */
+.identity-badge{position:absolute;right:-6px;bottom:-6px;display:grid;place-items:center;min-width:20px;height:20px;padding:0 4px;border-radius:6px;color:var(--identity-ink,var(--ground));font-size:12px;font-weight:600;line-height:1;background:var(--identity-color);outline:2px solid var(--badge-ring,var(--card-top))}
+.profile-state{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.profile-state-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:36px;margin:16px 0 12px}
+.profile-state-row>.profile-state{margin-right:auto}
+.running-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none;background:var(--positive)}
 .status-missing{color:var(--negative)}
 .status-running{color:var(--positive)}
-.profile-meta{display:flex;justify-content:space-between;color:var(--muted);border-top:1px solid var(--border);font-size:12px;line-height:1.55;gap:14px;align-items:flex-start;padding:12px 0 18px}
-.profile-meta>span:last-child{text-align:right;flex:none}
-.profile-meta>span:first-child{min-width:0}
-.profile-card .open-profile{width:100%}
-.profile-card .button{min-height:40px;font-size:13px}
+.profile-meta{color:var(--muted);font-size:12px;margin:-4px 0 14px}
+.profile-card .open-profile{width:100%;margin-top:auto}
+.profile-card .open-profile,.detail-panel .open-profile{min-height:40px}
 .empty-state{padding:38px 24px;background:var(--surface);border-radius:16px;grid-column:1/-1}
 .empty-state h2{margin-bottom:10px;font-size:22px;overflow-wrap:anywhere}
 .empty-state p{color:var(--muted);max-width:430px;margin-bottom:22px}
 .detail-panel{border-radius:16px;min-width:0;position:sticky;top:24px;padding:24px;background:var(--card);border:1px solid var(--border)}
-.detail-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
-.detail-top .app-art{margin:0;border:0;width:48px;height:48px}
+.detail-top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.detail-top .app-art{width:48px;height:48px;font-size:21px}
+.detail-heading{flex:1;min-width:0}
 .detail-panel h2{word-break:break-word}
-.detail-panel>.small{margin:6px 0 15px;font-size:12px}
-.detail-actions{display:flex;flex-wrap:wrap;margin:19px 0 22px;gap:10px}
-.detail-actions .button:first-child{flex:1}
+.detail-app{color:var(--muted);font-size:13px;margin-top:2px}
+.detail-panel .profile-state-row{margin:10px 0 12px}
+.detail-panel .open-profile{width:100%}
+.detail-command{margin-top:16px}
+/* Settings and Rename, then Remove at the far end. */
+.detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 18px}
+.detail-actions .button-danger{margin-left:auto}
+.detail-defaults{padding:11px 0;border-top:1px solid var(--border);font-size:13px;color:var(--muted)}
+.detail-rebuild{display:grid;justify-items:start;gap:10px;padding:11px 0 6px;border-top:1px solid var(--border)}
+.detail-rebuild p{font-size:12px;color:var(--muted)}
+/* The reserved detail column before a choice (901px and up). */
+.detail-placeholder{position:sticky;top:24px;padding:24px;border:1px dashed var(--control);border-radius:16px;color:var(--muted);font-size:13px}
 .details{margin:0}
 .details div{padding:11px 0;border-top:1px solid var(--border)}
 .details dt{color:var(--muted);margin-bottom:6px;font-size:12px}
 .details dd{margin:0;line-height:1.6;overflow-wrap:anywhere;font-size:13px}
 .details code{font-size:12px}
-.detail-footer{display:flex;flex-wrap:wrap;margin-top:20px;gap:8px}
-.detail-footer .button{min-height:34px}
+.detail-more{border-top:1px solid var(--border);padding-top:4px}
+.detail-more .details{padding-top:4px}
 .detail-back{display:none}
 
 /* Apps, panels and operation cards */
 .apps-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
-.application-card{border-radius:16px;padding:24px;border:1px solid var(--border);position:relative;isolation:isolate;border-color:color-mix(in srgb,var(--app-color) 32%,var(--border));background:radial-gradient(ellipse 130% 200px at 0% 0%,color-mix(in srgb,var(--app-color) 17%,transparent),transparent 75%),var(--card)}
-.application-card .app-art{margin:0 0 24px;border:0}
-.application-card p{color:var(--muted);margin:9px 0 22px;font-size:13px}
-.application-card .button{width:100%}
+/* Application card: the tile sits beside the name; an app with no profiles stays neutral. */
+.application-card{display:flex;flex-direction:column;gap:18px;border-radius:16px;padding:20px;border:1px solid var(--border);background:var(--card)}
+.app-head{display:flex;align-items:center;gap:14px;min-width:0}
+.app-head>div{min-width:0}
+.app-head h2{overflow-wrap:anywhere}
+.application-card .app-count{margin:0 -4px;color:var(--muted)}
+/* Apps without profiles: one disclosure of rows, each with its own Add profile. */
+.apps-other{margin-top:24px}
+.apps-other>.other-list{list-style:none;margin:0;padding:12px 0 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:0 24px}
+.other-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--border)}
+.other-name{min-width:0;font-size:13px;overflow-wrap:anywhere}
+.application-card .button{width:100%;margin-top:auto}
 .panel{border-radius:16px;padding:24px;background:var(--card);border:1px solid var(--border)}
 .panel-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}
 .operation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
@@ -220,6 +251,9 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .operation-card>.icon{margin-bottom:6px;color:var(--muted)}
 .operation-card p{font-size:13px;color:var(--muted);max-width:440px}
 .operation-card .button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px}
+.operation-card.wide{grid-column:1/-1}
+.callout{padding:12px 14px;border-radius:8px;background:var(--warnbg);color:var(--text);font-size:13px;line-height:1.55}
+.operation-card p.callout{color:var(--text)}
 
 /* Views: recovery, maintenance, guide, notices, loading */
 .recovery-list{display:flex;flex-direction:column;gap:0}
@@ -239,7 +273,7 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .health-findings li[data-level=error]>.icon,.health-findings li[data-level=error]>.finding-level{color:var(--negative)}
 .health-findings strong,.finding-level{font-weight:500}
 .health-result .output{max-height:220px;padding:12px;background:var(--ground)}
-.operation-card .health-next{font-size:12px}
+.operation-card .health-next,.operation-card .health-hint{font-size:12px}
 .health-next strong{color:var(--text);font-weight:500}
 .operation-card .update-status{color:var(--text)}
 /* Local storage is reference, not an operation: no fill, a muted label, a definition list. */
@@ -250,8 +284,20 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .guide-controls{display:grid;gap:17px}
 .output{padding:20px;background:var(--surface);border-radius:12px;max-height:500px;overflow:auto;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin:0;font-family:var(--font-mono)}
 .guide-output{min-height:210px}
+.guide-empty{min-height:210px;padding:20px;border:1px dashed var(--control);border-radius:12px;color:var(--muted);font-size:13px}
+/* Terms: plain-word definitions above the CLI help. */
+.terms{margin-bottom:20px;padding:20px 24px;border:1px solid var(--border);border-radius:16px}
+.terms h2{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:6px}
+.terms dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 24px;margin:0}
+.terms dl>div{padding:10px 0;border-top:1px solid var(--border)}
+.terms dt{font-size:13px;font-weight:500}
+.terms dd{margin:4px 0 0;font-size:13px;line-height:1.5;color:var(--muted)}
+.terms dl>.terms-keys{grid-column:1/-1}
+kbd{font-family:var(--font-mono);font-size:12px;padding:1px 6px;border:1px solid var(--button-edge);border-radius:6px;color:var(--text)}
+.health-empty{color:var(--muted)}
+.update-status time{margin-left:6px}
 .notice{padding:14px 16px;border-radius:8px;background:var(--raised);font-size:12px;line-height:1.6;color:var(--muted);margin-top:16px}
-.notice.error{border-left:2px solid var(--negative)}
+.notice.error{background:var(--badbg);color:var(--text)}
 .initial-loading{min-height:330px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px}
 .initial-loading h1{font-size:22px}
 .initial-loading p{color:var(--muted)}
@@ -276,32 +322,40 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
 .field label,.field-label{display:block;font-weight:500;margin-bottom:8px;font-size:13px;line-height:inherit}
 .field .hint{color:var(--muted);line-height:1.5;margin-top:7px;font-size:12px}
 .field-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.check-row{display:flex;align-items:flex-start;gap:10px;color:var(--text);padding:5px 0;font-size:13px}
+.check-row{display:flex;align-items:flex-start;gap:10px;min-height:36px;color:var(--text);padding:5px 0;font-size:13px}
 .check-row input{appearance:auto;width:16px;height:16px;flex:none;margin:1px 0 0;accent-color:var(--text)}
 .check-row span span{display:block;color:var(--muted);margin-top:5px;line-height:1.5;font-size:12px}
 .advanced{padding-top:7px}
-.advanced summary{cursor:pointer;font-size:12px;color:var(--muted);padding:8px 0}
+.advanced summary{display:flex;align-items:center;gap:8px;min-height:36px;cursor:pointer;list-style:none;font-size:13px;font-weight:500;color:var(--text)}
+.advanced summary::-webkit-details-marker{display:none}
+.advanced summary .icon{width:16px;height:16px;color:var(--muted);transform:rotate(90deg);transition:transform var(--motion-fade) ease-out}
+.advanced[open]>summary .icon{transform:rotate(180deg)}
 .advanced>.fields{padding-top:15px}
 .color-options{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.color-swatch{width:26px;height:26px;border-radius:50%;background:var(--swatch);border:3px solid var(--surface);outline:1px solid transparent}
+.color-swatch{width:32px;height:32px;border-radius:50%;background:var(--swatch);border:3px solid var(--surface);outline:1px solid transparent}
 .color-swatch[aria-pressed=true]{outline-color:var(--text)}
 .color-swatch:focus-visible{outline:2px solid var(--text);outline-offset:3px}
 .color-swatch[data-color="262624"]{box-shadow:inset 0 0 0 1px var(--field-border)} /* Graphite is 1.3:1 on the dialog surface */
-.preview-row{display:flex;gap:13px;align-items:center;padding:13px 16px;border-radius:12px;margin-bottom:20px;background:var(--raised)}
-.preview-row .app-art{margin:0;border:0;background:var(--active)}
-.preview-row .identity-badge{border-color:var(--raised)}
+.color-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;margin-top:8px;font-size:13px}
+.color-current{color:var(--muted);font-variant-numeric:tabular-nums}
+#custom-color{margin-top:8px}
+.preview-row{--badge-ring:var(--raised);display:flex;gap:12px;align-items:center;padding:13px 16px;border-radius:12px;margin-bottom:20px;background:var(--raised)}
+.preview-identity{display:flex;gap:13px;align-items:center;flex:1;min-width:0}
+.preview-identity>div{min-width:0}
 .preview-row strong{font-size:14px;font-weight:500;display:block}
-.preview-row .small{margin-top:5px;display:block}
+.preview-row .small{display:block}
+.preview-row strong+.small{margin-top:5px}
 .form-error{font-size:12px;color:var(--negative);line-height:1.6;padding:12px 14px;border-radius:8px;margin-top:16px;background:var(--badbg)}
 .danger-callout{border-radius:8px;padding:14px 15px;color:var(--text);font-size:13px;line-height:1.55;background:var(--warnbg)}
 .target-list{list-style:none;margin:14px 0 0;padding:2px 14px;max-height:200px;overflow:auto;border-radius:8px;background:var(--ground);font-size:13px}
 .target-list li{padding:8px 0;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
 .target-list li:last-child{border:0}
 /* "Runs:" echoes the server's redacted command for the form as it stands. */
-.command-echo{display:flex;align-items:center;gap:8px;margin-top:20px;padding:6px 6px 6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--ground);font-size:12px;color:var(--muted)}
-.command-echo code{flex:1;min-width:0;font-family:var(--font-mono);font-size:12px;line-height:1.7;overflow-wrap:anywhere;user-select:text}
+.command-echo{display:flex;align-items:center;gap:8px;margin-top:20px;padding:2px 2px 2px 12px;border:1px solid var(--border);border-radius:8px;background:var(--ground);font-size:12px;color:var(--muted)}
+.command-echo code{flex:1;min-width:0;padding:7px 0;font-family:var(--font-mono);font-size:12px;line-height:1.7;user-select:text}
+/* app.js wraps each shell word: lines break between words, inside one only when it is wider than the line. */
+.command-word{display:inline-block;max-width:100%;overflow-wrap:anywhere}
 .command-label{flex:none}
-.command-echo .icon-button{width:30px;height:30px}
 .import-preview{max-height:240px;overflow:auto;margin-top:17px;padding:12px 15px;background:var(--ground);border-radius:8px;line-height:1.55;font-size:12px}
 .import-summary{font-size:13px;color:var(--muted);margin-bottom:4px}
 .import-summary strong{color:var(--text);font-weight:500}
@@ -324,9 +378,9 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .toast.info>.icon{color:var(--muted)}
 .toast strong{display:block;font-weight:500;font-size:13px}
 .toast p{color:var(--muted);margin-top:5px;font-size:12px}
-.toast>.icon-button{margin:-6px -6px 0 auto;width:26px;height:26px}
-.toast-actions{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px}
-.toast .toast-action{padding:0;text-align:left;text-decoration:underline;font-size:12px}
+.toast>.icon-button{margin:-9px -9px 0 auto}
+.toast-actions{display:flex;flex-wrap:wrap;gap:0 16px;margin-top:2px}
+.toast .toast-action{min-height:36px;padding:0;text-align:left;text-decoration:underline;font-size:12px}
 .toast .toast-primary{font-weight:500}
 .toast.dismiss{transform:translateY(12px) scale(.98);opacity:0;transition:transform var(--motion-exit) var(--ease),opacity var(--motion-exit) ease-out;pointer-events:none}
 .toast-viewport:not(:hover)>.toast:nth-child(2){transform:scale(.98);opacity:1}
@@ -335,8 +389,10 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 /* Activity bar */
 .activity-toggle{position:fixed;bottom:0;right:0;left:var(--sidebar-width);height:40px;background:var(--ground);border-top:1px solid var(--border);display:flex;gap:9px;align-items:center;padding:0 32px;font-size:12px;color:var(--muted);z-index:20}
 .activity-toggle:focus-visible{outline-offset:-2px}
-.activity-toggle>.icon:last-child{margin-left:auto;width:14px}
-.activity-toggle>.icon:first-child{width:14px}
+/* index.html icons are hydrated inside their <span>, so the spans are the toggle's first and last children. */
+.activity-toggle>:first-child .icon,.activity-toggle>:last-child .icon{width:14px}
+.activity-toggle>:last-child{margin-left:auto;transition:transform var(--motion-fade) ease-out}
+.activity-toggle[aria-expanded=true]>:last-child{transform:rotate(180deg)}
 .activity-panel{position:fixed;bottom:40px;right:0;left:var(--sidebar-width);background:var(--surface);border-top:1px solid var(--control);padding:20px 32px;max-height:var(--activity-height);overflow:auto;z-index:25;animation:none}
 :root:has(#activity-panel:not([hidden])){--activity-open:var(--activity-height)}
 .activity-entry{margin-bottom:17px}
@@ -344,7 +400,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .activity-entry-title time{font-size:12px;color:var(--muted)}
 .activity-entry .output{padding:13px;background:var(--ground);font-size:12px;max-height:220px}
 .activity-error{color:var(--negative)}
-.activity-command{display:block;margin-bottom:8px;font-family:var(--font-mono);font-size:12px;line-height:1.7;overflow-wrap:anywhere;user-select:text}
+.activity-command{display:block;margin-bottom:8px;font-family:var(--font-mono);font-size:12px;line-height:1.7;user-select:text} /* .command-word spans: breaks at spaces only */
 
 /* Motion: shared springs for pressable controls and cards */
 .nav-label{transition:opacity var(--motion-fade) ease-out}
@@ -352,32 +408,26 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .button:active,.icon-button:active,.nav-item:active,.color-swatch:active{transform:scale(.97);transition-duration:var(--motion-press);transition-timing-function:ease-out}
 .button:hover:not(:disabled){transform:translateY(-1px)}
 .button:active:hover{transform:translateY(0) scale(.97)}
-.profile-card,.application-card{transition:transform var(--motion-surface) var(--spring-surface),outline-color var(--motion-fade) ease-out}
-.profile-card:hover,.application-card:hover{transform:translateY(-3px);outline-color:var(--app-color);border-color:color-mix(in srgb,var(--app-color) 65%,var(--border))}
+.profile-card,.application-card{transition:transform var(--motion-surface) var(--spring-surface),outline-color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
+.profile-card:hover,.application-card:hover{transform:translateY(-3px);border-color:var(--muted)}
 .color-swatch:hover{transform:scale(1.08)}
 .tabs button:active{transform:scale(.97);transition-duration:var(--motion-press)}
 
-/* App tone: palette from the user's board reference. App color is presentation; saved account
-   badges keep their own colors. */
+/* App tone. An app with profiles has one hue (app.js sets --app-color on .app-tone). It appears only as a solid fill
+   with Lampblack ink (the scope's primary button, the app tile), a plain dot, a 1px border (hover, running)
+   and focus rings; never as a gradient, glow, tinted text or tinted background. The header Add stays Bone. */
 .app-tone{--accent:var(--app-color)} /* on purpose: --accent is mint globally and the app's hue inside an app-toned scope */
-#header-add,.app-tone .button-primary{background:var(--app-color);border-color:var(--app-color);color:var(--app-ink)}
-#header-add:hover,.app-tone .button-primary:hover{background:color-mix(in srgb,var(--app-color) 90%,var(--text));border-color:var(--app-color);color:var(--app-ink)}
+.app-tone .button-primary{background:var(--app-color);border-color:var(--app-color);color:var(--app-ink)}
+.app-tone .button-primary:hover{background:color-mix(in srgb,var(--app-color) 90%,var(--text));border-color:var(--app-color);color:var(--app-ink)}
 .app-tone .input:focus,.app-tone textarea:focus,.app-tone select:focus{border-color:var(--app-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--app-color) 15%,transparent)}
-.profile-card::after,.application-card::after{content:"";position:absolute;z-index:-1;pointer-events:none;inset:auto 0 0;height:160px;border-radius:0 0 15px 15px;background:radial-gradient(ellipse 105% 110% at 50% 118%,color-mix(in srgb,var(--app-color) 14%,transparent),transparent 72%)}
-.profile-card.selected{outline-color:var(--app-color)}
-.app-tone .app-art{background:color-mix(in srgb,var(--app-color) 14%,var(--surface));color:var(--app-color)}
-.profile-card .app-art{border-color:var(--surface);box-shadow:0 0 0 1px color-mix(in srgb,var(--app-color) 35%,var(--border))}
-.profile-card .open-profile,.application-card .button:not(.button-danger){background:color-mix(in srgb,var(--app-color) 10%,var(--card-bottom));border-color:color-mix(in srgb,var(--app-color) 38%,var(--border));color:var(--app-color)}
-.profile-card .open-profile:hover,.application-card .button:hover:not(.button-danger){background:color-mix(in srgb,var(--app-color) 18%,var(--card-bottom));border-color:var(--app-color)}
-.detail-panel.app-tone{border-color:color-mix(in srgb,var(--app-color) 55%,var(--border));background:radial-gradient(ellipse 120% 180px at 50% -20px,color-mix(in srgb,var(--app-color) 15%,transparent),transparent),var(--card)}
-.preview-row.app-tone{border:1px solid color-mix(in srgb,var(--app-color) 35%,var(--border));background:linear-gradient(120deg,color-mix(in srgb,var(--app-color) 12%,var(--surface)),color-mix(in srgb,var(--app-color-secondary) 8%,var(--surface)))}
-#dialog.app-tone{border-color:color-mix(in srgb,var(--app-color) 38%,var(--control))}
-#dialog.app-tone .dialog-header{background:linear-gradient(120deg,color-mix(in srgb,var(--app-color) 10%,var(--surface)),color-mix(in srgb,var(--app-color-secondary) 7%,var(--surface)))}
+.app-tone.profile-card:hover,.app-tone.application-card:hover{border-color:var(--app-color)}
+.app-tone.profile-card.running{border-color:var(--app-color)} /* one running mark: Mint status, plus the app's 1px hue edge */
 
 /* Keyframes (sheet-in/out live in the mobile block) */
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{50%{opacity:.35}}
 @keyframes tabs-fade{from{--tabs-fade:32px}to{--tabs-fade:0px}}
+@keyframes detail-fade{from{--detail-fade:48px}to{--detail-fade:0px}}
 @keyframes dialog-in{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes dialog-out{to{opacity:0;transform:translateY(14px) scale(.96)}}
 @keyframes toast-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -385,32 +435,27 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 /* Breakpoints, widest first; min-width and reduced-motion blocks last */
 @media(max-width:1200px){
   #main{padding:26px 24px}
-  .profile-grid,.apps-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .profile-layout{grid-template-columns:minmax(0,1fr) 300px;gap:20px}
-  .profile-layout:not(.no-selection) .profile-grid{grid-template-columns:1fr}
-  .profile-body{padding-left:22px;padding-right:22px}
+  .apps-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .profile-layout{gap:20px}
+  .detail-panel{padding:20px}
   .toast-viewport{left:calc(var(--sidebar-width) + 24px)}
 }
 @media(max-width:1150px){
   :root{--sidebar-width:190px}
-  .brand-sub{white-space:normal;text-wrap:balance} /* the tagline is wider than a 190px sidebar */
   .sidebar{padding-left:10px;padding-right:10px}
   .topbar{padding:0 24px}
   .connection-banner{margin:16px 24px 0}
-  .freshness{display:none}
 }
 @media(max-width:900px){
   .detail-panel{position:relative;max-height:none}
+  .detail-placeholder{display:none}
   .detail-panel .details{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
-  .detail-panel>.small{margin-bottom:0}
   .detail-actions{margin:16px 0}
-  .detail-footer{margin-top:12px}
   .guide-layout{grid-template-columns:1fr}
   .guide-controls{grid-template-columns:1fr 1fr}
+  .terms dl{grid-template-columns:1fr 1fr}
   .guide-output{margin-top:5px}
   .profile-layout{grid-template-columns:1fr}
-  .profile-layout:not(.no-selection) .profile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .detail-top{float:none;margin-right:0}
 }
 /* Mobile: drawer sidebar, bottom-sheet dialogs, 44px touch targets */
 @media(max-width:767px){
@@ -420,18 +465,22 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .nav-scrim{position:fixed;inset:0;z-index:50;background:var(--scrim)}
   .sidebar-collapsed .nav-label{opacity:1;width:auto}
   .sidebar-collapsed .sidebar{padding:24px 16px 18px}
-  .sidebar-collapsed .scope{padding:12px}
+  .sidebar-collapsed .scope{padding:0 12px;justify-content:flex-start;gap:10px}
+  .sidebar-collapsed .nav-app-dot{display:block}
+  .sidebar-collapsed .nav-app-initial{display:none}
+  .sidebar-collapsed .nav-app .app-mini{width:18px}
+  #nav-close{display:inline-flex;position:absolute;top:14px;right:10px}
   .sidebar-collapsed .version-row>span{display:block}
   #collapse-nav{display:none}
   .nav-item,.nav-app{min-height:44px}
   #mobile-nav{display:flex}
+  .topbar-title{display:block;font-size:15px;font-weight:550;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .topbar-actions{gap:4px}
   .topbar-leading{gap:5px}
   .topbar .button>.icon{width:14px}
   .title-row{gap:12px;margin-bottom:20px}
   .title-actions{gap:5px}
   .title-actions .button{padding:0 9px}
-  .stat-line{margin-bottom:16px}
   .toolbar .search-field{width:auto;min-width:0;flex:1}
   .toolbar-end>.small{display:none}
   .detail-panel{display:none;padding:22px;max-height:none}
@@ -444,7 +493,6 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .connection-banner{margin:12px 18px 0}
   .operation-grid{grid-template-columns:1fr}
   .operation-card{padding:22px}
-  .application-card .app-art{margin-bottom:20px}
   .application-card .button{padding:0 7px;min-height:44px}
   .guide-controls{grid-template-columns:1fr}
   .panel{padding:20px}
@@ -478,23 +526,18 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .toolbar select{max-width:116px}
   .toolbar-end{gap:0}
   .toolbar-end>.button{display:none}
-  .profile-grid,.profile-grid[data-count="2"],.profile-grid[data-count="4"],.profile-layout:not(.no-selection) .profile-grid{grid-template-columns:1fr;gap:16px}
-  .profile-grid[data-count="1"]{max-width:none}
-  .profile-cover{height:50px}
-  .profile-body{padding:0 22px 20px}
-  .profile-name{padding-top:13px;min-height:44px}
-  .profile-state{margin:18px 0 14px}
-  .profile-meta{gap:12px;padding:12px 0 16px}
-  .profile-card .button{min-height:44px}
-  .profile-cover .icon-button{width:44px;min-height:44px;top:3px;right:6px}
-  .profile-cover .icon-button:focus-visible{outline-offset:-2px}
+  .profile-grid{grid-template-columns:1fr;gap:16px}
+  .profile-name{min-height:44px;line-height:44px}
+  .profile-card .button,.detail-panel .button,.link-button{min-height:44px}
+  .profile-state-row{min-height:44px}
   .apps-grid{grid-template-columns:1fr}
   .button,.button-small,.icon-button{min-height:44px}
   .icon-button{min-width:44px}
   .detail-panel h2{font-size:22px}
   .detail-panel .details{grid-template-columns:1fr}
-  .detail-actions .button,.detail-footer .button,.dialog-footer .button{min-height:44px}
-  .advanced summary{min-height:44px;padding:14px 0}
+  .dialog-footer .button{min-height:44px}
+  .advanced summary{min-height:44px}
+  .terms dl{grid-template-columns:1fr}
   .input,select,textarea{font-size:14px;min-height:44px}
   dialog[open]{animation:sheet-in var(--motion-surface) var(--ease)} /* no overshoot: a full-height slide would lift off the bottom edge */
   dialog.closing{animation:sheet-out var(--motion-exit) var(--ease) forwards}
@@ -502,7 +545,8 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .toast-viewport>.toast:nth-child(n+2){display:none}
   .color-swatch{width:44px;height:44px}
   .toast>.icon-button{min-width:44px;min-height:44px}
-  .profile-detail-mobile>.stat-line,.profile-detail-mobile>.tabs,.profile-detail-mobile>.toolbar{display:none}
+  .toast .toast-action{min-height:44px}
+  .profile-detail-mobile>.tabs,.profile-detail-mobile>.toolbar{display:none}
   .profile-detail-mobile>.title-row{margin-bottom:16px}
   .profile-detail-mobile>.title-row p{display:none}
   @keyframes sheet-in{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
@@ -513,10 +557,30 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .title-actions{margin-left:auto}
   .field-pair{grid-template-columns:1fr}
 }
-/* Keep profile actions inside the viewport above the activity bar. */
+/* From 768px the selected card shows state, Quit and the primary action, so the detail panel leaves them out.
+   Collapsed rail: "Your apps" becomes a divider. Workspace health puts its result beside its text. */
+@media(min-width:768px){
+  .detail-own{display:none}
+  .sidebar-collapsed .nav-apps{margin-top:18px;padding-top:10px;background:linear-gradient(var(--control) 0 0) 12px 0/calc(100% - 24px) 1px no-repeat}
+  .sidebar-collapsed .nav-group-title{height:0;padding:0}
+  .sidebar-collapsed .scope>.nav-label{position:absolute;width:1px;height:1px;clip-path:inset(50%)} /* visually hidden, still read: zero-size text can be skipped */
+  .operation-card.wide{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:12px 32px;align-items:start}
+  .operation-card.wide>*{grid-column:1}
+  .operation-card.wide>.health-result,.operation-card.wide>.health-empty{grid-column:2;grid-row:1/span 5;align-self:stretch}
+  .operation-card.wide>.health-empty{display:grid;place-items:center;max-width:none;padding:20px} /* plain text, no box: a box here is a card in a card */
+}
+/* The tagline (138px) is wider than the name column of a 190px sidebar: below the 32px mark, from its left edge, instead of wrapping. */
+@media(min-width:768px) and (max-width:1150px){
+  .brand{align-items:flex-start}
+  .brand>.nav-label{padding-top:4px} /* centres the name on the mark */
+  .brand-sub{margin:10px 0 0 -40px} /* -40px: the 29px mark and its 11px gap */
+}
+/* The detail panel sticks beside the grid and fits between the top bar and the activity bar (68 + 40 + 2 x 24).
+   Its bottom edge fades only while it overflows: the fade runs on the panel's own scroll timeline, which is inactive
+   (fade 0) when nothing scrolls. Below 901px the panel follows the grid and its close button returns. */
 @media(min-width:901px){
-  .detail-panel{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;max-height:calc(100dvh - 392px);min-height:240px}
-  .detail-footer{padding-bottom:8px}
+  .detail-panel{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;max-height:calc(100dvh - 68px - 40px - 48px - var(--activity-open));mask-image:linear-gradient(180deg,black calc(100% - var(--detail-fade)),transparent);animation:detail-fade linear both;animation-timeline:scroll(self)}
+  .detail-close{display:none}
 }
 @media(prefers-reduced-motion:reduce){
   *:not(.spinner),*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}

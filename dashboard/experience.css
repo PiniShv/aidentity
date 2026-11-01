@@ -1,181 +1,138 @@
-/* Focus panel: a Works Wheel reel (adapted from 21st.dev) above the app's ring of keys, beside a native app/account list. */
+/* Explore: a focus panel with the chosen app's profiles as keys (every profile action lives there), beside a navigator of apps. */
 .xp-wrap{background:var(--ground);color:var(--text);padding:32px;min-width:0}
 /* Zero-specificity reset, so .xp-* classes win without important flags. Disabled Explore buttons only dim:
-   the base button:disabled colour skips .xp-wrap (styles.css), so tinted buttons keep their colour. */
+   the base button:disabled colour skips .xp-wrap (styles.css), so filled buttons keep their colour. */
 :where(.xp-wrap) button,:where(.xp-wrap) select{font:inherit;color:inherit}
 :where(.xp-wrap) button{cursor:pointer}
 .xp-wrap button:is(:disabled,[aria-disabled="true"]){opacity:.55;cursor:default}
-.xp-wrap button:focus-visible,.xp-wrap select:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.xp-wrap :is(button,select,summary):focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 
 /* Header */
-.xp-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:28px}
+.xp-header{margin-bottom:28px}
 .xp-wrap>.notice{margin-bottom:28px}
 .xp-header h1{font-size:28px;font-weight:600;letter-spacing:-.035em;line-height:1.2;margin:0}
 .xp-header p{color:var(--muted);font-size:13px;line-height:1.5;margin:10px 0 0}
 
-/* Buttons */
+/* Buttons: neutral by default. Only a running key's Bring to front takes the app hue. */
 .xp-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--control);border-radius:8px;background:var(--surface);font-size:13px;white-space:nowrap;transition:background-color 160ms ease,border-color 160ms ease,transform 360ms var(--spring-control)}
 .xp-button svg{width:15px;height:15px;flex-shrink:0}
 .xp-button:hover:not(:disabled,[aria-disabled="true"]){background:var(--raised);border-color:var(--muted)}
 .xp-button:active:not(:disabled,[aria-disabled="true"]){transform:scale(.97);transition-duration:80ms}
-.xp-workspace{background:transparent;margin-top:2px}
+/* One Open everywhere: the secondary, a Raised fill with a 1px field-border edge. A running key's Bring to front is the hue fill with Lampblack ink. */
+.xp-key-action{background:var(--raised);border-color:var(--field-border);font-weight:500}
+.xp-key-action:hover:not(:disabled,[aria-disabled="true"]){background:var(--active);border-color:var(--field-border)}
+.xp-key-running .xp-key-action,.xp-key-running .xp-key-action:hover:not(:disabled,[aria-disabled="true"]){background:var(--app-color,var(--text));border-color:transparent;color:var(--ground)}
+.xp-key-running .xp-key-action:hover:not(:disabled,[aria-disabled="true"]){background:color-mix(in srgb,var(--app-color,var(--text)) 90%,var(--text))}
+/* Outside an app scope (no apps at all) the primary is Bone. */
+.xp-primary,.xp-primary:hover:not(:disabled,[aria-disabled="true"]){background:var(--text);border-color:transparent;color:var(--ground);font-weight:500}
 
-/* Focus panel. Fixed height, so switching apps never shifts the layout. */
-.xp-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start;gap:28px}
-.xp-preview{position:sticky;top:24px;display:flex;flex-direction:column;gap:14px;height:556px;padding:16px 18px;border:1px solid var(--border);border-radius:14px;min-width:0;isolation:isolate;overflow:hidden;background:radial-gradient(ellipse 110% 50% at 50% 110%,color-mix(in srgb,var(--app-color,var(--accent)) 16%,transparent),transparent 85%),var(--card);border-color:color-mix(in srgb,var(--app-color,var(--accent)) 28%,var(--border))}
-.xp-preview-top{display:flex;align-items:center;gap:10px;min-height:36px;color:var(--muted);font-size:12px;line-height:16px}
-.xp-position{font-variant-numeric:tabular-nums}
-.xp-jump-label{margin-left:auto;width:min(180px,45%)}
+/* The panel takes the width; the navigator is a narrow column. fitSticky drops sticky when the panel is taller than the view. */
+.xp-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,300px);align-items:start;gap:28px}
+.xp-preview{position:sticky;top:24px;display:flex;flex-direction:column;gap:16px;padding:18px;border:1px solid var(--border);border-radius:14px;min-width:0;background:var(--card);scroll-margin-top:24px;container:xp-panel/inline-size}
+.xp-preview.xp-tall{position:relative;top:auto}
+/* Pager: Prev, "N of M", Next and the jump select; hidden when only one app has profiles. */
+.xp-pager{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;line-height:16px}
+.xp-position{min-width:6ch;text-align:center;font-variant-numeric:tabular-nums}
+.xp-prev,.xp-next{width:36px;flex:none;padding:0}
+.xp-prev svg,.xp-next svg{width:18px;height:18px}
+.xp-jump-label{margin-left:auto;width:min(200px,50%)}
 .xp-jump{min-height:36px;width:100%;padding:6px 9px;border:1px solid var(--control);border-radius:8px;background:var(--ground);cursor:pointer;text-overflow:ellipsis}
-/* The reel: one app identity at rest, a short drum turn between apps. */
-.xp-frame{display:flex;align-items:center;gap:10px}
-.xp-prev,.xp-next{width:36px;flex:none;padding:0;font-size:18px}
-.xp-wheel{position:relative;flex:1;min-width:0;height:64px;overflow:hidden;pointer-events:none}
-.xp-wheel-plane{position:absolute;top:50%;left:50%;transform-style:preserve-3d}
-.xp-wheel-card{position:absolute;backface-visibility:hidden;transform-style:preserve-3d}
-.xp-moving .xp-wheel-card{will-change:transform,opacity}
-.xp-face{display:flex;align-items:center;gap:14px;width:100%;height:100%;padding:0 16px;border:1px solid var(--control);border-radius:12px;overflow:hidden;box-sizing:border-box;background:radial-gradient(ellipse 110% 85% at 0% 110%,color-mix(in srgb,var(--app-color,var(--accent)) 34%,transparent),transparent 78%),radial-gradient(ellipse 100% 70% at 100% 115%,color-mix(in srgb,var(--app-color-secondary,var(--accent)) 24%,transparent),transparent 80%),var(--card);border-color:color-mix(in srgb,var(--app-color,var(--accent)) 42%,var(--border));box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--app-color,var(--accent)) 60%,transparent)}
-.xp-app-icon{width:42px;height:42px;display:grid;place-items:center;flex:none;font-size:30px;color:var(--app-color,var(--accent))}
-.xp-app-icon svg{width:38px;height:38px}
-.xp-face-text{display:flex;flex-direction:column;gap:2px;min-width:0}
-.xp-card-name{font-size:22px;font-weight:550;line-height:1.2;letter-spacing:-.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.xp-card-foot{color:color-mix(in srgb,var(--text) 80%,var(--muted));font-size:12px;line-height:1.4}
-/* The ring: the app's accounts side by side as keys. More than fit scroll inside the panel. */
-.xp-keys{flex:1;min-height:0;display:grid;grid-template-columns:repeat(auto-fit,156px);justify-content:center;align-content:safe center;gap:10px;margin:0;padding:2px;list-style:none;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
-.xp-keys-empty{flex:1;display:flex;align-items:center;justify-content:center;max-width:32ch;margin:0 auto;text-align:center;color:var(--muted);font-size:13px;line-height:1.5}
-.xp-key{position:relative;isolation:isolate;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"badge tag" "name name" "state state" "act act";align-items:center;column-gap:8px;min-width:0;padding:12px;border:1px solid color-mix(in srgb,var(--app-color,var(--accent)) 22%,var(--border));border-radius:12px;background:var(--surface)}
-.xp-key-badge{grid-area:badge;display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:var(--identity);color:var(--identity-ink);font-size:13px;font-weight:600}
-.xp-key-tag{grid-area:tag;justify-self:end;font-size:12px;line-height:16px;color:var(--muted)}
-.xp-key-name{grid-area:name;margin-top:8px;font-size:17px;font-weight:550;line-height:1.3;letter-spacing:-.025em;overflow-wrap:anywhere}
-.xp-key-state{grid-area:state;display:flex;align-items:center;gap:7px;margin-top:2px;font-size:12px;line-height:18px;color:var(--muted)}
-.xp-key-dot{flex:none;width:8px;height:8px;border:1px solid currentColor;border-radius:50%;box-sizing:border-box}
-.xp-key-action,.xp-key-reason{grid-area:act;margin-top:10px}
+/* The app identity. A change stacks the old and new faces in one cell and crossfades them (experience.js). */
+.xp-ident{display:grid}
+.xp-ident>*{grid-area:1/1}
+.xp-face{display:flex;align-items:center;gap:14px;min-width:0}
+/* The app-art tile: a solid app hue with Lampblack ink, or graphite with Bone ink for an app without a hue. */
+.xp-app-icon,.xp-list-icon{display:grid;place-items:center;flex:none;background:var(--app-color,var(--raised));color:var(--app-ink,var(--text))}
+.xp-app-icon{width:44px;height:44px;border-radius:10px;font-size:20px;font-weight:600}
+.xp-app-icon svg{width:24px;height:24px}
+.xp-face-text{min-width:0}
+.xp-card-name{margin:0;font-size:22px;font-weight:550;line-height:1.2;letter-spacing:-.035em;overflow-wrap:anywhere}
+.xp-card-foot{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;margin:3px 0 0;color:var(--muted);font-size:12px;line-height:1.5}
+/* One running mark everywhere: a Mint dot and Mint text. Not running carries no dot. */
+.xp-run{display:inline-flex;align-items:center;gap:6px;color:var(--positive)}
+.xp-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--positive)}
+/* The ring: the app's profiles side by side as keys. 200px columns keep a state such as "Not running · Original" on one line. */
+.xp-keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.xp-key{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto 1fr;grid-template-areas:"badge name" "badge state" "act act";align-items:center;column-gap:10px;min-width:0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.xp-key-name{grid-area:name;font-size:17px;font-weight:550;line-height:1.3;letter-spacing:-.025em;overflow-wrap:anywhere}
+.xp-key-state{grid-area:state;font-size:12px;line-height:18px;color:var(--muted)}
+.xp-key-action,.xp-key-reason{grid-area:act;align-self:end;margin-top:12px}
 .xp-key-action{width:100%}
 .xp-key-reason{font-size:12px;line-height:1.5;color:var(--muted)}
 .xp-key-missing .xp-key-state{color:var(--negative)}
-/* Running keys carry the identity-dot glow, a hue edge and the app-tone bottom glow; no shadow, since keys rest. */
-.xp-key-running{border-color:color-mix(in srgb,var(--app-color,var(--accent)) 60%,var(--border))}
-.xp-key-running:before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:radial-gradient(ellipse 120% 70% at 50% 120%,color-mix(in srgb,var(--app-color,var(--accent)) 18%,transparent),transparent 72%)}
-.xp-key-running .xp-key-state{color:var(--text)}
-.xp-key-running .xp-key-dot{border:0;background:var(--app-color,var(--accent));box-shadow:0 0 12px color-mix(in srgb,var(--app-color,var(--accent)) 48%,transparent)}
-/* The authored moment: a key that starts running lights up once. */
+/* A running key keeps a 1px app-hue edge. No glow; keys rest flat. */
+.xp-key-running{border-color:var(--app-color,var(--text))}
+/* The authored moment: a key that starts running draws its edge once (static under reduced motion). */
 .xp-key-lit{animation:xp-key-edge 900ms var(--ease)}
-.xp-key-lit:before{animation:xp-key-glow 900ms var(--ease)}
-.xp-key-lit .xp-key-dot{animation:xp-key-dot 640ms var(--spring-control)}
-@keyframes xp-key-edge{from{border-color:color-mix(in srgb,var(--app-color,var(--accent)) 22%,var(--border))}}
-@keyframes xp-key-glow{from{opacity:0}}
-@keyframes xp-key-dot{from{transform:scale(.4);box-shadow:0 0 0 transparent}}
-.xp-preview-bottom{display:flex;flex-direction:column;gap:8px}
+@keyframes xp-key-edge{from{border-color:var(--border)}}
 .xp-key-add{width:100%}
-.xp-preview-hint{text-align:center;font-size:12px;line-height:16px;color:var(--muted);margin:0}
+.xp-preview>.xp-help{margin-top:-8px}
+/* A narrow panel (phones, and tablets beside the navigator) lays each key out as one row. */
+@container xp-panel (max-width:380px){
+  .xp-keys{grid-template-columns:minmax(0,1fr)}
+  .xp-key{grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto;grid-template-areas:"badge name act" "badge state act";padding:10px 12px}
+  .xp-key-name{font-size:15px}
+  .xp-key-action,.xp-key-reason{align-self:center;margin-top:0;width:auto}
+  .xp-key-reason{max-width:14ch}
+}
 
-/* App and account list */
-.xp-list-summary{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:12px;line-height:16px;margin:0 0 12px;padding:0 2px}
-.xp-app-group{padding:18px;border:1px solid var(--border);border-radius:12px;margin-bottom:16px;scroll-margin-top:24px;transition:border-color 160ms ease,background-color 160ms ease;border-color:color-mix(in srgb,var(--app-color,var(--accent)) 20%,var(--border))}
-.xp-app-header{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.xp-app-heading{margin:0;min-width:0;font:inherit}
-.xp-app-select{display:flex;align-items:center;gap:12px;min-width:0;min-height:44px;border:0;background:none;padding:0;text-align:left;border-radius:8px}
-.xp-app-select>span:last-child{min-width:0}
-.xp-app-name{display:block;font-size:17px;line-height:1.3;letter-spacing:-.025em;font-weight:550;overflow-wrap:anywhere;color:var(--text)}
-.xp-list-icon{display:grid;place-items:center;width:36px;height:36px;font-size:24px;flex:none}
-.xp-list-icon svg{width:30px;height:30px}
-.xp-app-meta{display:block;color:var(--muted);font-size:12px;line-height:1.4;margin-top:3px}
-.xp-add{flex:none}
-.xp-add,.xp-key-add,.xp-key-action{border-color:color-mix(in srgb,var(--app-color,var(--accent)) 34%,var(--control));color:var(--app-color,var(--accent))}
-.xp-accounts{padding:0;margin:14px 0 0;list-style:none}
-.xp-account{display:flex;gap:10px;align-items:center;padding:13px 0;border-top:1px solid var(--border)}
-.xp-account:last-child{padding-bottom:0}
-.xp-badge{display:grid;place-items:center;position:relative;flex:none;width:30px;height:34px;border:1px solid var(--identity);border-radius:8px;background:var(--surface);color:var(--text);font-size:12px;font-weight:600;overflow:hidden}
-.xp-badge:after{content:"";position:absolute;bottom:0;height:3px;left:0;right:0;background:var(--identity)}
-.xp-account-info{min-width:0;flex:1}
-.xp-account-info strong{display:block;font-size:13px;line-height:1.4;font-weight:500;overflow-wrap:anywhere}
-.xp-account-status{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin-top:3px}
-.xp-running{color:var(--positive)}
-.xp-missing{color:var(--negative)}
-.xp-account-actions{display:flex;gap:6px;align-items:center;flex:none}
-.xp-account-actions .xp-button{min-height:32px;padding:0 10px}
-.xp-manage{background:transparent;color:var(--muted)}
-.xp-account-empty{font-size:12px;line-height:1.5;color:var(--muted);padding-top:14px;margin:14px 0 0;border-top:1px solid var(--border)}
-.xp-help{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin:3px 0 0}
-.xp-app-group>.xp-help{margin-top:10px}
-.xp-inline-feedback{font-size:12px;line-height:1.5;color:var(--negative);margin:14px 0 0}
+/* One badge everywhere: a filled rounded square in the saved colour, ink by the Ink Rule. */
+.xp-key-badge{grid-area:badge;display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:var(--identity);color:var(--identity-ink);font-size:13px;font-weight:600}
 
-/* Empty state */
+/* Navigator: one row per app with profiles. A row chooses the app; profile actions live only on the keys. */
+.xp-list-summary{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:12px;line-height:16px;margin:0 0 10px;padding:0 12px}
+.xp-nav{display:grid;gap:4px;margin:0 0 16px;padding:0;list-style:none}
+.xp-nav-item{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:10px 12px;border:1px solid transparent;border-radius:12px;background:none;text-align:left;transition:background-color 160ms ease,border-color 160ms ease}
+.xp-nav-item:hover{background:var(--raised)}
+.xp-nav-item[aria-current="true"]{border-color:var(--app-color,var(--muted));background:var(--surface)}
+.xp-nav-text{min-width:0}
+.xp-app-name{display:block;font-size:15px;line-height:1.3;letter-spacing:-.015em;font-weight:550;overflow-wrap:anywhere;color:var(--text)}
+.xp-app-meta{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;margin-top:2px;color:var(--muted);font-size:12px;line-height:1.5}
+.xp-list-icon{width:36px;height:36px;border-radius:8px;font-size:16px;font-weight:600}
+.xp-list-icon svg{width:20px;height:20px}
+.xp-add{flex:none;padding:0 10px}
+.xp-help{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin:0}
+.xp-inline-feedback{font-size:12px;line-height:1.5;color:var(--negative);margin:0}
+/* Apps with no profiles yet: one disclosure of one-line neutral rows. */
+.xp-other{border:1px solid var(--border);border-radius:12px;background:var(--card)}
+.xp-other-summary{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 18px;border-radius:12px;color:var(--muted);font-size:13px;cursor:pointer;list-style:none}
+.xp-other-summary::-webkit-details-marker{display:none}
+.xp-other-summary:hover{color:var(--text)}
+.xp-other-summary:before{content:"";width:6px;height:6px;margin:0 2px 0 1px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(-45deg);transition:transform 160ms var(--ease)}
+.xp-other[open]>.xp-other-summary:before{transform:rotate(45deg)}
+.xp-other-list{list-style:none;margin:0;padding:0 18px 6px}
+.xp-other-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--border)}
+.xp-other-name{min-width:0;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+
+/* Empty states */
+.xp-start{display:grid;gap:16px;max-width:640px}
 .xp-empty{padding:32px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
 .xp-empty h2{font-size:22px;font-weight:550;letter-spacing:-.03em;margin:0 0 10px}
-.xp-empty p{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 20px}
-.xp-empty-add{width:auto}
+.xp-empty p{color:var(--muted);font-size:14px;line-height:1.5;margin:0}
+.xp-empty-add{width:auto;margin-top:20px}
 .xp-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-
-/* Reduced motion: the wheel sets transforms inline, so these need important flags. */
-.xp-reduced .xp-wheel-plane{transform:none!important}
-.xp-reduced .xp-wheel-card{transform:none!important}
-.xp-reduced *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-
-/* App colors carry the same vivid, softly lit character as the reference board. */
-.xp-preview-top>span:first-child{display:flex;align-items:center;gap:8px}
-.xp-preview-top>span:first-child:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--app-color,var(--accent));box-shadow:0 0 12px color-mix(in srgb,var(--app-color,var(--accent)) 48%,transparent)}
-.xp-primary,.xp-primary:hover:not(:disabled,[aria-disabled="true"]),.xp-key-add-first,.xp-key-add-first:hover:not([aria-disabled="true"]),.xp-key-running .xp-key-action,.xp-key-running .xp-key-action:hover:not([aria-disabled="true"]){background:var(--app-color,var(--accent));border-color:var(--app-color,var(--accent));color:var(--ground)}
-.xp-app-group,.xp-app-group.xp-selected{background:linear-gradient(110deg,color-mix(in srgb,var(--app-color,var(--accent)) 9%,transparent),transparent 58%),var(--card);box-shadow:inset 0 -1px 0 color-mix(in srgb,var(--app-color,var(--accent)) 18%,transparent)}
-.xp-app-group.xp-selected{border-color:color-mix(in srgb,var(--app-color,var(--accent)) 65%,var(--border))}
-.xp-list-icon,.xp-selected .xp-list-icon{color:var(--app-color,var(--accent))}
-.xp-add:hover:not(:disabled,[aria-disabled="true"]),.xp-key-add:not(.xp-key-add-first):hover:not([aria-disabled="true"]),.xp-key-action:hover:not([aria-disabled="true"]){background:color-mix(in srgb,var(--app-color,var(--accent)) 13%,var(--surface));border-color:var(--app-color,var(--accent))}
-.xp-open{color:var(--app-color,var(--accent))}
 
 /* Breakpoints */
 @media(max-width:1100px) and (min-width:768px){
   .xp-wrap{padding:28px 24px}
-  .xp-layout{gap:20px}
-  .xp-app-group{padding:15px}
-  .xp-app-header{flex-wrap:wrap}
-  .xp-app-heading{flex:1}
-  .xp-add{padding:0 9px}
-  .xp-account{flex-wrap:wrap;gap:9px}
-  .xp-account-info{min-width:100px}
-  .xp-account-actions{margin-left:39px}
+  .xp-layout{gap:20px;grid-template-columns:minmax(0,1fr) minmax(220px,260px)}
 }
 @media(max-width:767px){
   .xp-wrap{padding:24px 18px}
-  .xp-header{gap:12px;margin-bottom:18px}
+  .xp-header{margin-bottom:18px}
   .xp-header h1{font-size:24px}
-  .xp-header p{max-width:250px;margin-top:8px}
-  .xp-workspace{padding:0 10px;min-height:44px}
   .xp-layout{grid-template-columns:minmax(0,1fr);gap:22px}
-  .xp-preview{position:relative;top:auto;height:356px;padding:12px 14px;gap:12px;border-radius:12px}
-  .xp-preview-top{min-height:16px;line-height:14px}
-  .xp-jump-label,.xp-preview-hint{display:none}
+  .xp-preview{position:relative;top:auto;padding:14px;gap:14px;border-radius:12px;scroll-margin-top:80px}
+  .xp-jump-label{display:none}
   .xp-prev,.xp-next{width:44px;min-height:44px}
-  .xp-wheel{height:56px}
-  .xp-face{gap:10px;padding:0 12px}
-  .xp-app-icon{width:28px;height:28px;font-size:22px}
-  .xp-app-icon svg{width:26px;height:26px}
-  .xp-card-name{font-size:17px}
-  /* On a phone the ring is one row that scrolls sideways, so its height never changes. */
-  .xp-keys{display:flex;justify-content:safe center;align-items:stretch;overflow:auto hidden;scroll-snap-type:x mandatory;padding:2px 2px 6px}
-  .xp-key{flex:0 0 150px;scroll-snap-align:start}
-  .xp-key-action,.xp-key-add{min-height:44px}
-  .xp-app-group{padding:16px;margin-bottom:14px;scroll-margin-top:80px}
-  .xp-add{min-height:44px;padding:0 10px}
-  .xp-account{padding:14px 0;flex-wrap:wrap}
-  .xp-account-info{min-width:135px}
-  .xp-account-actions{margin-left:40px;gap:8px}
-  .xp-account-actions .xp-button{min-height:44px;padding:0 13px}
-  .xp-account-info strong{font-size:14px}
-}
-@media(max-width:390px){
-  .xp-header{flex-wrap:wrap;gap:10px}
-  .xp-header p{max-width:none}
-  .xp-app-header{gap:8px}
-  .xp-app-select{gap:9px}
-  .xp-list-icon{width:30px}
-  .xp-add{padding:0 8px}
-  .xp-account-info{min-width:120px}
+  .xp-app-icon{width:40px;height:40px;font-size:17px}
+  .xp-app-icon svg{width:22px;height:22px}
+  .xp-card-name{font-size:19px}
+  .xp-key-action,.xp-key-add,.xp-add{min-height:44px}
+  .xp-other-summary{min-height:48px;padding:0 16px}
+  .xp-other-list{padding:0 16px 6px}
 }
 @media(prefers-reduced-motion:reduce){
   .xp-wrap *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
   .xp-wrap .xp-button:active:not(:disabled,[aria-disabled="true"]){transform:none}
-}
-/* The scroll-to-switch hint applies only where the wheel listens. */
-@media not all and (hover:hover) and (pointer:fine){
-  .xp-preview-hint{display:none}
 }
