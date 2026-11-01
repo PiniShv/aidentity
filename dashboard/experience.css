@@ -1,5 +1,5 @@
 /* Explore: a focus panel with the chosen app's profiles as keys (every profile action lives there), beside a navigator of apps. */
-.xp-wrap{background:var(--ground);color:var(--text);min-width:0} /* no padding: #main's gutters, the same in every view */
+.xp-wrap{color:var(--text);min-width:0} /* no padding or fill: #main's gutters and the ambient ground, the same in every view */
 /* Zero-specificity reset, so .xp-* classes win without important flags. Disabled Explore buttons only dim:
    the base button:disabled colour skips .xp-wrap (styles.css), so filled buttons keep their colour. */
 :where(.xp-wrap) button,:where(.xp-wrap) select{font:inherit;color:inherit}
@@ -126,3 +126,10 @@
   .xp-wrap *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
   .xp-wrap .xp-button:active:not(:disabled,[aria-disabled="true"]){transform:none;opacity:.78} /* the press stays visible without movement */
 }
+
+/* The ambient ground, adapted from 21st.dev's Background ASCII Dither (nikolas-sapa): a Bone glyph field drawn by experience.js.
+   The shell paints above it; the skip link (z 100) sits outside the shell, and dialogs and toasts are in the top layer. */
+.ambient{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;color:var(--text)}
+.app-shell{position:relative;z-index:1}
+/* Increased contrast and forced colours return the solid ground; experience.js draws nothing either. */
+@media(prefers-contrast:more),(forced-colors:active){.ambient{display:none}}

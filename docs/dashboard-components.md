@@ -1,6 +1,6 @@
 # Dashboard components
 
-The dashboard adapts retrieved 21st.dev component source to dependency-free vanilla JavaScript and CSS. The CLI remains the source of profile data and operations. React, Radix, Base UI, Tailwind, Motion, and Lucide runtime dependencies were replaced with native elements, inline SVG, CSS, and Web Animations.
+The dashboard adapts retrieved 21st.dev component source to dependency-free vanilla JavaScript and CSS. The CLI remains the source of profile data and operations. React, Radix, Base UI, Tailwind, Motion, and Lucide runtime dependencies were replaced with native elements, inline SVG, a 2D canvas, CSS, and Web Animations.
 
 | UI category | Retrieved component | Adaptation |
 | --- | --- | --- |
@@ -12,6 +12,7 @@ The dashboard adapts retrieved 21st.dev component source to dependency-free vani
 | Buttons | [Button by Origin UI](https://21st.dev/@originui/components/button), demo 146 | Primary, outline, secondary and destructive variants with a loading overlay that preserves button size. |
 | Loading | [Button Spinner by uiable](https://21st.dev/@uiable/components/uiable-spinner-button), demo 19975 | CSS border spinner inside pending actions with visible text and `aria-busy`. |
 | Notifications | [Toast by cnippet-dev](https://21st.dev/@cnippet-dev/components/toast), demo 24297 | Stacked status notifications, entrance/exit transitions, hover pause, timed dismissal, dismiss and activity actions. |
+| Background | [Background ASCII Dither by nikolas-sapa](https://21st.dev/@nikolas-sapa/components/background-ascii-dither), demo 32067 | One fixed canvas under the whole dashboard in the component's ascii mode: its noise, glyph ramp and pointer boost at 14px cells and a 140px radius. The noise picks only the glyph, without the original's gamma or per-glyph alpha: every glyph is Bone at a flat 12%, so brightness is glyph density and the pointer shows as denser glyphs. The loop runs at 30fps at most and pauses while the tab is hidden. Reduced motion draws one still frame; increased contrast and forced colors hide the canvas. The image source, the dither and dot modes and the theme observer were dropped. |
 | Explore preview | None; written for this dashboard | The focus panel shows the selected app's profiles side by side as keys (badge, status, Original mark, Open or Bring to front), and a list beside it picks the app. The app identity crossfades in 160ms, with a static swap under reduced motion. Nothing switches apps on scroll. |
 
 The workspace uses near-black surfaces (`#060606`, `#0c0c0c`), warm-white text

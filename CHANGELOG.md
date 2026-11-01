@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a 3D preview adapted from 21st.dev's Works Wheel. The optional dashboard needs Python 3.9+ without extra
   packages and is bundled into the same single-file install.
 
+- The dashboard's ground is a slow field of faint glyphs behind the sidebar and
+  the workspace, adapted from 21st.dev's Background ASCII Dither. It holds still
+  under reduced motion and is gone under increased contrast.
+
 - A 31-second film, at the top of the README and in the first section of the
   site. It shows the problem first: to switch accounts, you sign out and sign in
   again, and you lose your open chats. Then it shows every account open at

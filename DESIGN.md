@@ -203,14 +203,14 @@ components:
 
 **Creative North Star: "The Keyring"**
 
-The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Color comes in two layers that never share a form. Apps: an app that has profiles gets one bright hue from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Sections: each part of the dashboard owns one deep tile color, a rounded square with a Bone glyph, as in macOS System Settings. Apart from those two layers and status, nothing on screen is colored. There is no second hue for an app, no gradient in a hue and no glow.
+The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, under a slow ambient field of glyphs in Bone at 12%, and text is Bone. Color comes in two layers that never share a form. Apps: an app that has profiles gets one bright hue from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Sections: each part of the dashboard owns one deep tile color, a rounded square with a Bone glyph, as in macOS System Settings. Apart from those two layers and status, nothing on screen is colored. There is no second hue for an app, no gradient in a hue and no glow.
 
 Density is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.
 
-Motion is brief and springy, and it never overshoots: every surface opens on a click, not a flick, so every spring is critically damped. Controls press to 0.97 on pointer-down and spring back, dialogs rise and scale in from 0.96, panels leave the way they came, pages crossfade, and the sidebar highlight slides to the new page. Hover moves nothing; it changes fill and border. With reduced motion on, the springs and both crossfades become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.
+Motion is brief and springy, and it never overshoots: every surface opens on a click, not a flick, so every spring is critically damped. Controls press to 0.97 on pointer-down and spring back, dialogs rise and scale in from 0.96, panels leave the way they came, pages crossfade, and the sidebar highlight slides to the new page. Hover moves nothing; it changes fill and border. With reduced motion on, the springs and both crossfades become static swaps, the ambient field holds one still frame, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.
 
 **Key Characteristics:**
-- Warm black ground, warm off-white text, graphite steps in between.
+- Warm black ground under a faint drifting glyph field, warm off-white text, graphite steps in between.
 - One flat hue per app with profiles, assigned once and kept for that app everywhere; apps without profiles stay neutral.
 - One deep tile color per section, on its sidebar row, its page title and its operation cards.
 - Flat tonal cards; shadow only on floating layers.
@@ -259,7 +259,7 @@ A section color appears in four places only: its sidebar tile, its current-page 
 - **Control** (`control`): borders of dialogs, toasts, Explore buttons and dashed empty states.
 - **Field border** (`field-border`): text fields, selects and file inputs (3.6–3.9:1 on every surface), the edge of the secondary (Open) button, and the ring that makes the Graphite swatch visible.
 - **Tip** (`tip`): toast ground.
-- **Bone** (`bone`): primary text, the default primary button fill, the tab indicator.
+- **Bone** (`bone`): primary text, the default primary button fill, the tab indicator, and the ambient field's glyphs at 12%.
 - **Muted** (`muted`): secondary text, idle nav items, idle tabs, placeholders.
 
 ### Status
@@ -270,7 +270,7 @@ A section color appears in four places only: its sidebar tile, its current-page 
 - The Running tab count turns Mint while it is above zero; a finding marked ok has a Mint check. In the Workspace health summary, the OK, warning and error numbers take Mint, Amber and Negative while above zero; their words stay Muted.
 
 ### Increased contrast
-Under `prefers-contrast: more`, Muted becomes #b4b2aa (7.3:1 on Warning bg, 8.7:1 on Raised, 9.5:1 on Lampblack), Border takes the Button edge, Control the Field border, the Button edge becomes Muted, the Field border #9a988f, the Danger edge Negative, and every material turns solid. Hues and Bone stay as they are.
+Under `prefers-contrast: more`, Muted becomes #b4b2aa (7.3:1 on Warning bg, 8.7:1 on Raised, 9.5:1 on Lampblack), Border takes the Button edge, Control the Field border, the Button edge becomes Muted, the Field border #9a988f, the Danger edge Negative, and every material turns solid. The ambient field is gone, here and under forced colors, so the ground is solid Lampblack. Hues and Bone stay as they are.
 
 ### Named Rules
 **The Two Layers Rule.** A bright hue means an app that has profiles; a deep tile color means a section of the dashboard; Mint, Amber and Negative mean status. Everything else stays on the Lampblack-to-Bone ramp: card surfaces, text, apps without profiles and the counts that are not status.
@@ -321,7 +321,7 @@ Breakpoints in use: 390px, 767/768px, 900/901px, 1100px (Explore gap), 1150px an
 
 ## Elevation & Depth
 
-Tonal, with shadows only when floating. Cards, panels, Explore keys and the sidebar sit flat: depth comes from the step between Lampblack, Surface and Raised and from 1px borders. Hover draws a card's border in the app hue (Muted on a neutral card) and does not move it. A running profile card draws a full 1px hue border, and so does the chosen navigator row (Muted for an app with no hue). A selected profile card adds a 2px Bone outline at a 2px offset, so a card that is selected and running shows both. A running Explore key draws a plain 1px hue edge and lights it once when it starts.
+Tonal, with shadows only when floating. Under everything lies the ambient field: the sidebar, the top bar and the open canvas show it, and every filled surface covers it. Cards, panels, Explore keys and the sidebar sit flat: depth comes from the step between Lampblack, Surface and Raised and from 1px borders. Hover draws a card's border in the app hue (Muted on a neutral card) and does not move it. A running profile card draws a full 1px hue border, and so does the chosen navigator row (Muted for an app with no hue). A selected profile card adds a 2px Bone outline at a 2px offset, so a card that is selected and running shows both. A running Explore key draws a plain 1px hue edge and lights it once when it starts.
 
 ### Shadow Vocabulary
 - **Dialog** (`--shadow-dialog`): modal dialogs and the mobile bottom sheet.
@@ -333,6 +333,8 @@ The fixed chrome that content passes under is a translucent layer, not a shadow:
 
 ### Named Rules
 **The Floating-Only Shadow Rule.** A shadow means the layer floats above the page (dialogs, toasts). Resting cards and keys never get one, and no hue ever glows; identity and running state are a border or a dot, never height or light.
+
+**The Ambient Ground Rule.** The glyph field is the only thing that moves at rest. It is neutral, every glyph Bone at a flat 12% and never a hue, and it lies under every layer; brightness is glyph density, not ink. It drifts at no more than 30 frames a second, grows denser near the pointer and pauses while the tab is hidden; under reduced motion it holds one still frame, and under increased contrast and forced colors it is gone. At 12% Muted text keeps 4.6:1 over any glyph; 13% would leave 4.5:1 with no margin, so 12% is the ceiling.
 
 ## Shapes
 
@@ -424,7 +426,7 @@ When a poll or action can't reach the dashboard server, a banner says "The dashb
 - **Do** define a new hue only as a `--hue-*` token; both scripts read the palette from CSS.
 - **Do** give a new section a `--tile-*` token and a `.section-<view>` class, and give a destructive operation the Brick tile.
 - **Do** put Lampblack (#060606) text on any app-colored fill; every hue clears 6.2:1.
-- **Do** keep text at Muted (#8d8b84) or brighter and at 12px or larger. Muted on Raised (5.4:1) is the lowest text pairing in use.
+- **Do** keep text at Muted (#8d8b84) or brighter and at 12px or larger. Muted on Raised (5.4:1) is the lowest text pairing on a surface; over an ambient field glyph Muted is 4.6:1.
 - **Do** show keyboard focus as a 2px outline in the current accent, offset 4px (swatches use Bone at 3px; controls inside clipping boxes use an inset ring).
 - **Do** give every spring and crossfade a reduced-motion path that keeps the feedback.
 - **Do** keep controls at least 36px tall on desktop (swatches 32px) and 44px below 768px.

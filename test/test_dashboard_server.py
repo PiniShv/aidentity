@@ -493,6 +493,30 @@ class DashboardTests(unittest.TestCase):
         self.assertIn(b"Accounts", response.read())
         connection.close()
 
+    def test_page_serves_the_ambient_field_and_increased_contrast_hides_it(self):
+        folder = SERVER_PATH.parent
+        assets = {path: (folder / name).read_text(encoding="utf-8")
+                  for path, name in (("/", "index.html"), ("/experience.css", "experience.css"))}
+        server = self.module.make_server(self.backend, port=0, assets=assets)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        served = {}
+        try:
+            for path in assets:
+                connection = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=4)
+                connection.request("GET", path)
+                response = connection.getresponse()
+                self.assertEqual(response.status, 200)
+                served[path] = response.read().decode()
+                connection.close()
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
+        self.assertRegex(served["/"], r'<body>\s*<canvas class="ambient" aria-hidden="true"></canvas>')
+        self.assertRegex(served["/experience.css"],
+                         r"@media\(prefers-contrast:more\)[^{]*\{\.ambient\{display:none\}")
+
     def test_unknown_fields_option_injection_and_wrong_types_are_rejected(self):
         invalid = [
             {"action": "exec", "command": "touch sentinel"},

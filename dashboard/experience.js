@@ -271,3 +271,83 @@
   }
   window.AidentityExperience = { mount };
 })();
+
+/* The ambient ground: a slow field of Bone glyphs behind the whole dashboard, adapted from 21st.dev's
+ * Background ASCII Dither (nikolas-sapa) in its ascii mode. At most 30fps, paused while the tab is hidden,
+ * one still frame under reduced motion, nothing at all under increased contrast or forced colours.
+ */
+(() => {
+  "use strict";
+  // Every glyph is Bone at 12% on Lampblack (#222), where Muted text keeps 4.6:1; 0.13 leaves 4.50:1, no margin, so 0.12 is the ceiling.
+  const INK_MAX = 0.12;
+  const RAMP = " .:-=+*#%@", CELL = 14, RADIUS = 140, FRAME_MS = 33, AWAY = -1e4;
+  const noise = (x, y, t) => (Math.sin(x * 1.7 + t * 0.6) + Math.sin(y * 2.3 - t * 0.4) +
+    Math.sin((x + y) * 1.1 + t * 0.25) + Math.sin(Math.hypot(x - 6, y - 4) * 1.9 - t * 0.7)) / 8 + 0.5;
+
+  function start() {
+    const canvas = document.querySelector("canvas.ambient");
+    const ctx = canvas?.getContext("2d");
+    if (!ctx) return;
+    const reducedQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const plainQuery = window.matchMedia("(prefers-contrast: more), (forced-colors: active)");
+    const target = { x: AWAY, y: AWAY }, cursor = { x: AWAY, y: AWAY };
+    let width = 0, height = 0, ink = "", t = 0, last = 0, frame = 0, resizeTimer = 0;
+
+    // Setting the bitmap size resets the context, so the font and alignment follow it.
+    function size() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      width = canvas.clientWidth; height = canvas.clientHeight;
+      canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const mono = getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim() || "ui-monospace, monospace";
+      ctx.font = `${CELL * 0.85}px ${mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ink = getComputedStyle(canvas).color;
+    }
+    function draw(react) {
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = ink; ctx.globalAlpha = INK_MAX; // flat ink: brightness comes from glyph density
+      const r2 = RADIUS * RADIUS, cols = Math.ceil(width / CELL), rows = Math.ceil(height / CELL);
+      for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
+        const x = gx * CELL + CELL / 2, y = gy * CELL + CELL / 2;
+        let lum = noise(gx * 0.35 + t * 0.22, gy * 0.35, t);
+        if (react) {
+          const d2 = (x - cursor.x) ** 2 + (y - cursor.y) ** 2;
+          if (d2 < r2 * 4) lum = Math.min(1, lum + Math.exp(-d2 / r2) * 0.7);
+        }
+        const ch = RAMP[Math.floor(lum * (RAMP.length - 1))];
+        if (ch !== " ") ctx.fillText(ch, x, y);
+      }
+    }
+    function tick(now) {
+      frame = requestAnimationFrame(tick);
+      if (now - last < FRAME_MS) return;
+      last = now; t += 0.028;
+      cursor.x += (target.x - cursor.x) * 0.12; cursor.y += (target.y - cursor.y) * 0.12;
+      draw(true);
+    }
+    const stop = () => { cancelAnimationFrame(frame); frame = 0; };
+    // Each preference picks one mode: nothing (the CSS hides the canvas), one still frame, or the loop while visible.
+    function run() {
+      stop();
+      if (plainQuery.matches) return;
+      size();
+      if (reducedQuery.matches) draw(false);
+      else if (!document.hidden) frame = requestAnimationFrame(tick);
+    }
+    // The canvas takes no pointer events, so the window reports the pointer.
+    window.addEventListener("pointermove", event => {
+      if (target.x === AWAY) { cursor.x = event.clientX; cursor.y = event.clientY; } // enter at the pointer, not from offscreen
+      target.x = event.clientX; target.y = event.clientY;
+    }, { passive: true });
+    const leave = () => { target.x = target.y = AWAY; };
+    document.documentElement.addEventListener("pointerleave", leave);
+    window.addEventListener("blur", leave);
+    window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(run, 150); });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); else run(); });
+    reducedQuery.addEventListener("change", run);
+    plainQuery.addEventListener("change", run);
+    run();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, { once: true });
+  else start();
+})();
