@@ -33,6 +33,8 @@ class DashboardTests(unittest.TestCase):
             "with open(os.environ['DASHBOARD_TEST_LOG'],'a') as f: f.write(json.dumps(a)+'\\n')\n"
             "d=os.path.join(os.environ['HOME'],'delay')\n"
             "if os.path.exists(d): time.sleep(float(open(d).read()))\n"
+            "f=os.path.join(os.environ['HOME'],'fail')\n"
+            "if os.path.exists(f) and json.load(open(f)) == a: print('cannot read the data root',file=sys.stderr); sys.exit(1)\n"
             "if a == ['list','--json']:\n"
             " print(json.dumps([{'name':'Claude Work','app':'Claude','app_path':'/Apps/Claude.app',"
             "'profile':'Work','data_dir':'/Data/claude-work','main':False,'status':'running',"
@@ -41,6 +43,7 @@ class DashboardTests(unittest.TestCase):
             "'env':['HTTPS_PROXY'], 'own_extensions':False}]))\n"
             "elif a == ['__complete','apps']: print('Claude\\nVisual Studio Code')\n"
             "elif a == ['__complete','restorable']: print('Claude Personal')\n"
+            "elif a == ['__complete','orphans']: print('Claude Personal\\nstray-folder')\n"
             "elif a == ['version']: print('aidentity 1.6.1')\n"
             "elif a and a[0] == 'import':\n"
             " d=json.load(sys.stdin); print(json.dumps({'imported':len(d['launchers'])}))\n"
@@ -140,11 +143,31 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(state["version"], "1.6.1")
         self.assertEqual(state["apps"], [{"name": "Claude"}, {"name": "Visual Studio Code"}])
         self.assertEqual(state["restorable"], [{"name": "Claude Personal"}])
+        self.assertEqual(state["unclaimed"], [{"name": "Claude Personal"}, {"name": "stray-folder"}])
         self.assertEqual(state["profiles"][0]["env"], ["HTTPS_PROXY"])
         self.assertNotIn("private", json.dumps(state))
         self.assertEqual(state["csrf_token"], self.token)
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertNotIn("Access-Control-Allow-Origin", headers)
+
+    def test_unclaimed_data_that_cannot_be_read_is_an_error_not_a_partial_list(self):
+        run = self.backend.run
+        failed = {"ok": False, "exit_code": 1, "stdout": "half a list\n", "stderr": "cannot read the data root"}
+        with mock.patch.object(self.backend, "run",
+                               side_effect=lambda argv: failed if argv == ["__complete", "orphans"] else run(argv)):
+            state = self.backend.state()
+        self.assertEqual(state["unclaimed"], [])
+        self.assertEqual(state["errors"], ["Unclaimed data: cannot read the data root"])
+
+    def test_a_failed_recovery_read_is_flagged_so_the_page_never_claims_an_empty_list(self):
+        for argv, failed, other in ((["__complete", "orphans"], "unclaimed", "restorable"),
+                                    (["__complete", "restorable"], "restorable", "unclaimed")):
+            with self.subTest(failed=failed):
+                (self.root / "fail").write_text(json.dumps(argv))
+                state = self.backend.state(fresh=True)
+                self.assertEqual(state[failed], [])
+                self.assertIs(state[failed + "_ok"], False)
+                self.assertIs(state[other + "_ok"], True)
 
     def test_shell_metacharacters_are_passed_as_one_argument(self):
         name = "Claude Work; touch " + str(self.root / "unwanted")

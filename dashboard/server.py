@@ -306,21 +306,23 @@ class Dashboard:
         return result
 
     def state(self, fresh=False):
-        commands = (["list", "--json"], ["__complete", "apps"], ["__complete", "restorable"], ["version"])
+        commands = (["list", "--json"], ["__complete", "apps"], ["__complete", "restorable"],
+                    ["__complete", "orphans"], ["version"])
         # The reads are independent; the lock still keeps them and every action apart.
-        # A poll can delay an action by up to ~1 s (four CLI reads); accepted so a read never sees a half-applied action.
+        # A poll can delay an action by up to ~1 s (five CLI reads); accepted so a read never sees a half-applied action.
         with self.lock:
             if not fresh and self.state_cache and time.monotonic() - self.state_cache[0] < STATE_TTL:
                 return self.state_cache[1]
             with ThreadPoolExecutor(len(commands)) as pool:
-                listing, apps, restorable, version = pool.map(self.run, commands)
-            self.state_cache = (time.monotonic(), self.inventory(listing, apps, restorable, version))
+                listing, apps, restorable, orphans, version = pool.map(self.run, commands)
+            self.state_cache = (time.monotonic(), self.inventory(listing, apps, restorable, orphans, version))
             return self.state_cache[1]
 
-    def inventory(self, listing, apps, restorable, version):
+    def inventory(self, listing, apps, restorable, orphans, version):
         errors = []
         for label, result in (("Profiles", listing), ("Installed apps", apps),
-                              ("Restorable profiles", restorable), ("Version", version)):
+                              ("Restorable profiles", restorable), ("Unclaimed data", orphans),
+                              ("Version", version)):
             if not result["ok"]:
                 errors.append(label + ": " + redact(result.get("error") or result["stderr"] or
                                                      "aidentity could not read this inventory."))
@@ -344,6 +346,9 @@ class Dashboard:
             "profiles": profiles,
             "apps": [{"name": name} for name in apps["stdout"].splitlines() if name] if apps["ok"] else [],
             "restorable": [{"name": name} for name in restorable["stdout"].splitlines() if name] if restorable["ok"] else [],
+            "unclaimed": [{"name": name} for name in orphans["stdout"].splitlines() if name] if orphans["ok"] else [],
+            # A failed read is not an empty list; the page must not claim "Nothing to restore" for one.
+            "restorable_ok": restorable["ok"], "unclaimed_ok": orphans["ok"],
             "paths": {
                 "launchers": os.path.abspath(self.env.get("AIDENTITY_APPS_DIR") or os.path.join(home, "Applications")),
                 "data": os.path.abspath(self.env.get("AIDENTITY_DATA_ROOT") or os.path.join(home, "Library/Application Support/aidentity/profiles")),

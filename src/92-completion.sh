@@ -3,7 +3,8 @@
 # `aidentity __complete SHELL CWORD WORD...` prints what Tab can offer for the
 # words typed so far, in the form SHELL's script reads (see complete_words).
 # `aidentity __complete WHAT` prints the names of one kind (launchers,
-# restorable or apps), the form that scripts saved from 1.4.0 use. The scripts
+# restorable or apps), the form that scripts saved from 1.4.0 use; orphans is
+# for the dashboard, which names what prune would move. The scripts
 # call it on every Tab, so it prints nothing on stderr and always exits 0,
 # whatever is wrong with the folders it reads.
 cmd_complete() {
@@ -27,6 +28,17 @@ complete_candidates() {
       while IFS= read -r dir; do
         [ -n "$dir" ] || continue
         label=$(restore_label "$dir") || continue
+        printf '%s\n' "$label"
+      done <<EOF
+$(orphan_dirs)
+EOF
+      ;;
+    orphans)     # what prune moves to the Trash, by restore name or folder name
+      while IFS= read -r dir; do
+        [ -n "$dir" ] || continue
+        data_is_ours "$dir" || continue   # prune skips these too
+        label=$(restore_label "$dir") || label=$(basename "$dir")
+        case "$label" in *[[:cntrl:]]*) continue ;; esac
         printf '%s\n' "$label"
       done <<EOF
 $(orphan_dirs)

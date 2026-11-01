@@ -135,6 +135,24 @@ assert_rc "__complete restorable exits 0" 0 "$RUN_RC" "$RUN_ERR"
 has_line "it lists a profile whose launcher was removed" "$RUN_OUT" "Fake Gone"
 lacks_line "and not one that still has a launcher" "$RUN_OUT" "Fake Work"
 
+# prune moves every folder no launcher uses, restore record or not, so the
+# dashboard names each one before it asks.
+mkdir -p "$DATA/loose folder" "$DATA/bad${ESC}[31mname"
+ln -s "$SRC" "$DATA/linked out"
+ai_stdout __complete orphans
+assert_rc "__complete orphans exits 0" 0 "$RUN_RC" "$RUN_ERR"
+assert_eq "and prints nothing on stderr" "" "$RUN_ERR"
+has_line "it lists an orphan by the launcher its restore record rebuilds" "$RUN_OUT" "Fake Gone"
+has_line "and one with no restore record by its folder name" "$RUN_OUT" "loose folder"
+lacks_line "and not a profile that still has a launcher" "$RUN_OUT" "Fake Work"
+lacks_line "and not a link out of the data root" "$RUN_OUT" "linked out"
+assert_not_contains "a folder name with an escape character is left out" "$RUN_OUT" "$ESC"
+assert_not_contains "and no path is printed" "$RUN_OUT" "/"
+ai_stdout __complete restorable
+has_line "__complete restorable still lists the recorded orphan" "$RUN_OUT" "Fake Gone"
+lacks_line "and not the one with no restore record" "$RUN_OUT" "loose folder"
+rm -rf "$DATA/loose folder" "$DATA/bad${ESC}[31mname" "$DATA/linked out"
+
 for what in bogus ""; do
   ai_stdout __complete "$what"
   assert_rc "__complete [$what] exits 0" 0 "$RUN_RC" "$RUN_ERR"
@@ -145,7 +163,7 @@ ai_stdout __complete
 assert_rc "__complete with no argument exits 0" 0 "$RUN_RC" "$RUN_ERR"
 assert_eq "and prints nothing" "$RUN_OUT$RUN_ERR" ""
 
-for what in launchers restorable apps; do
+for what in launchers restorable orphans apps; do
   RUN_OUT=$(AIDENTITY_APPS_DIR="$SB/no/such/folder" AIDENTITY_DATA_ROOT="$SB/no/such/data" \
     AIDENTITY_APP_DIRS="$SB/no/such/apps" detached "$BASH_BIN" "$AIDENTITY" __complete "$what" 2>"$SANDBOX/stderr" </dev/null)
   RUN_RC=$?
