@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-31T19:35:54+00:00",
+  "generatedAt": "2026-11-01T01:12:09+00:00",
   "title": "Design System: aidentity dashboard",
   "extensions": {
     "colorMeta": {
@@ -227,6 +227,14 @@
       "warning-bg": {
         "role": "status",
         "displayName": "Warning Ground"
+      },
+      "button-edge": {
+        "role": "neutral",
+        "displayName": "Button Edge"
+      },
+      "danger-edge": {
+        "role": "neutral",
+        "displayName": "Danger Edge"
       }
     },
     "typographyMeta": {
@@ -236,7 +244,7 @@
       },
       "title": {
         "displayName": "Title",
-        "purpose": "Card and section headings."
+        "purpose": "Card and section headings, profile and app names."
       },
       "body": {
         "displayName": "Body",
@@ -244,11 +252,11 @@
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Buttons, tabs, form labels, page subtitles, the stat line."
+        "purpose": "Buttons, tabs, form labels, page subtitles, Terms headings."
       },
       "meta": {
         "displayName": "Meta",
-        "purpose": "Profile metadata, state rows, counts, help text."
+        "purpose": "Profile metadata, state rows, counts, help text, the Explore summary and position."
       },
       "headline-compact": {
         "displayName": "Headline compact",
@@ -256,7 +264,7 @@
       },
       "card": {
         "displayName": "Card",
-        "purpose": "Dialog, empty-state and Explore reel card titles."
+        "purpose": "Dialog, empty-state and Explore panel app titles."
       },
       "mono": {
         "displayName": "Mono",
@@ -278,11 +286,6 @@
         "name": "input-focus",
         "value": "0 0 0 3px color-mix(in srgb,var(--app-color) 15%,transparent)",
         "purpose": "Focused inputs in app context; --ring-accent outside it."
-      },
-      {
-        "name": "identity-dot-glow",
-        "value": "0 0 12px color-mix(in srgb,var(--app-color) 48%,transparent)",
-        "purpose": "The 8px app dot in the sidebar, the In focus dot, and a running key on Explore."
       }
     ],
     "motion": [
@@ -330,6 +333,11 @@
         "name": "motion-fade",
         "value": "140ms",
         "purpose": "Opacity fades."
+      },
+      {
+        "name": "explore-crossfade",
+        "value": "160ms cubic-bezier(.16,1,.3,1)",
+        "purpose": "App identity change in Explore; a static swap under reduced motion."
       }
     ],
     "breakpoints": [
@@ -346,7 +354,7 @@
         "value": "900px"
       },
       {
-        "name": "explore-stack",
+        "name": "explore-gap",
         "value": "1100px"
       },
       {
@@ -356,10 +364,6 @@
       {
         "name": "medium",
         "value": "1200px"
-      },
-      {
-        "name": "desktop",
-        "value": "1201px"
       }
     ]
   },
@@ -368,33 +372,33 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Bone fill, Lampblack text; the one main action on a neutral screen.",
-      "html": "<button class=\"ds-btn ds-btn-primary\">Launch</button>",
-      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--control,#262624);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-primary{background:var(--text,#f3f2ee);border-color:var(--text,#f3f2ee);color:var(--ground,#060606)}.ds-btn-primary:hover{background:#f3f2ee;border-color:#f3f2ee}"
+      "description": "Bone fill, Lampblack text; the header Add button and the main action outside an app scope.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Add profile</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--button-edge,#4d4c48);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-primary{background:var(--text,#f3f2ee);border-color:var(--text,#f3f2ee);color:var(--ground,#060606)}"
     },
     {
       "name": "App Primary Button",
       "kind": "button",
       "refersTo": "button-primary-app",
-      "description": "Primary action on an app's screens: the app hue with Lampblack text.",
-      "html": "<button class=\"ds-btn ds-btn-app\">Add profile</button>",
-      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--control,#262624);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-app{--app-color:#7c8cff;background:var(--app-color);border-color:var(--app-color);color:#060606}.ds-btn-app:hover{background:color-mix(in srgb,var(--app-color) 90%,#f3f2ee)}.ds-btn-app:focus-visible{outline-color:var(--app-color)}"
+      "description": "Primary action in an app-toned scope: the app hue as a solid fill with Lampblack text.",
+      "html": "<button class=\"ds-btn ds-btn-app\">Bring to front</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--button-edge,#4d4c48);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-app{--app-color:#7c8cff;background:var(--app-color);border-color:var(--app-color);color:#060606}.ds-btn-app:hover{background:color-mix(in srgb,var(--app-color) 90%,#f3f2ee)}.ds-btn-app:focus-visible{outline-color:var(--app-color)}"
     },
     {
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "Raised fill, no border; quieter actions beside a primary.",
-      "html": "<button class=\"ds-btn ds-btn-secondary\">Settings</button>",
-      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--control,#262624);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-secondary{background:var(--raised,#141413);border-color:transparent}.ds-btn-secondary:hover{border-color:var(--muted,#8d8b84)}"
+      "description": "Raised fill with a 1px Field border edge; Open, wherever the profile is not running.",
+      "html": "<button class=\"ds-btn ds-btn-secondary\">Open</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--button-edge,#4d4c48);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-secondary{background:var(--raised,#141413);border-color:var(--field-border,#6f6d66)}.ds-btn-secondary:hover{border-color:var(--muted,#8d8b84)}"
     },
     {
       "name": "Danger Button",
       "kind": "button",
       "refersTo": "button-danger",
-      "description": "Negative text on a tinted border; destructive actions, always confirmed.",
+      "description": "Negative text on a Danger edge border; destructive actions, always confirmed.",
       "html": "<button class=\"ds-btn ds-btn-danger\">Remove</button>",
-      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--control,#262624);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-danger{color:var(--negative,#ff6b5b);border-color:var(--badbg,#2a1210)}.ds-btn-danger:hover{background:var(--badbg,#2a1210);border-color:var(--negative,#ff6b5b)}"
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--button-edge,#4d4c48);border-radius:8px;font:500 13px/1 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text,#f3f2ee);background:transparent;cursor:pointer;transition:background .18s,border-color .18s,transform var(--motion-control,360ms) var(--spring-control,cubic-bezier(.16,1,.3,1))}.ds-btn:active{transform:scale(.97);transition-duration:var(--motion-press,85ms)}.ds-btn:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}.ds-btn-danger{color:var(--negative,#ff6b5b);border-color:var(--danger-edge,#8a2f26)}.ds-btn-danger:hover{background:var(--badbg,#2a1210);border-color:var(--negative,#ff6b5b)}"
     },
     {
       "name": "Search Field",
@@ -402,47 +406,63 @@
       "refersTo": "input",
       "description": "40px field with a leading search icon; the border and ring take the accent on focus.",
       "html": "<label class=\"ds-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"10.5\" cy=\"10.5\" r=\"6.5\"/><path d=\"m16 16 5 5\"/></svg><input class=\"ds-input\" placeholder=\"Search profiles\"></label>",
-      "css": ".ds-search{position:relative;display:flex;align-items:center;width:280px;color:var(--muted,#8d8b84)}.ds-search svg{position:absolute;left:12px;pointer-events:none}.ds-input{width:100%;min-height:40px;padding:9px 12px 9px 37px;border:1px solid var(--field-border,#6f6d66);border-radius:8px;background:var(--raised,#141413);color:var(--text,#f3f2ee);font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:border-color .16s,box-shadow .16s}.ds-input::placeholder{color:var(--muted,#8d8b84)}.ds-input:focus{outline:0;border-color:var(--accent,#5fe08a);box-shadow:0 0 0 3px #5fe08a1a}"
+      "css": ".ds-search{position:relative;display:flex;align-items:center;width:280px;color:var(--muted,#8d8b84)}.ds-search svg{position:absolute;left:12px;pointer-events:none}.ds-input{width:100%;min-height:40px;padding:9px 12px 9px 37px;border:1px solid var(--field-border,#6f6d66);border-radius:8px;background:var(--raised,#141413);color:var(--text,#f3f2ee);font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:border-color .16s,box-shadow .16s}.ds-input::placeholder{color:var(--muted,#8d8b84)}.ds-input:focus{outline:0;border-color:var(--accent,#5fe08a);box-shadow:0 0 0 3px #5fe08a26}"
     },
     {
       "name": "Sidebar Navigation",
       "kind": "nav",
       "refersTo": "nav-item",
-      "description": "40px rows in Muted; the current page is Bone on Raised; app rows carry a glowing hue dot.",
+      "description": "40px rows in Muted; the current page is Bone on Raised; app rows carry a plain 8px hue dot.",
       "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" aria-current=\"page\" href=\"#\">Profiles</a><a class=\"ds-nav-item\" href=\"#\">Applications</a><a class=\"ds-nav-item ds-nav-app\" href=\"#\" style=\"--app-color:#ff8a3d\"><span class=\"ds-dot\"></span>Claude</a></nav>",
-      "css": ".ds-nav{display:flex;flex-direction:column;width:216px;gap:2px;font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-nav-item{display:flex;align-items:center;gap:11px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--muted,#8d8b84);text-decoration:none;transition:background .2s,color .2s}.ds-nav-item:hover{color:var(--text,#f3f2ee);background:var(--surface,#0c0c0c)}.ds-nav-item[aria-current=page]{color:var(--text,#f3f2ee);background:var(--raised,#141413)}.ds-nav-app:hover{background:color-mix(in srgb,var(--app-color) 11%,#060606)}.ds-dot{width:8px;height:8px;border-radius:50%;background:var(--app-color);box-shadow:0 0 12px color-mix(in srgb,var(--app-color) 48%,transparent)}.ds-nav-item:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}"
+      "css": ".ds-nav{display:flex;flex-direction:column;width:216px;gap:2px;font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-nav-item{display:flex;align-items:center;gap:11px;min-height:40px;padding:0 12px;border-radius:8px;color:var(--muted,#8d8b84);text-decoration:none;transition:background .2s,color .2s}.ds-nav-item:hover{color:var(--text,#f3f2ee);background:var(--surface,#0c0c0c)}.ds-nav-item[aria-current=page]{color:var(--text,#f3f2ee);background:var(--raised,#141413)}.ds-nav-app{min-height:36px;font-size:12px}.ds-dot{width:8px;height:8px;border-radius:50%;background:var(--app-color)}.ds-nav-item:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}"
     },
     {
       "name": "Tabs",
       "kind": "nav",
       "refersTo": "tab",
-      "description": "12px labels with a 2px Bone underline that springs to the selected tab.",
-      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button role=\"tab\" aria-selected=\"true\">All <span>4</span></button><button role=\"tab\" aria-selected=\"false\">Running <span>2</span></button></div>",
-      "css": ".ds-tabs{display:flex;gap:22px;border-bottom:1px solid var(--border,#1c1c1b);font:400 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-tabs button{position:relative;min-height:44px;padding:0 1px 11px;border:0;background:none;color:var(--muted,#8d8b84);font:inherit;cursor:pointer}.ds-tabs button[aria-selected=true]{color:var(--text,#f3f2ee)}.ds-tabs button[aria-selected=true]::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--text,#f3f2ee)}.ds-tabs span{color:var(--muted,#8d8b84);padding-left:6px;font-variant-numeric:tabular-nums}.ds-tabs button:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}"
+      "description": "13px labels with a 2px Bone underline that springs to the selected tab; counts live here.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button role=\"tab\" aria-selected=\"true\">All <span>4</span></button><button role=\"tab\" aria-selected=\"false\">Running <span>2</span></button><button role=\"tab\" aria-selected=\"false\">Not running <span>2</span></button></div>",
+      "css": ".ds-tabs{display:flex;gap:24px;border-bottom:1px solid var(--border,#1c1c1b);font:400 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-tabs button{position:relative;min-height:44px;padding:0 1px 11px;border:0;background:none;color:var(--muted,#8d8b84);font:inherit;cursor:pointer}.ds-tabs button[aria-selected=true]{color:var(--text,#f3f2ee)}.ds-tabs button[aria-selected=true]::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--text,#f3f2ee)}.ds-tabs span{color:var(--muted,#8d8b84);padding-left:2px;font-variant-numeric:tabular-nums}.ds-tabs button:focus-visible{outline:2px solid var(--accent,#5fe08a);outline-offset:4px}"
     },
     {
       "name": "Profile Card",
       "kind": "card",
-      "refersTo": "card",
-      "description": "Signature: cover strip, cut-in app tile, app-tinted border and bottom glow; lifts 3px on hover without a shadow.",
-      "html": "<article class=\"ds-profile\" style=\"--app-color:#7c8cff\"><div class=\"ds-cover\"></div><div class=\"ds-body\"><div class=\"ds-art\">W</div><strong class=\"ds-name\">Work</strong><div class=\"ds-meta\"><span>ChatGPT</span><span>2 days ago</span></div><div class=\"ds-state\"><i></i>Running</div><button class=\"ds-open\">Open</button></div></article>",
-      "css": ".ds-profile{position:relative;isolation:isolate;width:230px;overflow:hidden;border-radius:16px;background:linear-gradient(180deg,#0f0f0f,#090909);border:1px solid color-mix(in srgb,var(--app-color) 32%,#1c1c1b);outline:1px solid transparent;color:var(--text,#f3f2ee);font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:transform var(--motion-surface,520ms) var(--spring-surface,cubic-bezier(.16,1,.3,1)),outline-color .2s}.ds-profile::after{content:'';position:absolute;z-index:-1;inset:auto 0 0;height:160px;background:radial-gradient(ellipse 105% 110% at 50% 118%,color-mix(in srgb,var(--app-color) 14%,transparent),transparent 72%)}.ds-profile:hover{transform:translateY(-3px);outline-color:var(--app-color);border-color:color-mix(in srgb,var(--app-color) 65%,#1c1c1b)}.ds-cover{height:58px;background:linear-gradient(115deg,color-mix(in srgb,var(--app-color) 48%,#090909),color-mix(in srgb,#2fd4c0 30%,#090909))}.ds-body{padding:0 16px 16px}.ds-art{display:flex;align-items:center;justify-content:center;width:54px;height:54px;margin-top:-26px;border-radius:14px;border:4px solid var(--surface,#0c0c0c);background:#1f1f1d;font-weight:650;font-size:23px}.ds-name{display:block;padding:16px 0 4px;font-size:17px;font-weight:550}.ds-meta{display:flex;justify-content:space-between;padding:10px 0 14px;font-size:12px;color:var(--muted,#8d8b84);border-top:1px solid var(--border,#1c1c1b)}.ds-state{display:flex;align-items:center;gap:6px;margin-bottom:14px;font-size:12px;color:var(--muted,#8d8b84)}.ds-state i{width:5px;height:5px;border-radius:50%;background:var(--positive,#5fe08a)}.ds-open{width:100%;min-height:40px;border:0;border-radius:8px;background:var(--app-color);color:#060606;font:500 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}.ds-open:focus-visible{outline:2px solid var(--app-color);outline-offset:4px}@media(prefers-reduced-motion:reduce){.ds-profile,.ds-profile:hover{transition:none;transform:none}}"
+      "refersTo": "profile-card",
+      "description": "Signature: app tile with a ringed corner badge beside the profile name, state row, one full-width primary action. Hue is the tile, the Bring to front fill and the border; no cover strip, glow or shadow.",
+      "html": "<article class=\"ds-profile\" style=\"--app-color:#7c8cff\"><div class=\"ds-head\"><span class=\"ds-art\">C<span class=\"ds-badge\">W</span></span><div><h2 class=\"ds-name\">Work</h2><p class=\"ds-app\">ChatGPT</p></div></div><div class=\"ds-state\"><i></i>Running</div><p class=\"ds-meta\">Original account</p><button class=\"ds-open\">Bring to front</button></article>",
+      "css": ".ds-profile{display:flex;flex-direction:column;width:230px;padding:20px;border-radius:16px;background:linear-gradient(180deg,#0f0f0f,#090909);border:1px solid var(--app-color);color:var(--text,#f3f2ee);font:400 14px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;transition:transform var(--motion-surface,520ms) var(--spring-surface,cubic-bezier(.16,1,.3,1)),border-color .14s}.ds-profile:hover{transform:translateY(-3px);border-color:var(--app-color)}.ds-head{display:flex;align-items:center;gap:12px}.ds-art{position:relative;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none;border-radius:12px;background:var(--app-color);color:#060606;font-weight:650;font-size:20px}.ds-badge{position:absolute;right:-6px;bottom:-6px;display:grid;place-items:center;min-width:20px;height:20px;padding:0 4px;border-radius:6px;background:#2fd4c0;outline:2px solid #0f0f0f;color:#060606;font-size:12px;font-weight:600}.ds-name{margin:0;font-size:17px;font-weight:550;letter-spacing:-.015em}.ds-app{margin:3px 0 0;font-size:13px;color:var(--muted,#8d8b84)}.ds-state{display:flex;align-items:center;gap:6px;margin:16px 0 12px;font-size:12px;color:var(--positive,#5fe08a)}.ds-state i{width:8px;height:8px;border-radius:50%;background:var(--positive,#5fe08a)}.ds-meta{margin:-4px 0 14px;font-size:12px;color:var(--muted,#8d8b84)}.ds-open{width:100%;min-height:40px;margin-top:auto;border:0;border-radius:8px;background:var(--app-color);color:#060606;font:500 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}.ds-open:focus-visible{outline:2px solid var(--app-color);outline-offset:4px}@media(prefers-reduced-motion:reduce){.ds-profile,.ds-profile:hover{transition:none;transform:none}}"
+    },
+    {
+      "name": "Explore Key",
+      "kind": "card",
+      "refersTo": "explore-key",
+      "description": "Signature: a profile's badge, name, state and one action. A running key has a 1px hue edge and the Mint running mark, no glow.",
+      "html": "<div class=\"ds-key\" style=\"--app-color:#ff8a3d\"><span class=\"ds-kbadge\">W</span><strong class=\"ds-kname\">Work</strong><span class=\"ds-kstate\"><i></i>Running</span><button class=\"ds-kact\">Bring to front</button></div>",
+      "css": ".ds-key{display:grid;grid-template-columns:auto 1fr;grid-template-areas:'badge name' 'badge state' 'act act';align-items:center;column-gap:10px;width:200px;padding:12px;border:1px solid var(--app-color);border-radius:12px;background:var(--surface,#0c0c0c);color:var(--text,#f3f2ee);font:400 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-kbadge{grid-area:badge;display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:#7c8cff;color:#060606;font-size:13px;font-weight:600}.ds-kname{grid-area:name;font-size:17px;font-weight:550;letter-spacing:-.025em}.ds-kstate{grid-area:state;display:flex;align-items:center;gap:6px;color:var(--positive,#5fe08a)}.ds-kstate i{width:8px;height:8px;border-radius:50%;background:var(--positive,#5fe08a)}.ds-kact{grid-area:act;margin-top:12px;min-height:36px;border:0;border-radius:8px;background:var(--app-color);color:#060606;font:500 13px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}.ds-kact:focus-visible{outline:2px solid var(--app-color);outline-offset:4px}"
+    },
+    {
+      "name": "Explore Navigator Row",
+      "kind": "nav",
+      "refersTo": "navigator-row",
+      "description": "One row per app with profiles: tile, name, profile count and the running mark. It chooses the app and holds no profile actions; the chosen row draws a 1px hue border.",
+      "html": "<button class=\"ds-navrow\" style=\"--app-color:#ff8a3d\" aria-current=\"true\"><span class=\"ds-navtile\">C</span><span><span class=\"ds-navname\">Claude</span><span class=\"ds-navmeta\">3 profiles<span class=\"ds-navrun\"><i></i>1 running</span></span></span></button>",
+      "css": ".ds-navrow{display:flex;align-items:center;gap:12px;width:260px;min-height:60px;padding:10px 12px;border:1px solid transparent;border-radius:12px;background:none;color:var(--text,#f3f2ee);text-align:left;font:400 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer}.ds-navrow:hover{background:var(--raised,#141413)}.ds-navrow[aria-current=true]{border-color:var(--app-color);background:var(--surface,#0c0c0c)}.ds-navtile{display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:8px;background:var(--app-color);color:#060606;font-size:16px;font-weight:600}.ds-navname{display:block;font-size:15px;font-weight:550;letter-spacing:-.015em}.ds-navmeta{display:flex;gap:10px;margin-top:2px;color:var(--muted,#8d8b84)}.ds-navrun{display:inline-flex;align-items:center;gap:6px;color:var(--positive,#5fe08a)}.ds-navrun i{width:8px;height:8px;border-radius:50%;background:var(--positive,#5fe08a)}.ds-navrow:focus-visible{outline:2px solid var(--app-color);outline-offset:4px}"
     },
     {
       "name": "Toast",
       "kind": "custom",
       "refersTo": "toast",
       "description": "Floating status message: Tip ground, Control border, Toast shadow.",
-      "html": "<div class=\"ds-toast\" role=\"status\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 5 5 9-10\"/></svg><div><strong>Profile launched</strong><span>Work is running.</span></div></div>",
-      "css": ".ds-toast{display:flex;align-items:flex-start;gap:11px;width:340px;padding:15px;background:var(--tip,#050505);border:1px solid var(--control,#262624);border-radius:12px;box-shadow:0 10px 30px #0005;color:var(--text,#f3f2ee);font:400 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-toast>svg{color:var(--positive,#5fe08a);margin-top:1px}.ds-toast strong{display:block;font-size:13px;font-weight:550;margin-bottom:3px}.ds-toast span{color:var(--muted,#8d8b84)}"
+      "html": "<div class=\"ds-toast\" role=\"status\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 5 5 9-10\"/></svg><div><strong>Opened Claude Work</strong><span>It opens in its own window.</span></div></div>",
+      "css": ".ds-toast{display:flex;align-items:flex-start;gap:11px;width:340px;padding:15px;background:var(--tip,#050505);border:1px solid var(--control,#262624);border-radius:12px;box-shadow:0 10px 30px #0005;color:var(--text,#f3f2ee);font:400 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-toast>svg{color:var(--positive,#5fe08a);margin-top:1px}.ds-toast strong{display:block;font-size:13px;font-weight:500;margin-bottom:5px}.ds-toast span{color:var(--muted,#8d8b84)}"
     }
   ],
   "narrative": {
     "northStar": "The Keyring",
-    "overview": "The dashboard is one dark ring that holds every account. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: each app gets one color from a fixed eight-hue palette, and that app's account cards, primary action, focus ring and glow all carry it. Apart from status, nothing else on screen is colored.\n\nDensity is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.\n\nMotion is soft and springy. Controls press to 0.97 and spring back, cards rise 3px under the pointer, and desktop dialogs scale in from 0.96 and settle with a small overshoot. With reduced motion on, the springs and spatial scenes are gone, replaced by static, keyboard-reachable content. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.",
+    "overview": "The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: an app that has profiles gets one color from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Apart from status, nothing else on screen is colored. There is no second hue, no gradient in a hue and no glow.\n\nDensity is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.\n\nMotion is soft and springy. Controls press to 0.97 and spring back, cards rise 3px under the pointer, and desktop dialogs scale in from 0.96 and settle with a small overshoot. With reduced motion on, the springs and the short Explore crossfade become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.",
     "keyCharacteristics": [
       "Warm black ground, warm off-white text, graphite steps in between.",
-      "One hue per app, assigned once and kept for that app everywhere.",
+      "One flat hue per app with profiles, assigned once and kept for that app everywhere; apps without profiles stay neutral.",
       "Flat tonal cards; shadow only on floating layers.",
       "Spring motion with a full reduced-motion path.",
       "Platform UI font only; nothing loads from the network.",
@@ -451,12 +471,22 @@
     "rules": [
       {
         "name": "The Identity-Only Rule",
-        "body": "Hue means an app or a status. Everything else stays on the Lampblack-to-Bone ramp. Stat counts and operation cards are neutral.",
+        "body": "Hue means an app that has profiles, or a status. Everything else stays on the Lampblack-to-Bone ramp. Operation cards, counts and apps without profiles are neutral.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Running Mark Rule",
+        "body": "Running is an 8px Mint dot plus \"Running\" in Mint, on cards, the detail panel, Explore keys and the navigator alike, and the running card or key also keeps its 1px hue border. A profile that is not running shows no dot.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat Hue Rule",
+        "body": "A hue is a solid fill, a plain dot, a 1px border or a focus ring. Never a gradient, glow, tinted text, tinted background, tinted secondary button or accent stripe, and never a second hue for the same app.",
         "section": "colors"
       },
       {
         "name": "The Ink Rule",
-        "body": "Text on an app-colored fill is Lampblack. A badge picks whichever of Lampblack (#060606) and white (#ffffff) contrasts more with its saved color; every preset clears 4.83:1.",
+        "body": "Text on an app-colored fill is Lampblack. A badge picks whichever of Lampblack (#060606) and white (#ffffff) contrasts more with its saved color; every preset clears 5.9:1.",
         "section": "colors"
       },
       {
@@ -466,29 +496,35 @@
       },
       {
         "name": "The Tabular Count Rule",
-        "body": "Counts, tab totals and reel positions use tabular numerals.",
+        "body": "Counts, tab totals and the Explore position use tabular numerals.",
         "section": "typography"
       },
       {
         "name": "The Floating-Only Shadow Rule",
-        "body": "A shadow means the layer floats above the page (dialogs, toasts). Resting cards and keys never get one; a glow marks identity or a running account, never height.",
+        "body": "A shadow means the layer floats above the page (dialogs, toasts). Resting cards and keys never get one, and no hue ever glows; identity and running state are a border or a dot, never height or light.",
         "section": "elevation"
       }
     ],
     "dos": [
-      "Do give each app exactly one hue through `--app-color`, and use it for that app's primary action, focus ring, hover outline and bottom glow.",
+      "Do give each app that has profiles exactly one hue through `--app-color`, and use it only for that app's primary fill, app tile, dots, 1px borders and focus ring.",
       "Do define a new hue only as a `--hue-*` token; both scripts read the palette from CSS.",
       "Do put Lampblack (#060606) text on any app-colored fill; every hue clears 6.2:1.",
       "Do keep text at Muted (#8d8b84) or brighter and at 12px or larger. Muted on Raised (5.4:1) is the lowest text pairing in use.",
       "Do show keyboard focus as a 2px outline in the current accent, offset 4px (swatches use Bone at 3px; controls inside clipping boxes use an inset ring).",
-      "Do give every spring and spatial scene a reduced-motion path that keeps the feedback.",
-      "Do keep controls at least 36px tall on desktop and 44px below 768px.",
-      "Do show the server's command for every action (Runs line, Activity); never build it in the browser."
+      "Do give every spring and the Explore crossfade a reduced-motion path that keeps the feedback.",
+      "Do keep controls at least 36px tall on desktop (swatches 32px) and 44px below 768px.",
+      "Do show the server's command for every action (Runs line, Activity); never build it in the browser.",
+      "Do name the primary action Open, or Bring to front when the profile is running, on every surface; Open is always the Secondary (Raised fill, 1px Field border) and Bring to front the hue fill.",
+      "Do mark running with an 8px Mint dot and Mint \"Running\", and show no dot when not running.",
+      "Do default a new badge to the first swatch that is neither the app's hue nor used by that app's other profiles, and ring every badge on a tile in 2px of the surface it sits on."
     ],
     "donts": [
       "Don't add a light theme. The dashboard is dark-only.",
       "Don't bring the site's blue or its light/dark switch into the dashboard. The site is a separate world owned upstream.",
       "Don't put a shadow on a resting card. Shadows belong to dialogs and toasts.",
+      "Don't use a hue as a gradient, a glow, text color, a tinted background or secondary button, or an accent stripe, and don't add a second hue to an app.",
+      "Don't give an app with no profiles a hue, and don't use Mint as an app hue; it is status, the logo and the default accent.",
+      "Don't recolor the header Add button; it is always Bone.",
       "Don't color anything that is neither an app's identity nor a status.",
       "Don't write hex values outside `:root`; use the tokens. The one exception is the `dialog::backdrop` scrim, which mirrors `--scrim` because older browsers don't pass custom properties to `::backdrop`.",
       "Don't load webfonts or any other remote asset.",

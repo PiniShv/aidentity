@@ -8,6 +8,7 @@ colors:
   active: "#1f1f1d"
   border: "#1c1c1b"
   control: "#262624"
+  button-edge: "#4d4c48"
   field-border: "#6f6d66"
   card-top: "#0f0f0f"
   card-bottom: "#090909"
@@ -24,6 +25,7 @@ colors:
   violet: "#b26bff"
   negative: "#ff6b5b"
   negative-bg: "#2a1210"
+  danger-edge: "#8a2f26"
   warning-bg: "#2a2412"
 typography:
   headline:
@@ -70,7 +72,7 @@ typography:
 rounded:
   control: "8px"
   toast: "12px"
-  tile: "14px"
+  tile: "12px"
   card: "16px"
   dialog: "20px"
 spacing:
@@ -109,7 +111,7 @@ components:
     height: "36px"
   button-small:
     typography: "{typography.label}"
-    height: "30px"
+    height: "36px"
     padding: "0 10px"
   input:
     backgroundColor: "{colors.raised}"
@@ -135,10 +137,32 @@ components:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.card}"
     padding: "24px"
+  profile-card:
+    backgroundColor: "{colors.card-top}"
+    rounded: "{rounded.card}"
+    padding: "20px"
+  detail-panel:
+    backgroundColor: "{colors.card-top}"
+    rounded: "{rounded.card}"
+    padding: "24px"
+    width: "320px"
   app-art:
     backgroundColor: "{colors.active}"
     rounded: "{rounded.tile}"
-    size: "54px"
+    size: "44px"
+  badge:
+    textColor: "{colors.lampblack}"
+    rounded: "{rounded.control}"
+    size: "34px"
+  explore-key:
+    backgroundColor: "{colors.surface}"
+    rounded: "{rounded.tile}"
+    padding: "12px"
+  navigator-row:
+    textColor: "{colors.bone}"
+    rounded: "{rounded.tile}"
+    height: "60px"
+    padding: "10px 12px"
   dialog:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.bone}"
@@ -157,15 +181,15 @@ components:
 
 **Creative North Star: "The Keyring"**
 
-The dashboard is one dark ring that holds every account. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: each app gets one color from a fixed eight-hue palette, and that app's account cards, primary action, focus ring and glow all carry it. Apart from status, nothing else on screen is colored.
+The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, and text is Bone. Hue is reserved for identity: an app that has profiles gets one color from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Apart from status, nothing else on screen is colored. There is no second hue, no gradient in a hue and no glow.
 
 Density is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.
 
-Motion is soft and springy. Controls press to 0.97 and spring back, cards rise 3px under the pointer, and desktop dialogs scale in from 0.96 and settle with a small overshoot. With reduced motion on, the springs and spatial scenes are gone, replaced by static, keyboard-reachable content. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.
+Motion is soft and springy. Controls press to 0.97 and spring back, cards rise 3px under the pointer, and desktop dialogs scale in from 0.96 and settle with a small overshoot. With reduced motion on, the springs and the short Explore crossfade become static swaps, and every action stays keyboard-reachable. The dashboard is dark-only. The project site (`site/`) is a separate visual world owned upstream, and this file does not describe it.
 
 **Key Characteristics:**
 - Warm black ground, warm off-white text, graphite steps in between.
-- One hue per app, assigned once and kept for that app everywhere.
+- One flat hue per app with profiles, assigned once and kept for that app everywhere; apps without profiles stay neutral.
 - Flat tonal cards; shadow only on floating layers.
 - Spring motion with a full reduced-motion path.
 - Platform UI font only; nothing loads from the network.
@@ -173,167 +197,198 @@ Motion is soft and springy. Controls press to 0.97 and spring back, cards rise 3
 
 ## Colors
 
-A warm graphite ramp from Lampblack to Bone, lit only by eight app hues and two status colors.
+A warm graphite ramp from Lampblack to Bone, lit only by seven app hues and the status colors.
 
 ### Primary
-The eight app hues, defined once in CSS as `--hue-mint` … `--hue-violet`. `app.js` and `experience.js` read them from those tokens (with a frozen fallback and a console warning if one is missing), hash each app name into the palette and resolve collisions, so an app keeps its hue across screens and sessions. The app's secondary hue is the palette entry three steps on. Every hue clears 6.2:1 against Lampblack, so app-colored fills always take Lampblack text.
+The seven app hues, defined once in CSS as `--hue-periwinkle` … `--hue-violet`. `app.js` and `experience.js` read them from those tokens (with a frozen fallback and a console warning if one is missing). Only apps that have at least one profile get a hue: `app.js` hashes each app name into the palette, resolves collisions so no two such apps share a hue while one is free, and keeps the hue an app got first. An app with no profiles has no hue and renders in graphite with Bone ink. Every hue clears 6.2:1 against Lampblack, so app-colored fills always take Lampblack text.
 
-- **Mint** (`mint`): the default accent before any app context. It is also the positive status color and the sidebar logo color.
-- **Periwinkle** (`periwinkle`): the default `--app-color` and the header add action outside app context.
-- **Teal**, **Orange**, **Pink**, **Gold**, **Sky**, **Violet**: app hues, with no role outside app identity.
+- **Periwinkle**, **Teal**, **Orange**, **Pink**, **Gold**, **Sky**, **Violet** (`periwinkle` … `violet`): app hues, with no role outside app identity.
+- **Mint** (`mint`): not an app hue. It is the positive status color, the sidebar logo, the connection dot and the default accent.
 
-`--accent` is Mint globally and the app's hue inside an app-toned scope (`.app-tone{--accent:var(--app-color)}`); focus rings and focused fields follow it.
+`--accent` is Mint globally and the app's hue inside an app-toned scope (`.app-tone{--accent:var(--app-color)}`); focus rings, the focused-field border and the caret follow it. `--app-color` is set only on an app-toned element, never on `:root`.
 
-Saved account badges are a separate, user-chosen set: the eight hues (built from the same tokens) plus Gray and Graphite. A badge keeps its saved color; it never follows the app hue.
+Hue appears in exactly five forms: a solid fill with Lampblack ink (the primary button of an app scope, the app tile), a plain dot, a 1px border (hover, running, the chosen navigator row), a focus ring, and the 15% ring on a focused field. The header Add button is always Bone. A selected profile card is marked on the neutral ramp instead: a 2px Bone outline at a 2px offset.
+
+Saved profile badges are a separate, user-chosen set of ten swatches: Mint, the seven app hues, Gray (#8d8b84) and Graphite. A badge keeps its saved color; it never follows the app hue. A new profile's default badge is the first swatch, in that order, that is neither its app's hue nor worn by another profile of that app.
 
 ### Neutral
 - **Lampblack** (`lampblack`): page ground, and the ink on any app-colored fill.
-- **Surface** (`surface`): panels, dialogs, sidebar hover.
-- **Card gradient** (`card-top` to `card-bottom`): the resting fill of profile, application, operation cards and the detail panel.
-- **Raised** (`raised`): secondary buttons, selected nav item, cover strips, field fill.
-- **Active** (`active`): pressed and selected segments, the app-art tile.
+- **Surface** (`surface`): panels, dialogs, Explore keys, sidebar hover.
+- **Card gradient** (`card-top` to `card-bottom`): the resting fill of profile, application and operation cards, the detail panel and the Explore panel; neutral, never tinted.
+- **Raised** (`raised`): secondary buttons (with a Field border edge), selected nav item, field fill, notices.
+- **Active** (`active`): the app tile of an app with no hue.
 - **Border** (`border`): hairlines between regions and around cards.
-- **Control** (`control`): borders of buttons and dialogs.
-- **Field border** (`field-border`): text fields, selects and file inputs (3.6–3.9:1 on every surface), and the ring that makes the Graphite swatch visible.
+- **Button edge** (`button-edge`): the 1px edge of default (outlined) buttons and key caps, at least 2.1:1 on Lampblack, Surface, the card gradient and Raised.
+- **Control** (`control`): borders of dialogs, toasts, Explore buttons and dashed empty states.
+- **Field border** (`field-border`): text fields, selects and file inputs (3.6–3.9:1 on every surface), the edge of the secondary (Open) button, and the ring that makes the Graphite swatch visible.
 - **Tip** (`tip`): toast ground.
 - **Bone** (`bone`): primary text, the default primary button fill, the tab indicator.
-- **Muted** (`muted`): secondary text, idle nav items, idle tabs, placeholders, the stat line.
+- **Muted** (`muted`): secondary text, idle nav items, idle tabs, placeholders.
 
 ### Status
-- **Positive**: Mint (running state, success toasts).
+- **Positive**: Mint (the running mark, success toasts).
 - **Negative** (`negative`): errors and destructive buttons, on `negative-bg`.
+- **Danger edge** (`danger-edge`): the 1px edge of a destructive button at rest, at least 2.2:1 on the same surfaces as the Button edge.
 - **Warning**: danger callouts use `warning-bg` with Bone text.
 
 ### Named Rules
-**The Identity-Only Rule.** Hue means an app or a status. Everything else stays on the Lampblack-to-Bone ramp. Stat counts and operation cards are neutral.
+**The Identity-Only Rule.** Hue means an app that has profiles, or a status. Everything else stays on the Lampblack-to-Bone ramp. Operation cards, counts and apps without profiles are neutral.
 
-**The Ink Rule.** Text on an app-colored fill is Lampblack. A badge picks whichever of Lampblack (#060606) and white (#ffffff) contrasts more with its saved color; every preset clears 4.83:1.
+**The One Running Mark Rule.** Running is an 8px Mint dot plus "Running" in Mint, on cards, the detail panel, Explore keys and the navigator alike, and the running card or key also keeps its 1px hue border. A profile that is not running shows no dot.
+
+**The Flat Hue Rule.** A hue is a solid fill, a plain dot, a 1px border or a focus ring. Never a gradient, glow, tinted text, tinted background, tinted secondary button or accent stripe, and never a second hue for the same app.
+
+**The Ink Rule.** Text on an app-colored fill is Lampblack. A badge picks whichever of Lampblack (#060606) and white (#ffffff) contrasts more with its saved color; every preset clears 5.9:1.
 
 ## Typography
 
 **Display Font:** the platform UI font (`-apple-system`, BlinkMacSystemFont, "Segoe UI", sans-serif)
 **Body Font:** the same stack
-**Label/Mono Font:** `ui-monospace`, SFMono-Regular, Menlo, monospace, for command lines and command output only
+**Label/Mono Font:** `ui-monospace`, SFMono-Regular, Menlo, monospace, for command lines, command output and key caps only
 
 **Character:** San Francisco on a Mac, set tight at the top and plain below. Headings close up their tracking; labels stay at normal tracking and a 500 weight.
 
 ### Hierarchy
 - **Headline** (600, 28px, 1.2, -0.035em): page titles on every view. Below 768px every page title is **Headline compact** (24px).
-- **Card** (550, 22px, 1.2, -0.03em): dialog titles, empty-state titles, the detail title on mobile.
-- **Title** (550, 17px, 1.35, -0.015em): card and section headings, profile names, account names on Explore keys.
+- **Card** (550, 22px, 1.2, -0.03em): dialog titles, empty-state titles, the Explore panel's app name, the detail title on mobile.
+- **Title** (550, 17px, 1.35, -0.015em): card and section headings, profile names, app names, profile names on Explore keys.
 - **Body** (400, 14px, 1.55): the base size.
-- **Label** (500, 13px): buttons, tabs, form labels, page subtitles, the stat line.
-- **Meta** (400, 12px): profile metadata, state rows, counts, help text.
+- **Label** (500, 13px): buttons, tabs, form labels, page subtitles, the Terms headings.
+- **Meta** (400, 12px): profile metadata, state rows, counts, help text, the Explore "N apps · N profiles" summary, the Explore "N of M" position.
 - **Mono** (12px, 1.7): command lines ("Runs:", Activity) and command output blocks, wrapped, never truncated.
 
-Nothing is smaller than 12px. Exempt from the ramp: the sidebar wordmark (19px, part of the logo lockup), the app-art initial (23px) and other glyphs sized inside icon boxes (Explore arrows 18px, list icons 24px, the focus panel's app icon 30px).
+Nothing is smaller than 12px. Exempt from the ramp: the sidebar wordmark (19px, part of the logo lockup) and glyphs sized inside icon boxes (the app-tile initial 20px, 21px in the detail panel; Explore navigator initial 16px and panel initial 20px; Explore arrows 18px; rail initials 12px; the badge character 13px on an Explore key and 12px on a profile tile). The Explore navigator's app names and the phone top bar's page name are 15px.
 
 ### Named Rules
 **The System Voice Rule.** One family: the platform UI font. The dashboard loads no webfonts.
 
-**The Tabular Count Rule.** Counts, tab totals and reel positions use tabular numerals.
+**The Tabular Count Rule.** Counts, tab totals and the Explore position use tabular numerals.
 
 ## Layout
 
-A fixed sidebar beside a fluid canvas. The sidebar is 216px, collapses to a 72px icon rail on request, narrows to 190px at 1150px, and becomes a 248px slide-over drawer with a scrim below 768px. The sidebar scrolls when it runs out of height, and the "Your apps" list is capped at 40% of the viewport, so the Command guide and Collapse stay reachable at 200% zoom and on a landscape phone. The top bar is 68px (64px on mobile).
+A fixed sidebar beside a fluid canvas. The sidebar is 216px, collapses to a 72px icon rail on request, narrows to 190px at 1150px, and becomes a 248px slide-over drawer with a scrim below 768px. The sidebar scrolls when it runs out of height, and the "Your apps" list is capped at 40% of the viewport, so Help and Collapse stay reachable at 200% zoom and on a landscape phone. The top bar is 68px (64px on mobile, where it also names the page).
 
-Workspace gutters are 32px, 24px at 1150px and below, and 18px below 768px. Gaps are mostly 8, 12, 16, 20 and 24px. Profile cards sit in three columns (two at 1200px and below), and in two columns (one at 1200px and below) when the 320px detail panel is open beside them (300px at 1200px and below). Between 768px and 900px the detail panel follows the grid in reading order; selecting a card moves focus to it. Below 768px the detail panel replaces the grid. Explore splits 2:3: a sticky 556px focus panel (356px on mobile), then the app list.
+Workspace gutters are 32px; the canvas drops to 24px at 1200px and below (the top bar at 1150px), and to 18px below 768px. Gaps are mostly 8, 12, 16, 20 and 24px. Profile cards fill the grid by width (210px minimum, 20px gap; one or two cards stop at 360px) and never by selection. At 901px and up the grid always has a 320px detail column beside it while profiles exist, so choosing a card never reflows the grid. Nothing is selected for the user: until they choose, the column holds a dashed prompt, "Select a profile to see its settings and actions." Only an explicit choice returns on a later visit. Between 768px and 900px the detail panel follows the grid in reading order and the prompt is hidden; below 768px the panel replaces the grid behind a Back button. Selecting a card moves focus to the panel's heading.
 
-The fixed activity bar is 40px tall; focusable content inside `#main` keeps a scroll margin so the bar never covers a focused control, also while the activity panel is open.
+Explore is a focus panel on the left (the remaining width) and a navigator of apps on the right (a 240px to 300px column, 28px gap; 220px to 260px and a 20px gap from 768px to 1100px). The panel's height follows its content and it sticks 24px from the top only while it fits above the activity bar; a taller panel scrolls with the page. Below 768px the columns stack. Applications is three columns (two at 1200px and below, one on mobile); Maintenance is two columns of operation cards, with Workspace health spanning both and splitting in two from 768px; Help is a 270px control column beside the output, below a three-column Terms block (two at 900px, one on mobile).
 
-Breakpoints in use: 390px, 767/768px, 900/901px, 1100px (Explore), 1150px and 1200/1201px.
+The fixed activity bar is 40px tall and absent until the first action runs; its panel opens above it up to 45% of the viewport (50% on mobile). Focusable content inside `#main` keeps a scroll margin so the bar never covers a focused control, also while the panel is open.
+
+Breakpoints in use: 390px, 767/768px, 900/901px, 1100px (Explore gap), 1150px and 1200px.
 
 ## Elevation & Depth
 
-Tonal, with shadows only when floating. Cards, panels, Explore keys and the sidebar sit flat: depth comes from the step between Lampblack, Surface and Raised and from 1px borders. On app-toned cards a radial glow in the app hue (14% at the base, fading by 72%) tints the bottom edge; it marks identity and never lifts the card. Hover lifts a card 3px and draws its outline in the app hue, still without a shadow.
+Tonal, with shadows only when floating. Cards, panels, Explore keys and the sidebar sit flat: depth comes from the step between Lampblack, Surface and Raised and from 1px borders. Hover lifts a card 3px and draws its border in the app hue (Muted on a neutral card), still without a shadow. A running profile card draws a full 1px hue border, and so does the chosen navigator row (Muted for an app with no hue). A selected profile card adds a 2px Bone outline at a 2px offset, so a card that is selected and running shows both. A running Explore key draws a plain 1px hue edge and lights it once when it starts.
 
 ### Shadow Vocabulary
 - **Dialog** (`--shadow-dialog`): modal dialogs and the mobile bottom sheet.
 - **Toast** (`--shadow-toast`): the stacked toast column.
 - **Focus ring** (`box-shadow: 0 0 0 3px` accent at 15%, `--ring-accent` outside app context): focused fields, with the border in the accent.
-- **Identity glow** (`box-shadow: 0 0 12px` app hue at 48%): the 8px app dot in the sidebar, the "In focus" dot, and a running key on Explore.
 
 ### Named Rules
-**The Floating-Only Shadow Rule.** A shadow means the layer floats above the page (dialogs, toasts). Resting cards and keys never get one; a glow marks identity or a running account, never height.
+**The Floating-Only Shadow Rule.** A shadow means the layer floats above the page (dialogs, toasts). Resting cards and keys never get one, and no hue ever glows; identity and running state are a border or a dot, never height or light.
 
 ## Shapes
 
-Soft rectangles, nested by size. Controls, nav items, icon buttons, Explore badges and the file-picker button are 8px; toasts and reel faces 12px; the app-art tile and Explore preview 14px; cards and panels 16px; dialogs 20px, and 20px on the top corners only as a mobile sheet. Status and app dots are full circles (5px running dot, 8px identity dot).
+Soft rectangles, nested by size. Controls, nav items, icon buttons, Explore key badges and navigator tiles, and the file-picker button are 8px; Explore keys, navigator rows, the Other-apps disclosure and toasts 12px; the app tile 12px (10px in the Explore panel); the Explore panel 14px; cards and panels 16px; dialogs 20px, and 20px on the top corners only as a mobile sheet. The badge on a profile tile and the rail initial are 6px. Status and app dots and the color swatches are full circles (8px running dot, 8px app dot, 6px connection dot, 32px swatch, 44px on mobile).
 
-The app-art tile overlaps the card's cover strip and wears a 4px ring in the card's Surface color, so it reads as cut into the card.
+A badge is always a filled rounded square in its saved color, with no stripe or shadow: 34px on an Explore key, 20px at the corner of a profile tile, where it overlaps the tile by 6px. A badge on a tile carries a 2px ring in the surface it sits on (the card gradient's top, Raised in a dialog preview), so even a badge in the tile's own color reads as a separate chip.
 
 ## Components
 
 ### Buttons
 Soft and springy: every button lifts 1px on hover, presses to 0.97 in 85ms and springs back.
-- **Shape:** gently rounded (8px), 36px tall (40px in profile cards), 14px side padding, 13px label at 500. Below 768px touch targets reach 44px.
-- **Default:** transparent with a Control border. Hover fills Raised and lightens the border to Muted.
-- **Primary:** Bone fill, Lampblack text. On an app's screens the fill is the app hue with Lampblack text; hover mixes in 10% Bone.
-- **Secondary:** Raised fill, no border.
-- **Danger:** Negative text and a `negative-bg` border; hover fills `negative-bg` and borders in Negative.
-- **Small:** 30px tall, 13px label, 10px side padding.
+- **Shape:** gently rounded (8px), 36px tall, 14px side padding, 13px label at 500. Below 768px touch targets reach 44px.
+- **Default:** transparent with a Button edge border. Hover fills Raised and lightens the border to Muted.
+- **Primary:** Bone fill, Lampblack text. In an app-toned scope (a profile card, the detail panel, a dialog opened for an app) the fill is the app hue with Lampblack text; hover mixes in 10% Bone. The header Add button is outside any app scope and stays Bone.
+- **Secondary:** Raised fill with a 1px Field border edge. This is Open, when a profile is not running, on cards, the detail panel and Explore keys alike.
+- **Bring to front:** the Primary fill: the app hue with Lampblack ink. It replaces Open while a profile runs.
+- **Danger:** Negative text and a Danger edge border; hover fills `negative-bg` and borders in Negative.
+- **Small:** also 36px tall, with 10px side padding; used for Quit, Repair, Settings, Rename, Remove and Rebuild launcher.
+- **Link button:** underlined 13px text, 36px tall (44px on mobile); the "N profiles" count on an application card and "Custom color…".
+- **Explore buttons:** the same 36px shape on a Surface fill with a Control border. A key's Open is the Secondary and its Bring to front the hue fill, as everywhere; Add profile stays a plain Explore button. Bone fills only the empty state with no apps at all.
 - **Busy:** a spinner replaces the label; under reduced motion the spinner pulses in opacity instead of turning.
 
 ### Cards / Containers
 - **Corner Style:** 16px.
 - **Background:** the card gradient (#0f0f0f to #090909).
 - **Shadow Strategy:** none at rest; see Elevation & Depth.
-- **Border:** 1px Border; on app cards mixed with 32% of the app hue, 65% on hover. Operation cards stay neutral.
-- **Internal Padding:** 24px desktop, 20–22px mid, 16–18px mobile.
+- **Border:** 1px Border; on app cards hover draws the app hue (Muted on a neutral card), and a running profile card draws it in full. Selection never takes the hue: a selected profile card adds a 2px Bone outline at a 2px offset. Operation cards stay neutral.
+- **Internal Padding:** 24px for panels and operation cards, 20px for profile and application cards, 22px on mobile.
 
 ### Inputs / Fields
-- **Style:** 40px, Raised fill, 1px Field border, 8px radius, 9px × 12px padding. The search field has a 16px leading icon and a 32px clear button.
+- **Style:** 40px, Raised fill, 1px Field border, 8px radius, 9px × 12px padding. The search field has a 16px leading icon and a 36px clear button. Search appears on Profiles from seven profiles, and on Applications always.
 - **Focus:** the border turns to the accent (the app hue in app context) with a 3px ring at 15%. Under forced colors, a 2px Highlight outline.
 - **Error:** a `negative-bg` form-error block above the actions, and `aria-invalid` on the field the server rejected.
 
 ### Navigation
-- **Sidebar:** a `<nav aria-label="Main">` landmark. 40px items, 8px radius, Muted text. Hover shows Bone on Surface; the current page shows Bone on Raised. App entries carry an 8px glowing dot in their hue, and hovering one tints its row 11% toward the hue.
-- **Tabs:** 13px labels in Muted, Bone when selected, 44px tall, with a 2px Bone underline that springs between tabs. Arrow, Home and End move between tabs. When the strip overflows on a narrow phone, its right edge fades and the selected tab scrolls into view.
-- **Mobile:** the sidebar becomes a drawer from the left behind a 60% black scrim; Tab stays inside it and the page behind is inert.
-- **Focus on navigation:** the new view's `h1` takes focus (no ring; it is not a control) and the document title becomes "<View> · aidentity".
-
-### Stat line
-One quiet text row under the page title: counts in Bone tabular numerals, labels in Muted, 13px. No tiles, no hue.
+- **Sidebar:** a `<nav aria-label="Main">` landmark. 40px items, 8px radius, Muted text. Hover shows Bone on Surface; the current page shows Bone on Raised. Under the nav, "Your apps" lists only apps that have profiles, each with an 8px dot in its hue (36px rows, 12px text); "No profiles yet" shows only once data has loaded and there are none. Help and Collapse sit at the foot. Above the nav, one compact status row: a 6px Mint dot (Negative when offline) and "Connected · this Mac".
+- **Collapsed rail:** 72px; labels hide, the status row shows only its dot, and each app shows its initial as a 24px rounded tile in its hue with Lampblack ink, named by a tooltip that appears beside the rail for keyboard focus, with a divider where "Your apps" was. As a mobile drawer the full labels return.
+- **Tabs:** 13px labels in Muted, Bone when selected, 44px tall, with a 2px Bone underline that springs between tabs. Profiles tabs are All, Running, Not running and Needs repair, with the counts on the tabs only (Needs repair shows a muted dash until a check has run). Arrow, Home and End move between tabs. When the strip overflows on a narrow phone, its right edge fades and the selected tab scrolls into view.
+- **Mobile:** the top bar names the page, and the sidebar becomes a drawer from the left behind a 60% black scrim; Tab stays inside it and the page behind is inert.
+- **Focus on navigation:** the new view's `h1` takes focus (no ring; it is not a control) and the document title becomes "<View> · aidentity". There is no breadcrumb.
 
 ### Dialogs
 - **Shape:** 560px wide, 20px radius, Surface fill, Control border, Dialog shadow, header and footer pinned (the footer has a Control top border). Focus starts on the first field.
-- **Add profile:** App (preselected from context), Profile name, then "Appearance" (badge character and color, collapsed, defaulting to the name's first letter and the app's hue), then app location and launch settings, then the Runs line. Success selects the new card, scrolls to it and toasts "<App> <Profile> is ready" with "Open it".
-- **Motion:** on desktop, enter rises 14px and scales from 0.96 over 420ms on the surface spring; exit falls 10px to 0.97 over 200ms. Below 768px a dialog becomes a bottom sheet that slides up on `--ease`, with no overshoot.
+- **Create a profile:** Application (preselected from context), Profile name, "Use the original account", then two collapsed disclosures: "Appearance" and "App location & launch settings", then the Runs line. Appearance holds the badge character (it defaults to the name's first letter) and the badge color: ten 32px round swatches (44px on mobile), the chosen swatch's name and hex as visible text ("Periwinkle · 7C8CFF"), and a "Custom color…" link that reveals the hex field (open from the start only when the saved color is not a swatch). The default color is the first swatch that is neither the app's hue nor worn by that app's other profiles. Success selects the new card, scrolls to it and toasts "<App> <Profile> is ready" with "Open it".
+- **Settings, Rename, Remove, Import profiles, Export profiles:** the same dialog frame; Settings is titled "Settings for <name>", its preview row omits the name and offers Rename…, and it sends only what changed.
+- **Motion:** on desktop, enter rises 14px and scales from 0.96 over 420ms on the surface spring; exit falls 14px to 0.96 over 200ms. Below 768px a dialog becomes a bottom sheet that slides up on `--ease`, with no overshoot.
 
 ### Toasts
-Titles say what happened in plain words ("Opened Claude Work", "Version 1.7.0 is available"), never "<Action> complete". A 340px column at the bottom of the workspace, 32px in from the sidebar (24px at 1200px and below), above the activity bar. Each toast is Tip on a Control border, 12px radius, with a status icon in Mint or Negative. The front toast is expanded; the rest stack behind it and fan out on hover.
+Titles say what happened in plain words ("Opened Claude Work", "Brought Claude Work to the front"), never "<Action> complete". A 340px column at the bottom of the workspace, 32px in from the sidebar (24px at 1200px and below), above the activity bar. Each toast is Tip on a Control border, 12px radius, with a status icon in Mint or Negative. The front toast is expanded; the rest stack behind it and fan out on hover.
 
-### Profile Card (signature)
-A 58px cover strip in the app's two hues, the app-art tile cut into its lower edge, the profile name (550, 17px), a meta row above a hairline, a state line with a 5px running dot, then the Open action named for the profile. The whole card is tinted by its app: the border mix, the bottom glow and the hover outline.
+### Profile card (signature)
+The Profiles grid's unit. A 44px app tile in the app's hue (graphite for an app with no hue), carrying the profile's 20px badge at its corner, sits beside an `h2` whose name is a button (Title) over the app name (13px Muted). Clicking the card or pressing Enter on the name selects it; only the visible Open button launches, and O opens only while focus is inside the selected card or the detail panel. Below: a state row with the status label (an 8px Mint dot and Mint text when running), plus small Repair and Quit actions when they apply; a Meta line of "Original account · Own extensions · N launch options"; then one full-width, 40px primary action: Open (the Secondary), or Bring to front (the hue fill) when the profile is running. Quit is a small outlined button beside the state, never in the primary slot. There is no cover strip. Hue shows only in the tile, the Bring to front fill, and the hover and running borders; selection is a 2px Bone outline at a 2px offset.
 
-### Explore key ring (signature)
-The focus panel holds the selected app's accounts side by side as keys. A short identity reel (the depth-wheel adaptation, faster) turns between apps; at rest the panel shows the app's icon, name and account count, then the ring. Each key carries the account's badge in its saved color and ink, the account name (Title), an "Original" mark on the main account, its status label, and one action: Open, or Bring to front when it is running. A running key glows in the app hue and lights up once when it starts (static under reduced motion). The ring wraps and scrolls from six accounts; "+ Add account" sits under it. Prev, Next, the jump select and the list's Preview buttons switch apps; a mouse or trackpad scrolling over the panel switches apps too, except over a ring that scrolls, and touch scrolls the page. Keys are a real list with names that start with their visible text ("Open, Work, Claude", "Bring to front, Work, Claude").
+### Application card
+An application that has profiles: a 44px tile and the name over an underlined "N profiles" link button that opens Profiles filtered to that app, then a full-width Add profile. Applications with no profiles fold into one "Other compatible apps (N)" disclosure of neutral one-line rows, each with a small Add profile; it opens while searching and when no app has profiles.
+
+### Detail panel (signature)
+A 320px card on the right of the grid at 901px and up: sticky 24px from the top, with a max-height that fits between the top bar and the activity bar (and the open Activity panel), scrolling inside with a fade at the bottom edge only while it overflows. Before a choice the column holds a dashed prompt instead. From 768px the selected card already shows the state, Quit and primary action, so the panel omits them; below 768px, where it replaces the grid, it keeps them. Top to bottom: the 48px app tile with its badge, the profile name as `h2` over "<App> · original account" where it applies, the "Runs:" line with a Copy button, one row of small actions (Settings and Rename, with Remove in Negative pushed to the far end), then "Launch settings: app defaults" in one line, or the launch arguments, environment variable names and extensions when any are set, and last a "Details" disclosure holding the application path, profile data folder, who made the launcher, and "Rebuild launcher" with one sentence of explanation. Below 901px it follows the grid and gains a close button; below 768px, a Back button.
+
+### Explore focus panel (signature)
+The panel holds the selected app's profiles side by side as keys, under the app's identity (44px tile, name in Card, "N profiles" and, while any run, the running mark). Above the identity sit Prev, "N of M", Next and a jump select; they step only through apps that have profiles and are hidden when only one app does. A change of app crossfades the identity in 160ms (a static swap under reduced motion); nothing switches apps on scroll, and there is no reel or wheel. Each key carries the profile's badge in its saved color and ink, the profile name (Title), a state line (the running mark, or the status label, plus " · Original" on the original account), and the profile's one action: Open, or Bring to front when it is running. A running key has a 1px hue edge and draws it once when it starts (static under reduced motion), with no glow. Keys fill a grid of 200px columns and become one-row keys when the panel is narrow. "Add profile" sits under them. Keys are a real list with names that start with their visible text ("Open Work, Claude", "Bring to front, Work, Claude").
+
+### Explore navigator
+The list beside the panel chooses the app and holds no profile actions. Apps with profiles come first (running ones, then most profiles, then by name), one 60px row each with a 36px tile, the app name (15px), "N profiles" and the running mark while any profile runs. The chosen row draws a 1px hue border on Surface. A 12px "N apps · N profiles" summary sits above the list; it is the one count line (Profiles keeps its counts on its tabs). Apps with no profiles fold into one "Other compatible apps (N)" disclosure of neutral one-line rows, each with an Add profile button; it opens by default only when no app has profiles, and is then called "Compatible apps". There is no "All profiles" button.
 
 ### Command line
-Every dialog that runs an action shows a "Runs:" line under the form: the exact `aidentity …` command from the server's preview, in Mono 12px on Lampblack with a 1px Border, selectable, with a Copy button. It updates as fields change and hides while the form is invalid. Every Activity entry shows the command that ran. Values the CLI treats as secret (environment values, proxy credentials, an imported recipe's contents) always appear as `•••`. The browser never builds the command itself.
+Every dialog that runs an action shows a "Runs:" line under the form: the exact `aidentity …` command from the server's preview, in Mono 12px on Lampblack with a 1px Border, selectable, with a Copy button. It updates as fields change and hides while the form is invalid. The detail panel shows the Open command the same way, with its own Copy button. A command breaks only between shell words, never inside a quoted name. Every Activity entry shows the command that ran. Values the CLI treats as secret (environment values, proxy credentials, an imported recipe's contents) always appear as `•••`. The browser never builds the command itself.
+
+### Activity bar
+A 40px bar fixed to the bottom, hidden until the first entry (or while an action runs). It shows a terminal icon, a summary ("Activity · Nothing run yet", then "<toast title> · View details") and a chevron that flips when the panel opens. Entries (title, time, command, output) persist in `sessionStorage` for the tab, up to twelve; if storage fails, Activity lasts for the page.
+
+### Help terms
+The Help page opens with a "Terms" block above the CLI help: a 16px-radius bordered panel of plain-word definitions (Profile, Launcher, Original account, Doctor, Unclaimed data, Restore) in a three-column list, term in Label and definition in Muted. A full-width "Keyboard" entry lists the shortcuts in Mono key caps with a Button edge border: "/ search · ⌘B collapse sidebar · O open the focused profile".
 
 ### Status labels
-The CLI's status words become: `running` → Running · `in use` and `not running` → At rest · `signed out / new` → Not opened yet · `app missing` → App missing. Explore and Profiles use the same table.
+The CLI's status words become: `running` → Running · `in use` and `not running` → Not running · `signed out / new` → Not opened yet · `app missing` → App missing. Explore and Profiles use the same table. A profile is a "profile"; "account" means only the sign-in; "launcher" appears on Recovery, Maintenance and Help, where the `.app` itself is the subject. The app's own account is the "Original account"; the actions are Settings, Export profiles and Import profiles. The empty phrase is "No profiles yet"; Maintenance offers "Check" and "Check and repair", and Recovery "Clear unclaimed data…".
 
 ### Connection and busy states
-When a poll or action can't reach the dashboard server, a banner says "The dashboard stopped. Run `aidentity dashboard` in Terminal to reconnect.", action buttons are disabled, and the sidebar dot turns to "Disconnected"; all of it clears on the next good poll. While an action runs, other actions show a calm disabled state.
+When a poll or action can't reach the dashboard server, a banner says "The dashboard stopped. Run `aidentity dashboard` in Terminal to reconnect.", action buttons are disabled, and the sidebar status turns to "Disconnected" with a Negative dot; all of it clears on the next good poll. While an action runs, other actions show a calm disabled state.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** give each app exactly one hue through `--app-color`, and use it for that app's primary action, focus ring, hover outline and bottom glow.
+- **Do** give each app that has profiles exactly one hue through `--app-color`, and use it only for that app's primary fill, app tile, dots, 1px borders and focus ring.
 - **Do** define a new hue only as a `--hue-*` token; both scripts read the palette from CSS.
 - **Do** put Lampblack (#060606) text on any app-colored fill; every hue clears 6.2:1.
 - **Do** keep text at Muted (#8d8b84) or brighter and at 12px or larger. Muted on Raised (5.4:1) is the lowest text pairing in use.
 - **Do** show keyboard focus as a 2px outline in the current accent, offset 4px (swatches use Bone at 3px; controls inside clipping boxes use an inset ring).
-- **Do** give every spring and spatial scene a reduced-motion path that keeps the feedback.
-- **Do** keep controls at least 36px tall on desktop and 44px below 768px.
+- **Do** give every spring and the Explore crossfade a reduced-motion path that keeps the feedback.
+- **Do** keep controls at least 36px tall on desktop (swatches 32px) and 44px below 768px.
 - **Do** show the server's command for every action (Runs line, Activity); never build it in the browser.
+- **Do** name the primary action Open, or Bring to front when the profile is running, on every surface; Open is always the Secondary (Raised fill, 1px Field border) and Bring to front the hue fill.
+- **Do** mark running with an 8px Mint dot and Mint "Running", and show no dot when not running.
+- **Do** default a new badge to the first swatch that is neither the app's hue nor used by that app's other profiles, and ring every badge on a tile in 2px of the surface it sits on.
 
 ### Don't:
 - **Don't** add a light theme. The dashboard is dark-only.
 - **Don't** bring the site's blue or its light/dark switch into the dashboard. The site is a separate world owned upstream.
 - **Don't** put a shadow on a resting card. Shadows belong to dialogs and toasts.
+- **Don't** use a hue as a gradient, a glow, text color, a tinted background or secondary button, or an accent stripe, and don't add a second hue to an app.
+- **Don't** give an app with no profiles a hue, and don't use Mint as an app hue; it is status, the logo and the default accent.
+- **Don't** recolor the header Add button; it is always Bone.
 - **Don't** color anything that is neither an app's identity nor a status.
 - **Don't** write hex values outside `:root`; use the tokens. The one exception is the `dialog::backdrop` scrim, which mirrors `--scrim` because older browsers don't pass custom properties to `::backdrop`.
 - **Don't** load webfonts or any other remote asset.

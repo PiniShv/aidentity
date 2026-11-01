@@ -79,13 +79,12 @@ Moving to another Mac? `aidentity export > profiles.json` saves how each launche
 
 Prefer a browser? Run `aidentity dashboard`. It opens a local visual workspace
 with account cards, launch settings, maintenance, import/export and an Explore
-app browser. Scroll inside In focus to switch apps while the page stays still,
-or scroll the app list normally. Open, Manage and Add account are available
-immediately. Everything uses the same CLI operations. The dashboard needs
+app browser. Explore shows one app at a time with its profiles, and the list
+beside it picks the app. Each profile has Open (or Bring to front when it is
+running), and each app has Add profile. Everything uses the same CLI operations. The dashboard needs
 Python 3.9+ with no extra packages. Keep its terminal open and press Ctrl+C to
 stop it. [Dashboard guide](docs/guide.md#aidentity-dashboard).
-The UI adapts [these 21st.dev components](docs/dashboard-components.md), including
-[Works Wheel](https://21st.dev/@crafterui/components/works-wheel).
+The UI adapts [these 21st.dev components](docs/dashboard-components.md).
 
 Prefer a terminal menu? `aidentity ui` shows every profile on one screen; pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it.
 

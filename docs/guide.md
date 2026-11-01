@@ -487,21 +487,22 @@ aidentity dashboard
 
 Opens the visual account manager in your default browser at `127.0.0.1`, using
 an available port. It shows your existing profiles and installed compatible
-apps. Explore groups those apps and their accounts into an actionable list.
-Normal page scrolling moves a 3D preview adapted from 21st.dev's Works Wheel.
-Scrolling inside In focus switches apps without moving the page, including at
-the first and last app. Its arrows and app picker also leave the page in place.
-Open and Manage are available beside each account, and Add account beside each
-installed app. The preview's selection matches the list; reduced motion keeps
-the same actions with a static preview.
+apps. Explore shows one app at a time with its profiles. The list beside it
+has one row per app that has profiles; choose a row, or use the arrows and the
+app picker, to switch apps. Each profile has Open there, or Bring to front when
+it is running. Apps with no profiles sit under Other compatible apps, each with
+Add profile. The page never moves when you switch apps. Reduced motion swaps
+the app without the short fade.
 
 The workspace can create, open, quit, rename and customize profiles, including
 Main accounts, Claude seeding, badges, launch switches, environment settings
-and separate editor extensions. Maintenance offers restore, rebuild, prune,
-doctor and repair. Transfer downloads the CLI's export format and imports it
-back. Help includes command documentation, shell completion and update actions.
+and separate editor extensions. Recovery offers restore and clearing unclaimed
+data (`prune`). Maintenance offers check, check and repair (doctor), rebuild and
+update actions. Import & export downloads the CLI's export format and imports
+it back. Help has plain-word terms, the command documentation and shell
+completion.
 
-Removing or pruning requires confirmation in the UI. Existing environment
+Removing a profile or clearing unclaimed data requires confirmation in the UI. Existing environment
 values stay hidden; appearance changes preserve them. Export can contain
 sensitive launch settings, just like `aidentity export`.
 
