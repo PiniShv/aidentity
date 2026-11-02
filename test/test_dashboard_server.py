@@ -1,6 +1,7 @@
 """Dashboard API tests use an isolated fake executable, never the user's apps."""
 import http.client
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -290,6 +291,74 @@ class DashboardTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("timed out", result["error"])
         self.assertLess(time.monotonic() - started, 3)
+
+    def test_failed_export_returns_no_recipe_but_a_successful_one_keeps_it_verbatim(self):
+        recipe = ('{"aidentity_export":1,"profiles":[{"env":["API_KEY=sk-live-1234567890abcdef"],'
+                  '"args":["--proxy-server=http://alice:private@proxy.example:8080"]')
+        self.assertNotEqual(self.module.redact(recipe), recipe)  # so a second redaction of the recipe would show
+        for ok, expected in ((False, ""), (True, recipe)):
+            with self.subTest(ok=ok), mock.patch.object(self.backend, "run", return_value={
+                    "ok": ok, "exit_code": 0 if ok else -9, "stdout": recipe, "stderr": ""}):
+                _, _, result = self.action({"action": "export"})
+                self.assertEqual(result["stdout"], expected)
+
+    def test_doctor_that_never_completed_has_no_summary(self):
+        for error in ("The aidentity command timed out.", "Could not start aidentity."):
+            with self.subTest(error=error), mock.patch.object(self.backend, "run", return_value={
+                    "ok": False, "exit_code": None, "stdout": "", "stderr": "", "error": error}):
+                _, _, result = self.action({"action": "doctor"})
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["error"], error)
+                self.assertNotIn("summary", result)
+                self.assertNotIn("findings", result)
+
+    def test_doctor_killed_before_its_closing_tally_has_no_summary(self):
+        for exit_code in (-9, 143):
+            with self.subTest(exit_code=exit_code), mock.patch.object(self.backend, "run", return_value={
+                    "ok": False, "exit_code": exit_code,
+                    "stdout": "aidentity doctor\n\n  macOS               27.2\n", "stderr": ""}):
+                _, _, result = self.action({"action": "doctor"})
+                self.assertNotIn("summary", result)
+                self.assertNotIn("findings", result)
+                self.assertIn("(exit %d)" % exit_code, result["error"])
+
+    def test_doctor_with_a_tally_but_an_error_has_no_summary(self):
+        error = "The command produced too much output. Run it in the terminal for the full result."
+        with mock.patch.object(self.backend, "run", return_value={
+                "ok": False, "exit_code": -15, "stdout": "aidentity doctor\n\nProfiles\n  ✓ A\n",
+                "stderr": "! 1 problem(s) found.\n", "error": error}):
+            _, _, result = self.action({"action": "doctor"})
+        self.assertEqual(result["error"], error)
+        self.assertNotIn("summary", result)
+        self.assertNotIn("findings", result)
+
+    def test_doctor_that_finished_with_a_failed_fix_still_reports_findings(self):
+        with mock.patch.object(self.backend, "run", return_value={
+                "ok": False, "exit_code": 1,
+                "stdout": "Profiles\n  ✓ ChatGPT Research\n  ! Claude Work — rebuild failed\n\n",
+                "stderr": "! 1 problem(s) found.\n"}):
+            _, _, result = self.action({"action": "doctor", "fix": True})
+        self.assertEqual(result["summary"], {"ok": 1, "warn": 1, "error": 0})
+        self.assertEqual([finding["profile"] for finding in result["findings"]], ["ChatGPT Research", "Claude Work"])
+
+    def test_terminate_tolerates_a_zombie_group_leader(self):
+        # macOS answers EPERM, not ESRCH, for a group whose leader exited but is not yet reaped.
+        process = mock.Mock(pid=1)
+        for effects in ([PermissionError()], [None, PermissionError()]):
+            with self.subTest(calls=len(effects)), mock.patch.object(
+                    self.module.os, "killpg", side_effect=effects) as killpg:
+                self.module.terminate(process)
+                self.assertEqual(killpg.call_count, len(effects))
+
+    def test_a_broken_stdin_pipe_does_not_escape_the_writer_thread(self):
+        stdin = mock.Mock(**{"write.side_effect": BrokenPipeError, "close.side_effect": BrokenPipeError})
+        process = mock.Mock(pid=1, stdin=stdin, stdout=io.BytesIO(), stderr=io.BytesIO())
+        process.wait.return_value = 0
+        with mock.patch.object(self.module.subprocess, "Popen", return_value=process), \
+                mock.patch("threading.excepthook") as hook:
+            result = self.backend.run(["import"], stdin=b"{}")
+        hook.assert_not_called()
+        self.assertTrue(result["ok"])
 
     def test_schemeless_proxy_credentials_are_hidden(self):
         _, _, result = self.action({

@@ -79,6 +79,9 @@
 
 /* One badge everywhere: a filled rounded square in the saved colour, ink by the Ink Rule. */
 .xp-key-badge{grid-area:badge;display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:var(--identity);color:var(--identity-ink);font-size:13px;font-weight:600}
+/* A profile with no badge shows the app's own icon, as its launcher does. */
+.xp-key-badge-app{background:var(--app-color,var(--raised));color:var(--app-ink,var(--text))}
+.xp-key-badge-app svg{width:20px;height:20px}
 
 /* Navigator: one row per app, apps with profiles first. A row chooses the app; profile actions live only on the keys. */
 .xp-list-summary{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:12px;line-height:16px;margin:0 0 10px;padding:0 12px}

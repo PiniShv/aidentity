@@ -155,9 +155,10 @@ def parse_port(value):
 
 def terminate(process):
     """Give the CLI's rollback traps time to run before forcing cancellation."""
+    # macOS answers PermissionError, not ProcessLookupError, for a group whose leader has exited but is not yet reaped.
     try:
         os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
         return
     try:
         process.wait(timeout=TERM_GRACE)
@@ -166,7 +167,7 @@ def terminate(process):
     # A child may ignore TERM even after the CLI itself has exited.
     try:
         os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
         pass
 
 
@@ -276,7 +277,10 @@ class Dashboard:
             except (BrokenPipeError, OSError):
                 pass
             finally:
-                process.stdin.close()
+                try:
+                    process.stdin.close()  # re-flushes the buffer, so it raises BrokenPipeError after a failed write
+                except OSError:
+                    pass
 
         writer = None
         if stdin is not None:
@@ -487,12 +491,18 @@ class Dashboard:
             self.action_lock.release()
         result["action"] = action
         result["command"] = shown(argv, hidden, stdin)
-        # The deliberate export download retains the CLI's complete recipe.
         if action != "export":
             result["stdout"] = redact(result["stdout"], hidden)
+        elif not result["ok"]:  # a partial recipe holds env values redact cannot see; stderr and error explain it
+            result["stdout"] = ""
         result["stderr"] = redact(result["stderr"], hidden)
-        if action == "doctor":
-            result.update(doctor_report(result["stdout"], result["stderr"]))
+        # doctor prints its closing tally last: only a run that shows it finished has findings to count.
+        if action == "doctor" and "error" not in result:
+            if DOCTOR_VERDICT.search(result["stdout"] + "\n" + result["stderr"]):
+                result.update(doctor_report(result["stdout"], result["stderr"]))
+            elif result["exit_code"] < 0 or result["exit_code"] > 128:
+                # Killed from outside, so no line says why; a CLI error still explains itself on stderr.
+                result["error"] = "Doctor stopped before it finished (exit %d). Run the check again." % result["exit_code"]
         elif argv == ["update", "--check"]:
             result.update(update_versions(result["stdout"] + "\n" + result["stderr"]))
         return result

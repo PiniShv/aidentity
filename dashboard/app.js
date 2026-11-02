@@ -145,7 +145,8 @@
   const initialRoute=location.hash.slice(1);
   let state = null, inventory = null, view = [...navigation.map(item=>item[0]),"guide"].includes(initialRoute)?initialRoute:"explore", query = "", appFilter = "", statusFilter = "all", selected = "", mobileDetail = false;
   let cleanupExperience = null, lastData = "", loadedAt = null, loading = false, busy = false, dialogSubmit = null, lastFocus = null;
-  let history = [], guideText = "", importDocument = null, tabPosition=null, tabScroll=0;
+  // guideCommand and guideShell keep the Help selects across the re-render that shows the output.
+  let history = [], guideText = "", guideCommand = "", guideShell = "zsh", importDocument = null, tabPosition=null, tabScroll=0;
   // Activity survives a reload in this tab (sessionStorage); outputs and commands are already redacted by the server.
   const ACTIVITY="aidentity.activity";
   try{const saved=JSON.parse(sessionStorage.getItem(ACTIVITY)||"[]");if(Array.isArray(saved))history=saved.filter(item=>item&&typeof item==="object"&&!Number.isNaN(new Date(item.time).getTime())).map(item=>({...item,time:new Date(item.time)})).slice(0,12);}catch{history=[];}
@@ -161,6 +162,8 @@
   const statusLabel=status=>statusLabels[status]||status;
   const plural=(count,one,many=`${one}s`)=>`${count} ${count===1?one:many}`;
   const lastLine=text=>String(text||"").trim().split("\n").pop().trim();
+  // The one CSRF-protected POST to the local server; body is an object, or a string already serialized.
+  const post=(path,body)=>fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-AIdentity-CSRF":state.csrf_token},body:typeof body==="string"?body:JSON.stringify(body)});
   // Escaped path that wraps after a slash instead of mid-word.
   const breakPath=value=>escape(value).replace(/\//g,"/<wbr>");
   const contextApp=()=>(view==="explore"&&exploreApp)||profile(selected)?.app||appFilter;
@@ -309,10 +312,10 @@
         renderAppIcon:appGlyph,
         icon,
         appAccent,
-        openProfile:item=>{query="";statusFilter="all";showView("profiles",{profile:typeof item==="string"?item:item.name,app:"",focus:true});},
+        inkFor,
+        statusLabel,
         addProfile:app=>addDialog(app || ""),
-        showProfiles:(app="")=>{query="";statusFilter="all";selected="";showView("profiles",{app:app || "",focus:true});},
-        launchProfile:async item=>action("open",{name:typeof item==="string"?item:item.name}),
+        launchProfile:item=>action("open",{name:item.name}),
         focusApp:name=>{exploreApp=name;renderNav();},
       });
       else main.innerHTML=title("Every profile, together","Create a profile for each account you use.")+button("Open workspace","workspace",{primary:true,icon:"arrow"});
@@ -402,7 +405,7 @@
     for(const echo of $$("[data-preview]",main)){
       const spec=echo.dataset.preview;let command=previews.get(spec);
       if(command===undefined&&!offline&&state?.csrf_token){
-        try{const response=await fetch("/api/preview",{method:"POST",headers:{"Content-Type":"application/json","X-AIdentity-CSRF":state.csrf_token},body:spec});const result=await response.json();if(response.ok&&result.ok&&result.command){command=result.command;previews.set(spec,command);}}catch{}
+        try{const response=await post("/api/preview",spec);const result=await response.json();if(response.ok&&result.ok&&result.command){command=result.command;previews.set(spec,command);}}catch{}
       }
       if(command&&echo.isConnected){$("code",echo).innerHTML=commandHtml(command);echo.hidden=false;}
     }
@@ -455,10 +458,12 @@
     const commands=["","setup","ui","add","list","open","quit","rename","set","prune","restore","rebuild","rm","export","import","apps","doctor","update","completion","version","help","dashboard"];
     main.innerHTML=title("Help","Plain-word terms and keys, then the CLI’s own help and shell completion for your terminal.")+
       `<section class="terms" aria-labelledby="terms-title"><h2 id="terms-title">Terms</h2><dl>${terms.map(([term,text])=>`<div><dt>${term}</dt><dd>${text}</dd></div>`).join("")}<div class="terms-keys"><dt>Keyboard</dt><dd><kbd>/</kbd> search · <kbd>⌘B</kbd> collapse sidebar · <kbd>O</kbd> open the focused profile</dd></div></dl></section>`+
-      `<div class="guide-layout"><section class="panel guide-controls"><div class="field"><label for="help-command">Command help</label><select id="help-command">${commands.map(command=>`<option value="${command}">${command||"All commands"}</option>`).join("")}</select><div class="section-gap">${button("Read help","help",{icon:"book"})}</div></div><div class="field"><label for="completion-shell">Shell completion</label><select id="completion-shell"><option>zsh</option><option>bash</option><option>fish</option></select><div class="section-gap">${button("Generate completion","completion",{icon:"terminal"})}</div></div></section><section><div class="panel-heading"><h2>Command output</h2>${button("Copy output","copy-guide",{small:true,icon:"copy",disabled:!guideText})}</div>${guideText?`<pre class="output guide-output">${escape(guideText)}</pre>`:'<p class="guide-empty">Choose a command to read its help, or generate a completion script for your shell.</p>'}</section></div>`;
+      `<div class="guide-layout"><section class="panel guide-controls"><div class="field"><label for="help-command">Command help</label><select id="help-command">${commands.map(command=>`<option value="${command}"${command===guideCommand?" selected":""}>${command||"All commands"}</option>`).join("")}</select><div class="section-gap">${button("Read help","help",{icon:"book"})}</div></div><div class="field"><label for="completion-shell">Shell completion</label><select id="completion-shell">${["zsh","bash","fish"].map(shell=>`<option${shell===guideShell?" selected":""}>${shell}</option>`).join("")}</select><div class="section-gap">${button("Generate completion","completion",{icon:"terminal"})}</div></div></section><section><div class="panel-heading"><h2>Command output</h2>${button("Copy output","copy-guide",{small:true,icon:"copy",disabled:!guideText})}</div>${guideText?`<pre class="output guide-output">${escape(guideText)}</pre>`:'<p class="guide-empty">Choose a command to read its help, or generate a completion script for your shell.</p>'}</section></div>`;
   }
   async function refresh(options={}){
-    if(loading)return null;loading=true;let changed=null;
+    // loading is the read in flight: a polled read yields to it, a forced one (after an action) waits and then runs its own.
+    while(loading){if(!options.force)return null;await loading;}
+    let release;loading=new Promise(resolve=>{release=resolve;});let changed=null;
     try{
       const response=await fetch(options.force?"/api/state?fresh=1":"/api/state",{cache:"no-store"});
       const data=await response.json();
@@ -489,7 +494,7 @@
       if(!state)main.innerHTML=title("Workspace unavailable","The local server could not read your setup.")+`<div class="notice error">${escape(error.server?error.message:OFFLINE)}</div><div class="section-gap">${button("Retry connection","refresh",{primary:true,icon:"refresh"})}</div>`;
       $("#freshness").textContent=loadedAt?`Last updated ${time(loadedAt)}`:"Connection unavailable";
       if(options.notify)toast(error.server?"Refresh failed":"Still disconnected",error.server?error.message:"Run “aidentity dashboard” in Terminal, then try again.",true);
-    }finally{loading=false;}
+    }finally{loading=false;release();}
     return changed;
   }
   function setOffline(on){
@@ -531,11 +536,11 @@
     $("#activity-toggle").hidden=false;$("#activity-summary").textContent=name==="update"&&params.check?"Checking for updates…":doing[name]||"Working…";
     try{
       let response,result;
-      try{response=await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json","X-AIdentity-CSRF":state.csrf_token},body:JSON.stringify({action:name,...params})});}
+      try{response=await post("/api/action",{action:name,...params});}
       catch(error){setOffline(true);entry=logActivity({action:name,ok:false,output:`${error.name}: ${error.message}\n${OFFLINE}`});throw new Error(OFFLINE);}
       try{result=await response.json();}catch{result={ok:false,error:`The dashboard sent an unreadable reply (HTTP ${response.status}).`};}
       if(response.status===409&&result.busy)throw Object.assign(new Error(result.error||"Another action is still running. Try again when it finishes."),{busy:true});
-      entry=logActivity({action:name,ok:Boolean(result.ok),command:result.command,output:name==="export"?"Export file prepared for download.":[result.stdout,result.stderr,result.error].filter(Boolean).join("\n")});
+      entry=logActivity({action:name,ok:Boolean(result.ok),command:result.command,output:name==="export"&&result.ok?"Export file prepared for download.":[result.stdout,result.stderr,result.error].filter(Boolean).join("\n")});
       // Doctor reports findings with a non-zero exit; a summary means it ran, so it is a result, not a failure.
       const report=name==="doctor"&&Boolean(result.summary);
       if((!response.ok||!result.ok)&&!report)throw Object.assign(new Error(result.error||result.stderr||result.stdout||`${name} failed (exit ${result.exit_code}).`),{field:result.field});
@@ -581,8 +586,9 @@
     }
     if(name==="update"&&params.check){
       const {installed,available}=result;
-      if(installed&&available&&available!==installed){lastUpdate={text:`Version ${available} is available (you have ${installed}).`,available:true,at:new Date()};return {title:`Version ${available} is available`,text:`You have ${installed}. Choose Update now on Maintenance to install it.`};}
-      if(installed&&available===installed){lastUpdate={text:`You’re on the latest version (${installed}).`,available:false,at:new Date()};return {title:"aidentity is up to date",text:lastUpdate.text};}
+      // The CLI never downgrades: a build newer than the latest release is up to date, not an update.
+      if(installed&&available&&byName(available,installed)>0){lastUpdate={text:`Version ${available} is available (you have ${installed}).`,available:true,at:new Date()};return {title:`Version ${available} is available`,text:`You have ${installed}. Choose Update now on Maintenance to install it.`};}
+      if(installed&&available){lastUpdate={text:byName(available,installed)===0?`You’re on the latest version (${installed}).`:`You have ${installed}, newer than the latest release (${available}).`,available:false,at:new Date()};return {title:"aidentity is up to date",text:lastUpdate.text};}
       lastUpdate=null;return {title:"Update check finished",text:lastLine(result.stdout)||"The full result is in Activity."};
     }
     if(name==="update"){lastUpdate=null;return {title:"aidentity updated",text:lastLine(result.stdout)};}
@@ -657,7 +663,7 @@
     let spec=null;try{spec=dialogBuild(new FormData($("#dialog-form")));}catch{spec=null;}
     if(!spec||offline||!state?.csrf_token||$$("[required]",$("#dialog-form")).some(el=>!el.value.trim())){echo.hidden=true;return;}
     try{
-      const response=await fetch("/api/preview",{method:"POST",headers:{"Content-Type":"application/json","X-AIdentity-CSRF":state.csrf_token},body:JSON.stringify({action:spec[0],...spec[1]})});
+      const response=await post("/api/preview",{action:spec[0],...spec[1]});
       const result=await response.json();
       if(seq!==previewSeq||!echo.isConnected)return;
       echo.hidden=!(response.ok&&result.ok&&result.command);
@@ -717,7 +723,7 @@
   }
   // After Add: Profiles, the new card selected, scrolled into view, one gentle ring, and focus on its name once the dialog closes.
   function revealProfile(name){
-    query="";statusFilter="all";selected=name||"";if(name)stored.set("aidentity.last-profile",name);
+    query="";statusFilter="all";selected=name||"";if(name)stored.set(LAST_PROFILE,name);
     showView("profiles",{app:"",instant:true});// the card is looked up right after, so the page swaps now
     const target=$$(".profile-name",main).find(el=>el.dataset.name===name);if(!target)return;
     const cardNode=target.closest(".profile-card");
@@ -758,10 +764,12 @@
   function settingsDialog(item){
     const args=(item.args||[]).join("\n"),color=String(item.color||defaultBadgeColor).toUpperCase(),env=item.env||[];
     const build=data=>{
-      const params={name:item.name},noBadge=data.has("no_badge"),badge=String(data.get("badge")||""),next=hexValue(data.get("color"));
-      if(noBadge&&item.badge!==null)params.no_badge=true;
+      // An empty badge field means the CLI's default, the name's first character, as the preview shows.
+      const params={name:item.name},noBadge=data.has("no_badge"),badge=String(data.get("badge")||"")||[...(item.profile||item.name)][0]?.toUpperCase()||"",next=hexValue(data.get("color"));
+      if(next&&wordHex(next).toUpperCase()!==color)params.color=next;
+      // Checked, --no-badge rides along with a color too: set --color alone adds a letter badge to a badge-less profile.
+      if(noBadge&&(item.badge!==null||params.color))params.no_badge=true;
       if(!noBadge&&badge&&badge!==(item.badge||""))params.badge=badge;
-      if(next&&next.toUpperCase()!==color)params.color=next;
       const nextArgs=lines(data.get("args"));
       if(nextArgs.join("\n")!==args){params.clear_args=true;if(nextArgs.length)params.args=nextArgs;}
       if(lines(data.get("env")).length)params.env=lines(data.get("env"));
@@ -783,7 +791,7 @@
   function renameDialog(item){
     showDialog("Rename profile","The name changes; the profile stays signed in.",`<div class="fields">${field("Current name","current",item.name,"","text","disabled")}${field("New profile name","new_name",item.profile,"The app name is added by aidentity.","text","required maxlength=\"40\"")}</div>`,"Rename profile",async(data,el)=>{
       await action("rename",{name:item.name,new_name:data.get("new_name")},el);
-      selected=`${appName(item)} ${data.get("new_name")}`;stored.set("aidentity.last-profile",selected);
+      selected=`${appName(item)} ${data.get("new_name")}`;stored.set(LAST_PROFILE,selected);
       renderView();
     },{build:data=>["rename",{name:item.name,new_name:data.get("new_name")}],app:appName(item)});
   }
@@ -824,7 +832,8 @@
         const rows=data.launchers.map(item=>{const name=String(item?.name||[item?.app,item?.profile].filter(Boolean).join(" ")||"Unnamed profile");return {name,fate:owned.has(name)?"exists":(item?.app?!apps.has(item.app):!item?.bundle_id)?"missing":"create"};});
         const count=fate=>rows.filter(row=>row.fate===fate).length,create=count("create");
         $("#import-preview").innerHTML=`<p class="import-summary"><strong>${plural(create,"profile")} will be created</strong>${count("exists")?` · ${count("exists")} already ${count("exists")===1?"exists":"exist"}`:""}${count("missing")?` · ${plural(count("missing"),"app")} not installed`:""}</p><ul class="import-list">${rows.map(row=>`<li data-fate="${row.fate}"><span>${escape(row.name)}</span><span class="import-fate">${fates[row.fate]}</span></li>`).join("")}</ul><p class="small">From ${escape(file.name)}. The CLI checks each profile again when it runs.</p>`;
-        const submit=$("#dialog-submit");submit.textContent=create?`Create ${plural(create,"profile")}`:"Nothing to create";submit.disabled=!create;
+        // "App not installed" is only the estimate above, so it never blocks the import; only a list of profiles that all exist (or none) does.
+        const submit=$("#dialog-submit"),nothing=rows.every(row=>row.fate==="exists");submit.textContent=create?`Create ${plural(create,"profile")}`:nothing?"Nothing to create":"Import profiles";submit.disabled=nothing;
         schedulePreview(0);
       }catch(error){$("#form-error").textContent=error.message;$("#form-error").hidden=false;}
     };
@@ -841,7 +850,7 @@
     setBusy(el,true);
     try{
       let response;
-      try{response=await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json","X-AIdentity-CSRF":state.csrf_token},body:JSON.stringify({action:name,...params})});}
+      try{response=await post("/api/action",{action:name,...params});}
       catch{setOffline(true);throw new Error(OFFLINE);}
       const result=await response.json().catch(()=>({ok:false,error:`The dashboard sent an unreadable reply (HTTP ${response.status}).`}));
       if(!response.ok||!result.ok)throw new Error(result.error||result.stderr||`${name} failed (exit ${result.exit_code}).`);
@@ -882,7 +891,7 @@
     if(name==="import")return importDialog();
     if(name==="export")return showDialog("Export profiles?","Download your profiles’ settings as a JSON file.",`<p class="callout">${icon("alert")}<span>The file includes launch settings and can hold private environment or proxy values. Keep it private.</span></p><p class="muted section-gap">Sign-ins and profile data stay on this Mac.</p>`,"Export profiles",async(_,submit)=>{await exportSetup(submit);},{build:()=>["export",{}]});
     if(name==="help"||name==="completion"){
-      const command=$("#help-command").value,params=name==="help"?(command?{command}:{}):{shell:$("#completion-shell").value};
+      const command=guideCommand=$("#help-command").value,params=name==="help"?(command?{command}:{}):{shell:guideShell=$("#completion-shell").value};
       try{guideText=(await readOutput(name,params,el)).stdout;}
       catch(error){toast(name==="help"?"Could not read the help":"Could not generate completion",error.message,true);return;}
       // In one column (900px and below) the output sits under the controls: bring its top into view.
@@ -945,7 +954,11 @@
   document.addEventListener("input",event=>{
     if(event.target.id!=="workspace-search")return;query=event.target.value;keepFocus(renderView);
   });
-  document.addEventListener("change",event=>{if(event.target.id==="app-filter"){appFilter=event.target.value;keepFocus(renderView);}});
+  document.addEventListener("change",event=>{
+    if(event.target.id==="app-filter"){appFilter=event.target.value;keepFocus(renderView);}
+    if(event.target.id==="help-command")guideCommand=event.target.value;
+    if(event.target.id==="completion-shell")guideShell=event.target.value;
+  });
   // The selected profile's Details disclosure keeps its state across re-renders (Rebuild launcher lives there).
   document.addEventListener("toggle",event=>{
     if(event.target.matches?.(".detail-more"))detailMore=event.target.open?selected:"";

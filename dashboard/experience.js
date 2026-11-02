@@ -6,17 +6,8 @@
   "use strict";
   const esc = value => String(value ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const luminance = hex => [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
-    .map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4).reduce((sum, c, i) => sum + c * [.2126, .7152, .0722][i], 0);
-  // Same rule as app.js: the badge letter takes Lampblack or white, whichever contrasts more.
-  const badgeStyle = profile => {
-    const hex = /^[0-9a-f]{6}$/i.test(profile.color || "") ? profile.color : "5FE08A";
-    return `--identity:#${hex};--identity-ink:${(luminance(hex) + .05) / (luminance("060606") + .05) >= 1.05 / (luminance(hex) + .05) ? "#060606" : "#ffffff"}`;
-  };
-  const badgeChar = profile => profile.badge || (profile.profile || profile.name || "A").slice(0, 1);
-  // Display labels shared with the Profiles view; the CLI's status strings stay the data.
-  const statusLabels = { running: "Running", "in use": "Not running", "not running": "Not running", "signed out / new": "Not opened yet", "app missing": "App missing" };
-  const statusLabel = status => statusLabels[status] || status || "Status unavailable";
+  // The first code point, so an emoji name is not split into a lone surrogate.
+  const badgeChar = profile => profile.badge || [...(profile.profile || profile.name || "A")][0];
   // A data refresh remounts Explore in the same task as cleanup. Only that
   // rebuild inherits the chosen app and focused control; a later mount starts fresh.
   let carried = null;
@@ -64,6 +55,13 @@
     // The dashboard's drawn icon set (app.js), so Prev/Next match every other icon.
     const uiIcon = name => callbacks.icon?.(name) ?? "";
     const profileCount = count => `${count} ${count === 1 ? "profile" : "profiles"}`;
+    // The badge ink rule is app.js's (callbacks.inkFor): Lampblack or white, whichever contrasts more.
+    const badgeStyle = profile => {
+      const hex = /^[0-9a-f]{6}$/i.test(profile.color || "") ? profile.color : "5FE08A";
+      return `--identity:#${hex};--identity-ink:${callbacks.inkFor(hex)}`;
+    };
+    // Display labels are app.js's too (callbacks.statusLabel); the CLI's status strings stay the data.
+    const statusLabel = status => callbacks.statusLabel?.(status) || "Status unavailable";
     const reducedQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     let reduced = reducedQuery.matches;
     const kept = carried; carried = null;
@@ -108,7 +106,9 @@
     const keyHtml = profile => {
       const running = profile.status === "running", missing = profile.status === "app missing";
       return `<li class="xp-key${running ? " xp-key-running" : ""}${missing ? " xp-key-missing" : ""}${lit.delete(profile.name) ? " xp-key-lit" : ""}">
-        <span class="xp-key-badge" style="${badgeStyle(profile)}" aria-hidden="true">${esc(badgeChar(profile))}</span>
+        ${profile.badge === null
+          ? `<span class="xp-key-badge xp-key-badge-app" aria-hidden="true">${icon(profile.app || "")}</span>`
+          : `<span class="xp-key-badge" style="${badgeStyle(profile)}" aria-hidden="true">${esc(badgeChar(profile))}</span>`}
         <strong class="xp-key-name">${esc(profile.profile || profile.name)}</strong>
         <span class="xp-key-state">${running ? runMark("Running") : esc(statusLabel(profile.status))}${profile.main ? " · Original" : ""}</span>
         ${missing ? '<span class="xp-key-reason">Reinstall the app to open it.</span>' : `<button type="button" class="xp-button xp-key-action" data-xp-run data-xp-key="${esc(profile.name)}" aria-label="${esc(keyLabel(profile))}"${launching.has(profile.name) ? ' aria-disabled="true"' : ""}>${keyVerb(profile)}</button>`}
@@ -209,8 +209,7 @@
       launching.add(profile.name);
       paint(profile);
       try {
-        if (typeof callbacks.launchProfile === "function") await callbacks.launchProfile(profile);
-        else callbacks.openProfile?.(profile);
+        await callbacks.launchProfile(profile);
       } catch (error) {
         if (!disposed) {
           feedback.textContent = `Couldn’t open ${profile.profile || profile.name}. ${error?.message || "Try again, or check the profile on Profiles."}`;
@@ -291,21 +290,26 @@
     const reducedQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const plainQuery = window.matchMedia("(prefers-contrast: more), (forced-colors: active)");
     const target = { x: AWAY, y: AWAY }, cursor = { x: AWAY, y: AWAY };
-    let width = 0, height = 0, ink = "", t = 0, last = 0, frame = 0, resizeTimer = 0;
+    const atlas = document.createElement("canvas");
+    let width = 0, height = 0, dpr = 1, cellPx = 0, t = 0, last = 0, frame = 0, resizeTimer = 0;
 
-    // Setting the bitmap size resets the context, so the font and alignment follow it.
+    // Setting a bitmap size resets its context to the identity transform, so the glyph atlas is rebuilt here (dpr and ink can change).
     function size() {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      dpr = Math.min(2, window.devicePixelRatio || 1);
       width = canvas.clientWidth; height = canvas.clientHeight;
       canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const mono = getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim() || "ui-monospace, monospace";
-      ctx.font = `${CELL * 0.85}px ${mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ink = getComputedStyle(canvas).color;
+      // One cell per ramp glyph, drawn once at full alpha: draw() blits them instead of calling fillText per cell.
+      cellPx = Math.round(CELL * dpr);
+      atlas.width = cellPx * RAMP.length; atlas.height = cellPx;
+      const a = atlas.getContext("2d"), mono = getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim() || "ui-monospace, monospace";
+      a.scale(cellPx / CELL, cellPx / CELL);
+      a.font = `${CELL * 0.85}px ${mono}`; a.textAlign = "center"; a.textBaseline = "middle";
+      a.fillStyle = getComputedStyle(canvas).color;
+      [...RAMP].forEach((ch, i) => a.fillText(ch, i * CELL + CELL / 2, CELL / 2));
     }
     function draw(react) {
-      ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = ink; ctx.globalAlpha = INK_MAX; // flat ink: brightness comes from glyph density
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = INK_MAX; // flat ink: brightness comes from glyph density
       const r2 = RADIUS * RADIUS, cols = Math.ceil(width / CELL), rows = Math.ceil(height / CELL);
       for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
         const x = gx * CELL + CELL / 2, y = gy * CELL + CELL / 2;
@@ -314,8 +318,9 @@
           const d2 = (x - cursor.x) ** 2 + (y - cursor.y) ** 2;
           if (d2 < r2 * 4) lum = Math.min(1, lum + Math.exp(-d2 / r2) * 0.7);
         }
-        const ch = RAMP[Math.floor(lum * (RAMP.length - 1))];
-        if (ch !== " ") ctx.fillText(ch, x, y);
+        const glyph = Math.floor(lum * (RAMP.length - 1));
+        // 1:1 at whole device pixels, so a fractional dpr never resamples the glyph; 0 is the blank.
+        if (glyph) ctx.drawImage(atlas, glyph * cellPx, 0, cellPx, cellPx, Math.round(gx * CELL * dpr), Math.round(gy * CELL * dpr), cellPx, cellPx);
       }
     }
     function tick(now) {
