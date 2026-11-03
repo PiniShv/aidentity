@@ -118,7 +118,7 @@
     };
     const navRow = (group, i) => `<li><button type="button" class="xp-nav-item" data-xp-app="${esc(group.name)}" data-xp-select="${i}" style="${accentStyle(group)}" aria-describedby="xp-select-hint" aria-current="${i === active}"><span class="xp-list-icon" aria-hidden="true">${icon(group.name)}</span><span class="xp-nav-text"><span class="xp-app-name">${esc(group.name)}</span><span class="xp-app-meta"><span>${profileCount(group.profiles.length)}${group.installed ? "" : inventoryFailed ? " · Inventory unavailable" : " · App not found"}</span>${appRunning(group)}</span></span></button></li>`;
     root.innerHTML = `<div class="xp-wrap">
-      <header class="xp-header"><span class="tile section-explore" aria-hidden="true">${uiIcon("explore")}</span><div><h1 tabindex="-1">Explore</h1><p>Choose an app. Open a profile or add another.</p></div></header>${errorNotice}
+      <header class="xp-header"><span class="tile section-explore" aria-hidden="true">${uiIcon("explore")}</span><div><h1 tabindex="-1">Explore</h1><p>${profiles.length ? "Choose an app. Open a profile or add another." : "Choose an app and add its first profile."}</p></div></header>${errorNotice}
       ${nav.length ? `<div class="xp-layout">
         <section class="xp-preview" data-xp-preview="${esc(nav[active].name)}" aria-label="Selected app">
           <div class="xp-pager"${nav.length > 1 ? "" : " hidden"}><button type="button" class="xp-button xp-prev" aria-label="Previous app">${uiIcon("back")}</button><span class="xp-position" aria-live="polite" aria-atomic="true" data-at="${active}">${positionHtml(active)}</span><button type="button" class="xp-button xp-next" aria-label="Next app">${uiIcon("arrow")}</button><label class="xp-jump-label"><span class="xp-sr-only">Choose app</span><select class="xp-jump" aria-label="Choose app">${nav.map((group, i) => `<option value="${i}">${esc(group.name)}</option>`).join("")}</select></label></div>
@@ -135,7 +135,7 @@
           <div class="xp-list-summary"><span>${nav.length} ${nav.length === 1 ? "app" : "apps"}</span><span>${profileCount(profiles.length)}</span></div>
           <ul class="xp-nav">${nav.map(navRow).join("")}</ul>
         </div>
-      </div>` : errorNotice ? "" : `<section class="xp-empty"><h2>No AI apps found</h2><p>Install Claude or ChatGPT, then refresh this workspace.</p><button type="button" class="xp-button xp-primary xp-empty-add" data-xp-run>Add profile ${uiIcon("arrow")}</button></section>`}
+      </div>` : errorNotice ? "" : `<section class="xp-empty"><h2>No AI apps found</h2><p>Install Claude or ChatGPT, then refresh this workspace.</p><button type="button" class="xp-button xp-primary xp-empty-refresh">${uiIcon("refresh")}Refresh apps</button></section>`}
     </div>`;
     const preview = root.querySelector(".xp-preview"), ident = root.querySelector(".xp-ident");
     const keys = root.querySelector(".xp-keys"), feedback = root.querySelector(".xp-inline-feedback");
@@ -171,9 +171,10 @@
         keys.innerHTML = group.profiles.map(keyHtml).join("");
         // An app with no profiles yet shows the empty-state words instead of an empty ring.
         keys.hidden = !group.profiles.length; none.hidden = !keys.hidden;
-        none.firstElementChild.textContent = `No ${group.name} profiles yet. Each profile keeps its own sign-in. Add the first one below.`;
+        none.firstElementChild.textContent = `No ${group.name} profiles yet. A profile opens ${group.name} with its own sign-in, so your accounts run side by side.`;
       }
       addKey.setAttribute("aria-label", `Add profile, ${group.name}`);
+      addKey.classList.toggle("xp-primary", !group.profiles.length); // the first profile's action is the one primary in an empty panel
       block(addKey, !group.installed);
       addHelp.textContent = inventoryFailed ? "The app list could not be read." : "Install the app before adding a profile.";
       addHelp.hidden = group.installed;
@@ -229,8 +230,8 @@
         launchingState(button, launching.has(profile.name)); button.textContent = keyVerb(profile); button.setAttribute("aria-label", keyLabel(profile));
       }
     }
-    const emptyAdd = root.querySelector(".xp-empty-add");
-    if (emptyAdd) listen(emptyAdd, "click", () => { if (!blocked(emptyAdd)) callbacks.addProfile?.(""); });
+    const emptyRefresh = root.querySelector(".xp-empty-refresh");
+    if (emptyRefresh) listen(emptyRefresh, "click", () => callbacks.refreshApps?.());
     if (preview) {
       listen(addKey, "click", () => { if (!blocked(addKey)) callbacks.addProfile?.(nav[active].name); });
       listen(keys, "click", event => {

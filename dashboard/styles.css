@@ -196,7 +196,7 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 
 /* Profiles: layout, grid, card and detail panel. The grid fills by width, never by selection. */
 .profile-layout{display:grid;align-items:start;gap:24px;grid-template-columns:minmax(0,1fr) 320px}
-/* no-selection: no profiles at all. auto-fit: fewer cards than columns stretch instead of leaving an empty column before the
+/* no-selection: no card in this tab or filter and no chosen profile, so an empty state spans the width. auto-fit: fewer cards than columns stretch instead of leaving an empty column before the
    detail column; one or two cards stop at 360px rather than become banners. */
 .profile-layout.no-selection{grid-template-columns:1fr}
 .profile-grid{display:grid;align-items:stretch;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:20px}
@@ -273,7 +273,8 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .panel>.tile{margin-bottom:18px}
 .panel>.tile+.panel-heading{margin-bottom:8px}
 .operation-card p,.panel>p{font-size:13px;color:var(--muted);max-width:440px}
-.operation-card .button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px}
+.button-row{display:flex;flex-wrap:wrap;gap:8px}
+.operation-card .button-row{margin-top:auto;padding-top:10px}
 .operation-card.wide{grid-column:1/-1}
 .callout{padding:12px 14px;border-radius:8px;background:var(--warnbg);color:var(--text);font-size:13px;line-height:1.55}
 .operation-card p.callout{color:var(--text)}

@@ -317,6 +317,7 @@
         inkFor,
         statusLabel,
         addProfile:app=>addDialog(app || ""),
+        refreshApps:()=>refresh({notify:true,force:true}),
         launchProfile:item=>action("open",{name:item.name}),
         focusApp:name=>{exploreApp=name;renderNav();},
       });
@@ -345,7 +346,8 @@
     });
   }
   function scopedProfiles(){return state.profiles.filter(item=>(!appFilter||appName(item)===appFilter)&&(!query||`${item.name} ${appName(item)} ${item.profile}`.toLowerCase().includes(query.toLowerCase())));}
-  // At 901px and up the detail column is always there while profiles exist, so selecting never reflows the grid.
+  // At 901px and up the detail column is always there while the filter shows a card or holds the chosen profile, so selecting never reflows the grid
+  // and a status tab, an action or a poll never drops a choice; a filter or search that hides the card does.
   // Nothing is selected for the user: only a selection they made (stored on select, cleared on close) comes back.
   const wide=matchMedia("(min-width:901px)");
   const LAST_PROFILE="aidentity.last-profile";
@@ -359,7 +361,7 @@
     const running=scoped.filter(item=>item.status==="running").length;
     const visible=scoped.filter(item=>statusFilter==="all"||(statusFilter==="running"?item.status==="running":statusFilter==="attention"?needsRepair(item):item.status!=="running"));
     restoreSelection(visible);
-    const chosen=profile(selected);
+    const chosen=scoped.some(item=>item.name===selected)?profile(selected):null;
     if(!chosen)mobileDetail=false;
     main.classList.toggle("profile-detail-mobile",mobileDetail);
     // Counts live on the tabs only. Search shows from 7 profiles, the app filter once two apps have profiles.
@@ -368,20 +370,24 @@
     const search=state.profiles.length>6||query?searchField("Search profiles"):"";
     const filter=appNames.length>1?`<select id="app-filter" aria-label="Filter by application"><option value="">All apps</option>${appNames.map(name=>`<option${name===appFilter?" selected":""}>${escape(name)}</option>`).join("")}</select>`:"";
     const toolbar=search||filter||appFilter?`<div class="toolbar">${search}<div class="toolbar-end">${appFilter?button("All apps","all-apps",{small:true}):""}${filter}${search?`<span class="sr-only" id="result-count" role="status">${plural(visible.length,"profile")}</span>`:""}</div></div>`:"";
+    // No tabs until the first profile exists: on a first run they would filter nothing, and the grid is then no tabpanel.
+    const strip=state.profiles.length?tabs([["all","All",scoped.length],["running","Running",running],["idle","Not running",scoped.length-running],["attention","Needs repair",lastDoctor||repairs?repairs:null,"Not checked yet. Choose Check on Maintenance."]],statusFilter):"";
     paint(title(appFilter||"Profiles",appFilter?"":"Each profile opens an app with its own sign-in.")+
-      tabs([["all","All",scoped.length],["running","Running",running],["idle","Not running",scoped.length-running],["attention","Needs repair",lastDoctor||repairs?repairs:null,"Not checked yet. Choose Check on Maintenance."]],statusFilter)+
+      strip+
       toolbar+
-      `<div class="profile-layout ${state.profiles.length?"":"no-selection"} ${mobileDetail?"mobile-detail":""}"><div class="profile-grid" id="profile-results" role="tabpanel" aria-labelledby="status-${statusFilter}">${visible.map(card).join("")||profilesEmpty(scoped)}</div>${chosen?detail(chosen):state.profiles.length?'<p class="detail-placeholder">Select a profile to see its settings and actions.</p>':""}</div>`);
+      `<div class="profile-layout ${visible.length||chosen?"":"no-selection"} ${mobileDetail?"mobile-detail":""}"><div class="profile-grid" id="profile-results"${strip?` role="tabpanel" aria-labelledby="status-${statusFilter}"`:""}>${visible.map(card).join("")||profilesEmpty(scoped)}</div>${chosen?detail(chosen):visible.length?'<p class="detail-placeholder">Select a profile to see its settings and actions.</p>':""}</div>`);
     fillPreviews();
   }
   const emptyState=(heading,text,actions="")=>`<div class="empty-state"><h2>${heading}</h2><p>${text}</p>${actions}</div>`;
+  // The same words on Profiles, Applications and Explore: nothing to add to until an app is installed.
+  const noAppsState=()=>emptyState("No AI apps found","Install Claude or ChatGPT, then refresh this workspace.",button("Refresh apps","refresh",{icon:"refresh"}));
   // Search-empty, filter-empty and each status tab get their own words: an empty Running tab is not a failed search.
   function profilesEmpty(scoped){
-    if(!state.profiles.length)return state.errors?.length?setupError():emptyState("No Claude or ChatGPT profiles yet","Choose an installed app and name the profile. It keeps its own sign-in, apart from the app’s original account.",button("Create your first profile","add",{primary:true,icon:"plus"}));
-    if(!scoped.length)return query?emptyState(`No profiles match “${escape(query)}”`,"Check the spelling or clear the search.",button("Clear search","clear-search",{primary:true,icon:"x"})):emptyState("No matching profiles","Try another app.",button("Clear filters","reset-filters",{primary:true,icon:"search"}));
+    if(!state.profiles.length)return state.errors?.length?setupError():!state.apps.length?noAppsState():emptyState("No Claude or ChatGPT profiles yet","A profile opens the app with its own sign-in, so your accounts stay open side by side. Add one, open it and sign in once.",button("Add your first profile","add",{primary:true,icon:"plus"}));
+    if(!scoped.length)return query?emptyState(`No profiles match “${escape(query)}”`,"Check the spelling or clear the search.",button("Clear search","clear-search",{primary:true,icon:"x"})):state.apps.some(item=>item.name===appFilter)?emptyState(`No ${escape(appFilter)} profiles yet`,`Each profile opens ${escape(appFilter)} with its own sign-in.`,button("Add profile","add",{primary:true,icon:"plus",app:appFilter,label:`Add profile for ${appFilter}`})):emptyState(`No ${escape(appFilter)} profiles yet`,`Install ${escape(appFilter)} to add a profile.`,button("Show all profiles","reset-filters",{icon:"grid"}));
     const all=button("Show all profiles","show-all",{icon:"grid"});
     if(statusFilter==="running")return emptyState("Nothing is running","Open a profile and it shows up here.",all);
-    if(statusFilter==="attention")return emptyState("Nothing needs repair",lastDoctor?`Every profile has its app, and doctor flagged none at ${time(lastDoctor.at)}.`:"Every profile has its app. Choose Check on Maintenance for a deeper check.",all);
+    if(statusFilter==="attention")return emptyState("Nothing needs repair",lastDoctor?`Every profile has its app, and doctor flagged none at ${time(lastDoctor.at)}.`:"Every profile has its app. Choose Check on Maintenance for a deeper check.",lastDoctor?all:`<div class="button-row">${all}<button class="button" data-view="maintenance">${icon("shield")}<span>Open Maintenance</span></button></div>`);
     return emptyState("Every profile is running","Quit one and it shows up here.",all);
   }
   // A profile card: the app tile (its hue) carrying the profile's badge beside a real heading, then state, then the one primary action.
@@ -419,7 +425,7 @@
   function renderApps(){
     const apps=sortedApps().filter(item=>!query||item.name.toLowerCase().includes(query.toLowerCase()));
     const cards=apps.map(item=>{const t=tone(item.name),count=plural(profileCount(item.name),"profile");return `<article class="application-card${t.cls}"${t.style}><div class="app-head">${art(item.name)}<div><h2>${escape(item.name)}</h2><button class="link-button app-count" data-app-filter="${escape(item.name)}" aria-label="${escape(`${count} for ${item.name}`)}">${count}</button></div></div>${button("Add profile","add",{icon:"plus",app:item.name,label:`Add profile for ${item.name}`})}</article>`;}).join("");
-    const empty=!state.apps.length&&state.errors?.length?setupError():state.apps.length?`<div class="empty-state"><h2>No apps match “${escape(query)}”</h2><p>Check the spelling or clear the search to see ${state.apps.length===1?"the 1 app":`all ${state.apps.length} apps`}.</p>${button("Clear search","clear-search",{primary:true,icon:"x"})}</div>`:'<div class="empty-state"><h2>No AI apps found</h2><p>Install Claude or ChatGPT, then refresh this workspace.</p>'+button("Refresh apps","refresh",{icon:"refresh"})+"</div>";
+    const empty=!state.apps.length&&state.errors?.length?setupError():state.apps.length?`<div class="empty-state"><h2>No apps match “${escape(query)}”</h2><p>Check the spelling or clear the search to see ${state.apps.length===1?"the 1 app":`all ${state.apps.length} apps`}.</p>${button("Clear search","clear-search",{primary:true,icon:"x"})}</div>`:noAppsState();
     paint(title("Applications",!state.apps.length&&state.errors?.length?"Inventory unavailable.":`${state.apps.length} AI ${state.apps.length===1?"app":"apps"} found on this Mac.`)+`<div class="toolbar">${searchField("Search installed apps")}</div><div class="apps-body"><div class="apps-grid">${apps.length?cards:empty}</div></div>`);
   }
   function renderRecovery(){
@@ -428,7 +434,7 @@
     const restorableFailed=state.restorable_ok===false,unclaimedFailed=state.unclaimed_ok===false;
     const unread=what=>`<p class="muted">Could not read ${what}. Refresh to try again.</p>`;
     main.innerHTML=title("Recovery","Bring back profiles whose launcher was removed; their data is still on this Mac.","",LAUNCHER)+
-    `<section class="panel">${tile("recovery","recovery")}<div class="panel-heading"><h2>${entries.length?`${plural(entries.length,"profile")} to restore`:restorableFailed?"Profiles to restore":"Nothing to restore"}</h2>${entries.length?button("Restore all","restore-all",{icon:"recovery"}):""}</div>${entries.length?`<div class="recovery-list">${entries.map(item=>`<div class="recovery-row"><div><h3>${breakable(item.name)}</h3><p>The profile data remains on this Mac.</p></div>${button("Restore","restore",{icon:"recovery",name:item.name,label:`Restore ${item.name}`})}</div>`).join("")}</div>`:restorableFailed?unread("restorable profiles"):'<p class="muted">Every profile with kept data already has a launcher.</p>'}</section>`+
+    `<section class="panel">${tile("recovery","recovery")}<div class="panel-heading"><h2>${entries.length?`${plural(entries.length,"profile")} to restore`:restorableFailed?"Profiles to restore":"Nothing to restore"}</h2>${entries.length?button("Restore all","restore-all",{icon:"recovery"}):""}</div>${entries.length?`<div class="recovery-list">${entries.map(item=>`<div class="recovery-row"><div><h3>${breakable(item.name)}</h3><p>The profile data remains on this Mac.</p></div>${button("Restore","restore",{icon:"recovery",name:item.name,label:`Restore ${item.name}`})}</div>`).join("")}</div>`:restorableFailed?unread("restorable profiles"):state.profiles.length?'<p class="muted">Every profile with kept data already has a launcher.</p>':'<p class="muted">Remove a profile and keep its data, and it appears here, ready to restore.</p>'}</section>`+
     `<section class="operation-card section-gap">${tile("danger","trash")}<h2>${unclaimed.length||unclaimedFailed?"Clear unclaimed data":"Nothing unclaimed"}</h2>${unclaimedFailed?unread("unclaimed data"):""}<p>Unclaimed data is a profile folder that no launcher uses. Clearing moves it to the Trash, so restore any profile you want to keep first.</p><div class="button-row">${button("Clear unclaimed data…","prune",{danger:true,icon:"trash",disabled:!unclaimed.length})}</div></section>`;
   }
   const LAUNCHER="A launcher is the small app aidentity makes to open a profile.";
@@ -448,19 +454,19 @@
     // Update now appears only once a check has found a newer version.
     const update=lastUpdate?`<p class="update-status">${escape(lastUpdate.text)} <time class="small">Checked ${time(lastUpdate.at)}</time></p>`:"";
     main.innerHTML=title("Maintenance","Check your setup, rebuild launchers and keep aidentity current.","",LAUNCHER)+
-    `<div class="operation-grid"><section class="operation-card wide">${tile("maintenance","shield")}<h2>Workspace health</h2><p>Doctor checks your setup and every profile for missing apps, stale launchers and settings problems.</p>${healthResult()||'<p class="health-empty">Not checked yet.</p>'}<div class="button-row">${button("Check","doctor",{primary:!issues,icon:"shield"})}${button("Check and repair","doctor-fix",{primary:issues>0,icon:"tool"})}</div><p class="health-hint">Check only reports. Check and repair also rebuilds the launchers it can fix.</p></section><section class="operation-card">${tile("maintenance","update")}<h2>aidentity updates</h2><p>Installed version: <span class="num">${escape(state.version)}</span>.</p>${update}<div class="button-row">${button("Check for updates","update-check",{icon:"update"})}${lastUpdate?.available?button("Update now","update",{primary:true,icon:"update"}):""}</div></section><section class="operation-card">${tile("maintenance","rebuild")}<h2>Rebuild launchers</h2><p>Rebuild makes every launcher again from its saved settings and the app’s current location. Profile data is not touched.</p><div class="button-row">${button("Rebuild all","rebuild-all",{icon:"rebuild"})}</div></section></div>`+
+    `<div class="operation-grid"><section class="operation-card wide">${tile("maintenance","shield")}<h2>Workspace health</h2><p>Doctor checks your setup and every profile for missing apps, stale launchers and settings problems.</p>${healthResult()||'<p class="health-empty">Not checked yet. Choose Check to see the result here.</p>'}<div class="button-row">${button("Check","doctor",{primary:!issues,icon:"shield"})}${button("Check and repair","doctor-fix",{primary:issues>0,icon:"tool"})}</div><p class="health-hint">Check only reports. Check and repair also rebuilds the launchers it can fix.</p></section><section class="operation-card">${tile("maintenance","update")}<h2>aidentity updates</h2><p>Installed version: <span class="num">${escape(state.version)}</span>.</p>${update}<div class="button-row">${button("Check for updates","update-check",{icon:"update"})}${lastUpdate?.available?button("Update now","update",{primary:true,icon:"update"}):""}</div></section><section class="operation-card">${tile("maintenance","rebuild")}<h2>Rebuild launchers</h2><p>Rebuild makes every launcher again from its saved settings and the app’s current location. Profile data is not touched.</p><div class="button-row">${button("Rebuild all","rebuild-all",{icon:"rebuild"})}</div></section></div>`+
     `<section class="storage-panel" aria-labelledby="storage-title"><h2 id="storage-title">Local storage</h2><dl class="details storage-list"><div><dt>Launchers</dt><dd>${state.paths?.launchers?breakPath(state.paths.launchers):"Not available"}</dd></div><div><dt>Profile data</dt><dd>${state.paths?.data?breakPath(state.paths.data):"Not available"}</dd></div></dl></section>${errorNotice()}`;
   }
   function renderTransfer(){
     main.innerHTML=title("Import & export","Move your profiles to another Mac. Sign-ins and profile data stay on this one.")+
-    `<div class="operation-grid"><section class="operation-card">${tile("transfer","download")}<h2>Export</h2><p>Save the names, badges, colors and launch settings of ${plural(inventory.profiles.length,"profile")} to a file.</p><p class="callout">${icon("alert")}<span>The file can hold private environment or proxy values. Keep it private.</span></p><div class="button-row">${button("Export profiles","export",{primary:true,icon:"download"})}</div></section><section class="operation-card">${tile("transfer","upload")}<h2>Import</h2><p>Choose an aidentity export file and review it. Each profile is made with the apps installed here.</p><p>Imported profiles start signed out unless their data is already on this Mac.</p><div class="button-row">${button("Import profiles","import",{icon:"upload"})}</div></section></div>`;
+    `<div class="operation-grid"><section class="operation-card">${tile("transfer","download")}<h2>Export</h2><p>${inventory.profiles.length?`Save the names, badges, colors and launch settings of ${plural(inventory.profiles.length,"profile")} to a file.`:"Nothing to export yet. Add a profile first."}</p>${inventory.profiles.length?`<p class="callout">${icon("alert")}<span>The file can hold private environment or proxy values. Keep it private.</span></p>`:""}<div class="button-row">${button("Export profiles","export",{primary:true,icon:"download",disabled:!inventory.profiles.length})}</div></section><section class="operation-card">${tile("transfer","upload")}<h2>Import</h2><p>Choose an aidentity export file and review it. Each profile is made with the apps installed here.</p><p>Imported profiles start signed out unless their data is already on this Mac.</p><div class="button-row">${button("Import profiles","import",{icon:"upload"})}</div></section></div>`;
   }
   const terms=[["Profile","An app opened with its own sign-in and data. You add, open and remove profiles."],["Launcher","The small app aidentity makes to open a profile."],["Original account","The app’s own account, opened through aidentity."],["Doctor","Checks your setup and every profile for problems."],["Unclaimed data","Profile data that no launcher uses. Clearing it moves it to the Trash."],["Restore","Makes a removed profile’s launcher again from its kept data."]];
   function renderGuide(){
     const commands=["","setup","ui","add","list","open","quit","rename","set","prune","restore","rebuild","rm","export","import","apps","doctor","update","completion","version","help","dashboard"];
     main.innerHTML=title("Help","Plain-word terms and keys, then the CLI’s own help and shell completion for your terminal.")+
       `<section class="terms" aria-labelledby="terms-title"><h2 id="terms-title">Terms</h2><dl>${terms.map(([term,text])=>`<div><dt>${term}</dt><dd>${text}</dd></div>`).join("")}<div class="terms-keys"><dt>Keyboard</dt><dd><kbd>/</kbd> search · <kbd>⌘B</kbd> collapse sidebar · <kbd>O</kbd> open the focused profile</dd></div></dl></section>`+
-      `<div class="guide-layout"><section class="panel guide-controls"><div class="field"><label for="help-command">Command help</label><select id="help-command">${commands.map(command=>`<option value="${command}"${command===guideCommand?" selected":""}>${command||"All commands"}</option>`).join("")}</select><div class="section-gap">${button("Read help","help",{icon:"book"})}</div></div><div class="field"><label for="completion-shell">Shell completion</label><select id="completion-shell">${["zsh","bash","fish"].map(shell=>`<option${shell===guideShell?" selected":""}>${shell}</option>`).join("")}</select><div class="section-gap">${button("Generate completion","completion",{icon:"terminal"})}</div></div></section><section><div class="panel-heading"><h2>Command output</h2>${button("Copy output","copy-guide",{small:true,icon:"copy",disabled:!guideText})}</div>${guideText?`<pre class="output guide-output">${escape(guideText)}</pre>`:'<p class="guide-empty">Choose a command to read its help, or generate a completion script for your shell.</p>'}</section></div>`;
+      `<div class="guide-layout"><section class="panel guide-controls"><div class="field"><label for="help-command">Command help</label><select id="help-command">${commands.map(command=>`<option value="${command}"${command===guideCommand?" selected":""}>${command||"All commands"}</option>`).join("")}</select><div class="section-gap">${button("Read help","help",{icon:"book"})}</div></div><div class="field"><label for="completion-shell">Shell completion</label><select id="completion-shell">${["zsh","bash","fish"].map(shell=>`<option${shell===guideShell?" selected":""}>${shell}</option>`).join("")}</select><div class="section-gap">${button("Generate completion","completion",{icon:"terminal"})}</div></div></section><section><div class="panel-heading"><h2>Command output</h2>${guideText?button("Copy output","copy-guide",{small:true,icon:"copy"}):""}</div>${guideText?`<pre class="output guide-output">${escape(guideText)}</pre>`:'<p class="guide-empty">Choose a command to read its help, or generate a completion script for your shell.</p>'}</section></div>`;
   }
   async function refresh(options={}){
     // loading is the read in flight: a polled read yields to it, a forced one (after an action) waits and then runs its own.
@@ -525,8 +531,8 @@
     if(on){element.dataset.original=element.innerHTML;element.innerHTML=`<span class="button-content">${element.innerHTML}</span><span class="button-loader"><span class="spinner"></span></span>`;element.dataset.loading="true";element.disabled=true;element.setAttribute("aria-busy","true");}
     else {if(element.dataset.original!==undefined)element.innerHTML=element.dataset.original;delete element.dataset.loading;element.disabled=false;element.removeAttribute("aria-busy");}
   }
-  const verbs={open:"open",quit:"quit",add:"create the profile",set:"save the settings",rename:"rename",remove:"remove",restore:"restore",rebuild:"rebuild",prune:"clear unclaimed data",doctor:"check the workspace",import:"import",export:"export",update:"update",help:"read the help",completion:"generate completion"};
-  const doing={open:"Opening…",quit:"Closing…",add:"Creating the profile…",set:"Saving the settings…",rename:"Renaming…",remove:"Removing…",restore:"Restoring…",rebuild:"Rebuilding…",prune:"Clearing unclaimed data…",doctor:"Running doctor…",import:"Importing…",export:"Exporting…",update:"Updating aidentity…",help:"Loading the help…",completion:"Generating completion…"};
+  const verbs={open:"open",quit:"quit",add:"add the profile",set:"save the settings",rename:"rename",remove:"remove",restore:"restore",rebuild:"rebuild",prune:"clear unclaimed data",doctor:"check the workspace",import:"import",export:"export",update:"update",help:"read the help",completion:"generate completion"};
+  const doing={open:"Opening…",quit:"Closing…",add:"Adding the profile…",set:"Saving the settings…",rename:"Renaming…",remove:"Removing…",restore:"Restoring…",rebuild:"Rebuilding…",prune:"Clearing unclaimed data…",doctor:"Running doctor…",import:"Importing…",export:"Exporting…",update:"Updating aidentity…",help:"Loading the help…",completion:"Generating completion…"};
   async function action(name,params={},element=null,{quiet=false}={}){
     if(busy||offline||!state?.csrf_token){
       const error=busy?Object.assign(new Error("Another action is still running. Try again when it finishes."),{busy:true}):new Error(OFFLINE);
@@ -566,7 +572,7 @@
   function describe(name,params,result,before){
     const who=params.name||"",was=before?.profiles.find(item=>item.name===who);
     // A profile added by path for another app is created but hidden; say so only when the fresh full list has it.
-    if(name==="add")return {title:`${result.created} is ready`,text:!profile(result.created)&&inventory.profiles.some(item=>item.name===result.created)?"The dashboard lists only Claude and ChatGPT, so it is not shown here. Open it now.":"Find it in Profiles, or open it now.",extra:{label:"Open it",run:()=>action("open",{name:result.created})}};
+    if(name==="add")return {title:`${result.created} is ready`,text:!profile(result.created)&&inventory.profiles.some(item=>item.name===result.created)?"The dashboard lists only Claude and ChatGPT, so it is not shown here. Open it now.":params.main?"Open it to use the original account.":"Open it to sign in with that account.",extra:{label:"Open it",run:()=>action("open",{name:result.created})}};
     if(name==="open"){
       if(was?.status==="running")return {title:`Brought ${who} to the front`};
       const key=`aidentity.signin-hint.${who}`,first=was?.status==="signed out / new"&&!stored.get(key);
@@ -663,7 +669,7 @@
   async function runPreview(){
     const echo=$("#command-echo",dialog),seq=++previewSeq;if(!echo||!dialogBuild)return;
     let spec=null;try{spec=dialogBuild(new FormData($("#dialog-form")));}catch{spec=null;}
-    if(!spec||offline||!state?.csrf_token||$$("[required]",$("#dialog-form")).some(el=>!el.value.trim())){echo.hidden=true;return;}
+    if(!spec||offline||!state?.csrf_token||!$("#dialog-form").checkValidity()){echo.hidden=true;return;}
     try{
       const response=await post("/api/preview",{action:spec[0],...spec[1]});
       const result=await response.json();
@@ -685,16 +691,18 @@
   const field=(label,name,value="",hint="",type="text",attrs="")=>`<div class="field"><label for="field-${name}">${label}</label><input class="input" id="field-${name}" name="${name}" type="${type}" value="${escape(value)}" ${hint?`aria-describedby="hint-${name}" `:""}${attrs}>${hint?`<p class="hint" id="hint-${name}">${hint}</p>`:""}</div>`;
   const check=(name,label,description="",checked=false)=>`<label class="check-row"><input type="checkbox" name="${name}" ${checked?"checked":""}><span>${label}${description?`<span>${description}</span>`:""}</span></label>`;
   const area=(label,name,hint="",value="")=>`<div class="field"><label for="field-${name}">${label}</label><textarea id="field-${name}" name="${name}" rows="3" spellcheck="false" autocomplete="off"${hint?` aria-describedby="hint-${name}"`:""}>${escape(value)}</textarea>${hint?`<p class="hint" id="hint-${name}">${hint}</p>`:""}</div>`;
-  const disclosure=(label,body)=>`<details class="advanced"><summary>${icon("chevron")}<span>${label}</span></summary><div class="fields">${body}</div></details>`;
+  const disclosure=(label,body,open=false)=>`<details class="advanced"${open?" open":""}><summary>${icon("chevron")}<span>${label}</span></summary><div class="fields">${body}</div></details>`;
   // The CLI takes six hex digits or a color word; a leading "#" is dropped here.
   const hexValue=value=>String(value||"").trim().replace(/^#/,"");
+  // The CLI's profile-name rule (validate_profile_name): letters, numbers, spaces, hyphens and underscores, 40 at most, no leading hyphen or outer space.
+  const NAME_RULE='required maxlength="40" pattern="[A-Za-z0-9_]([A-Za-z0-9 _\\-]*[A-Za-z0-9_\\-])?" title="Letters, numbers, spaces, hyphens and underscores. It cannot start with a hyphen or start or end with a space."';
   // Paint the dialog in the app's hue (its primary button and focus rings), or leave it neutral.
   function toneDialog(app){const color=appAccent(app).color;dialog.classList.toggle("app-tone",Boolean(color));dialog.style.cssText=color?`--app-color:${color}`:"";}
   // Named swatches, the chosen one's name and hex as text, and the hex field behind "Custom color…" (open when the color is not a swatch).
   // data-auto: the hex follows the app's default badge until edited.
   function identityFields(p=null,fallback=defaultBadgeColor){
     const color=String(p?.color||fallback).toUpperCase(),custom=!colors.some(([,hex])=>hex===color);
-    return `<div class="field"><p class="field-label" id="badge-color-label">Badge color</p><div class="color-options" role="group" aria-labelledby="badge-color-label">${colors.map(([name,hex])=>`<button type="button" class="color-swatch" style="--swatch:#${hex}" data-color="${hex}" title="${name} · ${hex}" aria-label="${name}" aria-pressed="${color===hex}"></button>`).join("")}</div><div class="color-meta"><span class="color-current">${escape(colorName(color))}</span><button type="button" class="link-button" data-custom-color aria-expanded="${custom}" aria-controls="custom-color">Custom color…</button></div><div id="custom-color"${custom?"":" hidden"}>${field("Hex color","color",color,"Six hex digits, like B26BFF.","text",`maxlength="8" spellcheck="false" autocomplete="off"${p?"":" data-auto"}`)}</div></div>${field("Badge character","badge",p?.badge||"","Shown on the app icon.","text",'maxlength="4"')}${check("no_badge","Use the original app icon","Hide the colored badge.",p?.badge===null)}`;
+    return `<div class="field"><p class="field-label" id="badge-color-label">Badge color</p><div class="color-options" role="group" aria-labelledby="badge-color-label">${colors.map(([name,hex])=>`<button type="button" class="color-swatch" style="--swatch:#${hex}" data-color="${hex}" title="${name} · ${hex}" aria-label="${name}" aria-pressed="${color===hex}"></button>`).join("")}</div><div class="color-meta"><span class="color-current">${escape(colorName(color))}</span><button type="button" class="link-button" data-custom-color aria-expanded="${custom}" aria-controls="custom-color">Custom color…</button></div><div id="custom-color"${custom?"":" hidden"}>${field("Hex color","color",color,"Six hex digits, like B26BFF.","text",`maxlength="8" spellcheck="false" autocomplete="off"${p?"":" data-auto"}`)}</div></div>${field("Badge character","badge",p?.badge||"","Shown at the corner of the launcher’s icon.","text",'maxlength="4"')}${check("no_badge","Use the original app icon","Hide the colored badge.",p?.badge===null)}`;
   }
   // "Periwinkle · 7C8CFF" for a swatch, "Custom · 123ABC" for any other valid color (a CLI color word resolves to its hex).
   function colorName(value){
@@ -714,7 +722,7 @@
       if(hexValue(data.get("color")))params.color=hexValue(data.get("color"));
       return ["add",params];
     };
-    showDialog("Create a profile","Each profile opens the app with its own sign-in and data.",`<div class="preview-row"><div class="preview-identity" id="identity-preview"></div></div><div class="fields"><div class="field"><label for="field-app">Application</label><select name="app" id="field-app" required>${options||'<option value="">No AI apps found</option>'}</select></div>${field("Profile name","profile","","For example, Work, Personal, or Client.","text",'required maxlength="40"')}${check("main","Use the original account","Opens the app’s own account through aidentity instead of a new, separate one.")}${disclosure("Appearance",identityFields(null,badgeDefault(chosen)))}${disclosure("App location & launch settings",`${field("Application path (optional)","app_path","","Use a full .app path for an application outside discovery.","text",'placeholder="/Applications/Example.app"')}<div id="seed-option">${check("seed","Copy Claude’s MCP configuration","Copies the existing Claude Desktop configuration into the new profile.")}</div>${area("Launch arguments","args","One allowed switch per line, for example --lang=de.")}${area("Environment variables","env","One allowed NAME=value per line. Values are never displayed in this dashboard.")}${check("own_extensions","Use a separate extensions folder","For VS Code-style applications.")}`)}</div>`,"Create profile",async(data,el)=>{
+    showDialog("Add a profile","Each profile opens the app with its own sign-in and data.",`<div class="preview-row"><div class="preview-identity" id="identity-preview"></div></div><div class="fields"><div class="field"><label for="field-app">Application</label><select name="app" id="field-app" required${names.length?"":' aria-describedby="hint-app"'}>${options||'<option value="">No AI apps found</option>'}</select>${names.length?"":'<p class="hint" id="hint-app">Install Claude or ChatGPT and refresh, or give the app’s path below.</p>'}</div>${field("Profile name","profile","","For example Work, Personal or Client. Letters, numbers, spaces, hyphens and underscores.","text",NAME_RULE)}${check("main","Use the original account","Opens the app’s own account. Once a profile runs, the app’s own icon only switches to that profile; this launcher still opens the original.")}${disclosure("Appearance",identityFields(null,badgeDefault(chosen)))}${disclosure("App location & launch settings",`${field("Application path (optional)","app_path","","Use a full .app path for an application outside discovery.","text",'placeholder="/Applications/Example.app"')}<div id="seed-option">${check("seed","Copy Claude’s MCP configuration","Copies the existing Claude Desktop configuration into the new profile.")}</div>${area("Launch arguments","args","One allowed switch per line, for example --lang=de.")}${area("Environment variables","env","One allowed NAME=value per line. Values are never displayed in this dashboard.")}${check("own_extensions","Use a separate extensions folder","For VS Code-style applications.")}`,!names.length)}</div>`,"Add profile",async(data,el)=>{
       const result=await action(...build(data),el);
       stored.set("aidentity.last-app",data.get("app"));
       revealProfile(result.created);
@@ -791,7 +799,7 @@
     form.addEventListener("input",sync);form.addEventListener("change",sync);sync();
   }
   function renameDialog(item){
-    showDialog("Rename profile","The name changes; the profile stays signed in.",`<div class="fields">${field("Current name","current",item.name,"","text","disabled")}${field("New profile name","new_name",item.profile,"The app name is added by aidentity.","text","required maxlength=\"40\"")}</div>`,"Rename profile",async(data,el)=>{
+    showDialog("Rename profile","The name changes; the profile stays signed in.",`<div class="fields">${field("Current name","current",item.name,"","text","disabled")}${field("New profile name","new_name",item.profile,"The app name is added by aidentity.","text",NAME_RULE)}</div>`,"Rename profile",async(data,el)=>{
       await action("rename",{name:item.name,new_name:data.get("new_name")},el);
       selected=`${appName(item)} ${data.get("new_name")}`;stored.set(LAST_PROFILE,selected);
       renderView();
@@ -867,7 +875,7 @@
     if(name==="select"){selected=el.dataset.name;stored.set(LAST_PROFILE,selected);mobileDetail=true;renderNav();renderProfiles();positionTabs();animateMotion($(".detail-panel"),[{opacity:0},{opacity:1}],"surface",{duration:140,easing:"ease-out"});if(mobile.matches)window.scrollTo({top:0,behavior:"instant"});$("#detail-title")?.focus();return;}
     if(name==="close-detail"||name==="back-profiles"){const was=selected;selected="";stored.set(LAST_PROFILE,"");mobileDetail=false;renderNav();renderProfiles();positionTabs();$$(".profile-name",main).find(el=>el.dataset.name===was)?.focus();return;}
     if(name==="clear-search"){query="";renderView();$("#workspace-search")?.focus();return;}
-    if(name==="all-apps"){appFilter="";renderView();return;}
+    if(name==="all-apps"){appFilter="";renderView();($("#app-filter")||$("#status-all")||$("h1",main))?.focus();return;}
     if(name==="show-all"){statusFilter="all";renderProfiles();positionTabs();$("#status-all")?.focus();return;}
     if(name==="repair"&&item)return item.status==="app missing"?repairDialog(item):confirmAction(`Repair ${item.name}?`,"Doctor found a problem with how this profile opens.","Rebuild makes it again from its saved settings and the app’s current location. Its data is not touched.","Rebuild","rebuild",{name:item.name});
     if(name==="copy-command"){
@@ -875,7 +883,7 @@
       await navigator.clipboard.writeText(code);el.innerHTML=icon("check");el.setAttribute("aria-label","Copied");
       setTimeout(()=>{if(el.isConnected){el.innerHTML=icon("copy");el.setAttribute("aria-label","Copy command");}},1500);return;
     }
-    if(name==="reset-filters"){query="";appFilter="";statusFilter="all";renderView();return;}
+    if(name==="reset-filters"){query="";appFilter="";statusFilter="all";renderView();$("#status-all")?.focus();return;}
     if(name==="settings"&&item)return settingsDialog(item);
     if(name==="rename"&&item)return renameDialog(item);
     if(name==="remove"&&item)return removeDialog(item);

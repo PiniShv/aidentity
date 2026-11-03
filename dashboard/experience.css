@@ -24,7 +24,7 @@
 .xp-key-action:hover:not(:disabled,[aria-disabled="true"]){background:var(--active);border-color:var(--field-border)}
 .xp-key-running .xp-key-action,.xp-key-running .xp-key-action:hover:not(:disabled,[aria-disabled="true"]){background:var(--app-color,var(--text));border-color:transparent;color:var(--ground)}
 .xp-key-running .xp-key-action:hover:not(:disabled,[aria-disabled="true"]){background:color-mix(in srgb,var(--app-color,var(--text)) 90%,var(--text))}
-/* Outside an app scope (no apps at all) the primary is Bone. */
+/* The Bone primary: Add profile while the app has no profiles, and the state with no apps at all. Neither has an app hue. */
 .xp-primary,.xp-primary:hover:not(:disabled,[aria-disabled="true"]){background:var(--text);border-color:transparent;color:var(--ground)}
 
 /* The panel takes the width; the navigator is a narrow column. fitSticky drops sticky when the panel is taller than the view. */
@@ -101,7 +101,7 @@
 .xp-empty{padding:32px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
 .xp-empty h2{font-size:22px;font-weight:550;line-height:1.2;letter-spacing:-.03em;margin:0 0 8px}
 .xp-empty p{color:var(--muted);font-size:14px;margin:0}
-.xp-empty-add{width:auto;margin-top:20px}
+.xp-empty-refresh{width:auto;margin-top:20px}
 /* Inside the panel the no-profiles words are a placeholder, drawn like every other one (dashed Control, no fill): never a card in a card. */
 .xp-preview>.xp-empty{padding:20px;background:none;border-style:dashed;border-color:var(--control)}
 .xp-preview>.xp-empty p{font-size:13px}
