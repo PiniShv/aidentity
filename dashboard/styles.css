@@ -53,8 +53,10 @@ button:disabled:where(:not(.xp-wrap *)){cursor:wait;color:var(--muted)} /* Explo
 [hidden]{display:none!important}
 h1,h2,h3,p{margin:0}
 h1{font-size:28px;line-height:1.2;letter-spacing:-.035em;font-weight:600}
-h2{font-size:17px;line-height:1.35;letter-spacing:-.015em;font-weight:550}
-h3{font-size:17px;font-weight:550}
+h2,h3{font-size:17px;line-height:1.35;letter-spacing:-.015em;font-weight:550} /* Title */
+/* Card: dialog, empty-state and loading titles (Explore's panel name and empty title in experience.css). 19px below 768px, except in a dialog. */
+.dialog-header h2,.empty-state h2,.initial-loading h1{font-size:22px;line-height:1.2;letter-spacing:-.03em}
+h1,h2,h3{text-wrap:balance}
 p{line-height:1.55;text-wrap:pretty}
 dd{text-wrap:pretty}
 svg{display:block;flex:none}
@@ -63,8 +65,8 @@ svg{display:block;flex:none}
 h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for navigation, not controls */
 .muted{color:var(--muted)}
 .small{font-size:12px;color:var(--muted)}
-.num{font-variant-numeric:tabular-nums}
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.num,time{font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;-webkit-user-select:none;user-select:none} /* a hidden copy of visible text is not pasted twice */
 .skip-link{position:fixed;left:20px;top:-70px;z-index:100;background:var(--text);color:var(--ground);padding:12px}
 .skip-link:focus{top:10px}
 
@@ -183,7 +185,7 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 
 /* Tabs: educalvolpz Animated Tabs, movable underline; roving keyboard focus in app.js. */
 .tabs{display:flex;position:relative;border-bottom:1px solid var(--border);gap:24px}
-.tabs button{position:relative;padding:0 1px 11px;border-radius:6px;color:var(--muted);white-space:nowrap;transition:color var(--motion-fade) ease-out,transform var(--motion-control) var(--spring-control);font-size:13px;min-height:44px}
+.tabs button{position:relative;padding:0 1px 11px;border-radius:6px;color:var(--muted);white-space:nowrap;transition:color var(--motion-fade) ease-out,transform var(--motion-control) var(--spring-control);font-size:13px;font-weight:500;min-height:44px}
 .tabs button[aria-selected=true]{color:var(--text)}
 .tab-indicator{position:absolute;left:0;bottom:0;height:2px;background:var(--text);width:0;pointer-events:none;transform-origin:left center;transition:none}
 .tabs .tab-count{color:var(--muted);padding-left:2px;font-variant-numeric:tabular-nums}
@@ -225,7 +227,7 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .profile-card .open-profile{width:100%;margin-top:auto}
 .profile-card .open-profile,.detail-panel .open-profile{min-height:40px}
 .empty-state{padding:38px 24px;background:var(--surface);border-radius:16px;grid-column:1/-1}
-.empty-state h2{margin-bottom:10px;font-size:22px;overflow-wrap:anywhere}
+.empty-state h2{margin-bottom:8px;overflow-wrap:anywhere}
 .empty-state p{color:var(--muted);max-width:430px;margin-bottom:22px}
 .detail-panel{border-radius:16px;min-width:0;position:sticky;top:24px;padding:24px;background:var(--card);border:1px solid var(--border)}
 .detail-top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
@@ -260,16 +262,17 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .app-head{display:flex;align-items:center;gap:14px;min-width:0}
 .app-head>div{min-width:0}
 .app-head h2{overflow-wrap:anywhere}
-.application-card .app-count{margin:0 -4px;color:var(--muted)}
+.application-card .app-count{margin:0 -4px;color:var(--muted);font-variant-numeric:tabular-nums}
 .application-card .button{width:100%;margin-top:auto}
 .panel{border-radius:16px;padding:24px;background:var(--card);border:1px solid var(--border)}
 .panel-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}
 .operation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
 .operation-card{border-radius:16px;padding:24px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;border:1px solid var(--border);background:var(--card)}
 .operation-card>.tile{margin-bottom:6px}
+.operation-card>h2+p{margin-top:-4px} /* a heading sits 8px over its own text, against 12px between blocks */
 .panel>.tile{margin-bottom:18px}
-.panel>.tile+.panel-heading{margin-bottom:12px}
-.operation-card p{font-size:13px;color:var(--muted);max-width:440px}
+.panel>.tile+.panel-heading{margin-bottom:8px}
+.operation-card p,.panel>p{font-size:13px;color:var(--muted);max-width:440px}
 .operation-card .button-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:10px}
 .operation-card.wide{grid-column:1/-1}
 .callout{padding:12px 14px;border-radius:8px;background:var(--warnbg);color:var(--text);font-size:13px;line-height:1.55}
@@ -281,6 +284,7 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .recovery-list{display:flex;flex-direction:column;gap:0}
 .recovery-row{padding:17px 0;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border)}
 .recovery-row:last-child{border:0}
+.recovery-row>div{min-width:0;overflow-wrap:anywhere}
 .recovery-row p{font-size:12px;color:var(--muted);margin-top:5px}
 .section-gap{margin-top:26px}
 .health-result{align-self:stretch;display:grid;align-content:start;gap:12px;padding:14px 16px;border-radius:12px;background:var(--surface)}
@@ -305,7 +309,7 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .operation-card .update-status{color:var(--text)}
 /* Local storage is reference, not an operation: no fill, a muted label, a definition list. */
 .storage-panel{margin-top:16px;padding:18px 24px 8px;border:1px solid var(--border);border-radius:16px}
-.storage-panel h2{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:8px}
+.storage-panel h2{font-size:13px;font-weight:500;letter-spacing:normal;color:var(--muted);margin-bottom:8px}
 .storage-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px}
 .guide-layout{display:grid;grid-template-columns:270px minmax(0,1fr);gap:20px;align-items:start}
 .guide-controls{display:grid;gap:17px}
@@ -314,11 +318,11 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .guide-empty{min-height:210px;padding:20px;border:1px dashed var(--control);border-radius:12px;color:var(--muted);font-size:13px}
 /* Terms: plain-word definitions above the CLI help. */
 .terms{margin-bottom:20px;padding:20px 24px;border:1px solid var(--border);border-radius:16px}
-.terms h2{font-size:13px;font-weight:500;color:var(--muted);margin-bottom:6px}
+.terms h2{font-size:13px;font-weight:500;letter-spacing:normal;color:var(--muted);margin-bottom:6px}
 .terms dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 24px;margin:0}
 .terms dl>div{padding:10px 0;border-top:1px solid var(--border)}
 .terms dt{font-size:13px;font-weight:500}
-.terms dd{margin:4px 0 0;font-size:13px;line-height:1.5;color:var(--muted)}
+.terms dd{margin:4px 0 0;font-size:13px;line-height:1.55;color:var(--muted)}
 .terms dl>.terms-keys{grid-column:1/-1}
 kbd{font-family:var(--font-mono);font-size:12px;padding:1px 6px;border:1px solid var(--button-edge);border-radius:6px;color:var(--text)}
 .health-empty{color:var(--muted)}
@@ -326,7 +330,6 @@ kbd{font-family:var(--font-mono);font-size:12px;padding:1px 6px;border:1px solid
 .notice{padding:14px 16px;border-radius:8px;background:var(--raised);font-size:12px;line-height:1.6;color:var(--muted);margin-top:16px}
 .notice.error{background:var(--badbg);color:var(--text)}
 .initial-loading{min-height:330px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px}
-.initial-loading h1{font-size:22px}
 .initial-loading p{color:var(--muted)}
 .initial-loading .spinner{width:24px;height:24px;color:var(--accent)}
 
@@ -339,7 +342,7 @@ dialog[open]{animation:dialog-in var(--motion-dialog) var(--spring-surface)}
 dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;pointer-events:none}
 .dialog-inner{display:flex;flex-direction:column;max-height:85dvh}
 .dialog-header{padding:24px 26px 20px;position:relative;flex:none;border-bottom:1px solid var(--border)}
-.dialog-header h2{font-size:22px;padding-right:30px}
+.dialog-header h2{padding-right:30px;overflow-wrap:anywhere}
 .dialog-header p{color:var(--muted);margin-top:8px;padding-right:15px;font-size:13px}
 .dialog-header>.icon-button{position:absolute;top:16px;right:15px}
 .dialog-body{min-height:0;overflow-y:auto;padding:20px 26px 24px}
@@ -370,13 +373,13 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
 .preview-row{--badge-ring:var(--raised);display:flex;gap:12px;align-items:center;padding:13px 16px;border-radius:12px;margin-bottom:20px;background:var(--raised)}
 .preview-identity{display:flex;gap:13px;align-items:center;flex:1;min-width:0}
 .preview-identity>div{min-width:0}
-.preview-row strong{font-size:14px;font-weight:500;display:block}
+.preview-row strong{font-size:14px;font-weight:500;line-height:1.4;display:block;overflow-wrap:anywhere}
 .preview-row .small{display:block}
 .preview-row strong+.small{margin-top:5px}
 .form-error{font-size:12px;color:var(--negative);line-height:1.6;padding:12px 14px;border-radius:8px;margin-top:16px;background:var(--badbg)}
 .danger-callout{border-radius:8px;padding:14px 15px;color:var(--text);font-size:13px;line-height:1.55;background:var(--warnbg)}
-.target-list{list-style:none;margin:14px 0 0;padding:2px 14px;max-height:200px;overflow:auto;border-radius:8px;background:var(--ground);font-size:13px}
-.target-list li{padding:8px 0;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.target-list{position:relative;list-style:none;margin:14px 0 0;padding:2px 14px;max-height:200px;overflow:auto;border-radius:8px;background:var(--ground);font-size:13px} /* position: the .sr-only name copies belong to this scroller, so revealing one scrolls the list, not the dialog */
+.target-list li{padding:8px 0;border-bottom:1px solid var(--border);line-height:1.4;overflow-wrap:anywhere}
 .target-list li:last-child{border:0}
 /* "Runs:" echoes the server's redacted command for the form as it stands. */
 .command-echo{display:flex;align-items:center;gap:8px;margin-top:20px;padding:2px 2px 2px 12px;border:1px solid var(--border);border-radius:8px;background:var(--ground);font-size:12px;color:var(--muted)}
@@ -384,11 +387,11 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
 /* app.js wraps each shell word: lines break between words, inside one only when it is wider than the line. */
 .command-word{display:inline-block;max-width:100%;overflow-wrap:anywhere}
 .command-label{flex:none}
-.import-preview{max-height:240px;overflow:auto;margin-top:17px;padding:12px 15px;background:var(--ground);border-radius:8px;line-height:1.55;font-size:12px}
+.import-preview{position:relative;max-height:240px;overflow:auto;margin-top:17px;padding:12px 15px;background:var(--ground);border-radius:8px;line-height:1.55;font-size:12px} /* position: as .target-list */
 .import-summary{font-size:13px;color:var(--muted);margin-bottom:4px}
 .import-summary strong{color:var(--text);font-weight:500}
 .import-list{list-style:none;margin:0 0 8px;padding:0}
-.import-list li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border)}
+.import-list li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);line-height:1.4;overflow-wrap:anywhere}
 .import-list li:last-child{border:0}
 .import-fate{flex:none;color:var(--muted)}
 .import-list li[data-fate=create] .import-fate{color:var(--text)}
@@ -404,7 +407,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .toast.error>.icon{color:var(--negative)}
 .toast.warn>.icon{color:var(--warning)}
 .toast.info>.icon{color:var(--muted)}
-.toast strong{display:block;font-weight:500;font-size:13px}
+.toast strong{display:block;font-weight:500;font-size:13px;line-height:1.4;text-wrap:balance}
 .toast p{color:var(--muted);margin-top:5px;font-size:12px}
 .toast>.icon-button{margin:-9px -9px 0 auto}
 .toast-actions{display:flex;flex-wrap:wrap;gap:0 16px;margin-top:2px}
@@ -424,8 +427,9 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .activity-panel{position:fixed;bottom:40px;right:0;left:var(--sidebar-width);background:var(--material-panel);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur);border-top:1px solid var(--control);padding:20px 32px;max-height:var(--activity-height);overflow:auto;z-index:25;animation:none}
 :root:has(#activity-panel:not([hidden])){--activity-open:var(--activity-height)}
 .activity-entry{margin-bottom:17px}
-.activity-entry-title{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12px;margin-bottom:9px}
-.activity-entry-title time{font-size:12px;color:var(--muted)}
+.activity-entry-title{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:12px;margin-bottom:9px}
+.activity-entry-title strong{min-width:0;font-size:13px;font-weight:500;line-height:1.4;overflow-wrap:anywhere} /* Label, as the toast that announced it */
+.activity-entry-title time{flex:none;font-size:12px;color:var(--muted)}
 .activity-entry .output{padding:13px;background:var(--ground);font-size:12px;max-height:220px}
 .activity-error{color:var(--negative)}
 .activity-command{display:block;margin-bottom:8px;font-family:var(--font-mono);font-size:12px;line-height:1.7;user-select:text} /* .command-word spans: breaks at spaces only */
@@ -516,7 +520,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   #collapse-nav{display:none}
   .nav-item,.nav-app{min-height:44px}
   #mobile-nav{display:flex}
-  .topbar-title{display:block;font-size:15px;font-weight:550;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topbar-title{display:block;font-size:15px;font-weight:550;letter-spacing:-.015em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .topbar-actions{gap:4px}
   .topbar-leading{gap:5px}
   .topbar .button>.icon{width:14px}
@@ -578,7 +582,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .apps-grid{grid-template-columns:1fr}
   .button,.button-small,.icon-button{min-height:44px}
   .icon-button{min-width:44px}
-  .detail-panel h2{font-size:22px}
+  .detail-panel h2,.empty-state h2{font-size:19px;line-height:1.2;letter-spacing:-.03em} /* Card compact: under a 24px page title */
   .detail-panel .details{grid-template-columns:1fr}
   .dialog-footer .button{min-height:44px}
   .advanced summary{min-height:44px}

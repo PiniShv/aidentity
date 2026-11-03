@@ -55,15 +55,32 @@ typography:
     fontWeight: 550
     lineHeight: 1.2
     letterSpacing: "-0.03em"
+  card-compact:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+    fontSize: "19px"
+    fontWeight: 550
+    lineHeight: 1.2
+    letterSpacing: "-0.03em"
   title:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
     fontSize: "17px"
     fontWeight: 550
     lineHeight: 1.35
     letterSpacing: "-0.015em"
+  title-compact:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+    fontSize: "15px"
+    fontWeight: 550
+    lineHeight: 1.3
+    letterSpacing: "-0.015em"
   body:
     fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
     fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.55
+  secondary:
+    fontFamily: "-apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+    fontSize: "13px"
     fontWeight: 400
     lineHeight: 1.55
   label:
@@ -294,18 +311,24 @@ Under `prefers-contrast: more`, Muted becomes #b4b2aa (7.3:1 on Warning bg, 8.7:
 ### Hierarchy
 - **Headline** (600, 28px, 1.2, -0.035em): page titles on every view. Below 768px every page title is **Headline compact** (24px).
 - **Card** (550, 22px, 1.2, -0.03em): dialog titles, empty-state titles, the Explore panel's app name, the detail title on mobile.
-- **Title** (550, 17px, 1.35, -0.015em): card and section headings, profile names, app names, profile names on Explore keys.
-- **Body** (400, 14px, 1.55): the base size.
-- **Label** (500, 13px): buttons, tabs, form labels, page subtitles, the Terms headings.
-- **Meta** (400, 12px): profile metadata, state rows, counts, help text, the Explore "N apps · N profiles" summary, the Explore "N of M" position.
+- **Card compact** (550, 19px, 1.2, -0.03em): below 768px, every Card heading inside the page (the Explore panel's app name, empty-state titles, the detail title), so it reads under the 24px page title and not beside it. Dialog titles stay at Card.
+- **Title** (550, 17px, 1.35, -0.015em): card and section headings, profile names, app names, profile names on Explore keys, Recovery's profile rows.
+- **Title compact** (550, 15px, 1.3, -0.015em): the Explore navigator's app names, the names on one-row Explore keys and the phone top bar's page name.
+- **Body** (400, 14px, 1.55): the base size, and the text of an empty state.
+- **Secondary** (400, 13px, 1.55, Muted): page subtitles, card, panel and dialog descriptions, Terms definitions.
+- **Label** (500, 13px): buttons (Explore's included), tabs, form labels, the Terms and Local storage headings, toast titles and Activity entry titles. Label text that can wrap (toast and Activity titles, name lists in dialogs) sets at 1.4.
+- **Meta** (400, 12px): profile metadata, state rows, counts, times, help text, the Explore "N apps · N profiles" summary, the Explore "N of M" position.
 - **Mono** (12px, 1.7): command lines ("Runs:", Activity) and command output blocks, wrapped, never truncated.
 
-Nothing is smaller than 12px. Exempt from the ramp: the sidebar wordmark (19px, part of the logo lockup) and glyphs sized inside icon boxes (the app-tile initial 20px, 21px in the detail panel; Explore navigator initial 16px and panel initial 20px; Explore arrows 18px; rail initials 12px; the badge character 13px on an Explore key and 12px on a profile tile). The Explore navigator's app names and the phone top bar's page name are 15px.
+Nothing is smaller than 12px. Exempt from the ramp: the sidebar wordmark (19px, part of the logo lockup) and glyphs sized inside icon boxes (the app-tile initial 20px, 21px in the detail panel; Explore navigator initial 16px and panel initial 20px; Explore arrows 18px; rail initials 12px; the badge character 13px on an Explore key and 12px on a profile tile).
+
+### Rhythm and line breaks
+A card heading sits 8px over its own description; blocks inside a card are 12px apart. A page's title row sits 24px above its body (20px below 768px), on every view, Explore included. Headings balance their lines and prose wraps `pretty`. A name joined by underscores, such as `Northwind_Research_Quarterly_Review_Team`, breaks after an underscore (a `<wbr>` in a copy hidden from assistive tech, which reads the plain name), never mid-word; only a segment wider than its line breaks inside. A command line keeps its own rule (see Command line).
 
 ### Named Rules
 **The System Voice Rule.** One family: the platform UI font. The dashboard loads no webfonts.
 
-**The Tabular Count Rule.** Counts, tab totals and the Explore position use tabular numerals.
+**The Tabular Count Rule.** Counts (tab totals, "N profiles" and "N apps" lines, the health summary), the Explore position and every time use tabular numerals.
 
 ## Layout
 

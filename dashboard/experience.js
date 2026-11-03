@@ -6,6 +6,8 @@
   "use strict";
   const esc = value => String(value ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  // As app.js breakable(): breaks after an underscore, and assistive tech reads the plain name, not the <wbr> spaces.
+  const breakable = value => { const text = esc(value); return text.includes("_") ? `<span aria-hidden="true">${text.replace(/_/g, "_<wbr>")}</span><span class="xp-sr-only">${text}</span>` : text; };
   // The first code point, so an emoji name is not split into a lone surrogate.
   const badgeChar = profile => profile.badge || [...(profile.profile || profile.name || "A")][0];
   // A data refresh remounts Explore in the same task as cleanup. Only that
@@ -109,7 +111,7 @@
         ${profile.badge === null
           ? `<span class="xp-key-badge xp-key-badge-app" aria-hidden="true">${icon(profile.app || "")}</span>`
           : `<span class="xp-key-badge" style="${badgeStyle(profile)}" aria-hidden="true">${esc(badgeChar(profile))}</span>`}
-        <strong class="xp-key-name">${esc(profile.profile || profile.name)}</strong>
+        <strong class="xp-key-name">${breakable(profile.profile || profile.name)}</strong>
         <span class="xp-key-state">${running ? runMark("Running") : esc(statusLabel(profile.status))}${profile.main ? " · Original" : ""}</span>
         ${missing ? '<span class="xp-key-reason">Reinstall the app to open it.</span>' : `<button type="button" class="xp-button xp-key-action" data-xp-run data-xp-key="${esc(profile.name)}" aria-label="${esc(keyLabel(profile))}"${launching.has(profile.name) ? ' aria-disabled="true"' : ""}>${keyVerb(profile)}</button>`}
       </li>`;
