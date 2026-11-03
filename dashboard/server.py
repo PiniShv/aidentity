@@ -13,6 +13,7 @@ import secrets
 import shlex
 import signal
 import socket
+import socketserver
 import subprocess
 import sys
 import threading
@@ -509,6 +510,13 @@ class Dashboard:
         return result
 
 
+class LoopbackServer(ThreadingHTTPServer):
+    def server_bind(self):
+        # The stdlib bind calls getfqdn, a reverse lookup that goes to mDNS on macOS and can block startup.
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
 def make_server(dashboard, port=0, assets=None):
     registered = dict(assets or {})
 
@@ -624,7 +632,7 @@ def make_server(dashboard, port=0, assets=None):
         def do_OPTIONS(self):
             self.respond(405, {"ok": False, "error": "Cross-origin requests are not supported."})
 
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    server = LoopbackServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
     return server
 

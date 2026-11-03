@@ -595,6 +595,18 @@ class DashboardTests(unittest.TestCase):
         self.assertIn(b"Accounts", response.read())
         connection.close()
 
+    def test_binding_the_port_does_no_name_lookup(self):
+        with mock.patch("socket.getfqdn", side_effect=AssertionError("reverse DNS lookup during bind")):
+            server = self.module.make_server(
+                self.backend, port=0,
+                assets={"/": "<!doctype html><title>Accounts</title>"},
+            )
+        try:
+            self.assertEqual(server.server_name, "127.0.0.1")
+            self.assertGreater(server.server_address[1], 0)
+        finally:
+            server.server_close()
+
     def test_page_serves_the_ambient_field_and_increased_contrast_hides_it(self):
         folder = SERVER_PATH.parent
         assets = {path: (folder / name).read_text(encoding="utf-8")
