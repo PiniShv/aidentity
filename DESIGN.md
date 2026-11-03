@@ -410,6 +410,9 @@ Every button presses to 0.97 in 85ms on pointer-down and springs back on release
 ### Section tile
 A flat rounded square in its section's deep color with a Bone glyph, no border, shadow or gradient. 36px with a 20px glyph beside every page title (32px with an 18px glyph below 768px), centered on the title's capitals, with the subtitle aligned under the title text, not the tile; 36px above the heading of an operation card; 24px with a 15px glyph in the sidebar. It is decorative (`aria-hidden`); the label beside it names the section. Under forced colors it gains a 1px CanvasText border.
 
+### Icons
+Every UI icon is a Hugeicons stroke-rounded glyph from the MIT free set, its path data inline in `app.js`: a 24px grid, a 1.5 stroke in `currentColor`, round caps and joins, never filled, never a Unicode or emoji stand-in. 20px in a 36px section tile (18px in a 32px tile), 15px in the 24px sidebar tile, 18px in an icon button and for the Explore arrows, 16px beside a button label, in the search field, a callout and a finding (15px on Explore buttons, 14px in the phone top bar), 17px in a toast and 14px in the activity bar. An app tile carries the app's Hugeicons brand mark where the free set has one (Claude, ChatGPT, Chrome, Slack, Notion, Visual Studio Code, Arc), on the same stroke; Cursor, Edge and Brave keep the dashboard's own drawn marks, and any other app shows its initial. The official logo and the favicon are not icons (The Upstream Logo Rule).
+
 ### Inputs / Fields
 - **Style:** 40px, Raised fill, 1px Field border, 8px radius, 9px × 12px padding. The search field has a 16px leading icon and a 36px clear button. Search appears on Profiles from seven profiles. Applications lists two apps at most and has no search.
 - **Focus:** the border turns to the accent (the app hue in app context) with a 3px ring at 15%. Under forced colors, a 2px Highlight outline.

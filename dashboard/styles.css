@@ -64,7 +64,7 @@ h1,h2,h3{text-wrap:balance}
 p{line-height:1.55;text-wrap:pretty}
 dd{text-wrap:pretty}
 svg{display:block;flex:none}
-.icon{width:18px;height:18px;stroke-width:1.7}
+.icon{width:18px;height:18px;stroke-width:1.5}
 :focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for navigation, not controls */
 .muted{color:var(--muted)}

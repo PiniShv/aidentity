@@ -15,6 +15,7 @@ The dashboard adapts retrieved 21st.dev component source to dependency-free vani
 | Background | [Background ASCII Dither by nikolas-sapa](https://21st.dev/@nikolas-sapa/components/background-ascii-dither), demo 32067 | One fixed canvas under the whole dashboard in the component's ascii mode: its noise, glyph ramp and pointer boost at 14px cells and a 140px radius. The noise picks only the glyph, without the original's gamma or per-glyph alpha: every glyph is Bone at a flat 12%, so brightness is glyph density and the pointer shows as denser glyphs. The loop runs at 30fps at most and pauses while the tab is hidden. Reduced motion draws one still frame; increased contrast and forced colors hide the canvas. Added for aidentity: an `aidentity:ripple` event from app.js (a profile opened from the dashboard, added, restored or imported, and a reconnect) lifts the glyph density in one ring that spreads from that control and fades, inside the same loop; it is ignored whenever the loop is not running. The image source, the dither and dot modes and the theme observer were dropped. |
 | Application folders | [Glassmorphism Folder Cards by kedhareswer](https://21st.dev/@kedhareswer/components/glass-folder-cards), demo 37625 | Each app on Applications is a folder: the component's back panel, files and frosted front panel (its clip paths, corners brought to 20px), the hover lean on a bottom hinge, the open fan, the + and ··· keys, its keyboard-driven menu and the drop-in for a new file. The files are the app's profiles, each a button that opens the profile on Profiles; their name strips are measured so whole names show, and the folder reserves its open fan's height. Dropped: the generated canvas artwork and its shared painter (the back is translucent graphite), the milk-glass tone, the scroll-in assembly, the label placements and the paper lines. The springs are critically damped, so the drop and the pocket's give lose their rebound; the pointer lean needs a fine pointer; the menu holds the app's own actions; the glass turns solid under reduced transparency, increased contrast and forced colors and without `backdrop-filter`; a closed folder's files show no badge or running mark, since nothing colored sits under the glass. |
 | Explore preview | None; written for this dashboard | The focus panel shows the selected app's profiles side by side as keys (badge, status, Original mark, Open or Bring to front), and a list beside it picks the app. The app identity crossfades in 160ms, with a static swap under reduced motion. Nothing switches apps on scroll. |
+| Icons | [Hugeicons](https://21st.dev/community/icons/hugeicons) free set: `@hugeicons/core-free-icons` 4.4.0 ([hugeicons/hugeicons](https://github.com/hugeicons/hugeicons), MIT) | Every UI icon in `iconPaths` (app.js) is a stroke-rounded Hugeicons path copied inline: 24px grid, 1.5 stroke, `currentColor`, coordinates rounded to two decimals. App tiles use its Claude, ChatGPT, Chrome, Slack, Notion, Visual Studio Code and Arc marks; Cursor, Edge and Brave have none in the free set and keep the dashboard's own marks. Only path data was copied: the package is not a dependency and nothing loads at runtime. |
 
 The workspace uses near-black surfaces (`#060606`, `#0c0c0c`), warm-white text
 (`#f3f2ee`), muted gray (`#8d8b84`) and mint/cyan/blue accents. These color values
@@ -41,3 +42,31 @@ contrast. Reduced motion replaces springs and the crossfade with static,
 keyboard-accessible content, and a press dims instead of scaling. These parameters
 follow Emil Kowalski's apple-design motion skill and Apple's HIG Motion page; they
 are aidentity's choices, not platform timings.
+
+## Third-party notices
+
+The icon path data in `dashboard/app.js` comes from `@hugeicons/core-free-icons` 4.4.0, under this license:
+
+```text
+MIT License
+
+Copyright (c) 2025 Hugeicons
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
