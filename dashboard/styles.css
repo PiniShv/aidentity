@@ -480,6 +480,10 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .app-tone .input:focus,.app-tone textarea:focus,.app-tone select:focus{border-color:var(--app-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--app-color) 15%,transparent)}
 .app-tone.profile-card:hover,.app-tone.application-card:hover{border-color:var(--app-color)}
 .app-tone.profile-card.running{border-color:var(--app-color)} /* one running mark: Mint status, plus the app's 1px hue edge */
+/* A profile that starts running (app.js lit): its card draws that edge once and its running dot arrives, as an Explore key does;
+   the ambient field sends its ring from the card's button. Static under reduced motion. */
+.profile-card.lit{animation:card-edge 900ms var(--ease)}
+.lit .running-dot{animation:dot-in var(--motion-control) var(--spring-control)}
 
 /* Keyframes (sheet-in/out live in the mobile block) */
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -491,6 +495,8 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 @keyframes toast-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes page-out{to{opacity:0}}
 @keyframes page-in{from{opacity:0;transform:translateY(8px)}}
+@keyframes card-edge{from{border-color:var(--border)}}
+@keyframes dot-in{from{scale:0}}
 @keyframes topbar-title{to{opacity:1}}
 
 /* Breakpoints, widest first; min-width and reduced-motion blocks last */

@@ -18,7 +18,7 @@
 .xp-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--control);border-radius:8px;background:var(--surface);font-size:13px;font-weight:500;white-space:nowrap;transition:background-color 160ms ease,border-color 160ms ease,transform var(--motion-control) var(--spring-control)}
 .xp-button svg{width:15px;height:15px;flex-shrink:0}
 .xp-button:hover:not(:disabled,[aria-disabled="true"]){background:var(--raised);border-color:var(--muted)}
-.xp-button:active:not(:disabled,[aria-disabled="true"]){transform:scale(.97);transition-duration:80ms}
+.xp-button:active:not(:disabled,[aria-disabled="true"]){transform:scale(.97);transition-duration:var(--motion-press)}
 /* One Open everywhere: the secondary, a Raised fill with a 1px field-border edge. A running key's Bring to front is the hue fill with Lampblack ink. */
 .xp-key-action{background:var(--raised);border-color:var(--field-border)}
 .xp-key-action:hover:not(:disabled,[aria-disabled="true"]){background:var(--active);border-color:var(--field-border)}
@@ -61,9 +61,12 @@
 .xp-key-missing .xp-key-state{color:var(--negative)}
 /* A running key keeps a 1px app-hue edge. No glow; keys rest flat. */
 .xp-key-running{border-color:var(--app-color,var(--text))}
-/* The authored moment: a key that starts running draws its edge once (static under reduced motion). */
+/* The authored moment: a key that starts running draws its edge once and its running dot arrives (static under reduced motion).
+   A profile card does the same (styles.css .lit), and the ambient field sends its ring from the key (experience.js). */
 .xp-key-lit{animation:xp-key-edge 900ms var(--ease)}
+.xp-key-lit .xp-dot{animation:xp-dot-in var(--motion-control) var(--spring-control)}
 @keyframes xp-key-edge{from{border-color:var(--border)}}
+@keyframes xp-dot-in{from{scale:0}}
 .xp-key-add{width:100%}
 .xp-preview>.xp-help{margin-top:-8px}
 /* A narrow panel (phones, and tablets beside the navigator) lays each key out as one row. */

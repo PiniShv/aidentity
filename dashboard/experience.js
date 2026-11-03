@@ -276,12 +276,16 @@
 /* The ambient ground: a slow field of Bone glyphs behind the whole dashboard, adapted from 21st.dev's
  * Background ASCII Dither (nikolas-sapa) in its ascii mode. At most 30fps, paused while the tab is hidden,
  * one still frame under reduced motion, nothing at all under increased contrast or forced colours.
+ * It answers a profile that starts running, joins or comes back, and a reconnect, with one ring of denser glyphs (app.js sends "aidentity:ripple").
  */
 (() => {
   "use strict";
   // Every glyph is Bone at 12% on Lampblack (#222), where Muted text keeps 4.6:1; 0.13 leaves 4.50:1, no margin, so 0.12 is the ceiling.
   const INK_MAX = 0.12;
   const RAMP = " .:-=+*#%@", CELL = 14, RADIUS = 140, FRAME_MS = 33, AWAY = -1e4;
+  // A moment's ring: a band of a few cells that lifts the glyph density, spreads on a quadratic ease-out and fades as it goes.
+  // near: around the profile; far (the first profile, reach 0): to the farthest corner, wider and slower, so it reads as one wave.
+  const RING_LIFT = 0.55, RING_NEAR = { reach: 640, life: 1400, width: 42 }, RING_FAR = { reach: 0, life: 3200, width: 64 };
   const noise = (x, y, t) => (Math.sin(x * 1.7 + t * 0.6) + Math.sin(y * 2.3 - t * 0.4) +
     Math.sin((x + y) * 1.1 + t * 0.25) + Math.sin(Math.hypot(x - 6, y - 4) * 1.9 - t * 0.7)) / 8 + 0.5;
 
@@ -292,7 +296,7 @@
     const reducedQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     const plainQuery = window.matchMedia("(prefers-contrast: more), (forced-colors: active)");
     const target = { x: AWAY, y: AWAY }, cursor = { x: AWAY, y: AWAY };
-    const atlas = document.createElement("canvas");
+    const atlas = document.createElement("canvas"), rings = [];
     let width = 0, height = 0, dpr = 1, cellPx = 0, t = 0, last = 0, frame = 0, resizeTimer = 0;
 
     // Setting a bitmap size resets its context to the identity transform, so the glyph atlas is rebuilt here (dpr and ink can change).
@@ -313,14 +317,19 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.globalAlpha = INK_MAX; // flat ink: brightness comes from glyph density
       const r2 = RADIUS * RADIUS, cols = Math.ceil(width / CELL), rows = Math.ceil(height / CELL);
+      const live = react ? rings.map(ring => ({ x: ring.x, y: ring.y, r: ring.reach * (1 - (1 - ring.p) ** 2), w2: ring.width ** 2, lift: RING_LIFT * (1 - ring.p) })) : [];
       for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
         const x = gx * CELL + CELL / 2, y = gy * CELL + CELL / 2;
         let lum = noise(gx * 0.35 + t * 0.22, gy * 0.35, t);
         if (react) {
           const d2 = (x - cursor.x) ** 2 + (y - cursor.y) ** 2;
-          if (d2 < r2 * 4) lum = Math.min(1, lum + Math.exp(-d2 / r2) * 0.7);
+          if (d2 < r2 * 4) lum += Math.exp(-d2 / r2) * 0.7;
         }
-        const glyph = Math.floor(lum * (RAMP.length - 1));
+        for (const ring of live) {
+          const d = Math.hypot(x - ring.x, y - ring.y) - ring.r;
+          if (d * d < ring.w2 * 9) lum += ring.lift * Math.exp(-d * d / ring.w2);
+        }
+        const glyph = Math.floor(Math.min(1, lum) * (RAMP.length - 1));
         // 1:1 at whole device pixels, so a fractional dpr never resamples the glyph; 0 is the blank.
         if (glyph) ctx.drawImage(atlas, glyph * cellPx, 0, cellPx, cellPx, Math.round(gx * CELL * dpr), Math.round(gy * CELL * dpr), cellPx, cellPx);
       }
@@ -330,12 +339,20 @@
       if (now - last < FRAME_MS) return;
       last = now; t += 0.028;
       cursor.x += (target.x - cursor.x) * 0.12; cursor.y += (target.y - cursor.y) * 0.12;
+      // A ring follows its control while it moves (a card scrolled into view); one whose control never showed, or whose time is up, goes.
+      for (let i = rings.length - 1; i >= 0; i--) {
+        const ring = rings[i], box = ring.from.isConnected ? ring.from.getBoundingClientRect() : null;
+        if (box?.width) { ring.x = box.left + box.width / 2; ring.y = box.top + box.height / 2; }
+        if (!ring.reach && ring.x !== AWAY) ring.reach = Math.hypot(Math.max(ring.x, width - ring.x), Math.max(ring.y, height - ring.y)) + ring.width * 2;
+        ring.p = Math.max(0, (now - ring.born) / ring.life);
+        if (ring.p >= 1 || ring.x === AWAY) rings.splice(i, 1);
+      }
       draw(true);
     }
     const stop = () => { cancelAnimationFrame(frame); frame = 0; };
     // Each preference picks one mode: nothing (the CSS hides the canvas), one still frame, or the loop while visible.
     function run() {
-      stop();
+      stop(); rings.length = 0;
       if (plainQuery.matches) return;
       size();
       if (reducedQuery.matches) draw(false);
@@ -346,6 +363,14 @@
       if (target.x === AWAY) { cursor.x = event.clientX; cursor.y = event.clientY; } // enter at the pointer, not from offscreen
       target.x = event.clientX; target.y = event.clientY;
     }, { passive: true });
+    // Only while the loop runs: under reduced motion, increased contrast or forced colours, or in a hidden tab, the page's own change
+    // (the running mark, the new card, the toast) is the whole feedback. "far" crosses the whole field (the first profile).
+    document.addEventListener("aidentity:ripple", event => {
+      const from = event.detail?.from;
+      if (!frame || !from?.getBoundingClientRect) return;
+      rings.push({ ...(event.detail.reach === "far" ? RING_FAR : RING_NEAR), from, x: AWAY, y: AWAY, p: 0, born: performance.now() });
+      if (rings.length > 3) rings.shift();
+    });
     const leave = () => { target.x = target.y = AWAY; };
     document.documentElement.addEventListener("pointerleave", leave);
     window.addEventListener("blur", leave);

@@ -148,6 +148,13 @@
       if(Math.abs(delta)>.5)animateMotion(element,[{translate:`0 ${delta}px`},{translate:"0 0"}]);
     });
   }
+  // The ambient ground (experience.js) answers a profile that starts running, joins or comes back, and a reconnect: one ring of denser glyphs from where it shows.
+  const ripple=(from,reach="near")=>{if(from)document.dispatchEvent(new CustomEvent("aidentity:ripple",{detail:{from,reach}}));};
+  // Where a profile shows now: its visible Open or Bring to front, on a card, the detail panel or an Explore key.
+  // It runs after a successful action, so a browser without checkVisibility() must not turn that success into an error.
+  const profileSpot=name=>$$(".open-profile,[data-xp-key]",main).find(el=>(el.dataset.name??el.dataset.xpKey)===name&&(el.checkVisibility?.()??el.getClientRects().length>0));
+  // Profiles that started running since the last read: their card draws its hue edge once and its running dot arrives (Explore keeps its own).
+  const litCards=new Set();
   const initialRoute=location.hash.slice(1);
   let state = null, inventory = null, view = [...navigation.map(item=>item[0]),"guide"].includes(initialRoute)?initialRoute:"explore", query = "", appFilter = "", statusFilter = "all", selected = "", mobileDetail = false;
   let cleanupExperience = null, lastData = "", loadedAt = null, loading = false, busy = false, dialogSubmit = null, lastFocus = null;
@@ -404,7 +411,7 @@
     const t=tone(appName(item)),on=selected===item.name;
     const notes=[item.main?"Original account":"",item.own_extensions?"Own extensions":"",(item.args||[]).length?plural(item.args.length,"launch option"):""].filter(Boolean);
     const repair=needsRepair(item)?button("Repair","repair",{small:true,icon:"tool",name:item.name,label:`Repair, ${who(item)}`}):"";
-    return `<article class="profile-card${t.cls}${on?" selected":""}${item.status==="running"?" running":""}"${t.style} aria-labelledby="${profileId(item.name)}"><div class="profile-head">${art(appName(item),item.badge,item.color)}<div class="profile-title"><h2><button class="profile-name" id="${profileId(item.name)}"${on?' aria-current="true"':""} data-action="select" data-name="${escape(item.name)}">${breakable(item.profile||item.name)}</button></h2><p class="profile-app">${escape(appName(item))}</p></div></div><div class="profile-state-row">${statusMark(item)}${repair}${quitButton(item)}</div>${notes.length?`<p class="profile-meta">${notes.map(escape).join(" · ")}</p>`:""}${primaryButton(item,on)}</article>`;
+    return `<article class="profile-card${t.cls}${on?" selected":""}${item.status==="running"?" running":""}${litCards.has(item.name)?" lit":""}"${t.style} aria-labelledby="${profileId(item.name)}"><div class="profile-head">${art(appName(item),item.badge,item.color)}<div class="profile-title"><h2><button class="profile-name" id="${profileId(item.name)}"${on?' aria-current="true"':""} data-action="select" data-name="${escape(item.name)}">${breakable(item.profile||item.name)}</button></h2><p class="profile-app">${escape(appName(item))}</p></div></div><div class="profile-state-row">${statusMark(item)}${repair}${quitButton(item)}</div>${notes.length?`<p class="profile-meta">${notes.map(escape).join(" · ")}</p>`:""}${primaryButton(item,on)}</article>`;
   }
   // Detail: who, the command the primary action runs, then Settings, Rename and Remove; launch settings; paths and Rebuild behind Details.
   // From 768px the selected card beside or above it shows state, Quit and the primary action, so .detail-own (CSS) shows only below that.
@@ -412,7 +419,7 @@
     const t=tone(appName(item)),spec=JSON.stringify({action:"open",name:item.name}),command=previews.get(spec);
     const args=item.args||[],env=item.env||[];
     const launch=!args.length&&!env.length&&!item.own_extensions?'<p class="detail-defaults">Launch settings: app defaults</p>':`<dl class="details"><div><dt>Launch arguments</dt><dd>${args.length?args.map(arg=>`<code>${escape(arg)}</code>`).join("<br>"):"None"}</dd></div><div><dt>Environment variables</dt><dd>${env.length?escape(env.join(", "))+"<br><span class='small'>Values stay private</span>":"None"}</dd></div><div><dt>Extensions</dt><dd>${item.own_extensions?"Its own extensions folder":"The app’s default extensions"}</dd></div></dl>`;
-    return `<aside class="detail-panel${t.cls}"${t.style} aria-labelledby="detail-title">${button("Back to profiles","back-profiles",{small:true,icon:"back"}).replace('class="button ','class="button detail-back ')}<div class="detail-top">${art(appName(item),item.badge,item.color)}<div class="detail-heading"><h2 id="detail-title" tabindex="-1">${breakable(item.profile||item.name)}</h2><p class="detail-app">${escape(appName(item))}${item.main?" · original account":""}</p></div><button class="icon-button detail-close" data-action="close-detail" aria-label="Close details" title="Close details">${icon("x")}</button></div><div class="detail-own"><div class="profile-state-row">${statusMark(item)}${quitButton(item)}</div>${primaryButton(item,true)}</div><div class="command-echo detail-command" data-preview="${escape(spec)}"${command?"":" hidden"}><span class="command-label">Runs:</span><code>${commandHtml(command)}</code><button type="button" class="icon-button" data-action="copy-command" aria-label="Copy command" title="Copy command">${icon("copy")}</button></div><div class="detail-actions">${button("Settings","settings",{small:true,name:item.name,label:`Settings, ${who(item)}`})}${button("Rename","rename",{small:true,name:item.name,label:`Rename, ${who(item)}`})}${button("Remove","remove",{small:true,danger:true,name:item.name,label:`Remove, ${who(item)}`})}</div>${launch}<details class="advanced detail-more"${detailMore===item.name?" open":""}><summary>${icon("chevron")}<span>Details</span></summary><dl class="details"><div><dt>Application</dt><dd>${item.app_path?breakPath(item.app_path):escape(appName(item))}</dd></div><div><dt>Profile data</dt><dd>${item.main?"The app’s own original account":item.data_dir?breakPath(item.data_dir):"No folder recorded"}</dd></div><div><dt>Made by</dt><dd>${escape(item.built_by||"Not recorded")}</dd></div></dl><div class="detail-rebuild"><p>Makes the small app that opens this profile again from its saved settings. Its data is not touched.</p>${button("Rebuild launcher","rebuild",{small:true,icon:"rebuild",name:item.name,label:`Rebuild launcher, ${who(item)}`})}</div></details></aside>`;
+    return `<aside class="detail-panel${t.cls}${litCards.has(item.name)?" lit":""}"${t.style} aria-labelledby="detail-title">${button("Back to profiles","back-profiles",{small:true,icon:"back"}).replace('class="button ','class="button detail-back ')}<div class="detail-top">${art(appName(item),item.badge,item.color)}<div class="detail-heading"><h2 id="detail-title" tabindex="-1">${breakable(item.profile||item.name)}</h2><p class="detail-app">${escape(appName(item))}${item.main?" · original account":""}</p></div><button class="icon-button detail-close" data-action="close-detail" aria-label="Close details" title="Close details">${icon("x")}</button></div><div class="detail-own"><div class="profile-state-row">${statusMark(item)}${quitButton(item)}</div>${primaryButton(item,true)}</div><div class="command-echo detail-command" data-preview="${escape(spec)}"${command?"":" hidden"}><span class="command-label">Runs:</span><code>${commandHtml(command)}</code><button type="button" class="icon-button" data-action="copy-command" aria-label="Copy command" title="Copy command">${icon("copy")}</button></div><div class="detail-actions">${button("Settings","settings",{small:true,name:item.name,label:`Settings, ${who(item)}`})}${button("Rename","rename",{small:true,name:item.name,label:`Rename, ${who(item)}`})}${button("Remove","remove",{small:true,danger:true,name:item.name,label:`Remove, ${who(item)}`})}</div>${launch}<details class="advanced detail-more"${detailMore===item.name?" open":""}><summary>${icon("chevron")}<span>Details</span></summary><dl class="details"><div><dt>Application</dt><dd>${item.app_path?breakPath(item.app_path):escape(appName(item))}</dd></div><div><dt>Profile data</dt><dd>${item.main?"The app’s own original account":item.data_dir?breakPath(item.data_dir):"No folder recorded"}</dd></div><div><dt>Made by</dt><dd>${escape(item.built_by||"Not recorded")}</dd></div></dl><div class="detail-rebuild"><p>Makes the small app that opens this profile again from its saved settings. Its data is not touched.</p>${button("Rebuild launcher","rebuild",{small:true,icon:"rebuild",name:item.name,label:`Rebuild launcher, ${who(item)}`})}</div></details></aside>`;
   }
   let detailMore="";
   // The detail panel's "Runs:" line comes from the server's /api/preview, like the dialogs' line; never built here.
@@ -481,11 +488,12 @@
       const response=await fetch(options.force?"/api/state?fresh=1":"/api/state",{cache:"no-store"});
       const data=await response.json();
       if(!response.ok||!data.ok)throw Object.assign(new Error(data.error||"Could not read the workspace."),{server:true});
-      const firstLoad=!state;
+      const firstLoad=!state,was=new Map((state?.profiles||[]).map(item=>[item.name,item.status]));
       // inventory keeps every entry for counts of CLI-wide actions and the import preview; recovery lists stay whole in state too.
       inventory=data;
       state={...data,apps:data.apps.filter(item=>AI_APPS.includes(item.name)),profiles:data.profiles.filter(item=>AI_APPS.includes(appName(item)))};
       registerAppAccents(state);
+      for(const item of state.profiles)if(item.status==="running"&&was.has(item.name)&&was.get(item.name)!=="running")litCards.add(item.name);
       loadedAt=new Date();$("#freshness").textContent=`Updated ${time(loadedAt)}`;
       setOffline(false);
       const current=JSON.stringify({version:data.version,profiles:data.profiles,apps:data.apps,restorable:data.restorable,unclaimed:data.unclaimed,errors:data.errors});
@@ -500,6 +508,7 @@
         if(firstLoad)animateWorkspaceChange();
         if(view==="explore")requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:previousScroll,behavior:"instant"})));
       });
+      litCards.clear();// lit once, in the render this read caused; a later render or visit shows the card at rest
       syncControls();// the first good read unlocks the controls
       if(options.notify)toast("Workspace refreshed");
     }catch(error){
@@ -522,7 +531,7 @@
     // Gone: poll at the offline pace from now, not after a quiet poll's 30s, so a restarted server is picked up within 5s.
     if(on)schedulePoll();
     // Back online: a toast that says disconnected leaves, the Runs lines that hid come back, and an open form drops the reconnect step.
-    if(!on){$$(".toast[data-offline]").forEach(node=>$(".icon-button",node).click());fillPreviews();if(dialog.open){schedulePreview(0);const error=$("#form-error",dialog);if(error?.textContent===OFFLINE)error.hidden=true;}}
+    if(!on){ripple($(mobile.matches?"#refresh":".connection-dot"));$$(".toast[data-offline]").forEach(node=>$(".icon-button",node).click());fillPreviews();if(dialog.open){schedulePreview(0);const error=$("#form-error",dialog);if(error?.textContent===OFFLINE)error.hidden=true;}}
   }
   // While an action runs or the server is gone, run-type controls wait (aria-disabled); navigation and copy stay usable.
   const freeActions=new Set(["select","close-detail","back-profiles","clear-search","all-apps","reset-filters","show-all","workspace","refresh","copy-guide","copy-command"]);
@@ -581,6 +590,9 @@
       if(name==="add"){result.created=inventory.profiles.find(item=>!beforeAll.profiles.some(old=>old.name===item.name))?.name||`${params.app} ${params.profile}`;note=describe(name,params,result,before);}
       entry.title=note.title;renderActivity();
       if(!quiet)toast(note.title,note.text,note.kind,note.extra);
+      // A profile that starts running, or comes back, sends the ground's ring: from where it shows, else from the toast that says so.
+      const woke=name==="open"&&before.profiles.find(item=>item.name===params.name)?.status!=="running";
+      if(woke||name==="restore")ripple((woke&&profileSpot(params.name))||toastViewport.firstElementChild);
       return result;
     }catch(error){
       const failure=error.busy?"Still working":error.message===OFFLINE?"Disconnected":`Could not ${verbs[name]||name}${params.name?` ${params.name}`:""}`;
@@ -752,16 +764,16 @@
       return ["add",params];
     };
     showDialog("Add a profile","Each profile opens the app with its own sign-in and data.",`<div class="preview-dock"><div class="preview-row"><div class="preview-identity" id="identity-preview"></div></div></div><div class="fields"><div class="field"><label for="field-app">Application</label><select name="app" id="field-app" required${names.length?"":' aria-describedby="hint-app"'}>${options||'<option value="">No AI apps found</option>'}</select>${names.length?"":'<p class="hint" id="hint-app">Install Claude or ChatGPT and refresh, or give the app’s path below.</p>'}</div>${field("Profile name","profile","","For example Work, Personal or Client. Letters, numbers, spaces, hyphens and underscores.","text",NAME_RULE)}${check("main","Use the original account","Opens the app’s own account. Once a profile runs, the app’s own icon only switches to that profile; this launcher still opens the original.")}${disclosure("Appearance",identityFields(null,badgeDefault(chosen)))}${disclosure("App location & launch settings",`${field("Application path (optional)","app_path","","Use a full .app path for an application outside discovery.","text",'placeholder="/Applications/Example.app"')}<div id="seed-option">${check("seed","Copy Claude’s MCP configuration","Copies the existing Claude Desktop configuration into the new profile.")}</div>${area("Launch arguments","args","One allowed switch per line, for example --lang=de.")}${area("Environment variables","env","One allowed NAME=value per line. Values are never displayed in this dashboard.")}${check("own_extensions","Use a separate extensions folder","For VS Code-style applications.")}`,!names.length)}</div>`,"Add profile",async(data,el)=>{
-      const result=await action(...build(data),el);
+      const first=!state.profiles.length,result=await action(...build(data),el);
       stored.set("aidentity.last-app",data.get("app"));
-      revealProfile(result.created);
+      revealProfile(result.created,first);
     },{build,app:chosen});
     setupPreview();
     if(picked)$('[name="profile"]',dialog).focus();
     $('[name="main"]',dialog).onchange=event=>{if(event.target.checked&&!$('[name="profile"]',dialog).value)$('[name="profile"]',dialog).value="Main";setupPreviewUpdate();};
   }
   // After Add: Profiles, the new card selected, scrolled into view, one gentle ring, and focus on its name once the dialog closes.
-  function revealProfile(name){
+  function revealProfile(name,first=false){
     query="";statusFilter="all";selected=name||"";if(name)stored.set(LAST_PROFILE,name);
     showView("profiles",{app:"",instant:true});// the card is looked up right after, so the page swaps now
     const target=$$(".profile-name",main).find(el=>el.dataset.name===name);if(!target)return;
@@ -769,6 +781,8 @@
     cardNode.scrollIntoView({block:"center",behavior:reducedMotion.matches?"instant":"smooth"});
     lastFocus=target;
     animateMotion(cardNode,[{outlineOffset:"12px",outlineColor:"transparent"},{outlineOffset:"0px"}],"surface",{duration:900,delay:220});
+    // The card's ring closes in while the ground's spreads out from it; the first profile's crosses the whole field.
+    setTimeout(()=>ripple(cardNode,first?"far":"near"),220);
   }
   const lines=value=>String(value||"").split(/\r?\n/).map(v=>v.trim()).filter(Boolean);
   function setupPreview(){
@@ -856,7 +870,7 @@
     showDialog("Import profiles","Choose a JSON file made by aidentity export.",`<div class="field"><label for="import-file">Export file</label><input class="input file-input" type="file" id="import-file" accept=".json,application/json" aria-describedby="hint-import" required><p class="hint" id="hint-import">Maximum file size: 4 MiB. Sign-ins are not imported.</p></div><div id="import-preview" class="import-preview" hidden></div>`,"Import profiles",async(_,el)=>{
       if(!importDocument)throw new Error("Choose and review a valid aidentity export file first.");
       const result=await action("import",{document:importDocument,confirmed:true},el,{quiet:true});
-      const note=describe("import",{},result);toast(note.title,note.text,note.kind);showView("profiles",{app:""});
+      const note=describe("import",{},result);toast(note.title,note.text,note.kind);if(note.kind==="ok")ripple(toastViewport.firstElementChild);showView("profiles",{app:""});
     },{build:()=>importDocument?["import",{document:importDocument,confirmed:true}]:null});
     $("#import-file").onchange=async event=>{
       importDocument=null;$("#import-preview").hidden=true;$("#form-error").hidden=true;$("#dialog-submit").textContent="Import profiles";$("#dialog-submit").disabled=false;
