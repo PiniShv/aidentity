@@ -13,6 +13,12 @@ colors:
   card-top: "#0f0f0f"
   card-bottom: "#090909"
   tip: "#050505"
+  material-bar: "#060606e0"
+  material-panel: "#0c0c0ceb"
+  scrim: "#00000099"
+  glass-sheen: "#f3f2ee12"
+  glass-rim: "#f3f2ee29"
+  folder-shadow: "#000000a6"
   bone: "#f3f2ee"
   muted: "#8d8b84"
   mint: "#5fe08a"
@@ -96,12 +102,14 @@ typography:
     fontSize: "12px"
     lineHeight: 1.7
 rounded:
+  badge: "6px"
   control: "8px"
   section-tile-nav: "7px"
   section-tile-phone: "9px"
   section-tile: "10px"
   toast: "12px"
   tile: "12px"
+  explore-panel: "14px"
   card: "16px"
   dialog: "20px"
 spacing:
@@ -154,7 +162,6 @@ components:
     height: "40px"
     padding: "0 12px"
   nav-item-active:
-    backgroundColor: "{colors.raised}"
     textColor: "{colors.bone}"
   tab:
     textColor: "{colors.muted}"
@@ -163,7 +170,7 @@ components:
   tab-selected:
     textColor: "{colors.bone}"
   card:
-    backgroundColor: "{colors.surface}"
+    backgroundColor: "{colors.card-top}"
     rounded: "{rounded.card}"
     padding: "24px"
   profile-card:
@@ -193,6 +200,14 @@ components:
     textColor: "{colors.lampblack}"
     rounded: "{rounded.control}"
     size: "34px"
+  badge-tile:
+    textColor: "{colors.lampblack}"
+    rounded: "{rounded.badge}"
+    size: "20px"
+  explore-panel:
+    backgroundColor: "{colors.card-top}"
+    rounded: "{rounded.explore-panel}"
+    padding: "18px"
   explore-key:
     backgroundColor: "{colors.surface}"
     rounded: "{rounded.tile}"
@@ -282,15 +297,19 @@ A section color appears in four places only: its sidebar tile, its current-page 
 
 ### Neutral
 - **Lampblack** (`lampblack`): page ground, and the ink on any app-colored fill.
-- **Surface** (`surface`): panels, dialogs, Explore keys, sidebar hover.
-- **Card gradient** (`card-top` to `card-bottom`): the resting fill of profile and operation cards, the detail panel and the Explore panel; neutral, never tinted.
-- **Raised** (`raised`): secondary buttons (with a Field border edge), selected nav item, field fill, notices.
-- **Active** (`active`): the app tile of an app with no hue.
+- **Surface** (`surface`): empty states, health results and output blocks, dialogs, Explore keys, sidebar hover.
+- **Card gradient** (`card-top` to `card-bottom`): the resting fill of profile and operation cards, Recovery's and Help's panels, the detail panel and the Explore panel; neutral, never tinted.
+- **Raised** (`raised`): secondary buttons (with a Field border edge), the base the current nav item's section color mixes into (28%), field fill, notices.
+- **Active** (`active`): the app tile of an app with no hue on cards, the detail panel and Applications (Explore's panel and navigator use Raised).
 - **Border** (`border`): hairlines between regions and around cards.
 - **Button edge** (`button-edge`): the 1px edge of default (outlined) buttons and key caps, at least 2.1:1 on Lampblack, Surface, the card gradient and Raised.
 - **Control** (`control`): borders of dialogs, toasts, Explore buttons and dashed empty states.
 - **Field border** (`field-border`): text fields, selects and file inputs (3.6–3.9:1 on every surface), the edge of the secondary (Open) button, and the ring that makes the Graphite swatch visible.
 - **Tip** (`tip`): toast ground.
+- **Material bar** and **Material panel** (`material-bar`, `material-panel`): Lampblack and Surface made translucent for the floating chrome (see Material).
+- **Scrim** (`scrim`): black at 60%, behind the phone drawer and every modal dialog.
+- **Glass sheen** and **Glass rim** (`glass-sheen`, `glass-rim`): Bone at 7% and 16%, the pointer sheen on a folder's glass and the hairline on its rims and on each file's top (The Folder Glass Rule).
+- **Folder shadow** (`folder-shadow`): black at 65%, the soft shadow under a folder and its files, and nowhere else.
 - **Bone** (`bone`): primary text, the default primary button fill, the tab indicator, and the ambient field's glyphs at 12%.
 - **Muted** (`muted`): secondary text, idle nav items, idle tabs, placeholders.
 
@@ -302,7 +321,7 @@ A section color appears in four places only: its sidebar tile, its current-page 
 - The Running tab count turns Mint while it is above zero; a finding marked ok has a Mint check. In the Workspace health summary, the OK, warning and error numbers take Mint, Amber and Negative while above zero; their words stay Muted.
 
 ### Increased contrast
-Under `prefers-contrast: more`, Muted becomes #b4b2aa (7.3:1 on Warning bg, 8.7:1 on Raised, 9.5:1 on Lampblack), Border takes the Button edge, Control the Field border, the Button edge becomes Muted, the Field border #9a988f, the Danger edge Negative, and every material turns solid. The ambient field is gone, here and under forced colors, so the ground is solid Lampblack. Hues and Bone stay as they are.
+Under `prefers-contrast: more`, Muted becomes #b4b2aa (7.3:1 on Warning bg, 8.7:1 on Raised, 9.5:1 on Lampblack), Border takes the Button edge, Control the Field border, the Button edge becomes Muted, the Field border #9a988f, the Danger edge Negative, the glass rim the new Button edge (#8d8b84), and every material turns solid. The ambient field is gone, here and under forced colors, so the ground is solid Lampblack. Hues and Bone stay as they are.
 
 ### Named Rules
 **The Two Layers Rule.** A bright hue means an app that has profiles; a deep tile color means a section of the dashboard; Mint, Amber and Negative mean status. Everything else stays on the Lampblack-to-Bone ramp: card surfaces, text, apps without profiles and the counts that are not status. The official logo is the one exception (The Upstream Logo Rule).
@@ -329,7 +348,7 @@ Under `prefers-contrast: more`, Muted becomes #b4b2aa (7.3:1 on Warning bg, 8.7:
 
 ### Hierarchy
 - **Headline** (600, 28px, 1.2, -0.035em): page titles on every view. Below 768px every page title is **Headline compact** (24px).
-- **Card** (550, 22px, 1.2, -0.03em): dialog titles, empty-state titles, the Explore panel's app name, the detail title on mobile.
+- **Card** (550, 22px, 1.2, -0.03em): dialog titles, empty-state titles, the Explore panel's app name.
 - **Card compact** (550, 19px, 1.2, -0.03em): below 768px, every Card heading inside the page (the Explore panel's app name, empty-state titles, the detail title), so it reads under the 24px page title and not beside it. Dialog titles stay at Card.
 - **Title** (550, 17px, 1.35, -0.015em): card and section headings, profile names, app names, profile names on Explore keys, Recovery's profile rows.
 - **Title compact** (550, 15px, 1.3, -0.015em): the Explore navigator's app names, the names on one-row Explore keys, the profile names on folder files and the phone top bar's page name.
@@ -367,22 +386,23 @@ Tonal, with shadows only when floating. Under everything lies the ambient field:
 
 ### Shadow Vocabulary
 - **Dialog** (`--shadow-dialog`): modal dialogs and the mobile bottom sheet.
-- **Toast** (`--shadow-toast`): the stacked toast column.
+- **Toast** (`--shadow-toast`): the stacked toast column and the folders' ··· menu.
+- **Folder** (`folder-shadow`, blurred): the pool under each Applications folder and the drop under each of its files, the one shadow in the content layer (The Folder Glass Rule).
 - **Focus ring** (`box-shadow: 0 0 0 3px` accent at 15%, `--ring-accent` outside app context): focused fields, with the border in the accent.
 
 ### Material
-The fixed chrome that content passes under is a translucent layer, not a shadow: the activity bar and the phone top bar are `--material-bar` (Lampblack at 88%), the activity panel `--material-panel` (Surface at 92%), both with `blur(20px) saturate(140%)`. Muted text on the bar stays at 4.6:1 or more even over a solid Bone area. It turns solid where `backdrop-filter` is unsupported, under `prefers-reduced-transparency` and under `prefers-contrast: more`. Nothing else in the content layer is translucent: the folders on Applications are the one exception (The Folder Glass Rule).
+The fixed chrome that content passes under is a translucent layer, not a shadow: the activity bar and the phone top bar are `--material-bar` (Lampblack at 88%), the activity panel and the folders' ··· menu `--material-panel` (Surface at 92%), all with `blur(20px) saturate(140%)`. Muted text on the bar stays at 4.6:1 or more even over a solid Bone area. It turns solid where `backdrop-filter` is unsupported, under `prefers-reduced-transparency` and under `prefers-contrast: more`. Nothing else in the content layer is translucent: the folders on Applications are the one exception (The Folder Glass Rule).
 
 ### Named Rules
 **The Floating-Only Shadow Rule.** A shadow means the layer floats above the page (dialogs, toasts). Resting cards and keys never get one, and no hue ever glows; identity and running state are a border or a dot, never height or light. The folders on Applications are the one exception (The Folder Glass Rule).
 
-**The Folder Glass Rule.** The folders on Applications are the one glass object in the content layer and the one exception to the shadow rule above and to "hover moves nothing". Each is three layers of in-world material: a back panel of translucent graphite (Raised to Surface at 62–72%), the app's profiles as files (Active to Raised, a Bone hairline on top), and a front panel of smoked glass (Surface to Lampblack, from 8% at the top to 94% at the foot, `blur(16px)`), so the files and the ambient field frost through it, with a soft shadow under the folder and under each file and a neutral Bone sheen at 7% that follows a fine pointer. Nothing is painted for it: no artwork, no second canvas, no color outside the palette; only what is behind the glass shows through. The app's hue keeps its allowed forms: the app tile on the glass, the folder's 1px rim on hover and while open, a file's 1px edge on hover and while it runs in an open folder, and the focus ring. Nothing colored sits under the glass: a closed folder's files, on hover too, show no badge, no running mark and no name (a lifted file is blank paper, never a name cut by the glass's tab); all three appear once it opens and the files clear the glass. What runs still shows while it is closed: the running mark and its count sit on the glass, beside "N profiles", not under it. The label sits where the glass is at least 80% opaque: Muted keeps 5.7:1 there and 4.9:1 under the sheen at its brightest, so neither the glass nor the sheen may get lighter. Under `prefers-reduced-transparency`, `prefers-contrast: more` and forced colors, and without `backdrop-filter`, the glass and the back are solid (the card gradient, Raised to Surface) and the sheen is gone.
+**The Folder Glass Rule.** The folders on Applications are the one glass object in the content layer and the one exception to the shadow rule above and to "hover moves nothing". Each is three layers of in-world material: a back panel of translucent graphite (Raised to Surface at 62–72%), the app's profiles as files (Active to Raised, a Bone hairline on top), and a front panel of smoked glass (Surface to Lampblack, from 8% at the top to 94% at the foot, `blur(16px)`), so the files and the ambient field frost through it, with a soft shadow under the folder and under each file and a neutral Bone sheen at 7% that follows a fine pointer. Nothing is painted for it: no artwork, no second canvas, no color outside the palette; only what is behind the glass shows through. The app's hue keeps its allowed forms: the fallback app tile on the glass (an app without an installed icon), the folder's 1px rim on hover and while open, a file's 1px edge on hover and while it runs in an open folder, and the focus ring. Nothing colored sits under the glass: a closed folder's files, on hover too, show no badge, no running mark and no name (a lifted file is blank paper, never a name cut by the glass's tab); all three appear once it opens and the files clear the glass. What runs still shows while it is closed: the running mark and its count sit on the glass, beside "N profiles", not under it. The label sits where the glass is at least 80% opaque: Muted keeps 5.7:1 there and 4.9:1 under the sheen at its brightest, so neither the glass nor the sheen may get lighter. Under `prefers-reduced-transparency`, `prefers-contrast: more` and forced colors, and without `backdrop-filter`, the glass and the back are solid (the card gradient, Raised to Surface) and the sheen is gone.
 
 **The Ambient Ground Rule.** The glyph field is the only thing that moves at rest. It is neutral, every glyph Bone at a flat 12% and never a hue, and it lies under every layer; brightness is glyph density, not ink. It drifts at no more than 30 frames a second, grows denser near the pointer and pauses while the tab is hidden; under reduced motion it holds one still frame, and under increased contrast and forced colors it is gone. It answers four moments, and only these, with one ring of denser glyphs that spreads from where the profile shows and fades as it goes: a profile that starts running (from its Open; 640px over 1.4s), a profile added (from its new card, or its new file on Applications; for the very first profile the ring is wider and crosses to the farthest corner over 3.2s), a profile restored or imported (from the toast that says so), and the dashboard reconnecting (from the connection dot; from Refresh below 768px, where the sidebar is a drawer; the same 640px ring as a profile that starts, since the page coming back is the one recovery nobody pressed a button for). The ring is density only, in the same loop and the same Bone at 12%; Bring to front, Quit and every other action send none. Under reduced motion, increased contrast and forced colors, and in a hidden tab, there is no ring: the running mark, the new card and the toast are the whole feedback. At 12% Muted text keeps 4.6:1 over any glyph; 13% would leave 4.5:1 with no margin, so 12% is the ceiling.
 
 ## Shapes
 
-Soft rectangles, nested by size. Controls, nav items, icon buttons, Explore key badges and navigator tiles, and the file-picker button are 8px; Explore keys, navigator rows and toasts 12px; the fallback app tile 12px (10px in the Explore panel); the Explore panel 14px; section tiles 10px at 36px (9px at 32px on phones) and 7px at 24px in the sidebar; cards and panels 16px; dialogs 20px, and 20px on the top corners only as a mobile sheet. The badge on a profile tile and the rail initial are 6px. Status and app dots and the color swatches are full circles (8px running dot, 8px app dot, 6px connection dot, 32px swatch, 44px on mobile). An installed app icon brings its own squircle and shows whole, on nothing: no fill, border, clip or tint behind it. Its squircle fills the box it replaces, so the image is 1.24× that box (macOS draws an icon's body on 824 of 1024px), from a 128px PNG that stays crisp at 2x.
+Soft rectangles, nested by size. Controls, nav items, icon buttons, Explore key badges and navigator tiles, and the file-picker button are 8px; Explore keys, navigator rows and toasts 12px; the fallback app tile 12px (10px in the Explore panel); the Explore panel 14px (12px below 768px); section tiles 10px at 36px (9px at 32px on phones) and 7px at 24px in the sidebar; cards and panels 16px; dialogs 20px, and 20px on the top corners only as a mobile sheet. The badge on a profile tile and the rail initial are 6px. Status and app dots and the color swatches are full circles (8px running dot, 8px app dot, 6px connection dot, 32px swatch, 44px on mobile). An installed app icon brings its own squircle and shows whole, on nothing: no fill, border, clip or tint behind it. Its squircle fills the box it replaces, so the image is 1.24× that box (macOS draws an icon's body on 824 of 1024px), from a 128px PNG that stays crisp at 2x.
 
 A badge is always a filled rounded square in its saved color, with no stripe or shadow: 34px on an Explore key, 20px at the corner of a profile tile, where it overlaps the tile by 6px. A badge on a tile carries a 2px ring in the surface it sits on (the card gradient's top, Raised in the Add dialog's preview strip, Surface in Settings, where the tile sits on the dialog), so even a badge in the tile's own color reads as a separate chip. A profile set to use the original app icon has no badge: its tiles show the app's icon alone, and its Explore key fills the 34px badge slot with the app's installed icon (without one, its glyph at 20px on the app hue with Lampblack ink, or Raised with Bone ink for an app with no hue).
 
@@ -406,7 +426,7 @@ Every button presses to 0.97 in 85ms on pointer-down and springs back on release
 - **Background:** the card gradient (#0f0f0f to #090909).
 - **Shadow Strategy:** none at rest; see Elevation & Depth.
 - **Border:** 1px Border; on app cards hover draws the app hue (Muted on a neutral card), and a running profile card draws it in full. Selection never takes the hue: a selected profile card adds a 2px Bone outline at a 2px offset. Operation card surfaces stay neutral; each card, and Recovery's restore panel, leads with a 36px section tile.
-- **Internal Padding:** 24px for panels and operation cards, 20px for profile cards, 22px on mobile.
+- **Internal Padding:** 24px for panels and operation cards (below 768px, 22px for operation cards and 20px for panels), 20px for profile cards at every width.
 - **Recovery:** each restorable profile is a row of its name and its own Restore; Restore all joins them only from two profiles. The panel's description says once that the launchers were removed and their data is still on this Mac, so the rows do not repeat it; Help's Terms define "launcher".
 
 ### Section tile
@@ -442,7 +462,7 @@ The Profiles grid's unit. A 44px app tile, the app's installed icon or without o
 
 ### Application folder
 Every app the dashboard lists (Claude and ChatGPT) is a glass folder (The Folder Glass Rule), adapted from kedhareswer's Glass Folder Cards, apps with profiles first, then by name. Its stage is 340px wide, scaled down only where the column is narrower: the back panel with its tab on the right, the files, and the glass front panel carrying the app's 44px tile, its name (Title) and "N profiles" (Meta, Muted, tabular) at its foot, followed while any profile runs by the running mark with its count ("2 running"), with two 44px keys at its right, + and ···. The count line never wraps, so the label stays on the 80% glass: where it is full, the word "running" drops and the dot and count stay.
-- **States:** at rest the folder is closed and only the files' tops show over the glass. On hover or focus the front panel leans toward you on its bottom hinge (11°), the files lift and the rim takes the app hue (Muted with no hue). Opened (a click anywhere on the folder, or Enter or Space on it), the glass falls further open (20°) and the files rise out in a slight fan.
+- **States:** at rest the folder is closed and only the files' tops show over the glass. On hover or focus the front panel leans toward you on its bottom hinge (11°) and the files lift; on hover the rim takes the app hue (Muted with no hue), and keyboard focus on the folder draws the focus ring on its rim in the accent (the app hue, Mint with no hue). Opened (a click anywhere on the folder, or Enter or Space on it), the glass falls further open (20°) and the files rise out in a slight fan.
 - **Files:** each is a button: the profile's badge (the app's icon when it uses the original app icon), its whole name (Title compact, wrapping at underscores) and the running mark while it runs, with the file's 1px hue edge; the badge, the name and the running mark show only while the folder is open. A file opens its profile's detail on Profiles; launching stays with Open, as on a card. Each file's strip is measured, so every name shows whole above the file in front of it, and the folder reserves the height its open fan needs, so opening never reflows the page. The fan is tight, so that reserve stays small: the file in front covers all but 5px of the strip under each name, the front strip ends on the glass's raised tab, and the fan's top may reach the folder's own top, where the title row's 24px margin is its clearance (four files with the 40-character name keep about 93px above the folder, four short names about 74px). Four files at most: past that, three and a "N more profiles" file that opens Profiles for the app. Profiles added there this session come first, then running ones, then by name.
 - **Keys:** + opens Add a profile for that app. ··· opens a menu, "Show <App> profiles" and "Add profile" (arrows, Home and End move; Escape and Tab close it). When an add succeeds on Applications, from + or anywhere else, the folder opens and the new file drops in as the top file on the surface spring with no rebound, the glass gives once as it lands, the count rolls over, the ground's ring spreads from the file and focus lands on it.
 - **Closing:** one folder is open at a time; a second click, Escape or a press outside closes it, and Escape returns focus to it. Leaving the page closes it.
@@ -455,7 +475,7 @@ With no apps the grid holds "No AI apps found" and Refresh apps.
 A 320px card on the right of the grid at 901px and up: sticky 24px from the top, with a max-height that fits between the top bar and the activity bar (and the open Activity panel), scrolling inside with a fade at the bottom edge only while it overflows. Before a choice the column holds a dashed prompt instead. From 768px the selected card already shows the state, Quit and primary action, so the panel omits them; below 768px, where it replaces the grid, it keeps them. Top to bottom: the 48px app tile with its badge, the profile name as `h2` over "<App> · original account" where it applies, the "Runs:" line with a Copy button, one row of small actions (Settings and Rename, with Remove in Negative pushed to the far end), then "Launch settings: app defaults" in one line, or the launch arguments, environment variable names and extensions when any are set, and last a "Details" disclosure holding the application path, profile data folder, who made the launcher, and "Rebuild launcher" with one sentence of explanation. Below 901px it follows the grid and gains a close button; below 768px, a Back button.
 
 ### Explore focus panel (signature)
-The panel holds the selected app's profiles side by side as keys, under the app's identity (44px tile, name in Card and, while any run, the running mark; the keys and the navigator row carry the count). Below 768px, where the navigator follows the panel, Prev, "N of M" and Next sit above the identity; they step through every listed app and are hidden when only one app is listed. From 768px the navigator beside the panel is the one chooser. An app with no profiles shows "No <App> profiles yet. A profile opens <App> with its own sign-in, so your accounts run side by side." as a dashed Control placeholder with no fill, never a card inside the panel, above Add profile. A change of app crossfades the identity in 160ms (a static swap under reduced motion); nothing switches apps on scroll, and there is no reel or wheel. Each key carries the profile's badge in its saved color and ink (the app's icon on the app hue when the profile uses the original app icon), the profile name (Title), a state line (the running mark, or the status label, plus " · Original" on the original account), and the profile's one action: Open, or Bring to front when it is running. A running key has a 1px hue edge and draws it once when it starts, as its running dot arrives; when you opened it here, the field's ring also spreads from it (all static under reduced motion), with no glow. Keys fill a grid of 200px columns and become one-row keys when the panel is narrow. "Add profile" sits under them. Keys are a real list with names that start with their visible text ("Open Work, Claude", "Bring to front, Work, Claude").
+The panel holds the selected app's profiles side by side as keys, under the app's identity (44px tile, name in Card and, while any run, the running mark; the keys and the navigator row carry the count). Below 768px, where the navigator follows the panel, Prev, "N of M" and Next sit above the identity; they step through every listed app and are hidden when only one app is listed. From 768px the navigator beside the panel is the one chooser. An app with no profiles shows "No <App> profiles yet. A profile opens <App> with its own sign-in, so your accounts run side by side." as a dashed Control placeholder with no fill, never a card inside the panel, above Add profile. A change of app crossfades the identity in 160ms (a static swap under reduced motion); nothing switches apps on scroll, and there is no reel or wheel. Each key carries the profile's badge in its saved color and ink (the app's installed icon on nothing when the profile uses the original app icon; without one, its glyph on the app hue), the profile name (Title), a state line (the running mark, or the status label, plus " · Original" on the original account), and the profile's one action: Open, or Bring to front when it is running. A running key has a 1px hue edge and draws it once when it starts, as its running dot arrives; when you opened it here, the field's ring also spreads from it (all static under reduced motion), with no glow. Keys fill a grid of 200px columns and become one-row keys when the panel is narrow. "Add profile" sits under them. Keys are a real list with names that start with their visible text ("Open Work, Claude", "Bring to front, Work, Claude").
 
 ### Explore navigator
 The list beside the panel chooses the app and holds no profile actions. Every listed app is a row, apps with profiles first (running ones, then most profiles, then by name), one 60px row each with a 36px tile, the app name (15px), "N profiles" and the running mark while any profile runs. An app with no profiles keeps its row, neutral, with "0 profiles". The chosen row draws a 1px hue border on Surface (Muted for an app with no hue). The rows are the count line, with no summary above them (Profiles keeps its counts on its tabs). With no apps at all, Explore shows "No AI apps found" and Refresh apps instead of the panel and list, the same words as Profiles and Applications. There is no "All profiles" button.
