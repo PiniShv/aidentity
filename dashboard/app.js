@@ -2,7 +2,7 @@
  * Animated Sidebar (starc007, 29334), Animated Dialog (rmahammad, 26905),
  * Animated Profile Card (ravikatiyar162, 8206), Animated Tabs (educalvolpz, 24930),
  * Input/Button (originui, 159/146), Toast (cnippet-dev, 24297),
- * Button Spinner (uiable, 19975). React primitives translated to native DOM,
+ * Button Spinner (uiable, 19975), Glass Folder Cards (kedhareswer, 37625). React primitives translated to native DOM,
  * dialog, CSS transitions and Web Animations. See docs/dashboard-components.md.
  */
 (() => {
@@ -135,7 +135,7 @@
   }
   function animateWorkspaceChange(){
     if(view==="explore"||reducedMotion.matches)return;
-    const blocks=$$(".title-row,.terms,.tabs,.toolbar,.profile-card,.application-card,.operation-card,.panel,.guide-output,.guide-empty",main);
+    const blocks=$$(".title-row,.terms,.tabs,.toolbar,.profile-card,.folder,.operation-card,.panel,.guide-output,.guide-empty",main);
     blocks.forEach((element,index)=>animateMotion(element,[{opacity:0,translate:"0 9px"},{opacity:1,translate:"0 0"}],"surface",{delay:Math.min(index,7)*14}));
   }
   function animateToastLayout(update){
@@ -297,12 +297,13 @@
     const strip=tab.parentElement,pad=strip.firstElementChild.offsetLeft;
     strip.scrollLeft=moved?Math.min(tab.offsetLeft-pad,Math.max(tabScroll,tab.offsetLeft+tab.offsetWidth+pad-strip.clientWidth)):tabScroll;
   }
-  // A page change crossfades #main alone (styles.css names it; the sidebar and top bar stay put). A change started mid-flight
-  // skips the running one, which applies its update at once, so the last click wins. Reduced motion and options.instant swap in place.
+  // A page change crossfades #main alone (the sidebar and top bar stay put). A change started mid-flight skips the running one,
+  // which applies its update at once, so the last click wins. Reduced motion and options.instant swap in place.
+  let pageChange=null;
   function showView(next,options={}){
     const update=()=>{
       if(cleanupExperience){cleanupExperience();cleanupExperience=null;}
-      if(next!==view)query="";// each view starts unfiltered; its own query survives only while you stay on it
+      if(next!==view){query="";openFolder="";openMenu="";}// each view starts unfiltered and closed; its own query survives only while you stay on it
       view=next;mobileDetail=false;
       window.history.replaceState(null,"",`#${next}`);
       if(options.app!==undefined)appFilter=options.app;
@@ -316,7 +317,10 @@
     if(!document.startViewTransition||document.body.classList.contains("mobile-nav-open")){update();animateMotion(main,[{opacity:.5,translate:"0 8px"},{opacity:1,translate:"0 0"}]);return;}
     // The old page stays where it was on screen while it fades, though the update scrolls to the top.
     document.documentElement.style.setProperty("--page-scroll",`${window.scrollY}px`);
-    document.startViewTransition(update);
+    // #main is named only for the change: a named element is a Backdrop Root, which would keep the folder glass from frosting the ambient field.
+    main.style.viewTransitionName="main";
+    const change=pageChange=document.startViewTransition(update),unname=()=>{if(pageChange===change)main.style.viewTransitionName="";};
+    change.finished.then(unname,unname);
   }
   function renderView(){
     if(!state)return;
@@ -436,10 +440,77 @@
   const profileCount=name=>state.profiles.filter(item=>appName(item)===name).length;
   // Apps with profiles first, then by name: Applications and the Add dialog's select share this order.
   const sortedApps=()=>[...state.apps].sort((a,b)=>(profileCount(b.name)>0)-(profileCount(a.name)>0)||byName(a.name,b.name));
-  // Every listed app is a card, apps with profiles first; its count opens Profiles for that app. Two apps at most (AI_APPS), so no search.
+  // Applications: every listed app is a glass folder, apps with profiles first, adapted from kedhareswer's Glass Folder Cards
+  // (21st.dev): a back panel, the app's profiles as files and a frosted front panel. Open, the files fan out and each one shows
+  // its profile on Profiles; + adds a profile; ··· holds Show profiles and Add profile. One folder is open at a time, and a
+  // re-render keeps it open. Two apps at most (AI_APPS), so no search.
+  const FOLDER_BACK="M0 54A20 20 0 0 1 20 34L146 34C170 34 172 0 198 0L320 0A20 20 0 0 1 340 20L340 252A20 20 0 0 1 320 272L20 272A20 20 0 0 1 0 252Z";
+  const FOLDER_FRONT="M0 20A20 20 0 0 1 20 0L118 0C144 0 146 32 172 32L320 32A20 20 0 0 1 340 52L340 178A20 20 0 0 1 320 198L20 198A20 20 0 0 1 0 178Z";
+  // Four files at most: past that, three and a "N more profiles" file that opens Profiles for the app. Profiles added on this
+  // page this session come first, newest on top, then running ones, then by name.
+  const FOLDER_FILES=4,folderRecent=[];
+  let openFolder="",openMenu="",folderDrop="";
+  const folderId=name=>`folder-${appHash(name).toString(36)}`;
+  function folderCard(app){
+    const t=tone(app),id=folderId(app),open=openFolder===app,menuOpen=openMenu===app,rank=item=>{const at=folderRecent.indexOf(item.name);return at<0?Infinity:at;};
+    const items=state.profiles.filter(item=>appName(item)===app).sort((a,b)=>rank(a)-rank(b)||(b.status==="running")-(a.status==="running")||byName(a.profile||a.name,b.profile||b.name));
+    const shown=items.length>FOLDER_FILES?items.slice(0,FOLDER_FILES-1):items;
+    const files=shown.map(item=>{const hex=/^[0-9a-f]{6}$/i.test(item.color)?item.color:defaultBadgeColor;return [item.name,`<button type="button" class="gf-sheet${item.status==="running"?" gf-running":""}" data-folder-file data-name="${escape(item.name)}"><span class="gf-head">${item.badge?`<span class="gf-chip" style="--identity-color:#${hex};--identity-ink:${inkFor(hex)}" aria-hidden="true">${escape(item.badge)}</span>`:`<span class="gf-chip gf-chip-app" aria-hidden="true">${appGlyph(app)}</span>`}<span class="gf-name">${breakable(item.profile||item.name)}</span>${item.status==="running"?'<span class="gf-state status-running"><span class="running-dot"></span>Running</span>':item.status==="app missing"?'<span class="gf-state status-missing">App missing</span>':""}</span></button>`];});
+    if(items.length>shown.length)files.push(["",`<button type="button" class="gf-sheet" id="${id}-more" data-app-filter="${escape(app)}"><span class="gf-head"><span class="gf-chip gf-chip-more" aria-hidden="true">${icon("grid")}</span><span class="gf-name">${items.length-shown.length} more profiles</span><span class="gf-state">Show all</span></span></button>`]);
+    if(!items.length)files.push(["",`<div class="gf-sheet gf-sheet-empty"><span class="gf-head"><span class="gf-name">No ${escape(app)} profiles yet<span class="gf-note">Each profile opens ${escape(app)} with its own sign-in.</span></span></span></div>`]);
+    // Back to front in reading order; --slot places a file across the fan (-1 to 1), --depth counts the files in front of it,
+    // and a small offset from its name's hash keeps the stack hand-placed.
+    const last=files.length-1,sheets=files.map(([name,html],at)=>{const seed=appHash(name||app);return `<li class="gf-slot${name&&name===folderDrop?" gf-drop":""}" style="--slot:${last?(at/last*2-1).toFixed(3):0};--depth:${last-at};--jx:${((seed&255)/42.5-3).toFixed(2)};--jr:${((seed>>8&255)/160-.8).toFixed(2)};z-index:${at+1}">${html}</li>`;}).join("");
+    return `<article class="folder${t.cls}"${t.style} data-folder-app="${escape(app)}"${open?" data-open":""} aria-labelledby="${id}-title"><div class="gf-stage"><div class="gf-tilt"><div class="gf-shadow" aria-hidden="true"></div><div class="gf-back" style="clip-path:path('${FOLDER_BACK}')" aria-hidden="true"></div><svg class="gf-rim gf-back-rim" viewBox="0 0 340 272" aria-hidden="true"><path d="${FOLDER_BACK}"/></svg><div class="gf-front" style="clip-path:path('${FOLDER_FRONT}')"><div class="gf-glass" aria-hidden="true"></div><svg class="gf-rim gf-front-rim" viewBox="0 0 340 198" aria-hidden="true"><path d="${FOLDER_FRONT}"/></svg><div class="gf-label">${art(app)}<div><h2 id="${id}-title">${escape(app)}</h2><p class="gf-count" id="${id}-count">${plural(items.length,"profile")}</p></div></div><button type="button" class="gf-hit" id="${id}" data-folder aria-expanded="${open}" aria-controls="${id}-files" aria-labelledby="${id}-title ${id}-count"></button></div><ul class="gf-files" id="${id}-files" aria-label="${escape(app)} profiles"${open?"":" inert"}>${sheets}</ul><div class="gf-keys"><button type="button" class="gf-key${items.length?"":" gf-key-primary"}" data-action="add" data-app="${escape(app)}" aria-label="${escape(`Add profile for ${app}`)}" title="Add profile">${icon("plus")}</button><button type="button" class="gf-key" data-folder-menu aria-haspopup="menu" aria-expanded="${menuOpen}" aria-controls="${id}-menu" aria-label="${escape(`More for ${app}`)}" title="More">${icon("more")}</button></div><div class="gf-menu" id="${id}-menu" role="menu" aria-label="${escape(app)}"${menuOpen?"":" hidden"}><button type="button" role="menuitem" tabindex="-1" id="${id}-show" data-app-filter="${escape(app)}">${icon("grid")}<span>Show ${escape(app)} profiles</span></button><button type="button" role="menuitem" tabindex="-1" id="${id}-add" data-action="add" data-app="${escape(app)}">${icon("plus")}<span>Add profile</span></button></div></div></div></article>`;
+  }
   function renderApps(){
-    const cards=sortedApps().map(item=>{const t=tone(item.name),count=plural(profileCount(item.name),"profile");return `<article class="application-card${t.cls}"${t.style}><div class="app-head">${art(item.name)}<div><h2>${escape(item.name)}</h2><button class="link-button app-count" data-app-filter="${escape(item.name)}" aria-label="${escape(`${count} for ${item.name}`)}">${count}</button></div></div>${button("Add profile","add",{icon:"plus",app:item.name,label:`Add profile for ${item.name}`})}</article>`;}).join("");
-    main.innerHTML=title("Applications",state.apps.length?"The AI apps on this Mac and their profiles.":"")+`<div class="apps-grid">${cards||(state.errors?.length?setupError():noAppsState())}</div>`;
+    const apps=sortedApps().map(item=>item.name);
+    if(!apps.includes(openFolder))openFolder="";if(!apps.includes(openMenu))openMenu="";// its app left discovery, or a new profile's app has no folder
+    const folders=apps.map(name=>folderCard(name)).join("");
+    main.innerHTML=title("Applications",state.apps.length?"The AI apps on this Mac and their profiles.":"")+`<div class="apps-grid">${folders||(state.errors?.length?setupError():noAppsState())}</div>`;
+    layoutFolders();
+  }
+  // Each folder's scale (--k: it never grows past 340px) and its open fan. Every open file shows its whole name strip above the
+  // file in front of it, so the strips are measured front to back, and the folder reserves the room its fan needs (--headroom),
+  // so opening never reflows the page. Stage units: the front file's strip ends at 66, just above the glass's raised tab.
+  function layoutFolders(){
+    for(const node of $$(".folder",main)){
+      node.style.setProperty("--k",Math.min(1,node.clientWidth/340).toFixed(4));
+      let top=66;
+      for(const slot of $$(".gf-slot",node).reverse()){top-=$(".gf-head",slot).offsetHeight;slot.style.setProperty("--open-y",String(top-96));}
+      node.style.setProperty("--headroom",String(Math.max(16,Math.ceil(12-top))));
+    }
+  }
+  function setFolder(node,open){
+    closeFolderMenu();
+    $$(".folder[data-open]",main).forEach(other=>{if(other===node&&open)return;other.removeAttribute("data-open");$(".gf-hit",other).setAttribute("aria-expanded","false");$(".gf-files",other).inert=true;});
+    openFolder=open&&node?node.dataset.folderApp:"";
+    if(!openFolder)return;
+    node.setAttribute("data-open","");$(".gf-hit",node).setAttribute("aria-expanded","true");$(".gf-files",node).inert=false;
+    node.scrollIntoView({block:"nearest",behavior:reducedMotion.matches?"instant":"smooth"});
+  }
+  function setFolderMenu(node,open){
+    if(open)closeFolderMenu();
+    openMenu=open?node.dataset.folderApp:"";
+    const menu=$(".gf-menu",node);$("[data-folder-menu]",node).setAttribute("aria-expanded",String(open));
+    present(menu,open,[{opacity:0,transform:"translateY(6px) scale(.96)"},{opacity:1,transform:"none"}]);
+    if(open)$("[role=menuitem]",menu).focus();
+  }
+  // focusKey: focus goes back to ··· before the menu hides, so it never falls to <body> (a dialog opened from the menu returns there).
+  function closeFolderMenu(focusKey=false){
+    openMenu="";const key=$('[data-folder-menu][aria-expanded="true"]',main);if(!key)return;
+    if(focusKey)key.focus();setFolderMenu(key.closest(".folder"),false);
+  }
+  // After an add on Applications: its folder opens and the new profile drops in as the top file, the count rolls over, and focus
+  // lands on the file once the dialog closes. The ground's ring spreads from it as it lands (across the field for the first profile).
+  function dropIntoFolder(name,first=false){
+    const item=profile(name);if(!item)return;// a profile made for another app is not listed; its toast says so
+    folderRecent.unshift(name);openFolder=appName(item);folderDrop=name;
+    renderApps();folderDrop="";
+    const file=$$("[data-folder-file]",main).find(el=>el.dataset.name===name),node=file?.closest(".folder");if(!file)return;
+    node.classList.add("gf-landed");lastFocus=file;
+    node.scrollIntoView({block:"nearest",behavior:reducedMotion.matches?"instant":"smooth"});
+    setTimeout(()=>ripple(file,first?"far":"near"),600);
   }
   function renderRecovery(){
     const entries=state.restorable||[],unclaimed=state.unclaimed||[];
@@ -766,7 +837,7 @@
     showDialog("Add a profile","Each profile opens the app with its own sign-in and data.",`<div class="preview-dock"><div class="preview-row"><div class="preview-identity" id="identity-preview"></div></div></div><div class="fields"><div class="field"><label for="field-app">Application</label><select name="app" id="field-app" required${names.length?"":' aria-describedby="hint-app"'}>${options||'<option value="">No AI apps found</option>'}</select>${names.length?"":'<p class="hint" id="hint-app">Install Claude or ChatGPT and refresh, or give the app’s path below.</p>'}</div>${field("Profile name","profile","","For example Work, Personal or Client. Letters, numbers, spaces, hyphens and underscores.","text",NAME_RULE)}${check("main","Use the original account","Opens the app’s own account. Once a profile runs, the app’s own icon only switches to that profile; this launcher still opens the original.")}${disclosure("Appearance",identityFields(null,badgeDefault(chosen)))}${disclosure("App location & launch settings",`${field("Application path (optional)","app_path","","Use a full .app path for an application outside discovery.","text",'placeholder="/Applications/Example.app"')}<div id="seed-option">${check("seed","Copy Claude’s MCP configuration","Copies the existing Claude Desktop configuration into the new profile.")}</div>${area("Launch arguments","args","One allowed switch per line, for example --lang=de.")}${area("Environment variables","env","One allowed NAME=value per line. Values are never displayed in this dashboard.")}${check("own_extensions","Use a separate extensions folder","For VS Code-style applications.")}`,!names.length)}</div>`,"Add profile",async(data,el)=>{
       const first=!state.profiles.length,result=await action(...build(data),el);
       stored.set("aidentity.last-app",data.get("app"));
-      revealProfile(result.created,first);
+      if(view==="apps")dropIntoFolder(result.created,first);else revealProfile(result.created,first);
     },{build,app:chosen});
     setupPreview();
     if(picked)$('[name="profile"]',dialog).focus();
@@ -1000,6 +1071,16 @@
     // A swatch writes the hex field as typing would, so the preview, the Runs line and Save all follow.
     const swatch=event.target.closest("[data-color]");if(swatch){const input=$('[name="color"]',dialog);input.value=swatch.dataset.color;input.dispatchEvent(new Event("input",{bubbles:true}));return;}
     const custom=event.target.closest("[data-custom-color]");if(custom){const open=custom.getAttribute("aria-expanded")!=="true";custom.setAttribute("aria-expanded",String(open));$("#custom-color",dialog).hidden=!open;if(open)$('[name="color"]',dialog).focus();return;}
+    // A folder: ··· toggles its menu; a menu item closes the menu, then runs as its plain button would; a file shows its profile
+    // on Profiles; a click anywhere else on the folder opens or closes it.
+    const fold=event.target.closest(".folder");
+    if(fold){
+      const file=event.target.closest("[data-folder-file]");
+      if(event.target.closest("[role=menuitem]"))closeFolderMenu(true);
+      else if(event.target.closest("[data-folder-menu]")){setFolderMenu(fold,$("[data-folder-menu]",fold).getAttribute("aria-expanded")!=="true");return;}
+      else if(file){query="";statusFilter="all";stored.set(LAST_PROFILE,file.dataset.name);showView("profiles",{app:"",profile:file.dataset.name,focus:true});return;}
+      else if(!event.target.closest("button:not(.gf-hit),.gf-menu")){setFolder(fold,!fold.hasAttribute("data-open"));return;}
+    }
     const nav=event.target.closest("[data-view]");if(nav){query="";showView(nav.dataset.view,{focus:true});return;}
     const app=event.target.closest("[data-app-filter]");if(app){query="";statusFilter="all";showView("profiles",{app:app.dataset.appFilter,focus:true});return;}
     const filter=event.target.closest("[data-filter]");if(filter){statusFilter=filter.dataset.filter;keepFocus(renderProfiles);positionTabs();return;}
@@ -1021,8 +1102,16 @@
   },true);
   document.addEventListener("keydown",event=>{
     if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="b"){event.preventDefault();toggleNavigation();}
-    if(event.key==="Escape"&&document.body.classList.contains("mobile-nav-open")){closeNavigation();$("#mobile-nav").focus();}
+    if(event.key==="Escape"&&document.body.classList.contains("mobile-nav-open")){closeNavigation();$("#mobile-nav").focus();return;}
     if(event.key==="/"&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&!dialog.open&&!event.target.closest?.("input,textarea,select,[contenteditable]")){const search=$("#workspace-search");if(search){event.preventDefault();search.focus();search.select();}}
+    // Folder menu: arrows, Home and End move between its items and Tab leaves it closed; Escape closes it, then the open folder.
+    const menu=event.target.closest?.(".gf-menu"),items=menu?$$("[role=menuitem]",menu):[];
+    if(menu&&["ArrowDown","ArrowUp","Home","End"].includes(event.key)){event.preventDefault();const at=items.indexOf(event.target);items[event.key==="Home"?0:event.key==="End"?items.length-1:(at+(event.key==="ArrowDown"?1:-1)+items.length)%items.length].focus();}
+    if(menu&&event.key==="Tab")closeFolderMenu();
+    if(event.key==="Escape"&&view==="apps"&&!dialog.open){
+      if($('[data-folder-menu][aria-expanded="true"]',main)){event.preventDefault();closeFolderMenu(true);}
+      else if(openFolder){const node=$(".folder[data-open]",main);event.preventDefault();setFolder(null,false);if(node)$(".gf-hit",node).focus();}
+    }
     if(event.key==="Escape"&&event.target.id==="workspace-search"&&event.target.value){event.preventDefault();event.target.value="";query="";keepFocus(renderView);}
     // O runs the selected profile's primary action (Open or Bring to front) only while focus is inside its card or the detail panel (WCAG 2.1.4).
     if((event.key==="o"||event.key==="O")&&view==="profiles"&&profile(selected)&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&!dialog.open&&!event.target.closest?.("input,textarea,select,[contenteditable]")&&event.target.closest?.(".profile-card.selected,.detail-panel")){event.preventDefault();runPrimary();}
@@ -1054,6 +1143,24 @@
     });
   });
   window.addEventListener("resize",positionTabs);
+  window.addEventListener("resize",()=>{if(view==="apps"&&state)layoutFolders();});
+  // A press outside closes the folder menu, then the open folder (not while a dialog is over the page).
+  document.addEventListener("pointerdown",event=>{
+    if(view!=="apps"||dialog.open)return;
+    if(!event.target.closest?.(".gf-menu,[data-folder-menu]"))closeFolderMenu();
+    if(openFolder&&!event.target.closest?.(".folder[data-open]"))setFolder(null,false);
+  });
+  // A fine pointer leans the folder under it toward itself, and the glass's sheen follows (styles.css gates the tilt the same way).
+  const finePointer=matchMedia("(hover:hover) and (pointer:fine)");
+  let leaning=null,leanFrame=0;
+  const unlean=()=>{cancelAnimationFrame(leanFrame);if(leaning){leaning.style.removeProperty("--px");leaning.style.removeProperty("--py");leaning=null;}};
+  main.addEventListener("pointermove",event=>{
+    const node=event.target.closest?.(".folder");if(node!==leaning)unlean();
+    if(!node||event.pointerType==="touch"||!finePointer.matches||reducedMotion.matches)return;
+    const box=node.getBoundingClientRect(),x=(event.clientX-box.left)/box.width*2-1,y=(event.clientY-box.top)/box.height*2-1;leaning=node;
+    cancelAnimationFrame(leanFrame);leanFrame=requestAnimationFrame(()=>{node.style.setProperty("--px",x.toFixed(3));node.style.setProperty("--py",y.toFixed(3));});
+  });
+  main.addEventListener("pointerleave",unlean);
   document.addEventListener("scroll",event=>{if(event.target.classList?.contains("tabs"))tabScroll=event.target.scrollLeft;},{capture:true,passive:true});
   window.addEventListener("hashchange",()=>{const next=location.hash.slice(1);if([...navigation.map(item=>item[0]),"guide"].includes(next))showView(next,{focus:true});});
   const mobile=matchMedia("(max-width:767px)");

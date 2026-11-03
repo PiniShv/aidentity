@@ -1,6 +1,6 @@
 /* 21st.dev adaptations: starc007/animated-sidebar, rmahammad/animated-dialog,
    originui/input and button, educalvolpz/animated-tabs, ravikatiyar162/animated-profile-card,
-   cnippet-dev/toast, uiable/uiable-spinner-button. See docs/dashboard-components.md. */
+   cnippet-dev/toast, uiable/uiable-spinner-button, kedhareswer/glass-folder-cards. See docs/dashboard-components.md. */
 
 /* Tokens. Names match DESIGN.md; hues are read by app.js and experience.js. */
 :root {
@@ -22,6 +22,10 @@
   --shadow-dialog:0 24px 70px #0008; --shadow-toast:0 10px 30px #0005;
   /* Floating chrome (activity bar and panel, phone top bar): a translucent layer content scrolls under; solid where blur is off. */
   --material-bar:#060606e0; --material-panel:#0c0c0ceb; --material-blur:blur(20px) saturate(140%);
+  /* Folder glass (Applications only; DESIGN.md, The Folder Glass Rule): smoked glass in front of a translucent graphite back,
+     so the files and the ambient field frost through it; solid wherever the floating chrome turns solid. */
+  --glass:linear-gradient(180deg,#0c0c0c14 0%,#0a0a0a80 40%,#060606db 72%,#060606f0 100%); --glass-blur:blur(16px);
+  --glass-sheen:#f3f2ee12; --glass-rim:#f3f2ee29; --folder-back:linear-gradient(180deg,#1414139e,#0c0c0cb8); --folder-shadow:#000000a6;
   /* Motion: critically damped springs (damping 1.0). Every surface here opens on a click, not a flick, so nothing overshoots.
      The duration sets the response: 340ms is 0.25s (controls), 480ms is 0.35s (surfaces), 420ms is 0.3s (dialogs). */
   --ease:cubic-bezier(.2,0,0,1);
@@ -258,14 +262,75 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .detail-back{display:none}
 
 /* Apps, panels and operation cards */
-.apps-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
-/* Application card: the tile sits beside the name; an app with no profiles stays neutral. */
-.application-card{display:flex;flex-direction:column;gap:18px;border-radius:16px;padding:20px;border:1px solid var(--border);background:var(--card)}
-.app-head{display:flex;align-items:center;gap:14px;min-width:0}
-.app-head>div{min-width:0}
-.app-head h2{overflow-wrap:anywhere}
-.application-card .app-count{margin:0 -4px;color:var(--muted);font-variant-numeric:tabular-nums}
-.application-card .button{width:100%;margin-top:auto}
+/* Applications: each app is a glass folder, adapted from kedhareswer's Glass Folder Cards (21st.dev). The stage is drawn at
+   340 x 272 and scaled to the folder's width (--k, app.js); --headroom is the room its open fan needs above it, measured by
+   app.js, so opening never reflows. Glass, translucency and the folder's own shadow are these folders' exception (DESIGN.md,
+   The Folder Glass Rule); the hue stays the app tile, the 1px rim and the focus ring. */
+.apps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:24px 32px;align-items:end}
+.folder{--k:1;--headroom:16;--hinge:0deg;--spread:0;--rise:2;--step:9;--fan:0;--jitter:1;position:relative;width:min(340px,100%);height:calc((var(--headroom) + 272) * var(--k) * 1px);pointer-events:none} /* the headroom above takes no clicks */
+.gf-stage{position:absolute;left:0;top:0;width:340px;height:272px;transform-origin:0 0;transform:translateY(calc(var(--headroom) * var(--k) * 1px)) scale(var(--k));pointer-events:auto;cursor:pointer}
+.gf-tilt{position:absolute;inset:0;transition:transform var(--motion-surface) var(--spring-surface)}
+.gf-shadow{position:absolute;left:18px;right:18px;bottom:-6px;height:60px;border-radius:50%;background:var(--folder-shadow);filter:blur(22px);transform:translateX(calc(var(--px,0) * -8px));transition:transform var(--motion-surface) var(--spring-surface)}
+.gf-back{position:absolute;inset:0;background:var(--folder-back)}
+.gf-rim{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;fill:none}
+.gf-back-rim{width:340px;height:272px;stroke:var(--glass-rim);stroke-width:1}
+/* The front panel hinges on its bottom edge: it leans toward you on hover or focus and falls further open. Its clip-path cuts
+   the rim's stroke in half, so 2 draws the 1px border and 5 the focus ring. */
+.gf-front{position:absolute;left:0;top:74px;width:340px;height:198px;z-index:10;-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);transform-origin:50% 100%;transform:perspective(900px) rotateX(var(--hinge));transition:transform var(--motion-surface) var(--spring-surface)}
+.gf-glass{position:absolute;inset:0;background:radial-gradient(260px 200px at calc(50% + var(--px,0) * 46%) calc(30% + var(--py,0) * 40%),var(--glass-sheen),transparent 70%),var(--glass)}
+.gf-front-rim{width:340px;height:198px;stroke:var(--glass-rim);stroke-width:2;transition:stroke var(--motion-fade) ease-out}
+.gf-label{position:absolute;left:22px;right:128px;bottom:22px;z-index:2;display:flex;align-items:center;gap:12px;pointer-events:none}
+.gf-label>div{min-width:0}
+.gf-label h2{overflow-wrap:anywhere}
+.gf-count{margin-top:2px;font-size:12px;line-height:1.4;color:var(--muted);font-variant-numeric:tabular-nums}
+.gf-hit{position:absolute;inset:0;z-index:3;width:100%;height:100%}
+.gf-hit:focus-visible{outline:none}
+.gf-front:has(.gf-hit:focus-visible) .gf-front-rim{stroke:var(--accent);stroke-width:5}
+/* Files: a stack in the pocket, cut off at its bottom. At rest only their tops show; on hover or focus they lift; open, each one
+   rises to its measured --open-y. A file is a profile: its badge, its whole name and the running mark. */
+.gf-files{position:absolute;inset:0;z-index:5;margin:0;padding:0;list-style:none;pointer-events:none;clip-path:inset(-400px -400px 10px -400px)}
+.gf-slot{--y:calc(var(--rise) - var(--depth) * var(--step));position:absolute;left:34px;top:96px;width:272px;height:184px;transform-origin:50% 100%;transform:translate(calc((var(--jx) * var(--jitter) + var(--slot) * var(--spread)) * 1px),calc(var(--y) * 1px)) rotate(calc((var(--jr) * var(--jitter) + var(--slot) * var(--fan)) * 1deg));transition:transform var(--motion-surface) var(--spring-surface) calc(var(--depth) * 30ms),opacity var(--motion-fade) ease-out}
+.gf-sheet{display:flex;flex-direction:column;width:100%;height:100%;padding:0;border-radius:12px;overflow:hidden;text-align:left;pointer-events:auto;background:linear-gradient(180deg,var(--active),var(--raised));box-shadow:inset 0 1px 0 var(--glass-rim),0 0 0 1px var(--border),0 10px 26px -8px var(--folder-shadow);transition:translate var(--motion-control) var(--spring-control),box-shadow var(--motion-fade) ease-out}
+.gf-sheet:focus-visible{outline-offset:2px}
+.gf-head{display:flex;align-items:flex-start;gap:10px;padding:10px 14px 11px}
+.gf-chip{display:grid;place-items:center;flex:none;width:20px;height:20px;border-radius:6px;background:var(--identity-color);color:var(--identity-ink);font-size:12px;font-weight:600;line-height:1}
+.gf-chip-app{background:var(--app-color,var(--raised));color:var(--app-ink)}
+.gf-chip-more{background:var(--raised);color:var(--muted)}
+.gf-chip svg{width:14px;height:14px}
+.gf-name{flex:1;min-width:0;font-size:15px;font-weight:550;line-height:1.3;letter-spacing:-.015em;overflow-wrap:anywhere}
+.gf-state{display:flex;align-items:center;gap:6px;flex:none;font-size:12px;line-height:19.5px}
+.gf-state:not(.status-running,.status-missing){color:var(--muted)}
+/* Nothing colored sits under the glass: closed, even on hover, the front file's badge is under it, so the badges and the running
+   mark show once the folder is open and the files clear it. */
+.gf-chip,.gf-state{opacity:0;transition:opacity var(--motion-fade) ease-out}
+.folder[data-open] :is(.gf-chip,.gf-state){opacity:1;transition-delay:120ms}
+.gf-note{display:block;margin-top:4px;font-size:13px;font-weight:400;line-height:1.55;letter-spacing:0;color:var(--muted)}
+.gf-sheet-empty{background:var(--surface);border:1px dashed var(--control);box-shadow:none} /* a blank file: solid, so the back panel's edge does not show through */
+.gf-slot:has(.gf-sheet-empty){opacity:0} /* an empty folder shows its note only when opened */
+@media(hover:hover){.folder:hover{--hinge:-11deg;--spread:6;--rise:-30;--step:12;--fan:.6}.folder:hover .gf-front-rim{stroke:var(--app-color,var(--muted))}}
+.folder:focus-within{--hinge:-11deg;--spread:6;--rise:-30;--step:12;--fan:.6}
+.folder[data-open]{--hinge:-20deg;--spread:14;--fan:1.4;--jitter:.5}
+.folder[data-open] .gf-slot{--y:var(--open-y,-96)}
+.folder[data-open] .gf-slot:has(.gf-sheet-empty){opacity:1}
+.folder[data-open] .gf-front-rim{stroke:var(--app-color,var(--muted))}
+.folder[data-open] .gf-running{box-shadow:inset 0 1px 0 var(--glass-rim),0 0 0 1px var(--app-color,var(--muted)),0 10px 26px -8px var(--folder-shadow)} /* one running mark: Mint status and the 1px hue edge */
+.folder[data-open] .gf-sheet:is(:hover,:focus-visible){translate:0 -8px;box-shadow:inset 0 1px 0 var(--glass-rim),0 0 0 1px var(--app-color,var(--muted)),0 18px 34px -12px var(--folder-shadow)}
+/* + and ···: solid keys on the glass. + takes the Bone fill while the folder is empty: the first profile is its one next step. */
+.gf-keys{position:absolute;right:20px;bottom:20px;z-index:12;display:flex;gap:8px}
+.gf-key{display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--button-edge);border-radius:12px;background:var(--raised);color:var(--text)}
+.gf-key:hover{border-color:var(--muted)}
+.gf-key-primary,.gf-key-primary:hover{background:var(--text);border-color:var(--text);color:var(--ground)}
+.gf-key .icon{width:20px;height:20px}
+.gf-keys [data-locked]{pointer-events:auto;cursor:wait} /* a locked key still takes the click, so it never falls through to the glass and toggles the folder */
+.gf-menu{position:absolute;right:20px;bottom:74px;z-index:20;display:flex;flex-direction:column;min-width:208px;padding:6px;border:1px solid var(--control);border-radius:12px;background:var(--material-panel);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur);box-shadow:var(--shadow-toast);transform-origin:100% 100%;cursor:default}
+.gf-menu [role=menuitem]{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:500;text-align:left;white-space:nowrap}
+.gf-menu [role=menuitem]:hover,.gf-menu [role=menuitem]:focus-visible{background:var(--raised)}
+.gf-menu [role=menuitem]:focus-visible{outline-offset:-2px}
+.gf-menu .icon{width:16px;height:16px;color:var(--muted)}
+/* A profile added here drops into its folder (critically damped, no rebound), the pocket gives once as it lands and the count rolls. */
+.gf-drop{animation:folder-drop var(--motion-surface) var(--spring-surface) 220ms both}
+.gf-landed .gf-front{animation:folder-bump var(--motion-control) var(--ease) 560ms}
+.gf-landed .gf-count{animation:folder-roll var(--motion-control) var(--spring-control) 560ms both}
 .panel{border-radius:16px;padding:24px;background:var(--card);border:1px solid var(--border)}
 .panel-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}
 .operation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
@@ -451,17 +516,17 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 /* Motion: the press is the one spatial feedback on controls. It lands on pointer-down in 85ms and springs back on release.
    Hover is frequent, so it changes fill and border only, never position (HIG Motion: avoid motion on frequent interactions). */
 .nav-label{transition:opacity var(--motion-fade) ease-out}
-.button,.icon-button,.nav-item,.color-swatch{transition:transform var(--motion-control) var(--spring-control),background-color var(--motion-fade) ease-out,color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
-.button:active,.icon-button:active,.nav-item:active,.color-swatch:active{transform:scale(.97);transition-duration:var(--motion-press);transition-timing-function:ease-out}
-.profile-card,.application-card{transition:outline-color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
-.profile-card:hover,.application-card:hover{border-color:var(--muted)}
+.button,.icon-button,.nav-item,.color-swatch,.gf-key{transition:transform var(--motion-control) var(--spring-control),background-color var(--motion-fade) ease-out,color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
+.button:active,.icon-button:active,.nav-item:active,.color-swatch:active,.gf-key:active{transform:scale(.97);transition-duration:var(--motion-press);transition-timing-function:ease-out}
+.profile-card{transition:outline-color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
+.profile-card:hover{border-color:var(--muted)}
 .tabs button:active{transform:scale(.97);transition-duration:var(--motion-press)}
 /* Page change (app.js showView): only #main crossfades; the old page fades out faster than the new one rises 8px in.
    The root takes no snapshot, so the sidebar and top bar stay live and clickable: clicks pass through the snapshots, and the
    next click starts the next change. Snapshots draw above everything, so the layers floating over the page are captured too
-   (unanimated, on top; a captured element takes no clicks until the change ends), and main's is clipped at its own top edge. */
+   (unanimated, on top; a captured element takes no clicks until the change ends), and main's is clipped at its own top edge.
+   app.js names #main main only while a change runs. */
 :root{view-transition-name:none}
-#main{view-transition-name:main}
 .activity-toggle,.activity-panel,.toast-viewport{view-transition-name:match-element;view-transition-class:chrome}
 ::view-transition{pointer-events:none}
 /* No slide from the old scroll position: the old page is offset to where it was, and nothing shows above main's top. */
@@ -478,7 +543,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .app-tone .button-primary{background:var(--app-color);border-color:var(--app-color);color:var(--app-ink)}
 .app-tone .button-primary:hover{background:color-mix(in srgb,var(--app-color) 90%,var(--text));border-color:var(--app-color);color:var(--app-ink)}
 .app-tone .input:focus,.app-tone textarea:focus,.app-tone select:focus{border-color:var(--app-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--app-color) 15%,transparent)}
-.app-tone.profile-card:hover,.app-tone.application-card:hover{border-color:var(--app-color)}
+.app-tone.profile-card:hover{border-color:var(--app-color)}
 .app-tone.profile-card.running{border-color:var(--app-color)} /* one running mark: Mint status, plus the app's 1px hue edge */
 /* A profile that starts running (app.js lit): its card draws that edge once and its running dot arrives, as an Explore key does;
    the ambient field sends its ring from the card's button. Static under reduced motion. */
@@ -497,12 +562,14 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 @keyframes page-in{from{opacity:0;transform:translateY(8px)}}
 @keyframes card-edge{from{border-color:var(--border)}}
 @keyframes dot-in{from{scale:0}}
+@keyframes folder-drop{from{translate:0 -190px;rotate:-6deg;opacity:0}}
+@keyframes folder-bump{40%{scale:1.012 .985}}
+@keyframes folder-roll{from{opacity:0;translate:0 7px;filter:blur(3px)}}
 @keyframes topbar-title{to{opacity:1}}
 
 /* Breakpoints, widest first; min-width and reduced-motion blocks last */
 @media(max-width:1200px){
   #main{padding:26px 24px}
-  .apps-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .profile-layout{gap:20px}
   .detail-panel{padding:20px}
   .toast-viewport{left:calc(var(--sidebar-width) + 24px)}
@@ -568,7 +635,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .connection-banner{margin:12px 18px 0}
   .operation-grid{grid-template-columns:1fr}
   .operation-card{padding:22px}
-  .application-card .button{padding:0 7px;min-height:44px}
+  .gf-menu [role=menuitem]{min-height:44px}
   .guide-controls{grid-template-columns:1fr}
   .panel{padding:20px}
   .activity-toggle{left:0;padding:0 18px}
@@ -607,7 +674,6 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .profile-name{min-height:44px;padding-block:calc((44px - 1.35em) / 2)}
   .profile-card .button,.detail-panel .button,.link-button{min-height:44px}
   .profile-state-row{min-height:44px}
-  .apps-grid{grid-template-columns:1fr}
   .button,.button-small,.icon-button{min-height:44px}
   .icon-button{min-width:44px}
   .detail-panel h2,.empty-state h2{font-size:19px;line-height:1.2;letter-spacing:-.03em} /* Card compact: under a 24px page title */
@@ -659,24 +725,33 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .detail-panel{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;max-height:calc(100dvh - 68px - 40px - 48px - var(--activity-open));mask-image:linear-gradient(180deg,black calc(100% - var(--detail-fade)),transparent);animation:detail-fade linear both;animation-timeline:scroll(self)}
   .detail-close{display:none}
 }
+/* The pointer leans a folder toward itself only with a fine pointer and motion allowed (app.js sets --px and --py). */
+@media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+  .gf-tilt{transform:perspective(1400px) rotateX(calc(var(--py,0) * -3deg)) rotateY(calc(var(--px,0) * 4deg))}
+}
 @media(prefers-reduced-motion:reduce){
+  .gf-slot,.gf-chip,.gf-state{transition-delay:0s} /* open shows the files at once, without travel or a stagger */
+  .gf-drop,.gf-landed .gf-front,.gf-landed .gf-count{animation:none} /* a new file and the count swap in, with no hidden phase */
   *:not(.spinner),*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
-  .button:active,.icon-button:active,.nav-item:active,.color-swatch:active,.tabs button:active{transform:none;opacity:.78} /* the press stays visible without movement */
+  .button:active,.icon-button:active,.nav-item:active,.color-swatch:active,.tabs button:active,.gf-key:active{transform:none;opacity:.78} /* the press stays visible without movement */
   .toast-viewport:not(:hover)>.toast:nth-child(2),.toast-viewport:not(:hover)>.toast:nth-child(3){transform:none}
   .toast.dismiss{transform:none}
   .spinner{animation:pulse 1.2s ease-in-out infinite} /* busy buttons keep a non-spatial progress cue */
 }
 /* The floating chrome turns solid when blur is unavailable or transparency is reduced. */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  :root{--material-bar:var(--ground);--material-panel:var(--surface)}
+  :root{--material-bar:var(--ground);--material-panel:var(--surface);
+    --glass:var(--card);--glass-blur:none;--glass-sheen:transparent;--folder-back:linear-gradient(180deg,var(--raised),var(--surface))}
 }
 @media(prefers-reduced-transparency:reduce){
-  :root{--material-bar:var(--ground);--material-panel:var(--surface);--material-blur:none}
+  :root{--material-bar:var(--ground);--material-panel:var(--surface);--material-blur:none;
+    --glass:var(--card);--glass-blur:none;--glass-sheen:transparent;--folder-back:linear-gradient(180deg,var(--raised),var(--surface))}
 }
 /* Increased contrast: Muted reaches 7.3:1 or more on every surface (#b4b2aa), and hairlines and edges move up one step. */
 @media(prefers-contrast:more){
   :root{--muted:#b4b2aa;--border:#4d4c48;--control:#6f6d66;--button-edge:#8d8b84;--field-border:#9a988f;--danger-edge:var(--negative);
-    --material-bar:var(--ground);--material-panel:var(--surface);--material-blur:none}
+    --material-bar:var(--ground);--material-panel:var(--surface);--material-blur:none;
+    --glass:var(--card);--glass-blur:none;--glass-sheen:transparent;--glass-rim:var(--button-edge);--folder-back:linear-gradient(180deg,var(--raised),var(--surface))}
 }
 /* Forced colours drop box-shadow and non-system colours, so focus and selection get system-colour outlines. */
 @media(forced-colors:active){
@@ -684,6 +759,12 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .tab-indicator{background:Highlight}
   .nav-item[aria-current=page],.profile-card.selected{outline:2px solid Highlight}
   .tile{border:1px solid CanvasText}
+  .gf-back,.gf-glass{background:Canvas}
+  .gf-front{-webkit-backdrop-filter:none;backdrop-filter:none}
+  .gf-rim{stroke:CanvasText}
+  .gf-front:has(.gf-hit:focus-visible) .gf-front-rim{stroke:Highlight}
+  .gf-sheet,.gf-key,.gf-menu{border:1px solid CanvasText}
+  .gf-shadow{display:none}
 }
 /* Forced colours drop the gradient strip line on the mobile tab scroller; a border below the ring padding replaces it. */
 @media(forced-colors:active) and (max-width:767px){
