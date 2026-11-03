@@ -12,7 +12,6 @@
 .xp-header>.tile{margin-top:-1px}
 .xp-wrap>.notice{margin-bottom:28px}
 .xp-header h1{font-size:28px;font-weight:600;letter-spacing:-.035em;line-height:1.2;margin:0}
-.xp-header p{color:var(--muted);font-size:13px;margin:9px 0 0}
 
 /* Buttons: neutral by default. Only a running key's Bring to front takes the app hue. */
 .xp-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--control);border-radius:8px;background:var(--surface);font-size:13px;font-weight:500;white-space:nowrap;transition:background-color 160ms ease,border-color 160ms ease,transform var(--motion-control) var(--spring-control)}
@@ -117,7 +116,6 @@
 @media(max-width:767px){
   .xp-header{margin-bottom:20px}
   .xp-header h1{font-size:24px}
-  .xp-header p{margin-top:8px}
   .xp-header>.tile{width:32px;height:32px;border-radius:9px}
   .xp-header>.tile .icon{width:18px;height:18px}
   .xp-layout{grid-template-columns:minmax(0,1fr);gap:22px}

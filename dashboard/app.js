@@ -213,8 +213,9 @@
   const breakPath=value=>escape(value).replace(/\//g,"/<wbr>");
   const contextApp=()=>(view==="explore"&&exploreApp)||profile(selected)?.app||appFilter;
   const needsRepair=item=>item.status==="app missing"||doctorFlags.has(item.name);
-  // The server picks a free port each time it starts; started on this page's port again, it is the same origin and this tab reconnects.
-  const RECONNECT=location.port?`aidentity dashboard --port ${location.port}`:"aidentity dashboard";
+  // The server picks a free port each time it starts; started on this page's port again, it is the same origin and this tab reconnects,
+  // so --no-open: the restart opens no second tab.
+  const RECONNECT=location.port?`aidentity dashboard --port ${location.port} --no-open`:"aidentity dashboard";
   const OFFLINE=`The dashboard stopped. Run “${RECONNECT}” in Terminal to reconnect.`;
   const SIGN_IN_HINT="Sign in once in the window that opens. aidentity remembers it.";
   // localStorage can throw (disabled or private storage); the in-memory copy keeps this session consistent.
@@ -312,8 +313,9 @@
   $("#sidebar").addEventListener("focusout",hideRailTip);
   function errorNotice(){return (state.errors||[]).length?`<div class="notice error" tabindex="0">${state.errors.map(escape).join("<br>")}</div>`:"";}
   function setupError(){return `<div class="empty-state"><h2>aidentity could not read your setup</h2>${errorNotice()}<div class="section-gap">${button("Retry","refresh",{primary:true,icon:"refresh"})}</div></div>`;}
+  // The section tile and the page title, with no subtitle: the cards say what each part does and Help's Terms define the words.
   // Profiles filtered to one app leads with that app's own icon in place of the section tile.
-  function title(name,description="",actions=""){const glyph=view==="guide"?"book":navigation.find(item=>item[0]===view)?.[2],own=view==="profiles"&&appFilter?appIcon(appFilter):"";return `<div class="title-row"><div class="title-main">${own?`<span class="title-app" aria-hidden="true">${own}</span>`:glyph?tile(view,glyph):""}<div><h1 tabindex="-1">${escape(name)}</h1>${description?`<p>${escape(description)}</p>`:""}</div></div>${actions?`<div class="title-actions">${actions}</div>`:""}</div>`;}
+  function title(name,actions=""){const glyph=view==="guide"?"book":navigation.find(item=>item[0]===view)?.[2],own=view==="profiles"&&appFilter?appIcon(appFilter):"";return `<div class="title-row"><div class="title-main">${own?`<span class="title-app" aria-hidden="true">${own}</span>`:glyph?tile(view,glyph):""}<h1 tabindex="-1">${escape(name)}</h1></div>${actions?`<div class="title-actions">${actions}</div>`:""}</div>`;}
   function searchField(placeholder){return `<div class="search-field">${icon("search")}<input id="workspace-search" class="input" type="search" aria-keyshortcuts="/" aria-label="${escape(placeholder)}" placeholder="${escape(placeholder)}" value="${escape(query)}">${query?`<button class="icon-button" data-action="clear-search" aria-label="Clear search">${icon("x")}</button>`:""}</div>`;}
   // educalvolpz Animated Tabs translated to native tabs with measured sliding indicator.
   // count null: not counted yet, so a muted dash and the tab's title say why.
@@ -432,7 +434,7 @@
     const toolbar=search||filter||appFilter?`<div class="toolbar">${search}<div class="toolbar-end">${appFilter&&!filter?button("All apps","all-apps",{small:true}):""}${filter}${search?`<span class="sr-only" id="result-count" role="status">${plural(visible.length,"profile")}</span>`:""}</div></div>`:"";
     // No tabs until the first profile exists: on a first run they would filter nothing, and the grid is then no tabpanel.
     const strip=state.profiles.length?tabs([["all","All",scoped.length],["running","Running",running],["idle","Not running",scoped.length-running],["attention","Needs repair",lastDoctor||repairs?repairs:null,"Not checked yet. Choose Check on Maintenance."]],statusFilter):"";
-    paint(title(appFilter||"Profiles",appFilter?"":"Each profile opens an app with its own sign-in.")+
+    paint(title(appFilter||"Profiles")+
       strip+
       toolbar+
       `<div class="profile-layout ${visible.length||chosen?"":"no-selection"} ${mobileDetail?"mobile-detail":""}"><div class="profile-grid" id="profile-results"${strip?` role="tabpanel" aria-labelledby="status-${statusFilter}"`:""}>${visible.map(card).join("")||profilesEmpty(scoped)}</div>${chosen?detail(chosen):visible.length?'<p class="detail-placeholder">Select a profile to see its settings and actions.</p>':""}</div>`);
@@ -456,7 +458,7 @@
     const t=tone(appName(item)),on=selected===item.name;
     const notes=[item.main?"Original account":"",item.own_extensions?"Own extensions":"",(item.args||[]).length?plural(item.args.length,"launch option"):""].filter(Boolean);
     const repair=needsRepair(item)?button("Repair","repair",{small:true,icon:"tool",name:item.name,label:`Repair, ${who(item)}`}):"";
-    return `<article class="profile-card${t.cls}${on?" selected":""}${item.status==="running"?" running":""}${litCards.has(item.name)?" lit":""}"${t.style} aria-labelledby="${profileId(item.name)}"><div class="profile-head">${art(appName(item),item.badge,item.color)}<div class="profile-title"><h2><button class="profile-name" id="${profileId(item.name)}"${on?' aria-current="true"':""} data-action="select" data-name="${escape(item.name)}">${breakable(item.profile||item.name)}</button></h2><p class="profile-app">${escape(appName(item))}</p></div></div><div class="profile-state-row">${statusMark(item)}${repair}${quitButton(item)}</div>${notes.length?`<p class="profile-meta">${notes.map(escape).join(" · ")}</p>`:""}${primaryButton(item,on)}</article>`;
+    return `<article class="profile-card${t.cls}${on?" selected":""}${item.status==="running"?" running":""}${litCards.has(item.name)?" lit":""}${[...(item.profile||item.name)].length>24?" long-name":""}"${t.style} aria-labelledby="${profileId(item.name)}"><div class="profile-head">${art(appName(item),item.badge,item.color)}<div class="profile-title"><h2><button class="profile-name" id="${profileId(item.name)}"${on?' aria-current="true"':""} data-action="select" data-name="${escape(item.name)}">${breakable(item.profile||item.name)}</button></h2><p class="profile-app">${escape(appName(item))}</p></div></div><div class="profile-state-row">${statusMark(item)}${repair}${quitButton(item)}</div>${notes.length?`<p class="profile-meta">${notes.map(escape).join(" · ")}</p>`:""}${primaryButton(item,on)}</article>`;
   }
   // Detail: who, the command the primary action runs, then Settings, Rename and Remove; launch settings; paths and Rebuild behind Details.
   // From 768px the selected card beside or above it shows state, Quit and the primary action, so .detail-own (CSS) shows only below that.
@@ -495,31 +497,33 @@
   function folderCard(app){
     const t=tone(app),id=folderId(app),open=openFolder===app,menuOpen=openMenu===app,rank=item=>{const at=folderRecent.indexOf(item.name);return at<0?Infinity:at;};
     const items=state.profiles.filter(item=>appName(item)===app).sort((a,b)=>rank(a)-rank(b)||(b.status==="running")-(a.status==="running")||byName(a.profile||a.name,b.profile||b.name));
-    const shown=items.length>FOLDER_FILES?items.slice(0,FOLDER_FILES-1):items;
+    const shown=items.length>FOLDER_FILES?items.slice(0,FOLDER_FILES-1):items,running=items.filter(item=>item.status==="running").length;
     const files=shown.map(item=>{const hex=/^[0-9a-f]{6}$/i.test(item.color)?item.color:defaultBadgeColor;return [item.name,`<button type="button" class="gf-sheet${item.status==="running"?" gf-running":""}" data-folder-file data-name="${escape(item.name)}"><span class="gf-head">${item.badge?`<span class="gf-chip" style="--identity-color:#${hex};--identity-ink:${inkFor(hex)}" aria-hidden="true">${escape(item.badge)}</span>`:`<span class="gf-chip gf-chip-app" aria-hidden="true">${appGlyph(app)}</span>`}<span class="gf-name">${breakable(item.profile||item.name)}</span>${item.status==="running"?'<span class="gf-state status-running"><span class="running-dot"></span>Running</span>':item.status==="app missing"?'<span class="gf-state status-missing">App missing</span>':""}</span></button>`];});
     if(items.length>shown.length)files.push(["",`<button type="button" class="gf-sheet" id="${id}-more" data-app-filter="${escape(app)}"><span class="gf-head"><span class="gf-chip gf-chip-more" aria-hidden="true">${icon("grid")}</span><span class="gf-name">${items.length-shown.length} more profiles</span><span class="gf-state">Show all</span></span></button>`]);
     if(!items.length)files.push(["",`<div class="gf-sheet gf-sheet-empty"><span class="gf-head"><span class="gf-name">No ${escape(app)} profiles yet<span class="gf-note">Each profile opens ${escape(app)} with its own sign-in.</span></span></span></div>`]);
     // Back to front in reading order; --slot places a file across the fan (-1 to 1), --depth counts the files in front of it,
     // and a small offset from its name's hash keeps the stack hand-placed.
     const last=files.length-1,sheets=files.map(([name,html],at)=>{const seed=appHash(name||app);return `<li class="gf-slot${name&&name===folderDrop?" gf-drop":""}" style="--slot:${last?(at/last*2-1).toFixed(3):0};--depth:${last-at};--jx:${((seed&255)/42.5-3).toFixed(2)};--jr:${((seed>>8&255)/160-.8).toFixed(2)};z-index:${at+1}">${html}</li>`;}).join("");
-    return `<article class="folder${t.cls}"${t.style} data-folder-app="${escape(app)}"${open?" data-open":""} aria-labelledby="${id}-title"><div class="gf-stage"><div class="gf-tilt"><div class="gf-shadow" aria-hidden="true"></div><div class="gf-back" style="clip-path:path('${FOLDER_BACK}')" aria-hidden="true"></div><svg class="gf-rim gf-back-rim" viewBox="0 0 340 272" aria-hidden="true"><path d="${FOLDER_BACK}"/></svg><div class="gf-front" style="clip-path:path('${FOLDER_FRONT}')"><div class="gf-glass" aria-hidden="true"></div><svg class="gf-rim gf-front-rim" viewBox="0 0 340 198" aria-hidden="true"><path d="${FOLDER_FRONT}"/></svg><div class="gf-label">${art(app)}<div><h2 id="${id}-title">${escape(app)}</h2><p class="gf-count" id="${id}-count">${plural(items.length,"profile")}</p></div></div><button type="button" class="gf-hit" id="${id}" data-folder aria-expanded="${open}" aria-controls="${id}-files" aria-labelledby="${id}-title ${id}-count"></button></div><ul class="gf-files" id="${id}-files" aria-label="${escape(app)} profiles"${open?"":" inert"}>${sheets}</ul><div class="gf-keys"><button type="button" class="gf-key${items.length?"":" gf-key-primary"}" data-action="add" data-app="${escape(app)}" aria-label="${escape(`Add profile for ${app}`)}" title="Add profile">${icon("plus")}</button><button type="button" class="gf-key" data-folder-menu aria-haspopup="menu" aria-expanded="${menuOpen}" aria-controls="${id}-menu" aria-label="${escape(`More for ${app}`)}" title="More">${icon("more")}</button></div><div class="gf-menu" id="${id}-menu" role="menu" aria-label="${escape(app)}"${menuOpen?"":" hidden"}><button type="button" role="menuitem" tabindex="-1" id="${id}-show" data-app-filter="${escape(app)}">${icon("grid")}<span>Show ${escape(app)} profiles</span></button><button type="button" role="menuitem" tabindex="-1" id="${id}-add" data-action="add" data-app="${escape(app)}">${icon("plus")}<span>Add profile</span></button></div></div></div></article>`;
+    return `<article class="folder${t.cls}"${t.style} data-folder-app="${escape(app)}"${open?" data-open":""} aria-labelledby="${id}-title"><div class="gf-stage"><div class="gf-tilt"><div class="gf-shadow" aria-hidden="true"></div><div class="gf-back" style="clip-path:path('${FOLDER_BACK}')" aria-hidden="true"></div><svg class="gf-rim gf-back-rim" viewBox="0 0 340 272" aria-hidden="true"><path d="${FOLDER_BACK}"/></svg><div class="gf-front" style="clip-path:path('${FOLDER_FRONT}')"><div class="gf-glass" aria-hidden="true"></div><svg class="gf-rim gf-front-rim" viewBox="0 0 340 198" aria-hidden="true"><path d="${FOLDER_FRONT}"/></svg><div class="gf-label">${art(app)}<div><h2 id="${id}-title">${escape(app)}</h2><p class="gf-count" id="${id}-count"><span>${plural(items.length,"profile")}</span>${running?`<span class="gf-run status-running"><span class="running-dot"></span><span>${running} running</span></span>`:""}</p></div></div><button type="button" class="gf-hit" id="${id}" data-folder aria-expanded="${open}" aria-controls="${id}-files" aria-labelledby="${id}-title ${id}-count"></button></div><ul class="gf-files" id="${id}-files" aria-label="${escape(app)} profiles"${open?"":" inert"}>${sheets}</ul><div class="gf-keys"><button type="button" class="gf-key${items.length?"":" gf-key-primary"}" data-action="add" data-app="${escape(app)}" aria-label="${escape(`Add profile for ${app}`)}" title="Add profile">${icon("plus")}</button><button type="button" class="gf-key" data-folder-menu aria-haspopup="menu" aria-expanded="${menuOpen}" aria-controls="${id}-menu" aria-label="${escape(`More for ${app}`)}" title="More">${icon("more")}</button></div><div class="gf-menu" id="${id}-menu" role="menu" aria-label="${escape(app)}"${menuOpen?"":" hidden"}><button type="button" role="menuitem" tabindex="-1" id="${id}-show" data-app-filter="${escape(app)}">${icon("grid")}<span>Show ${escape(app)} profiles</span></button><button type="button" role="menuitem" tabindex="-1" id="${id}-add" data-action="add" data-app="${escape(app)}">${icon("plus")}<span>Add profile</span></button></div></div></div></article>`;
   }
   function renderApps(){
     const apps=sortedApps().map(item=>item.name);
     if(!apps.includes(openFolder))openFolder="";if(!apps.includes(openMenu))openMenu="";// its app left discovery, or a new profile's app has no folder
     const folders=apps.map(name=>folderCard(name)).join("");
-    main.innerHTML=title("Applications",state.apps.length?"The AI apps on this Mac and their profiles.":"")+`<div class="apps-grid">${folders||(state.errors?.length?setupError():noAppsState())}</div>`;
+    main.innerHTML=title("Applications")+`<div class="apps-grid">${folders||(state.errors?.length?setupError():noAppsState())}</div>`;
     layoutFolders();
   }
   // Each folder's scale (--k: it never grows past 340px) and its open fan. Every open file shows its whole name strip above the
   // file in front of it, so the strips are measured front to back, and the folder reserves the room its fan needs (--headroom),
-  // so opening never reflows the page. Stage units: the front file's strip ends at 66, just above the glass's raised tab.
+  // so opening never reflows the page. Stage units: the front file's strip ends at 70, on the glass's raised tab (74), and the
+  // file in front covers 6 of each strip's 11px foot, so the fan needs about a third less room than whole strips would.
+  // The fan's top may reach the folder's own top: the title row's 24px margin is its clearance.
   function layoutFolders(){
     for(const node of $$(".folder",main)){
       node.style.setProperty("--k",Math.min(1,node.clientWidth/340).toFixed(4));
-      let top=66;
-      for(const slot of $$(".gf-slot",node).reverse()){top-=$(".gf-head",slot).offsetHeight;slot.style.setProperty("--open-y",String(top-96));}
-      node.style.setProperty("--headroom",String(Math.max(16,Math.ceil(12-top))));
+      let top=70;
+      for(const slot of $$(".gf-slot",node).reverse()){top-=$(".gf-head",slot).offsetHeight-6;slot.style.setProperty("--open-y",String(top-96));}
+      node.style.setProperty("--headroom",String(Math.max(16,Math.ceil(4-top))));
     }
   }
   function setFolder(node,open){
@@ -558,8 +562,8 @@
     // A list the server could not read is unknown, not empty: say so instead of "Nothing …".
     const restorableFailed=state.restorable_ok===false,unclaimedFailed=state.unclaimed_ok===false;
     const unread=what=>`<p class="muted">Could not read ${what}. Refresh to try again.</p>`;
-    main.innerHTML=title("Recovery","Bring back a profile whose launcher, the small app that opens it, was removed. Its data is still on this Mac.")+
-    `<section class="panel">${tile("recovery","recovery")}<div class="panel-heading"><h2>${entries.length?`${plural(entries.length,"profile")} to restore`:restorableFailed?"Profiles to restore":"Nothing to restore"}</h2>${entries.length>1?button("Restore all","restore-all",{icon:"recovery"}):""}</div>${entries.length?`<div class="recovery-list">${entries.map(item=>`<div class="recovery-row"><h3>${breakable(item.name)}</h3>${button("Restore","restore",{icon:"recovery",name:item.name,label:`Restore ${item.name}`})}</div>`).join("")}</div>`:restorableFailed?unread("restorable profiles"):state.profiles.length?'<p class="muted">Every profile with kept data already has a launcher.</p>':'<p class="muted">Remove a profile and keep its data, and it appears here, ready to restore.</p>'}</section>`+
+    main.innerHTML=title("Recovery")+
+    `<section class="panel">${tile("recovery","recovery")}<div class="panel-heading"><h2>${entries.length?`${plural(entries.length,"profile")} to restore`:restorableFailed?"Profiles to restore":"Nothing to restore"}</h2>${entries.length>1?button("Restore all","restore-all",{icon:"recovery"}):""}</div>${entries.length?`<p>${entries.length===1?"Its launcher was removed, but its data is still on this Mac.":"Their launchers were removed, but their data is still on this Mac."}</p><div class="recovery-list">${entries.map(item=>`<div class="recovery-row"><h3>${breakable(item.name)}</h3>${button("Restore","restore",{icon:"recovery",name:item.name,label:`Restore ${item.name}`})}</div>`).join("")}</div>`:restorableFailed?unread("restorable profiles"):state.profiles.length?'<p class="muted">Every profile with kept data already has a launcher.</p>':'<p class="muted">Remove a profile and keep its data, and it appears here, ready to restore.</p>'}</section>`+
     `<section class="operation-card section-gap">${tile("danger","trash")}<h2>${unclaimed.length||unclaimedFailed?"Clear unclaimed data":"Nothing unclaimed"}</h2>${unclaimedFailed?unread("unclaimed data"):""}<p>Unclaimed data is a profile folder that no launcher uses. Clearing moves it to the Trash, so restore any profile you want to keep first.</p><div class="button-row">${button("Clear unclaimed data…","prune",{danger:true,icon:"trash",disabled:!unclaimed.length})}</div></section>`;
   }
   // The latest doctor run, read from the server's summary and findings; the raw output stands in when they are absent.
@@ -577,18 +581,18 @@
     const issues=healthIssues();
     // Update now appears only once a check has found a newer version.
     const update=lastUpdate?`<p class="update-status">${escape(lastUpdate.text)} <time class="small">Checked ${time(lastUpdate.at)}</time></p>`:"";
-    main.innerHTML=title("Maintenance","Check your setup, keep aidentity current and rebuild launchers, the small apps that open your profiles.")+
+    main.innerHTML=title("Maintenance")+
     `<div class="operation-grid"><section class="operation-card wide">${tile("maintenance","shield")}<h2>Workspace health</h2><p>Doctor checks your setup and every profile for missing apps, stale launchers and settings problems.</p>${healthResult()||'<p class="health-empty">Not checked yet. Choose Check to see the result here.</p>'}<div class="button-row">${button("Check","doctor",{primary:!issues,icon:"shield"})}${button("Check and repair","doctor-fix",{primary:issues>0,icon:"tool"})}</div></section><section class="operation-card">${tile("maintenance","update")}<h2>aidentity updates</h2><p>Installed version: <span class="num">${escape(state.version)}</span>.</p>${update}<div class="button-row">${button("Check for updates","update-check",{icon:"update"})}${lastUpdate?.available?button("Update now","update",{primary:true,icon:"update"}):""}</div></section><section class="operation-card">${tile("maintenance","rebuild")}<h2>Rebuild launchers</h2><p>Rebuild makes every launcher again from its saved settings and the app’s current location. Profile data is not touched.</p><div class="button-row">${button("Rebuild all","rebuild-all",{icon:"rebuild"})}</div></section></div>`+
     `<section class="storage-panel" aria-labelledby="storage-title"><h2 id="storage-title">Local storage</h2><dl class="details storage-list"><div><dt>Launchers</dt><dd>${state.paths?.launchers?breakPath(state.paths.launchers):"Not available"}</dd></div><div><dt>Profile data</dt><dd>${state.paths?.data?breakPath(state.paths.data):"Not available"}</dd></div></dl></section>${errorNotice()}`;
   }
   function renderTransfer(){
-    main.innerHTML=title("Import & export","Move your profiles to another Mac. Sign-ins and profile data stay on this one.")+
+    main.innerHTML=title("Import & export")+
     `<div class="operation-grid"><section class="operation-card">${tile("transfer","download")}<h2>Export</h2><p>${inventory.profiles.length?`Save the names, badges, colors and launch settings of ${plural(inventory.profiles.length,"profile")} to a file.`:"Nothing to export yet. Add a profile first."}</p><div class="button-row">${button("Export profiles","export",{primary:true,icon:"download",disabled:!inventory.profiles.length})}</div></section><section class="operation-card">${tile("transfer","upload")}<h2>Import</h2><p>Review an aidentity export file, then make its profiles with the apps installed here. They start signed out unless their data is already on this Mac.</p><div class="button-row">${button("Import profiles","import",{icon:"upload"})}</div></section></div>`;
   }
   const terms=[["Profile","An app opened with its own sign-in and data. You add, open and remove profiles."],["Launcher","The small app aidentity makes to open a profile."],["Original account","The app’s own account, opened through aidentity."],["Doctor","Checks your setup and every profile for problems."],["Unclaimed data","Profile data that no launcher uses. Clearing it moves it to the Trash."],["Restore","Makes a removed profile’s launcher again from its kept data."]];
   function renderGuide(){
     const commands=["","setup","ui","add","list","open","quit","rename","set","prune","restore","rebuild","rm","export","import","apps","doctor","update","completion","version","help","dashboard"];
-    main.innerHTML=title("Help","Terms, keys and the CLI’s own help.")+
+    main.innerHTML=title("Help")+
       `<section class="terms" aria-labelledby="terms-title"><h2 id="terms-title">Terms</h2><dl>${terms.map(([term,text])=>`<div><dt>${term}</dt><dd>${text}</dd></div>`).join("")}<div class="terms-keys"><dt>Keyboard</dt><dd><kbd>/</kbd> search · <kbd>⌘B</kbd> collapse sidebar · <kbd>O</kbd> open the focused profile</dd></div></dl></section>`+
       `<div class="guide-layout"><section class="panel guide-controls"><div class="field"><label for="help-command">Command help</label><select id="help-command">${commands.map(command=>`<option value="${command}"${command===guideCommand?" selected":""}>${command||"All commands"}</option>`).join("")}</select><div class="section-gap">${button("Read help","help",{icon:"book"})}</div></div><div class="field"><label for="completion-shell">Shell completion</label><select id="completion-shell">${["zsh","bash","fish"].map(shell=>`<option${shell===guideShell?" selected":""}>${shell}</option>`).join("")}</select><div class="section-gap">${button("Generate completion","completion",{icon:"terminal"})}</div></div></section><section><div class="panel-heading"><h2>Command output</h2>${guideText?button("Copy output","copy-guide",{small:true,icon:"copy"}):""}</div>${guideText?`<pre class="output guide-output">${escape(guideText)}</pre>`:'<p class="guide-empty">Choose a command to read its help, or generate a completion script for your shell.</p>'}</section></div>`;
   }
@@ -630,7 +634,9 @@
       // No reply at all (or not JSON) means the server is gone; a reported error means it is up but could not read the setup.
       const wasOffline=offline;if(!error.server)setOffline(true);
       // Server gone: the banner holds the step, so the page does not repeat it. Server up but failing: its own words.
-      if(!state)main.innerHTML=error.server?title("Workspace unavailable","The local server could not read your setup.")+`<div class="notice error" tabindex="0">${escape(error.message)}</div><div class="section-gap">${button("Retry connection","refresh",{primary:true,icon:"refresh"})}</div>`:title("Workspace unavailable","This page could not reach the dashboard.")+`<div class="section-gap">${button("Retry connection","refresh",{primary:true,icon:"refresh"})}</div>`;
+      // The cause leads the body as an empty state, under the page title.
+      const unavailable=(cause,notice="")=>`${title("Workspace unavailable")}<div class="empty-state"><h2>${cause}</h2>${notice}<div class="section-gap">${button("Retry connection","refresh",{primary:true,icon:"refresh"})}</div></div>`;
+      if(!state)main.innerHTML=error.server?unavailable("The local server could not read your setup",`<div class="notice error" tabindex="0">${escape(error.message)}</div>`):unavailable("This page could not reach the dashboard");
       $("#freshness").textContent=loadedAt?`Last updated ${time(loadedAt)}`:"Connection unavailable";
       if(options.notify)toast(error.server?"Refresh failed":wasOffline?"Still disconnected":"Disconnected",error.server?error.message:"",true);// the banner says how to reconnect
     }finally{loading=false;release();}
@@ -640,7 +646,7 @@
     if(offline===on)return;
     offline=on;document.body.classList.toggle("is-offline",on);
     const banner=$("#connection-banner");banner.hidden=!on;
-    banner.innerHTML=on?`<p><strong>The dashboard stopped.</strong> Run <code>${escape(RECONNECT)}</code> in Terminal to reconnect. This page picks it up on its own.</p><button type="button" class="icon-button" data-action="copy-command" aria-label="Copy command" title="Copy command">${icon("copy")}</button>`:"";
+    banner.innerHTML=on?`<p><strong>The dashboard stopped.</strong> Run <code>${commandHtml(RECONNECT)}</code> in Terminal to reconnect. This page picks it up on its own.</p><button type="button" class="icon-button" data-action="copy-command" aria-label="Copy command" title="Copy command">${icon("copy")}</button>`:"";
     $("#connection-state").textContent=on?"Disconnected":"Connected";$(".scope").title=on?"Disconnected from this Mac":"Connected to this Mac";
     syncControls();
     // Gone: poll at the offline pace from now, not after a quiet poll's 30s, so a restarted server is picked up within 5s.

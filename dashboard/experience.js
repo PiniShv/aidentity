@@ -119,7 +119,7 @@
     };
     const navRow = (group, i) => `<li><button type="button" class="xp-nav-item" data-xp-app="${esc(group.name)}" data-xp-select="${i}" style="${accentStyle(group)}" aria-describedby="xp-select-hint" aria-current="${i === active}"><span class="xp-list-icon" aria-hidden="true">${icon(group.name)}</span><span class="xp-nav-text"><span class="xp-app-name">${esc(group.name)}</span><span class="xp-app-meta"><span>${profileCount(group.profiles.length)}${group.installed ? "" : inventoryFailed ? " · Inventory unavailable" : " · App not found"}</span>${appRunning(group)}</span></span></button></li>`;
     root.innerHTML = `<div class="xp-wrap">
-      <header class="xp-header"><span class="tile section-explore" aria-hidden="true">${uiIcon("explore")}</span><div><h1 tabindex="-1">Explore</h1>${!nav.length ? "" : `<p>${profiles.length ? "Choose an app. Open a profile or add another." : "Choose an app and add its first profile."}</p>`}</div></header>${errorNotice}
+      <header class="xp-header"><span class="tile section-explore" aria-hidden="true">${uiIcon("explore")}</span><h1 tabindex="-1">Explore</h1></header>${errorNotice}
       ${nav.length ? `<div class="xp-layout">
         <section class="xp-preview" data-xp-preview="${esc(nav[active].name)}" aria-label="Selected app">
           <div class="xp-pager"${nav.length > 1 ? "" : " hidden"}><button type="button" class="xp-button xp-prev" aria-label="Previous app">${uiIcon("back")}</button><span class="xp-position" data-at="${active}">${positionHtml(active)}</span><button type="button" class="xp-button xp-next" aria-label="Next app">${uiIcon("arrow")}</button></div>
