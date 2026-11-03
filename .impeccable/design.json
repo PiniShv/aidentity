@@ -391,7 +391,7 @@
       },
       "meta": {
         "displayName": "Meta",
-        "purpose": "Profile metadata, state rows, counts, help text, the Explore summary and position."
+        "purpose": "Profile metadata, state rows, counts, help text, the Explore position."
       },
       "headline-compact": {
         "displayName": "Headline compact",
@@ -606,7 +606,7 @@
       "kind": "custom",
       "refersTo": "toast",
       "description": "Floating status message: Tip ground, Control border, Toast shadow.",
-      "html": "<div class=\"ds-toast\" role=\"status\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 5 5 9-10\"/></svg><div><strong>Opened Claude Work</strong><span>It opens in its own window.</span></div></div>",
+      "html": "<div class=\"ds-toast\" role=\"status\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 5 5 9-10\"/></svg><div><strong>Opened Claude Work</strong><span>Sign in once in the window that opens. aidentity remembers it.</span></div></div>",
       "css": ".ds-toast{display:flex;align-items:flex-start;gap:11px;width:340px;padding:15px;background:var(--tip,#050505);border:1px solid var(--control,#262624);border-radius:12px;box-shadow:0 10px 30px #0005;color:var(--text,#f3f2ee);font:400 12px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}.ds-toast>svg{color:var(--positive,#5fe08a);margin-top:1px}.ds-toast strong{display:block;font-size:13px;font-weight:500;margin-bottom:5px}.ds-toast span{color:var(--muted,#8d8b84)}"
     }
   ],

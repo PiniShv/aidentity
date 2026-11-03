@@ -166,7 +166,6 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
 .title-main{display:flex;gap:14px;align-items:flex-start;min-width:0}
 .title-main>.tile{margin-top:-1px} /* centres the tile on the h1's capitals */
 .title-row p{margin-top:9px;color:var(--muted);font-size:13px;max-width:640px}
-.title-row p.title-hint{margin-top:4px;font-size:12px}
 .title-actions{display:flex;gap:8px;align-items:center}
 
 /* Inputs and toolbar: Origin UI input with leading search icon, clear action and focus ring. */
@@ -276,17 +275,14 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .button-row{display:flex;flex-wrap:wrap;gap:8px}
 .operation-card .button-row{margin-top:auto;padding-top:10px}
 .operation-card.wide{grid-column:1/-1}
-.callout{padding:12px 14px;border-radius:8px;background:var(--warnbg);color:var(--text);font-size:13px;line-height:1.55}
-.operation-card p.callout{color:var(--text)}
-.callout,.danger-callout{display:flex;gap:10px;align-items:flex-start}
-.callout>.icon,.danger-callout>.icon{flex:none;width:16px;height:16px;margin-top:2px;color:var(--warning)}
+.callout{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:8px;background:var(--warnbg);color:var(--text);font-size:13px;line-height:1.55}
+.callout>.icon{flex:none;width:16px;height:16px;margin-top:2px;color:var(--warning)}
 
 /* Views: recovery, maintenance, guide, notices, loading */
 .recovery-list{display:flex;flex-direction:column;gap:0}
 .recovery-row{padding:17px 0;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border)}
 .recovery-row:last-child{border:0}
-.recovery-row>div{min-width:0;overflow-wrap:anywhere}
-.recovery-row p{font-size:12px;color:var(--muted);margin-top:5px}
+.recovery-row>h3{min-width:0;overflow-wrap:anywhere}
 .section-gap{margin-top:26px}
 .health-result{align-self:stretch;display:grid;align-content:start;gap:12px;padding:14px 16px;border-radius:12px;background:var(--surface)}
 .health-result p{max-width:none}
@@ -305,7 +301,7 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .health-findings li[data-level=ok]>.icon{color:var(--positive)}
 .health-findings strong,.finding-level{font-weight:500}
 .health-result .output{max-height:220px;padding:12px;background:var(--ground)}
-.operation-card .health-next,.operation-card .health-hint{font-size:12px}
+.operation-card .health-next{font-size:12px}
 .health-next strong{color:var(--text);font-weight:500}
 .operation-card .update-status{color:var(--text)}
 /* Local storage is reference, not an operation: no fill, a muted label, a definition list. */
@@ -347,12 +343,12 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
 .dialog-header p{color:var(--muted);margin-top:8px;padding-right:15px;font-size:13px}
 .dialog-header>.icon-button{position:absolute;top:16px;right:15px}
 .dialog-body{min-height:0;overflow-y:auto;padding:20px 26px 24px}
+.dialog-body>:first-child{margin-top:0} /* a confirmation whose description says it all opens on its list or Runs line */
 .dialog-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:17px 26px 22px;border-top:1px solid var(--control);flex:none}
 .dialog-footer .button{min-height:40px}
 .fields{display:grid;gap:17px}
 .field label,.field-label{display:block;font-weight:500;margin-bottom:8px;font-size:13px;line-height:inherit}
 .field .hint{color:var(--muted);line-height:1.5;margin-top:7px;font-size:12px}
-.field-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .check-row{display:flex;align-items:flex-start;gap:10px;min-height:36px;color:var(--text);padding:5px 0;font-size:13px}
 .check-row input{appearance:auto;width:16px;height:16px;flex:none;margin:1px 0 0;accent-color:var(--text)}
 .check-row span span{display:block;color:var(--muted);margin-top:5px;line-height:1.5;font-size:12px}
@@ -377,8 +373,8 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
 .preview-row strong{font-size:14px;font-weight:500;line-height:1.4;display:block;overflow-wrap:anywhere}
 .preview-row .small{display:block}
 .preview-row strong+.small{margin-top:5px}
+.preview-row:has(>[data-quiet]){--badge-ring:var(--surface);padding:0;background:none} /* Settings: the title names the profile, so the preview is the tile alone, with no strip */
 .form-error{font-size:12px;color:var(--negative);line-height:1.6;padding:12px 14px;border-radius:8px;margin-top:16px;background:var(--badbg)}
-.danger-callout{border-radius:8px;padding:14px 15px;color:var(--text);font-size:13px;line-height:1.55;background:var(--warnbg)}
 .target-list{position:relative;list-style:none;margin:14px 0 0;padding:2px 14px;max-height:200px;overflow:auto;border-radius:8px;background:var(--ground);font-size:13px} /* position: the .sr-only name copies belong to this scroller, so revealing one scrolls the list, not the dialog */
 .target-list li{padding:8px 0;border-bottom:1px solid var(--border);line-height:1.4;overflow-wrap:anywhere}
 .target-list li:last-child{border:0}
@@ -478,6 +474,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 @keyframes toast-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes page-out{to{opacity:0}}
 @keyframes page-in{from{opacity:0;transform:translateY(8px)}}
+@keyframes topbar-title{to{opacity:1}}
 
 /* Breakpoints, widest first; min-width and reduced-motion blocks last */
 @media(max-width:1200px){
@@ -522,6 +519,9 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .nav-item,.nav-app{min-height:44px}
   #mobile-nav{display:flex}
   .topbar-title{display:block;font-size:15px;font-weight:550;letter-spacing:-.015em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* The h1 names the page until half its letters are under the bar (38px of scroll); then the bar does, switched on at once, never half faded.
+     Without scroll timelines the bar always names it. */
+  @supports(animation-timeline:scroll()){.topbar-title{opacity:0;animation:topbar-title steps(1,jump-end) both;animation-timeline:scroll(root);animation-range:0px 38px}} /* a page that scrolls less keeps its h1 readable, and the bar stays blank */
   .topbar-actions{gap:4px}
   .topbar-leading{gap:5px}
   .topbar .button>.icon{width:14px}
@@ -552,7 +552,6 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .dialog-header{padding:24px 22px 18px}
   .dialog-body{padding:20px 22px 24px}
   .dialog-footer{padding:16px 22px 20px}
-  .field-pair{gap:12px}
   .initial-loading{min-height:300px;text-align:center}
   .initial-loading p{font-size:12px}
   .topbar{height:64px;padding:0 16px;position:sticky;top:0;z-index:30;background:var(--material-bar);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur)}
@@ -575,7 +574,6 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .toolbar .input,.toolbar select{min-height:44px}
   .toolbar select{max-width:116px}
   .toolbar-end{gap:0}
-  .toolbar-end>.button{display:none}
   .profile-grid{grid-template-columns:1fr;gap:16px}
   .profile-name{min-height:44px;line-height:44px}
   .profile-card .button,.detail-panel .button,.link-button{min-height:44px}
@@ -605,7 +603,6 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 @media(max-width:390px){
   .title-row{flex-wrap:wrap}
   .title-actions{margin-left:auto}
-  .field-pair{grid-template-columns:1fr}
 }
 /* From 768px the selected card shows state, Quit and the primary action, so the detail panel leaves them out.
    Collapsed rail: "Your apps" becomes a divider. Workspace health puts its result beside its text. */
@@ -616,7 +613,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .sidebar-collapsed .scope>.nav-label{position:absolute;width:1px;height:1px;clip-path:inset(50%)} /* visually hidden, still read: zero-size text can be skipped */
   .operation-card.wide{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:12px 32px;align-items:start}
   .operation-card.wide>*{grid-column:1}
-  .operation-card.wide>.health-result,.operation-card.wide>.health-empty{grid-column:2;grid-row:1/span 5;align-self:stretch}
+  .operation-card.wide>.health-result,.operation-card.wide>.health-empty{grid-column:2;grid-row:1/span 4;align-self:stretch}
   .operation-card.wide>.health-empty{display:grid;place-items:center;max-width:none;padding:20px} /* plain text, no box: a box here is a card in a card */
 }
 /* The tagline (138px) is wider than the name column of a 190px sidebar: below the 32px mark, from its left edge, instead of wrapping. */

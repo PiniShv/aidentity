@@ -31,13 +31,11 @@
 .xp-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,300px);align-items:start;gap:28px}
 .xp-preview{position:sticky;top:24px;display:flex;flex-direction:column;gap:16px;padding:18px;border:1px solid var(--border);border-radius:14px;min-width:0;background:var(--card);scroll-margin-top:24px;container:xp-panel/inline-size}
 .xp-preview.xp-tall{position:relative;top:auto}
-/* Pager: Prev, "N of M", Next and the jump select; hidden when only one app is listed. */
-.xp-pager{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;line-height:16px}
+/* Pager: Prev, "N of M" and Next, on phones only, where the navigator sits below the panel; hidden when only one app is listed. */
+.xp-pager{display:none;align-items:center;gap:8px;color:var(--muted);font-size:12px;line-height:16px}
 .xp-position{min-width:6ch;text-align:center;font-variant-numeric:tabular-nums}
 .xp-prev,.xp-next{width:36px;flex:none;padding:0}
 .xp-prev svg,.xp-next svg{width:18px;height:18px}
-.xp-jump-label{margin-left:auto;width:min(200px,50%)}
-.xp-jump{min-height:36px;width:100%;padding:6px 9px;border:1px solid var(--control);border-radius:8px;background:var(--ground);font-size:13px;cursor:pointer;text-overflow:ellipsis}
 /* The app identity. A change stacks the old and new faces in one cell and crossfades them (experience.js). */
 .xp-ident{display:grid}
 .xp-ident>*{grid-area:1/1}
@@ -84,7 +82,6 @@
 .xp-key-badge-app svg{width:20px;height:20px}
 
 /* Navigator: one row per app, apps with profiles first. A row chooses the app; profile actions live only on the keys. */
-.xp-list-summary{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:12px;line-height:16px;font-variant-numeric:tabular-nums;margin:0 0 10px;padding:0 12px}
 .xp-nav{display:grid;gap:4px;margin:0 0 16px;padding:0;list-style:none}
 .xp-nav-item{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:10px 12px;border:1px solid transparent;border-radius:12px;background:none;text-align:left;transition:background-color 160ms ease,border-color 160ms ease}
 .xp-nav-item:hover{background:var(--raised)}
@@ -119,7 +116,7 @@
   .xp-header>.tile .icon{width:18px;height:18px}
   .xp-layout{grid-template-columns:minmax(0,1fr);gap:22px}
   .xp-preview{position:relative;top:auto;padding:14px;gap:14px;border-radius:12px;scroll-margin-top:80px}
-  .xp-jump-label{display:none}
+  .xp-pager{display:flex}
   .xp-prev,.xp-next{width:44px;min-height:44px}
   .xp-app-icon{width:40px;height:40px;font-size:17px}
   .xp-app-icon svg{width:22px;height:22px}

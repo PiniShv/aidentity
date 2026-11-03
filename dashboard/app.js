@@ -258,7 +258,7 @@
   $("#sidebar").addEventListener("focusout",hideRailTip);
   function errorNotice(){return (state.errors||[]).length?`<div class="notice error">${state.errors.map(escape).join("<br>")}</div>`:"";}
   function setupError(){return `<div class="empty-state"><h2>aidentity could not read your setup</h2>${errorNotice()}<div class="section-gap">${button("Retry","refresh",{primary:true,icon:"refresh"})}</div></div>`;}
-  function title(name,description="",actions="",hint=""){const glyph=view==="guide"?"book":navigation.find(item=>item[0]===view)?.[2];return `<div class="title-row"><div class="title-main">${glyph?tile(view,glyph):""}<div><h1 tabindex="-1">${escape(name)}</h1>${description?`<p>${escape(description)}</p>`:""}${hint?`<p class="title-hint">${escape(hint)}</p>`:""}</div></div>${actions?`<div class="title-actions">${actions}</div>`:""}</div>`;}
+  function title(name,description="",actions=""){const glyph=view==="guide"?"book":navigation.find(item=>item[0]===view)?.[2];return `<div class="title-row"><div class="title-main">${glyph?tile(view,glyph):""}<div><h1 tabindex="-1">${escape(name)}</h1>${description?`<p>${escape(description)}</p>`:""}</div></div>${actions?`<div class="title-actions">${actions}</div>`:""}</div>`;}
   function searchField(placeholder){return `<div class="search-field">${icon("search")}<input id="workspace-search" class="input" type="search" aria-keyshortcuts="/" aria-label="${escape(placeholder)}" placeholder="${escape(placeholder)}" value="${escape(query)}">${query?`<button class="icon-button" data-action="clear-search" aria-label="Clear search">${icon("x")}</button>`:""}</div>`;}
   // educalvolpz Animated Tabs translated to native tabs with measured sliding indicator.
   // count null: not counted yet, so a muted dash and the tab's title say why.
@@ -364,12 +364,12 @@
     const chosen=scoped.some(item=>item.name===selected)?profile(selected):null;
     if(!chosen)mobileDetail=false;
     main.classList.toggle("profile-detail-mobile",mobileDetail);
-    // Counts live on the tabs only. Search shows from 7 profiles, the app filter once two apps have profiles.
+    // Counts live on the tabs only. Search shows from 7 profiles, the app filter once two apps have profiles; All apps clears a filter the select cannot.
     const appNames=[...new Set(state.profiles.map(appName))].sort(byName);
     const repairs=scoped.filter(needsRepair).length;
     const search=state.profiles.length>6||query?searchField("Search profiles"):"";
     const filter=appNames.length>1?`<select id="app-filter" aria-label="Filter by application"><option value="">All apps</option>${appNames.map(name=>`<option${name===appFilter?" selected":""}>${escape(name)}</option>`).join("")}</select>`:"";
-    const toolbar=search||filter||appFilter?`<div class="toolbar">${search}<div class="toolbar-end">${appFilter?button("All apps","all-apps",{small:true}):""}${filter}${search?`<span class="sr-only" id="result-count" role="status">${plural(visible.length,"profile")}</span>`:""}</div></div>`:"";
+    const toolbar=search||filter||appFilter?`<div class="toolbar">${search}<div class="toolbar-end">${appFilter&&!filter?button("All apps","all-apps",{small:true}):""}${filter}${search?`<span class="sr-only" id="result-count" role="status">${plural(visible.length,"profile")}</span>`:""}</div></div>`:"";
     // No tabs until the first profile exists: on a first run they would filter nothing, and the grid is then no tabpanel.
     const strip=state.profiles.length?tabs([["all","All",scoped.length],["running","Running",running],["idle","Not running",scoped.length-running],["attention","Needs repair",lastDoctor||repairs?repairs:null,"Not checked yet. Choose Check on Maintenance."]],statusFilter):"";
     paint(title(appFilter||"Profiles",appFilter?"":"Each profile opens an app with its own sign-in.")+
@@ -383,7 +383,7 @@
   const noAppsState=()=>emptyState("No AI apps found","Install Claude or ChatGPT, then refresh this workspace.",button("Refresh apps","refresh",{icon:"refresh"}));
   // Search-empty, filter-empty and each status tab get their own words: an empty Running tab is not a failed search.
   function profilesEmpty(scoped){
-    if(!state.profiles.length)return state.errors?.length?setupError():!state.apps.length?noAppsState():emptyState("No Claude or ChatGPT profiles yet","A profile opens the app with its own sign-in, so your accounts stay open side by side. Add one, open it and sign in once.",button("Add your first profile","add",{primary:true,icon:"plus"}));
+    if(!state.profiles.length)return state.errors?.length?setupError():!state.apps.length?noAppsState():emptyState("No Claude or ChatGPT profiles yet","Add one for each account, open it and sign in once. Your accounts then stay open side by side.",button("Add your first profile","add",{primary:true,icon:"plus"}));
     if(!scoped.length)return query?emptyState(`No profiles match “${escape(query)}”`,"Check the spelling or clear the search.",button("Clear search","clear-search",{primary:true,icon:"x"})):state.apps.some(item=>item.name===appFilter)?emptyState(`No ${escape(appFilter)} profiles yet`,`Each profile opens ${escape(appFilter)} with its own sign-in.`,button("Add profile","add",{primary:true,icon:"plus",app:appFilter,label:`Add profile for ${appFilter}`})):emptyState(`No ${escape(appFilter)} profiles yet`,`Install ${escape(appFilter)} to add a profile.`,button("Show all profiles","reset-filters",{icon:"grid"}));
     const all=button("Show all profiles","show-all",{icon:"grid"});
     if(statusFilter==="running")return emptyState("Nothing is running","Open a profile and it shows up here.",all);
@@ -421,23 +421,20 @@
   const profileCount=name=>state.profiles.filter(item=>appName(item)===name).length;
   // Apps with profiles first, then by name: Applications and the Add dialog's select share this order.
   const sortedApps=()=>[...state.apps].sort((a,b)=>(profileCount(b.name)>0)-(profileCount(a.name)>0)||byName(a.name,b.name));
-  // Every listed app is a card, apps with profiles first; its count opens Profiles for that app.
+  // Every listed app is a card, apps with profiles first; its count opens Profiles for that app. Two apps at most (AI_APPS), so no search.
   function renderApps(){
-    const apps=sortedApps().filter(item=>!query||item.name.toLowerCase().includes(query.toLowerCase()));
-    const cards=apps.map(item=>{const t=tone(item.name),count=plural(profileCount(item.name),"profile");return `<article class="application-card${t.cls}"${t.style}><div class="app-head">${art(item.name)}<div><h2>${escape(item.name)}</h2><button class="link-button app-count" data-app-filter="${escape(item.name)}" aria-label="${escape(`${count} for ${item.name}`)}">${count}</button></div></div>${button("Add profile","add",{icon:"plus",app:item.name,label:`Add profile for ${item.name}`})}</article>`;}).join("");
-    const empty=!state.apps.length&&state.errors?.length?setupError():state.apps.length?`<div class="empty-state"><h2>No apps match “${escape(query)}”</h2><p>Check the spelling or clear the search to see ${state.apps.length===1?"the 1 app":`all ${state.apps.length} apps`}.</p>${button("Clear search","clear-search",{primary:true,icon:"x"})}</div>`:noAppsState();
-    paint(title("Applications",!state.apps.length&&state.errors?.length?"Inventory unavailable.":`${state.apps.length} AI ${state.apps.length===1?"app":"apps"} found on this Mac.`)+`<div class="toolbar">${searchField("Search installed apps")}</div><div class="apps-body"><div class="apps-grid">${apps.length?cards:empty}</div></div>`);
+    const cards=sortedApps().map(item=>{const t=tone(item.name),count=plural(profileCount(item.name),"profile");return `<article class="application-card${t.cls}"${t.style}><div class="app-head">${art(item.name)}<div><h2>${escape(item.name)}</h2><button class="link-button app-count" data-app-filter="${escape(item.name)}" aria-label="${escape(`${count} for ${item.name}`)}">${count}</button></div></div>${button("Add profile","add",{icon:"plus",app:item.name,label:`Add profile for ${item.name}`})}</article>`;}).join("");
+    main.innerHTML=title("Applications",state.apps.length?"The AI apps on this Mac and their profiles.":"")+`<div class="apps-grid">${cards||(state.errors?.length?setupError():noAppsState())}</div>`;
   }
   function renderRecovery(){
     const entries=state.restorable||[],unclaimed=state.unclaimed||[];
     // A list the server could not read is unknown, not empty: say so instead of "Nothing …".
     const restorableFailed=state.restorable_ok===false,unclaimedFailed=state.unclaimed_ok===false;
     const unread=what=>`<p class="muted">Could not read ${what}. Refresh to try again.</p>`;
-    main.innerHTML=title("Recovery","Bring back profiles whose launcher was removed; their data is still on this Mac.","",LAUNCHER)+
-    `<section class="panel">${tile("recovery","recovery")}<div class="panel-heading"><h2>${entries.length?`${plural(entries.length,"profile")} to restore`:restorableFailed?"Profiles to restore":"Nothing to restore"}</h2>${entries.length?button("Restore all","restore-all",{icon:"recovery"}):""}</div>${entries.length?`<div class="recovery-list">${entries.map(item=>`<div class="recovery-row"><div><h3>${breakable(item.name)}</h3><p>The profile data remains on this Mac.</p></div>${button("Restore","restore",{icon:"recovery",name:item.name,label:`Restore ${item.name}`})}</div>`).join("")}</div>`:restorableFailed?unread("restorable profiles"):state.profiles.length?'<p class="muted">Every profile with kept data already has a launcher.</p>':'<p class="muted">Remove a profile and keep its data, and it appears here, ready to restore.</p>'}</section>`+
+    main.innerHTML=title("Recovery","Bring back a profile whose launcher, the small app that opens it, was removed. Its data is still on this Mac.")+
+    `<section class="panel">${tile("recovery","recovery")}<div class="panel-heading"><h2>${entries.length?`${plural(entries.length,"profile")} to restore`:restorableFailed?"Profiles to restore":"Nothing to restore"}</h2>${entries.length>1?button("Restore all","restore-all",{icon:"recovery"}):""}</div>${entries.length?`<div class="recovery-list">${entries.map(item=>`<div class="recovery-row"><h3>${breakable(item.name)}</h3>${button("Restore","restore",{icon:"recovery",name:item.name,label:`Restore ${item.name}`})}</div>`).join("")}</div>`:restorableFailed?unread("restorable profiles"):state.profiles.length?'<p class="muted">Every profile with kept data already has a launcher.</p>':'<p class="muted">Remove a profile and keep its data, and it appears here, ready to restore.</p>'}</section>`+
     `<section class="operation-card section-gap">${tile("danger","trash")}<h2>${unclaimed.length||unclaimedFailed?"Clear unclaimed data":"Nothing unclaimed"}</h2>${unclaimedFailed?unread("unclaimed data"):""}<p>Unclaimed data is a profile folder that no launcher uses. Clearing moves it to the Trash, so restore any profile you want to keep first.</p><div class="button-row">${button("Clear unclaimed data…","prune",{danger:true,icon:"trash",disabled:!unclaimed.length})}</div></section>`;
   }
-  const LAUNCHER="A launcher is the small app aidentity makes to open a profile.";
   // The latest doctor run, read from the server's summary and findings; the raw output stands in when they are absent.
   function healthResult(){
     if(!lastDoctor)return "";
@@ -453,18 +450,18 @@
     const issues=healthIssues();
     // Update now appears only once a check has found a newer version.
     const update=lastUpdate?`<p class="update-status">${escape(lastUpdate.text)} <time class="small">Checked ${time(lastUpdate.at)}</time></p>`:"";
-    main.innerHTML=title("Maintenance","Check your setup, rebuild launchers and keep aidentity current.","",LAUNCHER)+
-    `<div class="operation-grid"><section class="operation-card wide">${tile("maintenance","shield")}<h2>Workspace health</h2><p>Doctor checks your setup and every profile for missing apps, stale launchers and settings problems.</p>${healthResult()||'<p class="health-empty">Not checked yet. Choose Check to see the result here.</p>'}<div class="button-row">${button("Check","doctor",{primary:!issues,icon:"shield"})}${button("Check and repair","doctor-fix",{primary:issues>0,icon:"tool"})}</div><p class="health-hint">Check only reports. Check and repair also rebuilds the launchers it can fix.</p></section><section class="operation-card">${tile("maintenance","update")}<h2>aidentity updates</h2><p>Installed version: <span class="num">${escape(state.version)}</span>.</p>${update}<div class="button-row">${button("Check for updates","update-check",{icon:"update"})}${lastUpdate?.available?button("Update now","update",{primary:true,icon:"update"}):""}</div></section><section class="operation-card">${tile("maintenance","rebuild")}<h2>Rebuild launchers</h2><p>Rebuild makes every launcher again from its saved settings and the app’s current location. Profile data is not touched.</p><div class="button-row">${button("Rebuild all","rebuild-all",{icon:"rebuild"})}</div></section></div>`+
+    main.innerHTML=title("Maintenance","Check your setup, keep aidentity current and rebuild launchers, the small apps that open your profiles.")+
+    `<div class="operation-grid"><section class="operation-card wide">${tile("maintenance","shield")}<h2>Workspace health</h2><p>Doctor checks your setup and every profile for missing apps, stale launchers and settings problems.</p>${healthResult()||'<p class="health-empty">Not checked yet. Choose Check to see the result here.</p>'}<div class="button-row">${button("Check","doctor",{primary:!issues,icon:"shield"})}${button("Check and repair","doctor-fix",{primary:issues>0,icon:"tool"})}</div></section><section class="operation-card">${tile("maintenance","update")}<h2>aidentity updates</h2><p>Installed version: <span class="num">${escape(state.version)}</span>.</p>${update}<div class="button-row">${button("Check for updates","update-check",{icon:"update"})}${lastUpdate?.available?button("Update now","update",{primary:true,icon:"update"}):""}</div></section><section class="operation-card">${tile("maintenance","rebuild")}<h2>Rebuild launchers</h2><p>Rebuild makes every launcher again from its saved settings and the app’s current location. Profile data is not touched.</p><div class="button-row">${button("Rebuild all","rebuild-all",{icon:"rebuild"})}</div></section></div>`+
     `<section class="storage-panel" aria-labelledby="storage-title"><h2 id="storage-title">Local storage</h2><dl class="details storage-list"><div><dt>Launchers</dt><dd>${state.paths?.launchers?breakPath(state.paths.launchers):"Not available"}</dd></div><div><dt>Profile data</dt><dd>${state.paths?.data?breakPath(state.paths.data):"Not available"}</dd></div></dl></section>${errorNotice()}`;
   }
   function renderTransfer(){
     main.innerHTML=title("Import & export","Move your profiles to another Mac. Sign-ins and profile data stay on this one.")+
-    `<div class="operation-grid"><section class="operation-card">${tile("transfer","download")}<h2>Export</h2><p>${inventory.profiles.length?`Save the names, badges, colors and launch settings of ${plural(inventory.profiles.length,"profile")} to a file.`:"Nothing to export yet. Add a profile first."}</p>${inventory.profiles.length?`<p class="callout">${icon("alert")}<span>The file can hold private environment or proxy values. Keep it private.</span></p>`:""}<div class="button-row">${button("Export profiles","export",{primary:true,icon:"download",disabled:!inventory.profiles.length})}</div></section><section class="operation-card">${tile("transfer","upload")}<h2>Import</h2><p>Choose an aidentity export file and review it. Each profile is made with the apps installed here.</p><p>Imported profiles start signed out unless their data is already on this Mac.</p><div class="button-row">${button("Import profiles","import",{icon:"upload"})}</div></section></div>`;
+    `<div class="operation-grid"><section class="operation-card">${tile("transfer","download")}<h2>Export</h2><p>${inventory.profiles.length?`Save the names, badges, colors and launch settings of ${plural(inventory.profiles.length,"profile")} to a file.`:"Nothing to export yet. Add a profile first."}</p><div class="button-row">${button("Export profiles","export",{primary:true,icon:"download",disabled:!inventory.profiles.length})}</div></section><section class="operation-card">${tile("transfer","upload")}<h2>Import</h2><p>Review an aidentity export file, then make its profiles with the apps installed here. They start signed out unless their data is already on this Mac.</p><div class="button-row">${button("Import profiles","import",{icon:"upload"})}</div></section></div>`;
   }
   const terms=[["Profile","An app opened with its own sign-in and data. You add, open and remove profiles."],["Launcher","The small app aidentity makes to open a profile."],["Original account","The app’s own account, opened through aidentity."],["Doctor","Checks your setup and every profile for problems."],["Unclaimed data","Profile data that no launcher uses. Clearing it moves it to the Trash."],["Restore","Makes a removed profile’s launcher again from its kept data."]];
   function renderGuide(){
     const commands=["","setup","ui","add","list","open","quit","rename","set","prune","restore","rebuild","rm","export","import","apps","doctor","update","completion","version","help","dashboard"];
-    main.innerHTML=title("Help","Plain-word terms and keys, then the CLI’s own help and shell completion for your terminal.")+
+    main.innerHTML=title("Help","Terms, keys and the CLI’s own help.")+
       `<section class="terms" aria-labelledby="terms-title"><h2 id="terms-title">Terms</h2><dl>${terms.map(([term,text])=>`<div><dt>${term}</dt><dd>${text}</dd></div>`).join("")}<div class="terms-keys"><dt>Keyboard</dt><dd><kbd>/</kbd> search · <kbd>⌘B</kbd> collapse sidebar · <kbd>O</kbd> open the focused profile</dd></div></dl></section>`+
       `<div class="guide-layout"><section class="panel guide-controls"><div class="field"><label for="help-command">Command help</label><select id="help-command">${commands.map(command=>`<option value="${command}"${command===guideCommand?" selected":""}>${command||"All commands"}</option>`).join("")}</select><div class="section-gap">${button("Read help","help",{icon:"book"})}</div></div><div class="field"><label for="completion-shell">Shell completion</label><select id="completion-shell">${["zsh","bash","fish"].map(shell=>`<option${shell===guideShell?" selected":""}>${shell}</option>`).join("")}</select><div class="section-gap">${button("Generate completion","completion",{icon:"terminal"})}</div></div></section><section><div class="panel-heading"><h2>Command output</h2>${guideText?button("Copy output","copy-guide",{small:true,icon:"copy"}):""}</div>${guideText?`<pre class="output guide-output">${escape(guideText)}</pre>`:'<p class="guide-empty">Choose a command to read its help, or generate a completion script for your shell.</p>'}</section></div>`;
   }
@@ -495,13 +492,13 @@
         if(firstLoad)animateWorkspaceChange();
         if(view==="explore")requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:previousScroll,behavior:"instant"})));
       });
-      if(options.notify)toast("Workspace refreshed","Profiles and installed apps are up to date.");
+      if(options.notify)toast("Workspace refreshed");
     }catch(error){
       // No reply at all (or not JSON) means the server is gone; a reported error means it is up but could not read the setup.
       if(!error.server)setOffline(true);
       if(!state)main.innerHTML=title("Workspace unavailable","The local server could not read your setup.")+`<div class="notice error">${escape(error.server?error.message:OFFLINE)}</div><div class="section-gap">${button("Retry connection","refresh",{primary:true,icon:"refresh"})}</div>`;
       $("#freshness").textContent=loadedAt?`Last updated ${time(loadedAt)}`:"Connection unavailable";
-      if(options.notify)toast(error.server?"Refresh failed":"Still disconnected",error.server?error.message:"Run “aidentity dashboard” in Terminal, then try again.",true);
+      if(options.notify)toast(error.server?"Refresh failed":"Still disconnected",error.server?error.message:"",true);// the banner says how to reconnect
     }finally{loading=false;release();}
     return changed;
   }
@@ -536,7 +533,7 @@
   async function action(name,params={},element=null,{quiet=false}={}){
     if(busy||offline||!state?.csrf_token){
       const error=busy?Object.assign(new Error("Another action is still running. Try again when it finishes."),{busy:true}):new Error(OFFLINE);
-      if(!quiet){toast(busy?"Still working":"Disconnected",error.message,busy?"info":true);error.reported=true;}
+      if(!quiet){toast(busy?"Still working":"Disconnected",busy?error.message:"",busy?"info":true);error.reported=true;}
       throw error;
     }
     const before=state,beforeAll=inventory,from=focusOrigin(element);let note=null,entry=null;
@@ -563,7 +560,7 @@
     }catch(error){
       const failure=error.busy?"Still working":error.message===OFFLINE?"Disconnected":`Could not ${verbs[name]||name}${params.name?` ${params.name}`:""}`;
       if(entry)entry.title=failure;
-      if(!quiet&&!error.reported){toast(failure,String(error.message),error.busy?"info":true);error.reported=true;}
+      if(!quiet&&!error.reported){toast(failure,error.message===OFFLINE?"":String(error.message),error.busy?"info":true);error.reported=true;}
       renderActivity();
       throw error;
     }finally{busy=false;setBusy(element,false);syncControls();returnFocus(from);}
@@ -577,7 +574,7 @@
       if(was?.status==="running")return {title:`Brought ${who} to the front`};
       const key=`aidentity.signin-hint.${who}`,first=was?.status==="signed out / new"&&!stored.get(key);
       if(first)stored.set(key,"shown");
-      return {title:`Opened ${who}`,text:first?SIGN_IN_HINT:"It opens in its own window."};
+      return {title:`Opened ${who}`,text:first?SIGN_IN_HINT:""};
     }
     if(name==="quit")return {title:`Closed ${who}`};
     if(name==="remove")return {title:`${who} removed`,text:params.purge?"Its profile data is in the Trash.":"Its profile data stays on this Mac.",extra:params.purge||was?.main?null:{label:"Restore",run:()=>action("restore",{name:who})}};
@@ -590,7 +587,7 @@
       const sum=result.summary;
       if(!sum)return {title:params.fix?"Check and repair finished":"Check finished",text:"The full report is in Activity."};
       const issues=(sum.warn||0)+(sum.error||0),away=view!=="maintenance";
-      return {title:`Checked ${plural(before.profiles.length,"profile")}: ${issues?`${issues} ${issues===1?"needs":"need"} attention`:"all healthy"}`,text:issues?(away?"The findings are in Maintenance.":"The findings are in Workspace health."):"Nothing needs repair.",kind:sum.error?"error":sum.warn?"warn":"ok",extra:issues&&away?{label:"Show findings",run:()=>showView("maintenance",{focus:true})}:null};
+      return {title:`Checked ${plural(before.profiles.length,"profile")}: ${issues?`${issues} ${issues===1?"needs":"need"} attention`:"all healthy"}`,text:issues?(away?"The findings are in Maintenance.":"The findings are in Workspace health."):"",kind:sum.error?"error":sum.warn?"warn":"ok",extra:issues&&away?{label:"Show findings",run:()=>showView("maintenance",{focus:true})}:null};
     }
     if(name==="update"&&params.check){
       const {installed,available}=result;
@@ -625,9 +622,10 @@
     const level=kind===true?"error":kind||"ok";
     const viewport=toastViewport;
     const node=document.createElement("div");node.className=`toast ${level==="ok"?"":level}`;node.setAttribute("role",level==="error"?"alert":"status");
-    // A long error shows its first 180 characters; View details opens Activity, which keeps the full output.
+    // A long error shows its first 180 characters; View details opens Activity, which keeps the full output. A short toast needs no link: the activity bar names it.
     const text=String(description||""),long=text.length>180;
-    node.innerHTML=`${icon(level==="ok"?"check":"alert")}<div><strong>${breakable(titleText)}</strong>${text?`<p>${escape(long?`${text.slice(0,180).trimEnd()}…`:text)}</p>`:""}<div class="toast-actions">${extra?`<button class="toast-action toast-primary">${escape(extra.label)}</button>`:""}${history.length?`<button class="toast-action toast-activity">${long?"View details":"View activity"}</button>`:""}</div></div><button class="icon-button" aria-label="Dismiss notification">${icon("x")}</button>`;
+    const actions=`${extra?`<button class="toast-action toast-primary">${escape(extra.label)}</button>`:""}${long&&history.length?'<button class="toast-action toast-activity">View details</button>':""}`;
+    node.innerHTML=`${icon(level==="ok"?"check":"alert")}<div><strong>${breakable(titleText)}</strong>${text?`<p>${escape(long?`${text.slice(0,180).trimEnd()}…`:text)}</p>`:""}${actions?`<div class="toast-actions">${actions}</div>`:""}</div><button class="icon-button" aria-label="Dismiss notification">${icon("x")}</button>`;
     const dismiss=()=>{if(node.classList.contains("dismiss"))return;node.classList.add("dismiss");setTimeout(()=>animateToastLayout(()=>node.remove()),reducedMotion.matches?0:200);};
     $(".icon-button",node).onclick=dismiss;
     // Focus moves into the panel before the toast (and the focused button) goes away, so it never falls to <body>.
@@ -641,7 +639,7 @@
   // rmahammad Animated Dialog's fixed header/body/footer translated to <dialog>.
   // build(FormData) returns [action, params] for the live "Runs:" line and, when submit is null, for the submit itself.
   // app: the app whose hue the dialog takes (default: the one in view); an app with no profiles keeps it neutral.
-  // A dialog opened from another (Settings → Rename) keeps the focus target of the first.
+  // A dialog opened over another keeps the focus target of the first.
   function showDialog(titleText,description,body,submitText,submit,{danger=false,build=null,app=contextApp()}={}){
     clearTimeout(dialogCloseTimer);dialogRevision++;
     if(!dialog.open)lastFocus=document.activeElement;
@@ -746,7 +744,7 @@
     $('[name="color"]',dialog)?.addEventListener("input",event=>event.target.removeAttribute("data-auto"));
     $$('input,select,textarea',dialog).forEach(input=>input.addEventListener("input",setupPreviewUpdate));setupPreviewUpdate();
   }
-  // The preview shows what is set: the app alone until a profile name is typed, and a badge only once there is one.
+  // The preview shows what is set: the app alone until a profile name is typed, a badge only once there is one, and the original-account line only when it applies.
   function setupPreviewUpdate(){
     const preview=$("#identity-preview");if(!preview)return;
     const path=String($('[name="app_path"]',dialog)?.value||"").trim();
@@ -768,7 +766,7 @@
     if(seed){seed.hidden=!/claude/i.test(app);if(seed.hidden)$('[name="seed"]',dialog).checked=false;}
     const color=appAccent(app).color;
     preview.classList.toggle("app-tone",Boolean(color));preview.style.cssText=color?`--app-color:${color}`:"";toneDialog(app);
-    preview.innerHTML=art(app,badge,hex)+`<div>${label?`<strong>${breakable(label)}</strong>`:""}<span class="small">${original?"Opens the app’s original account":"Keeps its own sign-in"}</span></div>`;
+    preview.innerHTML=art(app,badge,hex)+`<div>${label?`<strong>${breakable(label)}</strong>`:""}${original?'<span class="small">Opens the app’s original account</span>':""}</div>`;
   }
   // Settings sends only what changed: Save and the Runs line wait for a change. Launch arguments are one list, and saving replaces it.
   function settingsDialog(item){
@@ -788,7 +786,7 @@
       if(data.get("extensions")==="shared"&&item.own_extensions)params.shared_extensions=true;
       return Object.keys(params).length>1?["set",params]:null;
     };
-    showDialog(`Settings for ${item.name}`,"Launch changes apply the next time it opens.",`<div class="preview-row"><div class="preview-identity" id="identity-preview" data-app="${escape(appName(item))}" data-profile="${escape(item.profile||"")}" data-quiet data-main="${Boolean(item.main)}"></div><button type="button" class="link-button" data-action="rename" data-name="${escape(item.name)}">Rename…</button></div><div class="fields">${identityFields(item)}${disclosure("Launch settings",`${area("Launch arguments","args","One allowed switch per line. Saving replaces the list; empty it to remove them all.",args)}<div class="field"><p class="field-label">Environment variables</p><p class="small">${env.length?`${escape(env.join(", "))} · values stay private`:"None"}</p></div>${area(env.length?"Add or change environment variables":"Add environment variables","env","One allowed NAME=value per line. Values are never shown here.")}${env.length?check("clear_env","Clear the existing variables first","Values entered above are added after clearing."):""}<div class="field"><label for="field-extensions">Extensions folder</label><select id="field-extensions" name="extensions"><option value="shared"${!item.own_extensions?" selected":""}>The app’s default extensions</option><option value="own"${item.own_extensions?" selected":""}>Its own extensions folder</option></select></div>`)}</div>`,"Save settings",async(data,el)=>{
+    showDialog(`Settings for ${item.name}`,"Launch changes apply the next time it opens.",`<div class="preview-row"><div class="preview-identity" id="identity-preview" data-app="${escape(appName(item))}" data-profile="${escape(item.profile||"")}" data-quiet data-main="${Boolean(item.main)}"></div></div><div class="fields">${identityFields(item)}${disclosure("Launch settings",`${area("Launch arguments","args","One allowed switch per line. Saving replaces the list; empty it to remove them all.",args)}<div class="field"><p class="field-label">Environment variables</p><p class="small">${env.length?`${escape(env.join(", "))} · values stay private`:"None"}</p></div>${area(env.length?"Add or change environment variables":"Add environment variables","env","One allowed NAME=value per line. Values are never shown here.")}${env.length?check("clear_env","Clear the existing variables first","Values entered above are added after clearing."):""}<div class="field"><label for="field-extensions">Extensions folder</label><select id="field-extensions" name="extensions"><option value="shared"${!item.own_extensions?" selected":""}>The app’s default extensions</option><option value="own"${item.own_extensions?" selected":""}>Its own extensions folder</option></select></div>`)}</div>`,"Save settings",async(data,el)=>{
       const spec=build(data);if(!spec)throw new Error("Nothing has changed yet.");
       // The dashboard shows private parts of an argument as [hidden]; saving that text would replace the real value.
       if((spec[1].args||[]).some(arg=>arg.includes("[hidden]")))throw Object.assign(new Error("A launch argument still shows [hidden]. Type its full value again, or remove that line."),{field:"args"});
@@ -799,7 +797,7 @@
     form.addEventListener("input",sync);form.addEventListener("change",sync);sync();
   }
   function renameDialog(item){
-    showDialog("Rename profile","The name changes; the profile stays signed in.",`<div class="fields">${field("Current name","current",item.name,"","text","disabled")}${field("New profile name","new_name",item.profile,"The app name is added by aidentity.","text",NAME_RULE)}</div>`,"Rename profile",async(data,el)=>{
+    showDialog(`Rename ${item.name}`,"The name changes; the profile stays signed in.",field("New profile name","new_name",item.profile,"The app name is added by aidentity.","text",NAME_RULE),"Rename profile",async(data,el)=>{
       await action("rename",{name:item.name,new_name:data.get("new_name")},el);
       selected=`${appName(item)} ${data.get("new_name")}`;stored.set(LAST_PROFILE,selected);
       renderView();
@@ -807,10 +805,10 @@
   }
   // An original-account profile has no data of its own, so there is nothing to move to the Trash.
   function removeDialog(item){
-    const body=item.main?`<p class="muted">This is ${escape(appName(item))}’s original account. Removing the profile only stops aidentity from opening it; the app and its sign-in stay as they are.</p>`:`<div class="danger-callout">${icon("alert")}<span>Removes the profile from your workspace. Its data stays on this Mac unless you choose to delete it.</span></div><p class="muted section-gap">With its data kept, you can restore the profile later from Recovery.</p><div class="section-gap">${check("purge","Also move the profile data to the Trash","Its sign-in and local data leave this workspace.")}</div>`;
-    showDialog(`Remove ${item.name}?`,item.main?"The app itself is not touched.":"You can restore it while its data is kept.",body,"Remove profile",async(data,el)=>{await action("remove",{name:item.name,purge:data.has("purge"),confirmed:true},el);if(selected===item.name)selected="";},{danger:true,build:data=>["remove",{name:item.name,purge:data.has("purge"),confirmed:true}],app:appName(item)});
+    const body=item.main?"":check("purge","Also move the profile data to the Trash","Its sign-in and local data leave this workspace."),kept="Its data stays on this Mac, so you can restore it from Recovery.";
+    showDialog(`Remove ${item.name}?`,item.main?`This is ${appName(item)}’s original account. aidentity stops opening it; the app and its sign-in stay as they are.`:kept,body,"Remove profile",async(data,el)=>{await action("remove",{name:item.name,purge:data.has("purge"),confirmed:true},el);if(selected===item.name)selected="";},{danger:true,build:data=>["remove",{name:item.name,purge:data.has("purge"),confirmed:true}],app:appName(item)});
     const purge=$('[name="purge"]',dialog);
-    if(purge)purge.addEventListener("change",()=>{$("#dialog-submit").textContent=purge.checked?"Remove and move data to Trash":"Remove profile";});
+    if(purge)purge.addEventListener("change",()=>{$("#dialog-submit").textContent=purge.checked?"Remove and move data to Trash":"Remove profile";$("#dialog-description").textContent=purge.checked?"Its data moves to the Trash, so Recovery cannot restore it.":kept;});
   }
   // An app-missing profile cannot be fixed by a rebuild alone: say what to do first, then offer the rebuild.
   function repairDialog(item){
@@ -818,9 +816,9 @@
     showDialog(`Repair ${item.name}`,`${app} is not where this profile expects it.`,`<p class="muted">Reinstall ${escape(app)} or move it back to your Applications folder. Then rebuild the profile so it finds the app again. Its data is not touched.</p>`,"Rebuild",null,{build:()=>["rebuild",{name:item.name}],app});
   }
   const targetList=names=>names.length?`<ul class="target-list">${names.map(name=>`<li>${breakable(name)}</li>`).join("")}</ul>`:"";
-  // body is plain text; extra is trusted HTML built with escape() (target lists).
+  // body is plain text, or empty when the description says it all; extra is trusted HTML built with escape() (target lists).
   function confirmAction(titleText,description,body,submit,name,params={},danger=false,extra=""){
-    showDialog(titleText,description,`<p class="muted">${escape(body)}</p>${extra}`,submit,null,{danger,build:()=>[name,params]});
+    showDialog(titleText,description,`${body?`<p class="muted">${escape(body)}</p>`:""}${extra}`,submit,null,{danger,build:()=>[name,params]});
   }
   function importDialog(){
     importDocument=null;
@@ -888,22 +886,22 @@
     if(name==="rename"&&item)return renameDialog(item);
     if(name==="remove"&&item)return removeDialog(item);
     if(name==="open"||name==="quit"||name==="restore"||name==="rebuild")return action(name,{name:el.dataset.name},el);
-    if(name==="restore-all")return confirmAction("Restore all launchers?","Reconnect every restorable profile.",`${plural(state.restorable.length,"recorded profile")} will get new launchers using their existing profile data.`,"Restore all","restore",{all:true},false,targetList(state.restorable.map(entry=>entry.name)));
-    if(name==="rebuild-all")return confirmAction("Rebuild all launchers?","Refresh launcher bundles for every profile.",`${plural(inventory.profiles.length,"launcher")} will be rebuilt. Each profile keeps its data.`,"Rebuild all","rebuild",{all:true});
+    if(name==="restore-all")return confirmAction(`Restore ${plural(state.restorable.length,"profile")}?`,"Each gets a new launcher that uses its kept data.","","Restore all","restore",{all:true},false,targetList(state.restorable.map(entry=>entry.name)));
+    if(name==="rebuild-all")return confirmAction("Rebuild all launchers?",`Makes ${plural(inventory.profiles.length,"launcher")} again from saved settings. Profile data is not touched.`,"","Rebuild all","rebuild",{all:true});
     if(name==="prune"){
       const names=(state.unclaimed||[]).map(entry=>entry.name);
-      return confirmAction("Clear unclaimed data?","Unclaimed data is profile data that no launcher uses. Clearing moves it to the Trash.",`${plural(names.length,"profile folder")} will move to the Trash. Restore the ones you want to keep first.`,"Clear unclaimed data","prune",{confirmed:true},true,targetList(names));
+      return confirmAction("Clear unclaimed data?",`${plural(names.length,"profile folder")} that no launcher uses will move to the Trash.`,"Restore any you want to keep first.","Clear unclaimed data","prune",{confirmed:true},true,targetList(names));
     }
     if(name==="doctor")return action("doctor",{},el);
-    if(name==="doctor-fix")return confirmAction("Check and repair the workspace?","Run doctor with automatic fixes.","Doctor checks the setup, then rebuilds the launchers it can fix.","Check and repair","doctor",{fix:true});
+    if(name==="doctor-fix")return confirmAction("Check and repair the workspace?","Doctor checks your setup, then rebuilds the launchers it can fix.","","Check and repair","doctor",{fix:true});
     if(name==="update-check")return action("update",{check:true},el);
-    if(name==="update")return confirmAction("Install the latest aidentity?","Update this CLI installation.","The CLI checks its release source and installation before replacing the current executable.","Update aidentity","update",{check:false});
+    if(name==="update")return confirmAction("Install the latest aidentity?","aidentity checks the release and its installation before it replaces itself.","","Update aidentity","update",{check:false});
     if(name==="import")return importDialog();
-    if(name==="export")return showDialog("Export profiles?","Download your profiles’ settings as a JSON file.",`<p class="callout">${icon("alert")}<span>The file includes launch settings and can hold private environment or proxy values. Keep it private.</span></p><p class="muted section-gap">Sign-ins and profile data stay on this Mac.</p>`,"Export profiles",async(_,submit)=>{await exportSetup(submit);},{build:()=>["export",{}]});
+    if(name==="export")return showDialog("Export profiles?","Downloads your profiles’ settings as a JSON file. Sign-ins and profile data stay on this Mac.",`<p class="callout">${icon("alert")}<span>The file can hold private environment or proxy values. Keep it private.</span></p>`,"Export profiles",async(_,submit)=>{await exportSetup(submit);},{build:()=>["export",{}]});
     if(name==="help"||name==="completion"){
       const command=guideCommand=$("#help-command").value,params=name==="help"?(command?{command}:{}):{shell:guideShell=$("#completion-shell").value};
       try{guideText=(await readOutput(name,params,el)).stdout;}
-      catch(error){toast(name==="help"?"Could not read the help":"Could not generate completion",error.message,true);return;}
+      catch(error){toast(name==="help"?"Could not read the help":"Could not generate completion",error.message===OFFLINE?"":error.message,true);return;}
       // In one column (900px and below) the output sits under the controls: bring its top into view.
       renderGuide();$(`[data-action="${name}"]`,main)?.focus({preventScroll:true});
       const output=$(".guide-output",main);if(output&&output.getBoundingClientRect().top>innerHeight*.6)output.scrollIntoView({block:"start",behavior:reducedMotion.matches?"instant":"smooth"});

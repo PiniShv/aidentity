@@ -40,7 +40,7 @@
       Math.sign(b.profiles.length) - Math.sign(a.profiles.length) ||
       Math.sign(runningCount(b)) - Math.sign(runningCount(a)) || b.profiles.length - a.profiles.length ||
       a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
-    // The navigator, Prev/Next, the counter and the jump select cover every app, in that order.
+    // The navigator, Prev/Next and the counter cover every app, in that order.
     const nav = groups;
     // app.js owns the hues and gives none to an app without profiles; such an app renders neutral.
     for (const group of groups) {
@@ -88,7 +88,8 @@
     // A launching button is the running action, so the app's lock leaves it alone (aria-busy), as it does for its own buttons.
     const launchingState = (button, on) => { block(button, on); if (on) button.setAttribute("aria-busy", "true"); else button.removeAttribute("aria-busy"); };
     const blocked = button => button.getAttribute("aria-disabled") === "true";
-    const positionHtml = i => `<span aria-hidden="true">${i + 1} of ${nav.length}</span><span class="xp-sr-only">${esc(nav[i].name)}, ${i + 1} of ${nav.length}, ${profileCount(nav[i].profiles.length)}</span>`;
+    const positionText = i => `${nav[i].name}, ${i + 1} of ${nav.length}, ${profileCount(nav[i].profiles.length)}`;
+    const positionHtml = i => `<span aria-hidden="true">${i + 1} of ${nav.length}</span><span class="xp-sr-only">${esc(positionText(i))}</span>`;
     const listen = (element, event, handler, options) => {
       element.addEventListener(event, handler, options);
       cleanup.push(() => element.removeEventListener(event, handler, options));
@@ -104,7 +105,7 @@
     // One running mark everywhere: a Mint dot and Mint text. Not running carries no dot.
     const runMark = text => `<span class="xp-run"><span class="xp-dot" aria-hidden="true"></span>${text}</span>`;
     const appRunning = group => runningCount(group) ? runMark(`${runningCount(group)} running`) : "";
-    const face = group => `<div class="xp-face" style="${accentStyle(group)}"><span class="xp-app-icon" aria-hidden="true">${icon(group.name)}</span><div class="xp-face-text"><h2 class="xp-card-name">${esc(group.name)}</h2><p class="xp-card-foot"><span>${profileCount(group.profiles.length)}</span>${appRunning(group)}</p></div></div>`;
+    const face = group => `<div class="xp-face" style="${accentStyle(group)}"><span class="xp-app-icon" aria-hidden="true">${icon(group.name)}</span><div class="xp-face-text"><h2 class="xp-card-name">${esc(group.name)}</h2>${runningCount(group) ? `<p class="xp-card-foot">${appRunning(group)}</p>` : ""}</div></div>`;
     const keyHtml = profile => {
       const running = profile.status === "running", missing = profile.status === "app missing";
       return `<li class="xp-key${running ? " xp-key-running" : ""}${missing ? " xp-key-missing" : ""}${lit.delete(profile.name) ? " xp-key-lit" : ""}">
@@ -118,10 +119,10 @@
     };
     const navRow = (group, i) => `<li><button type="button" class="xp-nav-item" data-xp-app="${esc(group.name)}" data-xp-select="${i}" style="${accentStyle(group)}" aria-describedby="xp-select-hint" aria-current="${i === active}"><span class="xp-list-icon" aria-hidden="true">${icon(group.name)}</span><span class="xp-nav-text"><span class="xp-app-name">${esc(group.name)}</span><span class="xp-app-meta"><span>${profileCount(group.profiles.length)}${group.installed ? "" : inventoryFailed ? " · Inventory unavailable" : " · App not found"}</span>${appRunning(group)}</span></span></button></li>`;
     root.innerHTML = `<div class="xp-wrap">
-      <header class="xp-header"><span class="tile section-explore" aria-hidden="true">${uiIcon("explore")}</span><div><h1 tabindex="-1">Explore</h1><p>${profiles.length ? "Choose an app. Open a profile or add another." : "Choose an app and add its first profile."}</p></div></header>${errorNotice}
+      <header class="xp-header"><span class="tile section-explore" aria-hidden="true">${uiIcon("explore")}</span><div><h1 tabindex="-1">Explore</h1>${!nav.length ? "" : `<p>${profiles.length ? "Choose an app. Open a profile or add another." : "Choose an app and add its first profile."}</p>`}</div></header>${errorNotice}
       ${nav.length ? `<div class="xp-layout">
         <section class="xp-preview" data-xp-preview="${esc(nav[active].name)}" aria-label="Selected app">
-          <div class="xp-pager"${nav.length > 1 ? "" : " hidden"}><button type="button" class="xp-button xp-prev" aria-label="Previous app">${uiIcon("back")}</button><span class="xp-position" aria-live="polite" aria-atomic="true" data-at="${active}">${positionHtml(active)}</span><button type="button" class="xp-button xp-next" aria-label="Next app">${uiIcon("arrow")}</button><label class="xp-jump-label"><span class="xp-sr-only">Choose app</span><select class="xp-jump" aria-label="Choose app">${nav.map((group, i) => `<option value="${i}">${esc(group.name)}</option>`).join("")}</select></label></div>
+          <div class="xp-pager"${nav.length > 1 ? "" : " hidden"}><button type="button" class="xp-button xp-prev" aria-label="Previous app">${uiIcon("back")}</button><span class="xp-position" data-at="${active}">${positionHtml(active)}</span><button type="button" class="xp-button xp-next" aria-label="Next app">${uiIcon("arrow")}</button></div>
           <div class="xp-ident">${face(nav[active])}</div>
           <ul class="xp-keys"></ul>
           <div class="xp-empty" data-xp-none hidden><p></p></div>
@@ -132,7 +133,6 @@
         </section>
         <div class="xp-app-list" role="region" aria-label="Apps">
           <span id="xp-select-hint" hidden>Shows this app's profiles</span>
-          <div class="xp-list-summary"><span>${nav.length} ${nav.length === 1 ? "app" : "apps"}</span><span>${profileCount(profiles.length)}</span></div>
           <ul class="xp-nav">${nav.map(navRow).join("")}</ul>
         </div>
       </div>` : errorNotice ? "" : `<section class="xp-empty"><h2>No AI apps found</h2><p>Install Claude or ChatGPT, then refresh this workspace.</p><button type="button" class="xp-button xp-primary xp-empty-refresh">${uiIcon("refresh")}Refresh apps</button></section>`}
@@ -141,7 +141,6 @@
     const keys = root.querySelector(".xp-keys"), feedback = root.querySelector(".xp-inline-feedback");
     const none = root.querySelector("[data-xp-none]");
     const addKey = root.querySelector(".xp-key-add"), addHelp = root.querySelector("#xp-add-help"), live = root.querySelector("[data-xp-live]");
-    const jump = root.querySelector(".xp-jump");
     const prev = root.querySelector(".xp-prev"), next = root.querySelector(".xp-next");
     const position = root.querySelector(".xp-position");
     const navButtons = [...root.querySelectorAll("[data-xp-select]")];
@@ -160,9 +159,8 @@
       callbacks.focusApp?.(group.name);
       preview.setAttribute("style", accentStyle(group));
       preview.setAttribute("aria-label", `${group.name}, ${profileCount(group.profiles.length)}`);
-      // Rewrite only on a real change, so the live region speaks once per app.
-      if (position.dataset.at !== String(active)) { position.dataset.at = String(active); position.innerHTML = positionHtml(active); }
-      jump.value = String(active);
+      // Rewrite only on a real change, so the status speaks once per app. It sits outside the pager, which is hidden from 768px.
+      if (position.dataset.at !== String(active)) { position.dataset.at = String(active); position.innerHTML = positionHtml(active); live.textContent = positionText(active); }
       block(prev, active === 0);
       block(next, active === nav.length - 1);
       if (keys.dataset.app !== group.name) {
@@ -193,7 +191,7 @@
       old.animate({ opacity: [1, 0] }, { ...timing, fill: "forwards" }).onfinish = () => old.remove();
       ident.lastElementChild.animate({ opacity: [0, 1] }, timing);
     }
-    // The only ways to change the app: the select, Prev/Next and a navigator row. Each is remembered.
+    // The only ways to change the app: a navigator row, and Prev/Next on phones. Each is remembered.
     function choose(index) {
       index = Math.min(nav.length - 1, Math.max(0, index));
       if (index !== active) {
@@ -240,7 +238,6 @@
       });
       listen(prev, "click", () => { if (!blocked(prev)) choose(active - 1); });
       listen(next, "click", () => { if (!blocked(next)) choose(active + 1); });
-      listen(jump, "change", () => choose(Number(jump.value)));
       navButtons.forEach(button => listen(button, "click", () => {
         choose(Number(button.dataset.xpSelect));
         // A row shows its app in the panel, so bring the panel back if it scrolled away (the stacked mobile layout).
