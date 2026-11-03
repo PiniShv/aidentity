@@ -5,8 +5,10 @@ import io
 import json
 import os
 from pathlib import Path
+import plistlib
 import re
 import shlex
+import struct
 import subprocess
 import sys
 import tempfile
@@ -15,6 +17,7 @@ import time
 import unittest
 from unittest import mock
 import urllib.parse
+import zlib
 
 SERVER_PATH = Path(__file__).resolve().parents[1] / "dashboard" / "server.py"
 
@@ -139,12 +142,39 @@ class DashboardTests(unittest.TestCase):
     def calls(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
 
+    def install(self, name, icon):
+        """A fake app in the search dir; with icon, a real 128px .icns made by sips from a generated PNG."""
+        bundle = self.root / "Installed" / (name + ".app")
+        (bundle / "Contents" / "Resources").mkdir(parents=True)
+        info = {"CFBundleIdentifier": "test." + name.replace(" ", "")}
+        if icon:
+            info["CFBundleIconFile"] = "AppIcon"
+            chunk = lambda kind, data: (struct.pack(">I", len(data)) + kind + data
+                                        + struct.pack(">I", zlib.crc32(kind + data)))
+            png = self.root / "icon.png"
+            png.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 128, 128, 8, 6, 0, 0, 0))
+                            + chunk(b"IDAT", zlib.compress((b"\x00" + bytes((217, 119, 87, 255)) * 128) * 128))
+                            + chunk(b"IEND", b""))
+            subprocess.run(["/usr/bin/sips", "-s", "format", "icns", str(png), "--out",
+                            str(bundle / "Contents" / "Resources" / "AppIcon.icns")],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30, check=True)
+        with open(bundle / "Contents" / "Info.plist", "wb") as handle:
+            plistlib.dump(info, handle)
+
+    def icon(self, query, headers=None):
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        connection.request("GET", "/api/app-icon?" + query, headers=headers or {})
+        response = connection.getresponse()
+        result = (response.status, dict(response.getheaders()), response.read())
+        connection.close()
+        return result
+
     def test_state_uses_cli_inventory_and_hides_proxy_credentials(self):
         status, headers, state = self.request("GET", "/api/state")
         self.assertEqual(status, 200)
         self.assertTrue(state["ok"])
         self.assertEqual(state["version"], "1.6.1")
-        self.assertEqual(state["apps"], [{"name": "Claude"}, {"name": "Visual Studio Code"}])
+        self.assertEqual(state["apps"], [{"name": "Claude", "icon": False}, {"name": "Visual Studio Code", "icon": False}])
         self.assertEqual(state["restorable"], [{"name": "Claude Personal"}])
         self.assertEqual(state["unclaimed"], [{"name": "Claude Personal"}, {"name": "stray-folder"}])
         self.assertEqual(state["profiles"][0]["env"], ["HTTPS_PROXY"])
@@ -152,6 +182,49 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(state["csrf_token"], self.token)
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertNotIn("Access-Control-Allow-Origin", headers)
+
+    @unittest.skipUnless(os.path.exists("/usr/bin/sips"), "sips converts app icons")
+    def test_state_flags_which_apps_have_their_own_icon(self):
+        self.install("Claude", icon=True)
+        self.install("Visual Studio Code", icon=False)
+        state = self.backend.state()
+        self.assertEqual(state["apps"], [{"name": "Claude", "icon": True}, {"name": "Visual Studio Code", "icon": False}])
+        # The profile's recorded app is gone, so its icon comes from the app the search dir holds.
+        self.assertIs(state["profiles"][0]["app_icon"], True)
+
+    @unittest.skipUnless(os.path.exists("/usr/bin/sips"), "sips converts app icons")
+    def test_app_icon_serves_a_png_of_a_listed_app_only(self):
+        self.install("Claude", icon=True)
+        self.install("Visual Studio Code", icon=False)
+        self.backend.state()
+        status, headers, body = self.icon("app=Claude")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "image/png")
+        self.assertTrue(body.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertLessEqual(struct.unpack(">II", body[16:24]), (128, 128))
+        self.assertEqual(headers["Cache-Control"], "private, max-age=3600")
+        self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
+        with mock.patch.object(self.module.subprocess, "run", side_effect=AssertionError("converted twice")):
+            self.assertEqual(self.backend.app_icon("Claude"), body)
+        for query in ("app=Visual%20Studio%20Code", "app=Slack", "app=..%2FClaude", "app=Claude%2F..",
+                      "app=..", "app=Claude.app%2FContents", "", "app=Claude&app=Claude"):
+            with self.subTest(query=query):
+                status, headers, body = self.icon(query)
+                self.assertEqual(status, 404)
+                self.assertEqual(headers["Content-Type"], "application/json; charset=utf-8")
+        status, _, _ = self.icon("app=Claude", headers={"Host": "attacker.example"})
+        self.assertEqual(status, 403)
+
+    def test_app_icon_is_none_when_sips_is_missing_or_fails(self):
+        icns = self.root / "AppIcon.icns"
+        icns.write_bytes(b"not an icon")
+        self.backend.icons = {"Claude": str(icns)}
+        for failure in (FileNotFoundError("sips"), subprocess.TimeoutExpired("sips", 10),
+                        subprocess.CompletedProcess([], 1)):
+            with self.subTest(failure=failure):
+                effect = {"return_value": failure} if isinstance(failure, subprocess.CompletedProcess) else {"side_effect": failure}
+                with mock.patch.object(self.module.subprocess, "run", **effect):
+                    self.assertIsNone(self.backend.app_icon("Claude"))
 
     def test_unclaimed_data_that_cannot_be_read_is_an_error_not_a_partial_list(self):
         run = self.backend.run

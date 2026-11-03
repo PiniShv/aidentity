@@ -8,6 +8,7 @@ import json
 import mimetypes
 import os
 from pathlib import Path
+import plistlib
 import re
 import secrets
 import shlex
@@ -16,6 +17,7 @@ import socket
 import socketserver
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from urllib.parse import parse_qs, urlsplit
@@ -145,6 +147,19 @@ def update_versions(output):
     return {"installed": match[1] if match else None, "available": match[2] if match else None}
 
 
+def app_icns(bundle):
+    """The .icns an app declares, found as src/30-apps.sh app_icns finds it; None when it declares none."""
+    try:
+        with open(os.path.join(bundle, "Contents", "Info.plist"), "rb") as handle:
+            name = plistlib.load(handle).get("CFBundleIconFile")
+    except Exception:  # missing, unreadable or malformed: an app without an icon, never a failed inventory
+        return None
+    if not isinstance(name, str) or not name or "/" in name:
+        return None
+    path = os.path.join(bundle, "Contents", "Resources", name.removesuffix(".icns") + ".icns")
+    return path if os.path.isfile(path) else None
+
+
 def parse_port(value):
     try:
         port = int(value)
@@ -221,6 +236,8 @@ class Dashboard:
         self.processes = set()
         self.stopped = False
         self.state_cache = None
+        self.icons = {}  # app name -> its .icns, from the last inventory read
+        self.icon_cache = {}  # .icns path -> (mtime, PNG)
 
     def stop(self):
         """Stopping the dashboard must also stop the CLI operations it started."""
@@ -346,11 +363,24 @@ class Dashboard:
                 profiles = []
                 errors.append("Profiles: aidentity returned invalid profile JSON.")
         home = self.env.get("HOME", os.path.expanduser("~"))
+        names = [name for name in apps["stdout"].splitlines() if name] if apps["ok"] else []
+        # An icon comes only from a bundle the CLI named: a profile's app_path, then <dir>/<name>.app in its app_search_dirs.
+        dirs = [d[:-1] if d.endswith("/") else d
+                for d in (self.env.get("AIDENTITY_APP_DIRS") or "/Applications:" + home + "/Applications").split(":") if d]
+        bundles = {}
+        for profile in profiles:
+            if isinstance(profile.get("app"), str) and isinstance(profile.get("app_path"), str):
+                bundles.setdefault(profile["app"], []).append(profile["app_path"])
+        for name in names:
+            bundles.setdefault(name, []).extend(d + "/" + name + ".app" for d in dirs)
+        self.icons = {name: icns for name, paths in bundles.items() if (icns := next(filter(None, map(app_icns, paths)), None))}
+        for profile in profiles:
+            profile["app_icon"] = isinstance(profile.get("app"), str) and profile["app"] in self.icons
         return {
             "ok": True, "csrf_token": self.csrf_token,
             "version": redact(version["stdout"]).strip().removeprefix("aidentity "),
             "profiles": profiles,
-            "apps": [{"name": name} for name in apps["stdout"].splitlines() if name] if apps["ok"] else [],
+            "apps": [{"name": name, "icon": name in self.icons} for name in names],
             "restorable": [{"name": name} for name in restorable["stdout"].splitlines() if name] if restorable["ok"] else [],
             "unclaimed": [{"name": name} for name in orphans["stdout"].splitlines() if name] if orphans["ok"] else [],
             # A failed read is not an empty list; the page must not claim "Nothing to restore" for one.
@@ -360,6 +390,32 @@ class Dashboard:
                 "data": os.path.abspath(self.env.get("AIDENTITY_DATA_ROOT") or os.path.join(home, "Library/Application Support/aidentity/profiles")),
             }, "errors": errors,
         }
+
+    def app_icon(self, name):
+        """An app's own icon as a PNG of 128px at most, for an app the last inventory read named; None when it has none."""
+        path = self.icons.get(name)
+        if path is None:
+            return None
+        try:
+            version = os.stat(path).st_mtime_ns
+        except OSError:
+            return None
+        cached = self.icon_cache.get(path)
+        if cached and cached[0] == version:
+            return cached[1]
+        with tempfile.TemporaryDirectory() as folder:
+            target = os.path.join(folder, "icon.png")
+            try:
+                done = subprocess.run(["/usr/bin/sips", "-s", "format", "png", "-Z", "128", path, "--out", target],
+                                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                      timeout=10, shell=False, check=False)
+                png = Path(target).read_bytes() if done.returncode == 0 else b""
+            except (OSError, subprocess.TimeoutExpired):
+                png = b""
+        if not png.startswith(b"\x89PNG\r\n\x1a\n"):
+            return None
+        self.icon_cache[path] = (version, png)
+        return png
 
     def command(self, payload):
         if not isinstance(payload, dict):
@@ -528,10 +584,10 @@ def make_server(dashboard, port=0, assets=None):
             # Request bodies, query strings and command output may contain secrets.
             pass
 
-        def headers_safe(self, mime, length):
+        def headers_safe(self, mime, length, cache="no-store"):
             self.send_header("Content-Type", mime)
             self.send_header("Content-Length", str(length))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", cache)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
             self.send_header("Referrer-Policy", "no-referrer")
@@ -541,13 +597,13 @@ def make_server(dashboard, port=0, assets=None):
                              "object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
             self.end_headers()
 
-        def respond(self, status, data, mime="application/json; charset=utf-8"):
+        def respond(self, status, data, mime="application/json; charset=utf-8", cache="no-store"):
             if mime.startswith("application/json"):
                 body = json.dumps(data, ensure_ascii=False, allow_nan=False).encode("utf-8")
             else:
                 body = data.encode("utf-8") if isinstance(data, str) else data
             self.send_response(status)
-            self.headers_safe(mime, len(body))
+            self.headers_safe(mime, len(body), cache)
             self.wfile.write(body)
 
         def check_request(self, write=False):
@@ -579,6 +635,14 @@ def make_server(dashboard, port=0, assets=None):
                 if path == "/api/state":
                     self.check_owner()
                     self.respond(200, dashboard.state(fresh=parse_qs(url.query).get("fresh") == ["1"]))
+                elif path == "/api/app-icon":
+                    self.check_owner()
+                    names = parse_qs(url.query).get("app", [])
+                    png = dashboard.app_icon(names[0]) if len(names) == 1 else None
+                    if png is None:
+                        raise RequestError("This app has no icon to show.", 404)
+                    # An icon changes only with its app; a reload reuses it instead of asking again.
+                    self.respond(200, png, "image/png", cache="private, max-age=3600")
                 elif path in registered:
                     mime = "text/html" if path == "/" else mimetypes.guess_type(path)[0] or "text/plain"
                     self.respond(200, registered[path], mime + "; charset=utf-8")

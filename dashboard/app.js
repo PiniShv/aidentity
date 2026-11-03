@@ -67,6 +67,13 @@
   const colors=[["Mint",hueToken("mint","#5fe08a")],...hueNames.map((hue,i)=>[hue[0].toUpperCase()+hue.slice(1),appPalette[i]])].map(([name,hex])=>[name,hex.slice(1).toUpperCase()]).concat([["Gray","8D8B84"],["Graphite","262624"]]);
   const appAccentAssignments=new Map();
   let huedApps=new Set();
+  // Apps the server can show their own installed icon for (state: apps[].icon, profiles[].app_icon).
+  let iconApps=new Set();
+  // An installed icon's own color as a hue angle (null for a neutral icon), learned once per page by learnIconAngles.
+  const iconAngles=new Map();
+  const hueAngle=(r,g,b)=>{const max=Math.max(r,g,b),c=max-Math.min(r,g,b);return c?((max===r?(g-b)/c+6:max===g?(b-r)/c+2:(r-g)/c+4)*60)%360:0;};
+  const paletteAngles=appPalette.map(hex=>hueAngle(...[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16))));
+  const arc=(a,b)=>{const d=Math.abs(a-b)%360;return Math.min(d,360-d);};
   const appKey=name=>String(name||"App").trim().toLowerCase();
   // One app order everywhere: by name, numbers compared as numbers ("ChatGPT 2" after "ChatGPT").
   const byName=(a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"});
@@ -82,14 +89,38 @@
     const used=new Set(),fresh=[];
     for(const name of names){const index=appAccentAssignments.get(appKey(name));if(index!==undefined&&!used.has(index))used.add(index);else fresh.push(name);}
     for(const name of fresh){
-      const preferred=appHash(name)%appPalette.length;
-      let index=preferred;
-      for(let offset=0;offset<appPalette.length;offset++){
-        const candidate=(preferred+offset)%appPalette.length;
-        if(!used.has(candidate)){index=candidate;break;}
-      }
+      // An app with a colored installed icon takes the palette hue nearest the icon's own color, so icon and hue read as one;
+      // any other app takes its name's hash. Either way, the next free hue on a collision.
+      const preferred=appHash(name)%appPalette.length,angle=iconAngles.get(appKey(name));
+      const order=appPalette.map((_,offset)=>(preferred+offset)%appPalette.length);
+      if(angle!=null)order.sort((a,b)=>arc(angle,paletteAngles[a])-arc(angle,paletteAngles[b]));
+      const index=order.find(candidate=>!used.has(candidate))??order[0];
       appAccentAssignments.set(appKey(name),index);used.add(index);
     }
+  }
+  // Reads each new app icon's chroma-weighted mean hue over its pixels before that app gets its hue. The PNG is same-origin
+  // (server.py /api/app-icon), so the canvas stays readable, and the <img> tiles reuse the cached response.
+  function learnIconAngles(profiles){
+    const names=[...new Set(profiles.map(appName))].filter(name=>iconApps.has(name)&&!iconAngles.has(appKey(name)));
+    return Promise.all(names.map(name=>new Promise(resolve=>{
+      const image=new Image();
+      // shortcut: an icon slower than 2s leaves this page on the name's hash hue; a reload reads it again.
+      setTimeout(resolve,2000);
+      image.onerror=()=>{iconAngles.set(appKey(name),null);resolve();};
+      image.onload=()=>{
+        const canvas=document.createElement("canvas");canvas.width=canvas.height=32;
+        const context=canvas.getContext("2d",{willReadFrequently:true});context.drawImage(image,0,0,32,32);
+        const pixels=context.getImageData(0,0,32,32).data;let x=0,y=0,weight=0;
+        for(let i=0;i<pixels.length;i+=4){
+          const r=pixels[i],g=pixels[i+1],b=pixels[i+2],alpha=pixels[i+3]/255,chroma=(Math.max(r,g,b)-Math.min(r,g,b))*alpha,h=hueAngle(r,g,b)*Math.PI/180;
+          x+=chroma*Math.cos(h);y+=chroma*Math.sin(h);weight+=alpha;
+        }
+        // A mean chroma under 24 of 255 is a neutral icon (ChatGPT's black and white): no hue of its own, so the hash picks.
+        iconAngles.set(appKey(name),weight&&Math.hypot(x,y)/weight>=24?(Math.atan2(y,x)*180/Math.PI+360)%360:null);
+        resolve();
+      };
+      image.src=`/api/app-icon?app=${encodeURIComponent(name)}`;
+    })));
   }
   // {color}: the app's hue, or null for an app with no profiles, which renders neutral (Explore reads this too).
   const appAccent=name=>({color:huedApps.has(appKey(name))?appPalette[appAccentAssignments.get(appKey(name))]:null});
@@ -197,7 +228,10 @@
     const {summary,findings,stdout,stderr}=lastDoctor.result;
     stored.set(DOCTOR,JSON.stringify({result:Array.isArray(findings)?{summary,findings}:{summary,stdout,stderr},at:lastDoctor.at,flags:[...doctorFlags]}));
   }
+  // An app is drawn with its own installed icon (server.py /api/app-icon), never with artwork shipped here. alt is empty: its name is always beside it.
+  const appIcon=name=>iconApps.has(name)?`<img class="app-icon" src="/api/app-icon?app=${encodeURIComponent(name)}" width="128" height="128" alt="" decoding="async" draggable="false">`:"";
   const appGlyph = name => {
+    if(iconApps.has(name)) return appIcon(name);
     const n = String(name).toLowerCase();
     // Hugeicons brand marks (24px grid) where the free set has one; Cursor, Edge and Brave keep their own drawn marks (32px grid).
     let huge = "", paths = "";
@@ -254,9 +288,9 @@
   function renderNav() {
     if(!$("#primary-nav").children.length)$("#primary-nav").innerHTML=navigation.map(([id,label,glyph])=>`<button class="nav-item section-${id}" data-view="${id}" title="${label}">${tile(id,glyph)}<span class="nav-label">${label}</span></button>`).join("");
     const apps = [...new Set((state?.profiles || []).map(appName))].sort(byName);
-    const appsKey=JSON.stringify([apps.map(name=>[name,appAccent(name).color]),Boolean(state?.errors?.length),Boolean(state)]);
-    // Expanded: an 8px dot in the app's hue. Collapsed rail: the app's initial on its hue, named by the focus tooltip.
-    if(appsKey!==navApps){navApps=appsKey;keepFocus(()=>{$("#app-nav").innerHTML=apps.map(name=>{const t=tone(name);return `<button class="nav-item nav-app${t.cls}"${t.style} data-app-filter="${escape(name)}" title="${escape(name)}"><span class="app-mini" aria-hidden="true"><span class="nav-app-dot"></span><span class="nav-app-initial">${escape([...name][0].toUpperCase())}</span></span><span class="nav-label">${escape(name)}</span></button>`;}).join("") || (state?`<p class="small nav-label" style="padding:0 12px">${state.errors?.length?"Inventory unavailable":"No profiles yet"}</p>`:"");});}
+    const appsKey=JSON.stringify([apps.map(name=>[name,appAccent(name).color,iconApps.has(name)]),Boolean(state?.errors?.length),Boolean(state)]);
+    // The app's own icon, at the label's size (24px on the collapsed rail). Without one: an 8px dot in its hue, and on the rail its initial on its hue. The focus tooltip names it.
+    if(appsKey!==navApps){navApps=appsKey;keepFocus(()=>{$("#app-nav").innerHTML=apps.map(name=>{const t=tone(name);return `<button class="nav-item nav-app${t.cls}"${t.style} data-app-filter="${escape(name)}" title="${escape(name)}"><span class="app-mini" aria-hidden="true">${appIcon(name)||`<span class="nav-app-dot"></span><span class="nav-app-initial">${escape([...name][0].toUpperCase())}</span>`}</span><span class="nav-label">${escape(name)}</span></button>`;}).join("") || (state?`<p class="small nav-label" style="padding:0 12px">${state.errors?.length?"Inventory unavailable":"No profiles yet"}</p>`:"");});}
     // The highlight (the current item's ::before) slides in from where the old one is on screen, mid-slide included.
     const was=$("#sidebar [data-view][aria-current]"),now=$(`#sidebar [data-view="${view}"]`),top=el=>el.getBoundingClientRect().top+(parseFloat(getComputedStyle(el,"::before").translate.split(" ")[1])||0);
     const from=was&&now&&was!==now?top(was)-now.getBoundingClientRect().top:0;
@@ -278,7 +312,8 @@
   $("#sidebar").addEventListener("focusout",hideRailTip);
   function errorNotice(){return (state.errors||[]).length?`<div class="notice error" tabindex="0">${state.errors.map(escape).join("<br>")}</div>`:"";}
   function setupError(){return `<div class="empty-state"><h2>aidentity could not read your setup</h2>${errorNotice()}<div class="section-gap">${button("Retry","refresh",{primary:true,icon:"refresh"})}</div></div>`;}
-  function title(name,description="",actions=""){const glyph=view==="guide"?"book":navigation.find(item=>item[0]===view)?.[2];return `<div class="title-row"><div class="title-main">${glyph?tile(view,glyph):""}<div><h1 tabindex="-1">${escape(name)}</h1>${description?`<p>${escape(description)}</p>`:""}</div></div>${actions?`<div class="title-actions">${actions}</div>`:""}</div>`;}
+  // Profiles filtered to one app leads with that app's own icon in place of the section tile.
+  function title(name,description="",actions=""){const glyph=view==="guide"?"book":navigation.find(item=>item[0]===view)?.[2],own=view==="profiles"&&appFilter?appIcon(appFilter):"";return `<div class="title-row"><div class="title-main">${own?`<span class="title-app" aria-hidden="true">${own}</span>`:glyph?tile(view,glyph):""}<div><h1 tabindex="-1">${escape(name)}</h1>${description?`<p>${escape(description)}</p>`:""}</div></div>${actions?`<div class="title-actions">${actions}</div>`:""}</div>`;}
   function searchField(placeholder){return `<div class="search-field">${icon("search")}<input id="workspace-search" class="input" type="search" aria-keyshortcuts="/" aria-label="${escape(placeholder)}" placeholder="${escape(placeholder)}" value="${escape(query)}">${query?`<button class="icon-button" data-action="clear-search" aria-label="Clear search">${icon("x")}</button>`:""}</div>`;}
   // educalvolpz Animated Tabs translated to native tabs with measured sliding indicator.
   // count null: not counted yet, so a muted dash and the tab's title say why.
@@ -568,7 +603,10 @@
       const firstLoad=!state,was=new Map((state?.profiles||[]).map(item=>[item.name,item.status]));
       // inventory keeps every entry for counts of CLI-wide actions and the import preview; recovery lists stay whole in state too.
       inventory=data;
-      state={...data,apps:data.apps.filter(item=>AI_APPS.includes(item.name)),profiles:data.profiles.filter(item=>AI_APPS.includes(appName(item)))};
+      iconApps=new Set([...data.apps.filter(item=>item.icon).map(item=>item.name),...data.profiles.filter(item=>item.app_icon).map(appName)]);
+      const profiles=data.profiles.filter(item=>AI_APPS.includes(appName(item)));
+      await learnIconAngles(profiles);
+      state={...data,apps:data.apps.filter(item=>AI_APPS.includes(item.name)),profiles};
       registerAppAccents(state);
       for(const item of state.profiles)if(item.status==="running"&&was.has(item.name)&&was.get(item.name)!=="running")litCards.add(item.name);
       loadedAt=new Date();$("#freshness").textContent=`Updated ${time(loadedAt)}`;

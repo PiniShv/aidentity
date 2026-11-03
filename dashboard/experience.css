@@ -83,6 +83,9 @@
 /* A profile with no badge shows the app's own icon, as its launcher does. */
 .xp-key-badge-app{background:var(--app-color,var(--raised));color:var(--app-ink,var(--text))}
 .xp-key-badge-app svg{width:20px;height:20px}
+/* An app's own installed icon fills its tile whole, on nothing (styles.css .app-icon). */
+.xp-app-icon:has(>.app-icon),.xp-list-icon:has(>.app-icon),.xp-key-badge-app:has(>.app-icon){position:relative;background:none}
+.xp-app-icon>.app-icon,.xp-list-icon>.app-icon,.xp-key-badge-app>.app-icon{position:absolute;inset:0;width:100%;height:100%}
 
 /* Navigator: one row per app, apps with profiles first. A row chooses the app; profile actions live only on the keys. */
 .xp-nav{display:grid;gap:4px;margin:0 0 16px;padding:0;list-style:none}
