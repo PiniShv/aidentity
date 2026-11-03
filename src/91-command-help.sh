@@ -39,8 +39,10 @@ USAGE
   aidentity dashboard [options]
 
 Starts the visual account manager at 127.0.0.1 and opens your browser. It uses
-the same profiles and operations as the CLI. Keep this terminal open; Ctrl+C
-stops the server. The server is reachable only from this Mac.
+the same profiles and operations as the CLI. The server runs in the background
+and keeps running after this terminal closes, until 'aidentity dashboard
+--stop'. Running the command again while it runs opens the same dashboard. The
+server is reachable only from this Mac.
 
 Python 3.9 or newer is required for the dashboard. No Python packages are
 needed. Other aidentity commands work without Python.
@@ -48,11 +50,13 @@ needed. Other aidentity commands work without Python.
 OPTIONS
   --port PORT         Port from 0 to 65535 (default: 0, choose a free port)
   --no-open           Print the address without opening a browser
+  --stop              Stop the running dashboard
 
 EXAMPLES
   aidentity dashboard
   aidentity dashboard --port 8765
   aidentity dashboard --no-open
+  aidentity dashboard --stop
 EOF
     ;;
     setup) cat <<'EOF'

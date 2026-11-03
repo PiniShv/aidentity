@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a 3D preview adapted from 21st.dev's Works Wheel. The optional dashboard needs Python 3.9+ without extra
   packages and is bundled into the same single-file install.
 
+- `aidentity dashboard` runs its server in the background and gives the prompt
+  back at once. The server keeps running after the terminal closes, until
+  `aidentity dashboard --stop`. Running `aidentity dashboard` again while it
+  runs opens the same dashboard; asking for another `--port` then says to stop
+  it first.
+
 - The dashboard's ground is a slow field of faint glyphs behind the sidebar and
   the workspace, adapted from 21st.dev's Background ASCII Dither. It holds still
   under reduced motion and is gone under increased contrast.

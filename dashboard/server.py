@@ -1,6 +1,7 @@
 """Optional, loopback-only dashboard; all operations use the existing CLI."""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import fcntl
 import hmac
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -221,7 +222,7 @@ class Dashboard:
         self.state_cache = None
 
     def stop(self):
-        """A terminal interrupt must also stop detached CLI operations."""
+        """Stopping the dashboard must also stop the CLI operations it started."""
         with self.process_lock:
             self.stopped = True
             active = list(self.processes)
@@ -628,14 +629,88 @@ def make_server(dashboard, port=0, assets=None):
     return server
 
 
+def take_lock(fd):
+    """True when no dashboard runs: the running one holds this lock for its whole life."""
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return False
+    return True
+
+
+def read_state(fd):
+    try:
+        state = json.loads(os.pread(fd, 4096, 0) or b"{}")
+    except ValueError:
+        return {}
+    return state if isinstance(state, dict) else {}
+
+
+def number(state, key):
+    value = state.get(key)
+    return value if type(value) is int and value > 0 else None  # bool and 0 would be valid ints to os.kill
+
+
+def open_browser(url, no_open):
+    if no_open:
+        return
+    try:
+        subprocess.run(["open", url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=10, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        print("Open the dashboard address above in your browser.", flush=True)
+
+
+def stop_running(parser, fd):
+    if take_lock(fd):
+        print("No dashboard is running.")
+        return 0
+    pid = number(read_state(fd), "pid")
+    if pid is None:
+        parser.exit(1, "The dashboard is still starting. Try again in a moment.\n")
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass  # it already ended; its lock goes with it
+    except PermissionError:
+        parser.exit(1, "Could not stop the dashboard (process %d): permission denied.\n" % pid)
+    # The dashboard first gives any CLI command it started TERM_GRACE seconds to roll back.
+    deadline = time.monotonic() + TERM_GRACE + 2
+    while time.monotonic() < deadline:
+        if take_lock(fd):
+            print("Dashboard stopped.")
+            return 0
+        time.sleep(0.1)
+    parser.exit(1, "The dashboard (process %d) did not stop. Try 'aidentity dashboard --stop' again.\n" % pid)
+
+
 def main(argv=None, assets=None):
     parser = argparse.ArgumentParser(description="Run the optional aidentity localhost dashboard.")
     parser.add_argument("cli", help="Path to the installed aidentity executable")
     parser.add_argument("--port", type=parse_port, default=0)
     parser.add_argument("--no-open", action="store_true")
+    parser.add_argument("--stop", action="store_true")
+    parser.add_argument("--state", required=True, help="the file that names the running dashboard")
     options = parser.parse_args(argv)
     if not os.path.isfile(options.cli) or not os.access(options.cli, os.X_OK):
         parser.error("the aidentity executable is not available")
+    os.makedirs(os.path.dirname(os.path.abspath(options.state)), mode=0o700, exist_ok=True)
+    state = os.open(options.state, os.O_RDWR | os.O_CREAT, 0o600)
+    if options.stop:
+        return stop_running(parser, state)
+    if not take_lock(state):
+        port = number(read_state(state), "port")
+        if port is None:
+            parser.exit(1, "The dashboard is still starting. Try again in a moment.\n")
+        url = "http://127.0.0.1:" + str(port)
+        if options.port and options.port != port:
+            parser.exit(1, "A dashboard is already running at %s. Run 'aidentity dashboard --stop' first "
+                           "to use another port.\n" % url)
+        print("aidentity dashboard: " + url + " (already running)", flush=True)
+        print("Stop it with 'aidentity dashboard --stop'.", flush=True)
+        open_browser(url, options.no_open)
+        return 0
+    os.ftruncate(state, 0)  # a stale address must not be reused while this one starts
     if assets is None:
         assets = globals().get("ASSETS")
     if assets is None:
@@ -650,22 +725,32 @@ def main(argv=None, assets=None):
     except OSError:
         parser.exit(1, "The dashboard port is unavailable. Choose another --port or use --port 0.\n")
     url = "http://127.0.0.1:" + str(server.server_address[1])
-    print("aidentity dashboard: " + url, flush=True)
-    print("Keep this terminal open. Press Ctrl-C to stop the dashboard.", flush=True)
-    if not options.no_open:
-        try:
-            subprocess.run(["open", url], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL, timeout=10, check=False)
-        except (OSError, subprocess.TimeoutExpired):
-            print("Open the dashboard address above in your browser.", flush=True)
+    # Nothing above starts a thread, so the fork copies a whole, idle process.
+    child = os.fork()
+    if child:
+        # Never unlock here: the child shares this lock, and an unlock would release it for both.
+        os.pwrite(state, json.dumps({"pid": child, "port": server.server_address[1]}).encode(), 0)
+        print("aidentity dashboard: " + url, flush=True)
+        print("Running in the background. Stop it with 'aidentity dashboard --stop'.", flush=True)
+        open_browser(url, options.no_open)
+        return 0
     try:
-        server.serve_forever(poll_interval=0.25)
-    except KeyboardInterrupt:
-        print("\nDashboard stopped.", flush=True)
+        # Its own session and no terminal or pipe: a closed terminal or `| cat` neither ends nor waits for it.
+        os.setsid()
+        devnull = os.open(os.devnull, os.O_RDWR)
+        for fd in (0, 1, 2):
+            os.dup2(devnull, fd)
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.default_int_handler)  # --stop runs the cleanup below
+        try:
+            server.serve_forever(poll_interval=0.25)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            dashboard.stop()
+            server.server_close()
     finally:
-        dashboard.stop()
-        server.server_close()
-    return 0
+        os._exit(0)  # the child never returns into the caller of main()
 
 
 if __name__ == "__main__":

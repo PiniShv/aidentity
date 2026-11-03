@@ -10,7 +10,7 @@ macOS runs an app only once, so you get one account at a time. To check your per
 
 - **Verified with** Claude Desktop. Also tested with ChatGPT, Slack, VS Code, Cursor, Notion and other apps built on Chromium (the engine inside Google Chrome) or Electron. See [Which apps work](#which-apps-work).
 - **Your real app is not changed.** It is never copied, patched or re-signed. See [Is this safe?](#is-this-safe)
-- **One executable file.** The shell commands need nothing extra. The optional dashboard uses Python 3.9+ and listens on localhost while its terminal is open. Only `aidentity update` accesses the internet; there is no background service or `sudo` (admin rights).
+- **One executable file.** The shell commands need nothing extra. The optional dashboard uses Python 3.9+ and listens on localhost from `aidentity dashboard` until `aidentity dashboard --stop`. Only `aidentity update` accesses the internet; nothing starts by itself, and there is no `sudo` (admin rights).
 - **Set up once in Terminal.** After that, you open each account by clicking its icon, like any other app.
 
 ---
@@ -291,7 +291,7 @@ One thing does change. While a profile is running, clicking the app itself switc
 - **Touch profile data outside its profiles folder.** `--purge`, `prune` and the uninstaller move a data folder only if it is inside `~/Library/Application Support/aidentity/profiles`, or the folder set by `AIDENTITY_DATA_ROOT`.
 - **Move or rename a profile's data while the profile is running.** If it cannot tell, it treats the profile as running and stops.
 - **Access the internet, except when you run `aidentity update`.** No telemetry, analytics, automatic update checks or crash reports. `aidentity update` (and `update --check`) connects only to GitHub. The dashboard serves bundled assets on `127.0.0.1`; it loads no external scripts or fonts. Apart from update, only the installer downloads anything, when you run it. [What `update` does](#aidentity-update).
-- **Use `sudo` or run in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
+- **Use `sudo` or start itself in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. The dashboard runs in the background only after you start it, until `aidentity dashboard --stop`. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
 - **Edit your shell files.** If you need a `PATH` line, the installer prints it, and you add it.
 - **Control other apps.** It does not use System Events, so it needs no Accessibility permission. The one thing it does to a running app is `aidentity quit`, which asks that one app to quit, as its Quit menu item does. That needs no permission either.
 - **Trust an import file.** `import` checks every value as `add` does, finds each app by its bundle ID among the apps installed here, ignores any path in the file, and shows what it will build, and asks before it builds anything. Only `-y` skips that question. A launcher that exists is skipped, never changed.
@@ -506,14 +506,18 @@ Removing a profile or clearing unclaimed data requires confirmation in the UI. E
 values stay hidden; appearance changes preserve them. Export can contain
 sensitive launch settings, just like `aidentity export`.
 
-Keep the terminal open while using the dashboard. Press **Ctrl+C** to stop the
-server. It is available only on this Mac; it creates no startup service.
+The server runs in the background, so the command gives the prompt back at
+once. It keeps running after the terminal closes, until you run
+`aidentity dashboard --stop`. Running `aidentity dashboard` again while it runs
+opens the same dashboard; to use another `--port`, stop it first. It is
+available only on this Mac; it creates no startup service.
 Profile reads and actions are restricted to the same macOS account using the
 system's connection-owner information. No API key or account setup is needed.
 
 ```sh
 aidentity dashboard --port 8765   # choose a fixed port
 aidentity dashboard --no-open     # print the address for manual opening
+aidentity dashboard --stop        # stop the running dashboard
 ```
 
 `--port` accepts 0 through 65535; 0 chooses a free port. An occupied explicit

@@ -72,6 +72,12 @@ class InstalledDashboardTests(unittest.TestCase):
                 self.assertEqual(list((folder / "launchers").iterdir()), [])
                 self.assertEqual(list((folder / "profiles").iterdir()), [])
             finally:
+                # The server runs in its own session, out of the launcher's process group.
+                stopped = subprocess.run(
+                    [str(binary), "dashboard", "--stop"], cwd=folder, env=env,
+                    stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                    timeout=30, check=False,
+                )
                 # Stop only the process group this test created.
                 import signal
                 if child.poll() is None:
@@ -83,6 +89,8 @@ class InstalledDashboardTests(unittest.TestCase):
                     child.wait(timeout=5)
                 child.stdout.close()
                 reader.join(timeout=2)
+            # After the finally, so an error in the try body is never masked by this one.
+            self.assertIn("Dashboard stopped.", stopped.stdout, stopped.stdout + stopped.stderr)
 
 
 if __name__ == "__main__":

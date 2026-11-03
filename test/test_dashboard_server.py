@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -434,6 +435,38 @@ class DashboardTests(unittest.TestCase):
         thread.join(timeout=2)
         self.assertFalse(thread.is_alive())
         self.assertFalse(results[0]["ok"])
+
+    def test_stop_ends_a_background_dashboard_and_lets_its_cli_clean_up(self):
+        command = [sys.executable, "-I", str(SERVER_PATH), self.cli, "--state", str(self.root / "dashboard.json")]
+        run = dict(env=self.backend.env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+        started = subprocess.run(command + ["--no-open"], **run)
+        thread = None
+        try:
+            self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+            # The request helpers talk to the background server from here on.
+            self.port = int(re.search(r"http://127\.0\.0\.1:(\d+)", started.stdout)[1])
+            self.origin = "http://127.0.0.1:" + str(self.port)
+            self.token = self.request("GET", "/api/state")[2]["csrf_token"]
+
+            def slow_action():
+                try:
+                    self.action({"action": "help", "command": "cleanup"})
+                except (OSError, http.client.HTTPException):
+                    pass  # the server may exit before it answers
+            thread = threading.Thread(target=slow_action, daemon=True)
+            thread.start()
+            deadline = time.monotonic() + 5
+            while ["help", "cleanup"] not in self.calls() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertIn(["help", "cleanup"], self.calls(), "The CLI fixture did not start.")
+        finally:
+            # Before tearDown deletes the state file, so no server outlives the test.
+            stopped = subprocess.run(command + ["--stop"], **run)
+            if thread is not None:
+                thread.join(timeout=5)
+        self.assertEqual(stopped.returncode, 0, stopped.stdout + stopped.stderr)
+        self.assertIn("Dashboard stopped.", stopped.stdout)
+        self.assertTrue((self.root / "cleaned").exists(), "Stopping the dashboard skipped the CLI's cleanup.")
 
     def test_timeout_allows_cli_rollback_trap_to_run(self):
         _, _, result = self.action({"action": "help", "command": "cleanup"})

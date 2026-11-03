@@ -82,8 +82,8 @@ with account cards, launch settings, maintenance, import/export and an Explore
 app browser. Explore shows one app at a time with its profiles, and the list
 beside it picks the app. Each profile has Open (or Bring to front when it is
 running), and each app has Add profile. Everything uses the same CLI operations. The dashboard needs
-Python 3.9+ with no extra packages. Keep its terminal open and press Ctrl+C to
-stop it. [Dashboard guide](docs/guide.md#aidentity-dashboard).
+Python 3.9+ with no extra packages. It runs in the background and keeps running
+after its terminal closes, until `aidentity dashboard --stop`. [Dashboard guide](docs/guide.md#aidentity-dashboard).
 The UI adapts [these 21st.dev components](docs/dashboard-components.md).
 
 Prefer a terminal menu? `aidentity ui` shows every profile on one screen; pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it.
@@ -118,7 +118,7 @@ There is still one `Claude.app`. [The full picture](docs/guide.md#how-it-works)
 ## Why aidentity
 
 - **Your app stays untouched.** It is never copied, changed or signed again, so it keeps its signature, its keychain access and its own updates.
-- **One file you can read.** [Read it](bin/aidentity) before you run it. The shell commands need nothing extra; the optional browser dashboard uses Python 3.9+. Only `aidentity update` accesses the internet. The dashboard listens on localhost while its terminal is open. No `sudo`, login items or background service.
+- **One file you can read.** [Read it](bin/aidentity) before you run it. The shell commands need nothing extra; the optional browser dashboard uses Python 3.9+. Only `aidentity update` accesses the internet. The dashboard listens on localhost from `aidentity dashboard` until `aidentity dashboard --stop`. No `sudo`, login items or anything that starts by itself.
 - **Easy to undo.** Deleted an icon? `aidentity restore` brings it back, still signed in. Something looks wrong? `aidentity doctor --fix`. `rm` keeps your data unless you add `--purge`, and even then it moves the data to the Trash, so you can move it back. The [uninstaller](docs/guide.md#uninstall) asks before it removes any profile, and it also moves the data to the Trash.
 - **Your original account stays one click away.** While a profile runs, clicking `Claude.app` takes you to that profile. `aidentity add Claude --main` builds a Main launcher that opens your original account instead. [Why](docs/guide.md#opening-your-original-account-while-a-profile-runs)
 

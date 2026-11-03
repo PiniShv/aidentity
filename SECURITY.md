@@ -24,8 +24,9 @@ the changelog if you want it.
 Read this before deciding whether a finding is a bug.
 
 - **aidentity runs as you, with your permissions.** It is a shell script. No
-  daemon, no root, no `sudo`, no privileged helper, no launch agent. Anything it
-  can do, you could do from a terminal.
+  daemon, no root, no `sudo`, no privileged helper, no launch agent. The optional
+  dashboard runs in the background only after you start it, until
+  `aidentity dashboard --stop`. Anything it can do, you could do from a terminal.
 - **It builds a local app bundle that Apple has not signed.** The launcher in
   `~/Applications` is ad-hoc signed at most (`codesign --sign -`). It is not
   notarised and never will be, because it is generated on your Mac. macOS treats
@@ -88,7 +89,8 @@ Read this before deciding whether a finding is a bug.
   Assets are bundled and served locally. Requests are mapped
   to allowlisted CLI argument arrays; the browser cannot submit a shell command.
   No request bodies or environment values are logged. Export has the same
-  sensitivity as CLI export. Ctrl+C closes the server; there is no login item.
+  sensitivity as CLI export. The server keeps running after its terminal closes,
+  until `aidentity dashboard --stop`; there is no login item.
 
 ## In scope
 

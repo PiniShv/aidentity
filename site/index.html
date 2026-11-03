@@ -702,7 +702,7 @@ html:not(.js) .chapters{display:none}
 <ul role="list">
 <li class="rv" style="--d:0"><strong>Free.</strong><span>Open source, Apache-2.0 licence.</span></li>
 <li class="rv" style="--d:1"><strong>Untouched.</strong><span>Your app is never copied, changed or signed again.</span></li>
-<li class="rv" style="--d:2"><strong>No sudo.</strong><span>Nothing runs in the background.</span></li>
+<li class="rv" style="--d:2"><strong>No sudo.</strong><span>Nothing starts by itself.</span></li>
 <li class="rv" style="--d:3"><strong>One script.</strong><span>Written in bash. Nothing extra to install.</span></li>
 <li class="rv" style="--d:4"><strong>Mac only.</strong><span>For Chromium and Electron apps.</span></li>
 </ul>
@@ -1021,7 +1021,7 @@ html:not(.js) .chapters{display:none}
 <div class="wrap">
 <div class="head rv">
 <h2 id="h-why">Easy to try. Easy to undo.</h2>
-<p class="intro">Your app is not copied or changed, nothing runs in the background, and you can remove everything aidentity made.</p>
+<p class="intro">Your app is not copied or changed, nothing starts by itself, and you can remove everything aidentity made.</p>
 </div>
 <ul class="specs" role="list">
 <li class="rv">
@@ -1036,8 +1036,8 @@ html:not(.js) .chapters{display:none}
 </li>
 <li class="rv">
 <div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-moon"/></svg>Background</div>
-<div><h3>Nothing runs in the background</h3>
-<p>It makes no network calls except when you run <code>aidentity update</code>, and it never uses <code>sudo</code>. It adds no login item and no background service.</p></div>
+<div><h3>Nothing starts by itself</h3>
+<p>It makes no network calls except when you run <code>aidentity update</code>, and it never uses <code>sudo</code>. It adds no login item and no launch agent. The optional dashboard runs only after you start it, until <code>aidentity dashboard --stop</code>.</p></div>
 </li>
 <li class="rv">
 <div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-file"/></svg>Source</div>
@@ -1141,7 +1141,7 @@ html:not(.js) .chapters{display:none}
 </details>
 <details>
 <summary>Is it safe?</summary>
-<div class="a"><p>The installer checks the download, never uses <code>sudo</code> and leaves your shell files alone. After install, aidentity makes no network calls except when you run <code>aidentity update</code>, and it runs nothing in the background.</p>
+<div class="a"><p>The installer checks the download, never uses <code>sudo</code> and leaves your shell files alone. After install, aidentity makes no network calls except when you run <code>aidentity update</code>, and nothing starts by itself.</p>
 <p>One thing to know: it does not encrypt profile data. Each data folder holds a live sign-in, just like the app's own folder. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#is-this-safe">Read more about safety</a> or see the <a href="https://github.com/PiniShv/aidentity/blob/main/SECURITY.md">security policy</a>.</p></div>
 </details>
 <details>
