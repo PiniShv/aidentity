@@ -81,8 +81,9 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
    The sidebar scrolls on short viewports; the app list keeps min(content, 40dvh) and pads 8px so focus rings stay unclipped. */
 .app-shell{display:flex;min-height:100vh}
 .sidebar{width:var(--sidebar-width);flex:none;position:sticky;top:0;height:100dvh;padding:27px 14px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden auto;scrollbar-width:thin;overscroll-behavior:contain;transition:none}
-.brand{display:flex;gap:11px;align-items:center;padding:0 9px;margin-bottom:27px;white-space:nowrap}
-.brand-mark{width:29px;height:32px;color:var(--accent)}
+/* The 16x32 mark centres over the 24px section tiles (16px in) and the wordmark starts on the nav labels' line (15px gap), in the rail too. */
+.brand{display:flex;gap:15px;align-items:center;padding:0 16px;margin-bottom:27px;white-space:nowrap}
+.brand-mark{width:16px;height:32px;flex:none}
 .brand>.nav-label{font-size:19px;letter-spacing:-.04em;font-weight:650}
 .brand-sub{display:block;font-size:12px;letter-spacing:0;font-weight:400;color:var(--muted);margin-top:5px}
 /* Connection status: one quiet row; in the collapsed rail only its dot. */
@@ -133,7 +134,6 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
 /* Collapsed sidebar */
 .sidebar-collapsed{--sidebar-width:72px}
 .sidebar-collapsed .sidebar{padding-left:12px;padding-right:12px}
-.sidebar-collapsed .brand{padding:0 9px}
 .sidebar-collapsed .nav-label{opacity:0;pointer-events:none;width:0;overflow:hidden}
 .sidebar-collapsed .brand-sub{white-space:nowrap} /* a zero-width label must not wrap the tagline word by word */
 .sidebar-collapsed .scope{padding:0;justify-content:center;gap:0}
@@ -644,7 +644,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 @media(min-width:768px) and (max-width:1150px){
   .brand{align-items:flex-start}
   .brand>.nav-label{padding-top:4px} /* centres the name on the mark */
-  .brand-sub{margin:10px 0 0 -40px} /* -40px: the 29px mark and its 11px gap */
+  .brand-sub{margin:10px 0 0 -31px} /* -31px: the 16px mark and its 15px gap */
 }
 /* The detail panel sticks beside the grid and fits between the top bar and the activity bar (68 + 40 + 2 x 24).
    Its bottom edge fades only while it overflows: the fade runs on the panel's own scroll timeline, which is inactive

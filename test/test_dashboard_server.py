@@ -14,6 +14,7 @@ import threading
 import time
 import unittest
 from unittest import mock
+import urllib.parse
 
 SERVER_PATH = Path(__file__).resolve().parents[1] / "dashboard" / "server.py"
 
@@ -630,6 +631,20 @@ class DashboardTests(unittest.TestCase):
         self.assertRegex(served["/"], r'<body>\s*<canvas class="ambient" aria-hidden="true"></canvas>')
         self.assertRegex(served["/experience.css"],
                          r"@media\(prefers-contrast:more\)[^{]*\{\.ambient\{display:none\}")
+
+    def test_page_carries_the_upstream_logo_and_icon_unchanged(self):
+        root = SERVER_PATH.parents[1]
+        page = (SERVER_PATH.parent / "index.html").read_text(encoding="utf-8")
+
+        def art(svg):  # the drawing alone: no comments, title, root tag or whitespace runs
+            svg = re.sub(r"<!--.*?-->|<title>.*?</title>", "", svg, flags=re.S)
+            svg = re.sub(r">\s+<", "><", re.sub(r"\s+", " ", svg)).strip()
+            return re.sub(r"^<svg[^>]*>", "", svg).replace("'", '"')
+
+        mark = re.search(r'<svg class="brand-mark"[^>]* aria-hidden="true">.*?</svg>', page).group(0)
+        icon = re.search(r'<link rel="icon" type="image/svg\+xml" href="data:image/svg\+xml,([^"]+)">', page).group(1)
+        self.assertEqual(art(mark), art((root / "assets" / "logo.svg").read_text(encoding="utf-8")))
+        self.assertEqual(art(urllib.parse.unquote(icon)), art((root / "assets" / "icon.svg").read_text(encoding="utf-8")))
 
     def test_unknown_fields_option_injection_and_wrong_types_are_rejected(self):
         invalid = [

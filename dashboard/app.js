@@ -57,7 +57,7 @@
   const luminance=hex=>[0,2,4].map(i=>parseInt(String(hex).replace("#","").slice(i,i+2),16)/255).map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4).reduce((sum,c,i)=>sum+c*[.2126,.7152,.0722][i],0);
   // Badge letter ink: Lampblack or white, whichever contrasts more with the badge (WCAG 1.4.3).
   const inkFor=hex=>(luminance(hex)+.05)/(luminance("060606")+.05)>=(luminance("ffffff")+.05)/(luminance(hex)+.05)?"#060606":"#ffffff";
-  // The seven app hues live in styles.css (--hue-*). Mint is status, the logo and the default accent, never an app hue.
+  // The seven app hues live in styles.css (--hue-*). Mint is status and the default accent, never an app hue.
   // Frozen copy of those tokens, used only when one is missing or not #rrggbb.
   const hueNames=["periwinkle","teal","orange","pink","gold","sky","violet"],hueDefaults=["#7c8cff","#2fd4c0","#ff8a3d","#ff6fb5","#ffd166","#4cc3ff","#b26bff"];
   const hueToken=(hue,fallback)=>{const hex=getComputedStyle(document.documentElement).getPropertyValue(`--hue-${hue}`).trim().toLowerCase();return /^#[0-9a-f]{6}$/.test(hex)?hex:(console.warn(`--hue-${hue} is missing or not #rrggbb; using ${fallback}`),fallback);};

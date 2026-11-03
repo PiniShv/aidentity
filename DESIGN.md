@@ -220,7 +220,7 @@ components:
 
 **Creative North Star: "The Keyring"**
 
-The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, under a slow ambient field of glyphs in Bone at 12%, and text is Bone. Color comes in two layers that never share a form. Apps: an app that has profiles gets one bright hue from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Sections: each part of the dashboard owns one deep tile color, a rounded square with a Bone glyph, as in macOS System Settings. Apart from those two layers and status, nothing on screen is colored. There is no second hue for an app, no gradient in a hue and no glow.
+The dashboard is one dark ring that holds every profile. The ground is Lampblack, a warm near-black, under a slow ambient field of glyphs in Bone at 12%, and text is Bone. Color comes in two layers that never share a form. Apps: an app that has profiles gets one bright hue from a fixed seven-hue palette, and that app's primary action, app tile, dots, borders and focus rings carry it. Sections: each part of the dashboard owns one deep tile color, a rounded square with a Bone glyph, as in macOS System Settings. Apart from those two layers and status, nothing on screen is colored. There is no second hue for an app, no gradient in a hue and no glow. The one exception is the official aidentity logo, which keeps its own blue gradients and glow (The Upstream Logo Rule).
 
 Density is a desktop tool's: a 14px base, 13px labels, a 216px sidebar and 32px gutters. The CLI stays visible: every dialog shows the command it will run, and every Activity entry the command that ran. Surfaces are tonal steps of graphite with 1px borders between them. Depth comes from tone; only things that float (dialogs and toasts) cast a shadow.
 
@@ -237,13 +237,13 @@ Motion is brief and springy, and it never overshoots: every surface opens on a c
 
 ## Colors
 
-A warm graphite ramp from Lampblack to Bone, lit only by seven app hues, eight section tiles and the status colors.
+A warm graphite ramp from Lampblack to Bone, lit only by seven app hues, eight section tiles, the status colors and the official logo.
 
 ### Primary
 The seven app hues, defined once in CSS as `--hue-periwinkle` … `--hue-violet`. `app.js` and `experience.js` read them from those tokens (with a frozen fallback and a console warning if one is missing). Only apps that have at least one profile get a hue: `app.js` hashes each app name into the palette, resolves collisions so no two such apps share a hue while one is free, and keeps the hue an app got first. An app with no profiles has no hue and renders in graphite with Bone ink. Every hue clears 6.2:1 against Lampblack, so app-colored fills always take Lampblack text.
 
 - **Periwinkle**, **Teal**, **Orange**, **Pink**, **Gold**, **Sky**, **Violet** (`periwinkle` … `violet`): app hues, with no role outside app identity.
-- **Mint** (`mint`): not an app hue. It is the positive status color, the sidebar logo, the connection dot and the default accent.
+- **Mint** (`mint`): not an app hue. It is the positive status color, the connection dot and the default accent.
 
 `--accent` is Mint globally and the app's hue inside an app-toned scope (`.app-tone{--accent:var(--app-color)}`); focus rings, the focused-field border and the caret follow it. `--app-color` is set only on an app-toned element, never on `:root`.
 
@@ -290,13 +290,15 @@ A section color appears in four places only: its sidebar tile, its current-page 
 Under `prefers-contrast: more`, Muted becomes #b4b2aa (7.3:1 on Warning bg, 8.7:1 on Raised, 9.5:1 on Lampblack), Border takes the Button edge, Control the Field border, the Button edge becomes Muted, the Field border #9a988f, the Danger edge Negative, and every material turns solid. The ambient field is gone, here and under forced colors, so the ground is solid Lampblack. Hues and Bone stay as they are.
 
 ### Named Rules
-**The Two Layers Rule.** A bright hue means an app that has profiles; a deep tile color means a section of the dashboard; Mint, Amber and Negative mean status. Everything else stays on the Lampblack-to-Bone ramp: card surfaces, text, apps without profiles and the counts that are not status.
+**The Two Layers Rule.** A bright hue means an app that has profiles; a deep tile color means a section of the dashboard; Mint, Amber and Negative mean status. Everything else stays on the Lampblack-to-Bone ramp: card surfaces, text, apps without profiles and the counts that are not status. The official logo is the one exception (The Upstream Logo Rule).
 
 **The Section Rule.** A page's tiles take its section's color, except a destructive operation's tile, which is Brick. A section color is only ever a tile fill or the current-page highlight, never text, a border or a card surface.
 
 **The One Running Mark Rule.** Running is an 8px Mint dot plus "Running" in Mint, on cards, the detail panel, Explore keys and the navigator alike, and the running card or key also keeps its 1px hue border. A profile that is not running shows no dot.
 
-**The Flat Hue Rule.** A hue is a solid fill, a plain dot, a 1px border or a focus ring. Never a gradient, glow, tinted text, tinted background, tinted secondary button or accent stripe, and never a second hue for the same app.
+**The Flat Hue Rule.** A hue is a solid fill, a plain dot, a 1px border or a focus ring. Never a gradient, glow, tinted text, tinted background, tinted secondary button or accent stripe, and never a second hue for the same app. The logo's own gradients and glow are its art, not a hue (The Upstream Logo Rule).
+
+**The Upstream Logo Rule.** The official aidentity logo is the one sanctioned exception to the Two Layers, Flat Hue and no-site-blue rules. The mark (`assets/logo.svg`) leads the sidebar lockup and the app icon (`assets/icon.svg`) is the favicon, both inline in `index.html` with their own paths, gradients, colors and glow, cropped to the art and scaled, never recolored or redrawn. The logo belongs to the upstream maintainer, and any change to it is a proposal to them.
 
 **The Ink Rule.** Text on an app-colored fill is Lampblack. A badge picks whichever of Lampblack (#060606) and white (#ffffff) contrasts more with its saved color; every preset clears 5.9:1.
 
@@ -397,8 +399,8 @@ A flat rounded square in its section's deep color with a Bone glyph, no border, 
 - **Error:** a `negative-bg` form-error block above the actions, and `aria-invalid` on the field the server rejected. A long CLI error keeps its line breaks and scrolls inside the block from 160px; an inventory error notice scrolls from 200px. Both take Tab focus, so the keyboard can scroll them, and a failure that names no field brings the form error into view. A rule the browser can check first (the profile-name `pattern`) stops the submit with the browser's own message and the rule in its `title`.
 
 ### Navigation
-- **Sidebar:** a `<nav aria-label="Main">` landmark. 40px items, 8px radius, Muted text, each led by its 24px section tile. Hover shows Bone on Surface; the current page shows Bone on its section color mixed 28% into Raised. On a page change that fill slides from the item it left, or from where it is mid-slide, over 340ms on the control spring; under reduced motion it jumps. Under the nav, "Your apps" lists only apps that have profiles, each with an 8px dot in its hue (36px rows, 12px text); "No profiles yet" shows only once data has loaded and there are none. Help and Collapse sit at the foot. Above the nav, one compact status row: a 6px Mint dot (Negative when offline) and "Connected · this Mac".
-- **Collapsed rail:** 72px; labels hide, the section tiles stay centered, the status row shows only its dot, and each app shows its initial as a 24px rounded tile in its hue with Lampblack ink, named by a tooltip that appears beside the rail for keyboard focus, with a divider where "Your apps" was. As a mobile drawer the full labels return.
+- **Sidebar:** a `<nav aria-label="Main">` landmark. 40px items, 8px radius, Muted text, each led by its 24px section tile. Hover shows Bone on Surface; the current page shows Bone on its section color mixed 28% into Raised. On a page change that fill slides from the item it left, or from where it is mid-slide, over 340ms on the control spring; under reduced motion it jumps. Under the nav, "Your apps" lists only apps that have profiles, each with an 8px dot in its hue (36px rows, 12px text); "No profiles yet" shows only once data has loaded and there are none. Help and Collapse sit at the foot. At the top, the logo lockup: the official mark at 16 × 32px, centered over the section tiles, beside the "aidentity" wordmark and the tagline "One app. Every account." on the nav labels' line (from 768 to 1150px the tagline sits under the mark, from its left edge, so it does not wrap). The mark is decorative (`aria-hidden`); the link's own text names it. Above the nav, one compact status row: a 6px Mint dot (Negative when offline) and "Connected · this Mac".
+- **Collapsed rail:** 72px; labels hide, the logo mark and the section tiles stay centered, the status row shows only its dot, and each app shows its initial as a 24px rounded tile in its hue with Lampblack ink, named by a tooltip that appears beside the rail for keyboard focus, with a divider where "Your apps" was. As a mobile drawer the full labels return.
 - **Tabs:** 13px labels in Muted, Bone when selected, 44px tall, with a 2px Bone underline that springs between tabs. Profiles tabs are All, Running, Not running and Needs repair, with the counts on the tabs only (Needs repair shows a muted dash until a check has run). Arrow, Home and End move between tabs. The strip appears with the first profile: with none at all it is absent, since the tabs would filter nothing, and the first-run empty state follows the title directly. When the strip overflows on a narrow phone, its right edge fades and the selected tab scrolls into view.
 - **Mobile:** the top bar names the page once half the letters of its `h1` are under the bar (a switch on the `h1`'s own view timeline, inset by the bar, so it follows the title wherever it sits, below a banner or wrapped; on at once and never half faded, so it is the same under reduced motion; a page that scrolls less keeps the bar blank and its `h1` readable, and a browser without scroll timelines always shows the name), so the name reads in one place at every scroll position and never twice in full. The sidebar becomes a drawer from the left behind a 60% black scrim; Tab stays inside it and the page behind is inert.
 - **Page change:** the old page fades out in place over 200ms while the new one fades in and rises 8px over 480ms on the surface spring; the activity bar, its panel and the toasts stay still. Without the View Transitions API, or while the phone drawer is open, only the new page animates, from 50% opacity and 8px down. Under reduced motion the swap is instant.
@@ -464,13 +466,14 @@ When a poll or action can't reach the dashboard server, a banner says "The dashb
 
 ### Don't:
 - **Don't** add a light theme. The dashboard is dark-only.
-- **Don't** bring the site's blue or its light/dark switch into the dashboard. The site is a separate world owned upstream.
+- **Don't** bring the site's blue or its light/dark switch into the dashboard. The site is a separate world owned upstream. The official logo's own blue is the one exception.
+- **Don't** recolor, redraw or animate the logo, cut into its art, or take a color from it; only trim its empty canvas to the art and scale it.
 - **Don't** put a shadow on a resting card. Shadows belong to dialogs and toasts.
 - **Don't** use a hue as a gradient, a glow, text color, a tinted background or secondary button, or an accent stripe, and don't add a second hue to an app.
-- **Don't** give an app with no profiles a hue, and don't use Mint as an app hue; it is status, the logo and the default accent.
+- **Don't** give an app with no profiles a hue, and don't use Mint as an app hue; it is status and the default accent.
 - **Don't** recolor the header Add button; it is always Bone.
-- **Don't** color anything that is not an app's identity, a section tile or a status.
+- **Don't** color anything that is not an app's identity, a section tile, a status or the official logo.
 - **Don't** use a section color as text, a border, a card fill or a gradient, and don't put Lampblack ink on a section tile.
-- **Don't** write hex values outside `:root`; use the tokens. The two exceptions are the `dialog::backdrop` scrim, which mirrors `--scrim` because older browsers don't pass custom properties to `::backdrop`, and the favicon in `index.html`, the sidebar's brand mark in Mint on a Lampblack rounded square, because a favicon cannot read CSS variables.
+- **Don't** write hex values outside `:root`; use the tokens. The two exceptions are the `dialog::backdrop` scrim, which mirrors `--scrim` because older browsers don't pass custom properties to `::backdrop`, and the official logo in `index.html` (the sidebar mark and the favicon), whose colors are the upstream art's own.
 - **Don't** load webfonts or any other remote asset.
 - **Don't** show a secret anywhere, including a command line; masked values read `•••`.
