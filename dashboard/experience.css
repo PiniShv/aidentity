@@ -92,7 +92,7 @@
 .xp-list-icon{width:36px;height:36px;border-radius:8px;font-size:16px;font-weight:600}
 .xp-list-icon svg{width:20px;height:20px}
 .xp-help{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin:0}
-.xp-inline-feedback{font-size:12px;line-height:1.5;color:var(--negative);margin:0}
+.xp-inline-feedback{font-size:12px;line-height:1.5;color:var(--negative);margin:0;overflow-wrap:anywhere}
 
 /* Empty states */
 .xp-empty{padding:32px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px}

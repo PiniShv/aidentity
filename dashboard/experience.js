@@ -23,7 +23,7 @@
     const discovered = Array.isArray(state.apps) ? state.apps : [];
     // A failed inventory read leaves apps empty; say so instead of "no apps found".
     const errors = Array.isArray(state.errors) ? state.errors : [];
-    const errorNotice = errors.length ? `<div class="notice error">${errors.map(esc).join("<br>")}</div>` : "";
+    const errorNotice = errors.length ? `<div class="notice error" tabindex="0">${errors.map(esc).join("<br>")}</div>` : "";
     const inventoryFailed = errors.length > 0 && !discovered.length;
     const groupsByName = new Map();
     for (const app of discovered) {
@@ -213,7 +213,9 @@
         await callbacks.launchProfile(profile);
       } catch (error) {
         if (!disposed) {
-          feedback.textContent = `Couldn’t open ${profile.profile || profile.name}. ${error?.message || "Try again, or check the profile on Profiles."}`;
+          // One line beside the key: the toast and Activity hold a long CLI error in full.
+          const reason = String(error?.message || "").trim().split("\n")[0];
+          feedback.textContent = `Couldn’t open ${profile.profile || profile.name}. ${reason.length > 160 ? `${reason.slice(0, 160).trimEnd()}…` : reason || "Try again, or check the profile on Profiles."}`;
           feedback.hidden = false;
         }
       } finally {

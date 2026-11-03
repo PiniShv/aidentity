@@ -113,7 +113,7 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
 .icon-button:hover{background:var(--raised);color:var(--text)}
 
 /* Topbar and main canvas. .main-shell clips so transform-only sidebar shifts stay inside the canvas. */
-.main-shell{min-width:0;flex:1;padding-bottom:calc(var(--activity-open) + 45px);overflow-x:clip}
+.main-shell{min-width:0;flex:1;padding-bottom:max(var(--activity-open) + 45px, var(--toast-inset, 0px));overflow-x:clip} /* --toast-inset: app.js */
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 32px;border-bottom:1px solid var(--border);gap:15px;height:68px}
 .topbar-leading,.topbar-actions{display:flex;align-items:center}
 .topbar-leading{gap:12px;font-size:12px;color:var(--muted)}
@@ -122,12 +122,13 @@ h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for
 .freshness{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 #mobile-nav{display:none}
 /* Shown while the local server is unreachable; app.js fills it and clears it on the next good poll. */
-.connection-banner{margin:16px 32px 0;padding:12px 16px;border-radius:8px;background:var(--badbg);color:var(--text);font-size:13px;line-height:1.55}
-.connection-banner code{font-family:var(--font-mono);font-size:12px;padding:1px 6px;border-radius:6px;background:var(--ground)}
+.connection-banner{display:flex;align-items:center;gap:8px;margin:16px 32px 0;padding:6px 6px 6px 16px;border-radius:8px;background:var(--badbg);color:var(--text);font-size:13px;line-height:1.55}
+.connection-banner p{flex:1;min-width:0;padding:6px 0}
+.connection-banner code{display:inline-block;max-width:100%;overflow-wrap:anywhere;font-family:var(--font-mono);font-size:12px;padding:1px 6px;border-radius:6px;background:var(--ground)} /* the command moves to the next line whole */
 #main{outline:none;padding:30px 32px}
 /* Focus scrolls content clear of the fixed activity bar (and the open panel). Scroll-margin, not root
    scroll-padding: the sticky sidebar and topbar take none, so focusing them never jumps the page. */
-#main *{scroll-margin-bottom:calc(var(--activity-open) + 56px)}
+#main *{scroll-margin-bottom:max(var(--activity-open) + 56px, var(--toast-inset, 0px))}
 
 /* Collapsed sidebar */
 .sidebar-collapsed{--sidebar-width:72px}
@@ -206,7 +207,9 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 .profile-head{display:flex;align-items:center;gap:12px;min-width:0}
 .profile-title{flex:1;min-width:0}
 .profile-title h2{font:inherit;letter-spacing:normal}
-.profile-name{display:block;max-width:100%;min-height:36px;margin:0 -4px;padding:0 4px;border-radius:6px;text-align:left;font-size:17px;font-weight:550;letter-spacing:-.015em;line-height:36px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* The whole name, never cut off: it wraps at a space or after an underscore (app.js breakable()), and inside a word only when one is wider
+   than the card. One line still makes the 36px target (44px on phones): the padding is what the line leaves. */
+.profile-name{display:block;max-width:100%;min-height:36px;margin:0 -4px;padding:calc((36px - 1.35em) / 2) 4px;border-radius:6px;text-align:left;font-size:17px;font-weight:550;letter-spacing:-.015em;line-height:1.35;overflow-wrap:anywhere;text-wrap:balance}
 .profile-name:focus-visible{outline-offset:0}
 .profile-app{color:var(--muted);font-size:13px;line-height:1.3;margin-top:3px} /* clears the name's focus ring */
 /* App tile: the app's hue as a solid fill with Lampblack ink; neutral graphite for an app with no hue. */
@@ -324,7 +327,7 @@ input[type=search]::-webkit-search-cancel-button{appearance:none}
 kbd{font-family:var(--font-mono);font-size:12px;padding:1px 6px;border:1px solid var(--button-edge);border-radius:6px;color:var(--text)}
 .health-empty{color:var(--muted)}
 .update-status time{margin-left:6px}
-.notice{padding:14px 16px;border-radius:8px;background:var(--raised);font-size:12px;line-height:1.6;color:var(--muted);margin-top:16px}
+.notice{padding:14px 16px;border-radius:8px;background:var(--raised);font-size:12px;line-height:1.6;color:var(--muted);margin-top:16px;max-height:200px;overflow:auto;overflow-wrap:anywhere} /* an inventory error quotes the CLI's stderr, which can be long */
 .notice.error{background:var(--badbg);color:var(--text)}
 .initial-loading{min-height:330px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px}
 .initial-loading p{color:var(--muted)}
@@ -342,10 +345,11 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
 .dialog-header h2{padding-right:30px;overflow-wrap:anywhere}
 .dialog-header p{color:var(--muted);margin-top:8px;padding-right:15px;font-size:13px}
 .dialog-header>.icon-button{position:absolute;top:16px;right:15px}
-.dialog-body{min-height:0;overflow-y:auto;padding:20px 26px 24px}
+.dialog-body{--body-inline:26px;position:relative;min-height:0;overflow-y:auto;padding:20px var(--body-inline) 24px} /* position: .sr-only copies belong to this scroller, as in .target-list */
 .dialog-body>:first-child{margin-top:0} /* a confirmation whose description says it all opens on its list or Runs line */
 .dialog-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:17px 26px 22px;border-top:1px solid var(--control);flex:none}
 .dialog-footer .button{min-height:40px}
+.dialog-status{margin-right:auto;min-width:0;font-size:12px;line-height:1.4;color:var(--muted)}
 .fields{display:grid;gap:17px}
 .field label,.field-label{display:block;font-weight:500;margin-bottom:8px;font-size:13px;line-height:inherit}
 .field .hint{color:var(--muted);line-height:1.5;margin-top:7px;font-size:12px}
@@ -374,7 +378,15 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
 .preview-row .small{display:block}
 .preview-row strong+.small{margin-top:5px}
 .preview-row:has(>[data-quiet]){--badge-ring:var(--surface);padding:0;background:none} /* Settings: the title names the profile, so the preview is the tile alone, with no strip */
-.form-error{font-size:12px;color:var(--negative);line-height:1.6;padding:12px 14px;border-radius:8px;margin-top:16px;background:var(--badbg)}
+/* Add and Settings: the preview stays at the top of the body while the fields scroll under it, so a swatch, badge or name shows as it is
+   picked. An opaque Surface band flush with the body's top edge; focus scrolls a field clear of it. Only in a dialog that can be 560px
+   tall: 85dvh of a 660px window, or 90dvh of a 623px one below 768px wide. */
+@media(min-height:660px),(max-width:767px) and (min-height:623px){
+  .dialog-body:has(>.preview-dock){padding-top:0;scroll-padding-top:120px}
+  .preview-dock{position:sticky;top:0;z-index:1;margin-inline:calc(var(--body-inline) * -1);padding:20px var(--body-inline);background:var(--surface)} /* full width: a focus ring passing under it stays under it */
+  .preview-dock>.preview-row{margin-bottom:0}
+}
+.form-error{font-size:12px;color:var(--negative);line-height:1.6;padding:12px 14px;border-radius:8px;margin-top:16px;background:var(--badbg);max-height:160px;overflow:auto;overflow-wrap:anywhere;white-space:pre-line;scroll-margin-bottom:24px} /* a long stderr scrolls in place; revealed, it keeps the body's foot padding */
 .target-list{position:relative;list-style:none;margin:14px 0 0;padding:2px 14px;max-height:200px;overflow:auto;border-radius:8px;background:var(--ground);font-size:13px} /* position: the .sr-only name copies belong to this scroller, so revealing one scrolls the list, not the dialog */
 .target-list li{padding:8px 0;border-bottom:1px solid var(--border);line-height:1.4;overflow-wrap:anywhere}
 .target-list li:last-child{border:0}
@@ -404,7 +416,9 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 .toast.error>.icon{color:var(--negative)}
 .toast.warn>.icon{color:var(--warning)}
 .toast.info>.icon{color:var(--muted)}
+.toast>div{flex:1;min-width:0}
 .toast strong{display:block;font-weight:500;font-size:13px;line-height:1.4;text-wrap:balance}
+.toast strong,.toast p{overflow-wrap:anywhere}
 .toast p{color:var(--muted);margin-top:5px;font-size:12px}
 .toast>.icon-button{margin:-9px -9px 0 auto}
 .toast-actions{display:flex;flex-wrap:wrap;gap:0 16px;margin-top:2px}
@@ -420,6 +434,9 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 /* index.html icons are hydrated inside their <span>, so the spans are the toggle's first and last children. */
 .activity-toggle>:first-child .icon,.activity-toggle>:last-child .icon{width:14px}
 .activity-toggle>:last-child{margin-left:auto;transition:transform var(--motion-fade) ease-out}
+#activity-summary{display:flex;gap:.3em;min-width:0;white-space:nowrap}
+.activity-summary-title{overflow:hidden;text-overflow:ellipsis}
+.activity-summary-more{flex:none}
 .activity-toggle[aria-expanded=true]>:last-child{transform:rotate(180deg)}
 .activity-panel{position:fixed;bottom:40px;right:0;left:var(--sidebar-width);background:var(--material-panel);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur);border-top:1px solid var(--control);padding:20px 32px;max-height:var(--activity-height);overflow:auto;z-index:25;animation:none}
 :root:has(#activity-panel:not([hidden])){--activity-open:var(--activity-height)}
@@ -503,7 +520,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 }
 /* Mobile: drawer sidebar, bottom-sheet dialogs, 44px touch targets */
 @media(max-width:767px){
-  :root{--sidebar-width:0px;--activity-height:50dvh}
+  :root{--sidebar-width:0px;--activity-height:50dvh;--topbar-height:64px}
   .sidebar{width:248px;position:fixed;left:0;z-index:51;background:var(--ground);transform:translateX(-100%);padding:24px 16px 18px;transition:transform var(--motion-surface) var(--spring-surface)}
   .mobile-nav-open .sidebar{transform:translateX(0)}
   .nav-scrim{position:fixed;inset:0;z-index:50;background:var(--scrim)}
@@ -519,9 +536,14 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .nav-item,.nav-app{min-height:44px}
   #mobile-nav{display:flex}
   .topbar-title{display:block;font-size:15px;font-weight:550;letter-spacing:-.015em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* The h1 names the page until half its letters are under the bar (38px of scroll); then the bar does, switched on at once, never half faded.
-     Without scroll timelines the bar always names it. */
-  @supports(animation-timeline:scroll()){.topbar-title{opacity:0;animation:topbar-title steps(1,jump-end) both;animation-timeline:scroll(root);animation-range:0px 38px}} /* a page that scrolls less keeps its h1 readable, and the bar stays blank */
+  /* The h1 names the page until half of it is under the bar; then the bar does, switched on at once, never half faded. The h1's own view
+     timeline (inset by the bar) measures that, so the switch follows the title wherever it sits: a banner above it, a wrapped title.
+     A page that scrolls less keeps its h1 readable and the bar blank; without view timelines the bar always names it. */
+  @supports(timeline-scope:--page-title) and (animation-timeline:view()){
+    .main-shell{timeline-scope:--page-title}
+    #main h1{view-timeline:--page-title block;view-timeline-inset:var(--topbar-height) 0px}
+    .topbar-title{opacity:0;animation:topbar-title steps(1,jump-end) both;animation-timeline:--page-title;animation-range:exit 0% exit 50%}
+  }
   .topbar-actions{gap:4px}
   .topbar-leading{gap:5px}
   .topbar .button>.icon{width:14px}
@@ -550,11 +572,12 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   dialog{width:100%;max-width:100%;max-height:90dvh;margin:auto 0 0;border-radius:20px 20px 0 0;animation-name:sheet-in}
   .dialog-inner{max-height:90dvh}
   .dialog-header{padding:24px 22px 18px}
-  .dialog-body{padding:20px 22px 24px}
-  .dialog-footer{padding:16px 22px 20px}
+  .dialog-body{--body-inline:22px}
+  .dialog-footer{flex-wrap:wrap;padding:16px 22px 20px}
+  .dialog-status:not(:empty){flex-basis:100%} /* a running status takes its own line, so a long submit label never squeezes it */
   .initial-loading{min-height:300px;text-align:center}
   .initial-loading p{font-size:12px}
-  .topbar{height:64px;padding:0 16px;position:sticky;top:0;z-index:30;background:var(--material-bar);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur)}
+  .topbar{height:var(--topbar-height);padding:0 16px;position:sticky;top:0;z-index:30;background:var(--material-bar);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur)}
   .topbar .button,.topbar .icon-button{min-height:44px}
   .topbar .button{font-size:13px;padding:0 13px}
   .topbar #refresh{width:40px}
@@ -575,7 +598,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .toolbar select{max-width:116px}
   .toolbar-end{gap:0}
   .profile-grid{grid-template-columns:1fr;gap:16px}
-  .profile-name{min-height:44px;line-height:44px}
+  .profile-name{min-height:44px;padding-block:calc((44px - 1.35em) / 2)}
   .profile-card .button,.detail-panel .button,.link-button{min-height:44px}
   .profile-state-row{min-height:44px}
   .apps-grid{grid-template-columns:1fr}
@@ -589,7 +612,8 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .input,select,textarea{font-size:14px;min-height:44px}
   dialog[open]{animation:sheet-in var(--motion-surface) var(--ease)} /* no overshoot: a full-height slide would lift off the bottom edge */
   dialog.closing{animation:sheet-out var(--motion-exit) var(--ease) forwards}
-  .toast-viewport{left:16px;right:16px;width:auto;max-width:none}
+  .toast-viewport{left:16px;right:16px;bottom:8px;width:auto;max-width:none} /* over the activity bar, which names the same entry */
+  dialog .toast-viewport{top:8px;bottom:auto} /* over an open sheet, in the scrim above it: the sheet's footer holds its buttons */
   .toast-viewport>.toast:nth-child(n+2){display:none}
   .color-swatch{width:44px;height:44px}
   .toast>.icon-button{min-width:44px;min-height:44px}
