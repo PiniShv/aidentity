@@ -189,6 +189,20 @@ jobs:
       - name: Dashboard bundle, API and installed-file tests
         run: make dashboard-check
 
+      # Homebrew's python3 comes first on PATH here, but the dashboard promises
+      # Python 3.9, the one a Mac with only the Command Line Tools has at
+      # /usr/bin/python3. With /usr/bin first, the server tests, the
+      # installed-file test and the shell end-to-end test all run on it.
+      - name: Dashboard on Python 3.9 (/usr/bin/python3)
+        run: |
+          set -eu
+          export PATH="/usr/bin:$PATH"
+          python3 --version
+          python3 -c 'import sys; sys.exit(sys.version_info[:2] != (3, 9))' \
+            || { echo "::error::/usr/bin/python3 is not 3.9, the version this step tests." >&2; exit 1; }
+          python3 -m unittest discover -s test -p 'test_dashboard*.py'
+          /bin/bash test/run_tests.sh dashboard
+
       - name: Dashboard JavaScript syntax
         run: |
           node --check dashboard/app.js

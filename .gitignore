@@ -37,6 +37,3 @@ scratch/
 NOTES.local.md
 __pycache__/
 *.pyc
-
-# Impeccable per-machine settings
-.impeccable/config.local.json

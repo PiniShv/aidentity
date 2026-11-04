@@ -7,25 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.6.2] - 2026-11-01
-
 ### Added
 
-- `aidentity dashboard` opens a localhost browser workspace for profile
-  management, launch settings, maintenance, import/export, help and updates.
-  Includes an actionable Explore app/account list whose native scrolling moves
-  a 3D preview adapted from 21st.dev's Works Wheel. The optional dashboard needs Python 3.9+ without extra
-  packages and is bundled into the same single-file install.
-
-- `aidentity dashboard` runs its server in the background and gives the prompt
-  back at once. The server keeps running after the terminal closes, until
+- `aidentity dashboard` opens a workspace in your browser, on `127.0.0.1`. It
+  lists Claude and ChatGPT profiles only. Explore shows one app's profiles
+  beside a list that picks the app. Profiles, Applications (each app is a glass
+  folder of its profiles), Recovery, Maintenance, Import & export and Help cover
+  the rest. Each app is drawn with its own installed icon, and the interface
+  icons are Hugeicons (MIT).
+- The dashboard runs its server in the background and gives the prompt back at
+  once. It keeps running after the terminal closes, until
   `aidentity dashboard --stop`. Running `aidentity dashboard` again while it
   runs opens the same dashboard; asking for another `--port` then says to stop
-  it first.
-
+  it first. It needs Python 3.9+ and no packages, and is bundled into the same
+  single-file install.
 - The dashboard's ground is a slow field of faint glyphs behind the sidebar and
   the workspace, adapted from 21st.dev's Background ASCII Dither. It holds still
   under reduced motion and is gone under increased contrast.
+
+### Changed
+
+- The uninstaller stops a running dashboard and removes its state file.
+
+## [1.6.2] - 2026-11-01
+
+### Added
 
 - A 31-second film, at the top of the README and in the first section of the
   site. It shows the problem first: to switch accounts, you sign out and sign in

@@ -164,11 +164,19 @@ fi
 
 # 8. bin/aidentity is built from src/ by scripts/build.sh, and both are
 #    committed. A change made in bin/aidentity alone would be lost at the next
-#    build; one made in src/ alone would never ship.
+#    build; one made in src/ alone would never ship. src/83-dashboard-bundle.sh
+#    is built from dashboard/ the same way, and the check above cannot see it
+#    stale: the stale bundle is itself part of src/.
 if err=$(bash scripts/build.sh --check 2>&1); then
   pass "bin/aidentity is the build of src/"
 else
   bad "bin/aidentity is not the build of src/. Edit src/*.sh, then run: make build"
+  printf '%s\n' "$err" >&2
+fi
+if err=$(python3 scripts/bundle-dashboard.py --check 2>&1); then
+  pass "src/83-dashboard-bundle.sh is the build of dashboard/"
+else
+  bad "src/83-dashboard-bundle.sh is not the build of dashboard/ (or python3 is missing). Edit dashboard/, then run: make build"
   printf '%s\n' "$err" >&2
 fi
 
