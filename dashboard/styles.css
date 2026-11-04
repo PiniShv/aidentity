@@ -479,14 +479,8 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
 /* app.js wraps each shell word: lines break between words, inside one only when it is wider than the line. */
 .command-word{display:inline-block;max-width:100%;overflow-wrap:anywhere}
 .command-label{flex:none}
-.import-preview{position:relative;max-height:240px;overflow:auto;margin-top:17px;padding:12px 15px;background:var(--ground);border-radius:8px;line-height:1.55;font-size:12px} /* position: as .target-list */
-.import-summary{font-size:13px;color:var(--muted);margin-bottom:4px}
-.import-summary strong{color:var(--text);font-weight:500}
-.import-list{list-style:none;margin:0 0 8px;padding:0}
-.import-list li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);line-height:1.4;overflow-wrap:anywhere}
-.import-list li:last-child{border:0}
-.import-fate{flex:none;color:var(--muted)}
-.import-list li[data-fate=create] .import-fate{color:var(--text)}
+.import-preview{margin-top:17px}
+.import-plan{max-height:240px;padding:12px 15px;background:var(--ground);border-radius:8px;margin-bottom:8px} /* the CLI's own plan, verbatim */
 .file-input{padding:10px;font-size:12px}
 .file-input::file-selector-button{background:var(--raised);color:var(--text);border:0;border-radius:8px;padding:7px 12px;margin-right:12px}
 
@@ -718,10 +712,11 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .title-row{flex-wrap:wrap}
   .title-actions{margin-left:auto}
 }
-/* From 768px the selected card shows state, Quit and the primary action, so the detail panel leaves them out.
+/* From 768px, while the selected card is on screen it shows state, Quit and the primary action, so the detail panel leaves them out;
+   a selected profile whose card left the current tab keeps them in the panel.
    Collapsed rail: "Your apps" becomes a divider. Workspace health puts its result beside its text. */
 @media(min-width:768px){
-  .detail-own{display:none}
+  .profile-layout.card-shown .detail-own{display:none}
   .sidebar-collapsed .nav-apps{margin-top:18px;padding-top:10px;background:linear-gradient(var(--control) 0 0) 12px 0/calc(100% - 24px) 1px no-repeat}
   .sidebar-collapsed .nav-group-title{height:0;padding:0}
   .sidebar-collapsed .scope>.nav-label{position:absolute;width:1px;height:1px;clip-path:inset(50%)} /* visually hidden, still read: zero-size text can be skipped */

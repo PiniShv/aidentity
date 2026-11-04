@@ -279,7 +279,7 @@
     if(!from||document.activeElement&&document.activeElement!==document.body)return;
     const area=from.place==="detail"?$(".detail-panel",main):from.place==="card"?$$(".profile-card",main).find(node=>$(".profile-name",node)?.dataset.name===from.name):main;
     const same=from.id?document.getElementById(from.id):area&&$$("[data-action]",area).find(el=>el.dataset.action===from.action&&(el.dataset.name||"")===from.name);
-    // A candidate can be hidden (a closed disclosure, the panel's own copy from 768px): try the next until one takes focus.
+    // A candidate can be hidden (a closed disclosure, the panel's own copy beside a shown card from 768px): try the next until one takes focus.
     for(const el of [same,from.place&&area&&$(from.place==="detail"?"#detail-title":".profile-name",area),$("h1",main)]){if(!el||el.disabled)continue;el.focus({preventScroll:true});if(document.activeElement===el)return;}
   }
   let navApps=null;
@@ -422,6 +422,8 @@
     const visible=scoped.filter(item=>statusFilter==="all"||(statusFilter==="running"?item.status==="running":statusFilter==="attention"?needsRepair(item):item.status!=="running"));
     restoreSelection(visible);
     const chosen=scoped.some(item=>item.name===selected)?profile(selected):null;
+    // The panel keeps a profile whose card left this tab; its own state, Quit and primary show again while no card carries them.
+    const cardShown=Boolean(chosen)&&visible.some(item=>item.name===chosen.name);
     if(!chosen)mobileDetail=false;
     main.classList.toggle("profile-detail-mobile",mobileDetail);
     // Counts live on the tabs only. Search shows from 7 profiles, the app filter once two apps have profiles; All apps clears a filter the select cannot.
@@ -435,7 +437,7 @@
     paint(title(appFilter||"Profiles")+
       strip+
       toolbar+
-      `<div class="profile-layout ${visible.length||chosen?"":"no-selection"} ${mobileDetail?"mobile-detail":""}"><div class="profile-grid" id="profile-results"${strip?` role="tabpanel" aria-labelledby="status-${statusFilter}"`:""}>${visible.map(card).join("")||profilesEmpty(scoped)}</div>${chosen?detail(chosen):visible.length?'<p class="detail-placeholder">Select a profile to see its settings and actions.</p>':""}</div>`);
+      `<div class="profile-layout ${visible.length||chosen?"":"no-selection"} ${mobileDetail?"mobile-detail":""}${cardShown?" card-shown":""}"><div class="profile-grid" id="profile-results"${strip?` role="tabpanel" aria-labelledby="status-${statusFilter}"`:""}>${visible.map(card).join("")||profilesEmpty(scoped)}</div>${chosen?detail(chosen):visible.length?'<p class="detail-placeholder">Select a profile to see its settings and actions.</p>':""}</div>`);
     fillPreviews();
   }
   const emptyState=(heading,text,actions="")=>`<div class="empty-state"><h2>${heading}</h2><p>${text}</p>${actions}</div>`;
@@ -459,7 +461,7 @@
     return `<article class="profile-card${t.cls}${on?" selected":""}${item.status==="running"?" running":""}${litCards.has(item.name)?" lit":""}${[...(item.profile||item.name)].length>24?" long-name":""}"${t.style} aria-labelledby="${profileId(item.name)}"><div class="profile-head">${art(appName(item),item.badge,item.color)}<div class="profile-title"><h2><button class="profile-name" id="${profileId(item.name)}"${on?' aria-current="true"':""} data-action="select" data-name="${escape(item.name)}">${breakable(item.profile||item.name)}</button></h2><p class="profile-app">${escape(appName(item))}</p></div></div><div class="profile-state-row">${statusMark(item)}${repair}${quitButton(item)}</div>${notes.length?`<p class="profile-meta">${notes.map(escape).join(" · ")}</p>`:""}${primaryButton(item,on)}</article>`;
   }
   // Detail: who, the command the primary action runs, then Settings, Rename and Remove; launch settings; paths and Rebuild behind Details.
-  // From 768px the selected card beside or above it shows state, Quit and the primary action, so .detail-own (CSS) shows only below that.
+  // From 768px, while the selected card is on screen it shows state, Quit and the primary action, so .detail-own (CSS) hides then (.card-shown).
   function detail(item){
     const t=tone(appName(item)),spec=JSON.stringify({action:"open",name:item.name}),command=previews.get(spec);
     const args=item.args||[],env=item.env||[];
@@ -701,7 +703,7 @@
       entry=logActivity({action:name,ok:Boolean(result.ok),command:result.command,output:name==="export"&&result.ok?"Export file prepared for download.":[result.stdout,result.stderr,result.error].filter(Boolean).join("\n")});
       // Doctor reports findings with a non-zero exit; a summary means it ran, so it is a result, not a failure.
       const report=name==="doctor"&&Boolean(result.summary);
-      if((!response.ok||!result.ok)&&!report)throw Object.assign(new Error(result.error||result.stderr||result.stdout||`${name} failed (exit ${result.exit_code}).`),{field:result.field});
+      if((!response.ok||!result.ok)&&!report)throw Object.assign(new Error(result.error||result.stderr||result.stdout||`${name} failed (exit ${result.exit_code}).`),{field:result.field,stale:response.status===409});
       if(name==="doctor"){lastDoctor={result,at:new Date()};doctorFlags=new Set((result.findings||[]).filter(item=>item.profile&&(item.level==="warn"||item.level==="error")).map(item=>item.profile));saveDoctor();}
       if(name==="rebuild"){if(params.all)doctorFlags.clear();else doctorFlags.delete(params.name);saveDoctor();}
       if(name!=="add")note=describe(name,params,result,before);
@@ -714,6 +716,8 @@
       if(woke||name==="restore")ripple((woke&&profileSpot(params.name))||toastViewport.firstElementChild);
       return result;
     }catch(error){
+      // A 409 that is not "busy" means what the user approved changed underneath: reread, so the page shows the current list.
+      if(error.stale)await refresh({force:true}).catch(()=>{});
       const failure=error.busy?"Still working":error.message===OFFLINE?"Disconnected":`Could not ${verbs[name]||name}${params.name?` ${params.name}`:""}`;
       if(entry)entry.title=failure;
       if(!quiet&&!(inDialog&&dialog.open)&&!error.reported){toast(failure,error.message===OFFLINE?"":String(error.message),error.busy?"info":true);error.reported=true;}
@@ -991,23 +995,26 @@
       const result=await action("import",{document:importDocument,confirmed:true},el,{quiet:true});
       const note=describe("import",{},result);toast(note.title,note.text,note.kind);if(note.kind==="ok")ripple(toastViewport.firstElementChild);showView("profiles",{app:""});
     },{build:()=>importDocument?["import",{document:importDocument,confirmed:true}]:null});
+    // Instant checks first (size, JSON, format), then the CLI's own plan: its real targets and redacted launch settings, proxies included.
     $("#import-file").onchange=async event=>{
-      importDocument=null;$("#import-preview").hidden=true;$("#form-error").hidden=true;$("#dialog-submit").textContent="Import profiles";$("#dialog-submit").disabled=false;
+      const input=event.target,preview=$("#import-preview"),submit=$("#dialog-submit");
+      importDocument=null;preview.hidden=true;$("#form-error").hidden=true;submit.textContent="Import profiles";submit.disabled=false;
+      const file=input.files[0];if(!file)return;
+      submit.disabled=true;
       try{
-        const file=event.target.files[0];if(!file)return;
         if(file.size>4194304)throw new Error("The export file is larger than 4 MiB.");
         const data=JSON.parse(await file.text());if(data.aidentity_export!==1||!Array.isArray(data.launchers))throw new Error("Choose a format 1 aidentity export file.");
-        importDocument=data;$("#import-preview").hidden=false;
-        // An estimate from the dashboard's own lists: the CLI matches apps by bundle ID and checks again when it runs.
-        const owned=new Set(inventory.profiles.map(item=>item.name)),apps=new Set(inventory.apps.map(item=>item.name));
-        const fates={create:"will create",exists:"already exists (skipped)",missing:"app not installed (skipped)"};
-        const rows=data.launchers.map(item=>{const name=String(item?.name||[item?.app,item?.profile].filter(Boolean).join(" ")||"Unnamed profile");return {name,fate:owned.has(name)?"exists":(item?.app?!apps.has(item.app):!item?.bundle_id)?"missing":"create"};});
-        const count=fate=>rows.filter(row=>row.fate===fate).length,create=count("create");
-        $("#import-preview").innerHTML=`<p class="import-summary"><strong>${plural(create,"profile")} will be created</strong>${count("exists")?` · ${count("exists")} already ${count("exists")===1?"exists":"exist"}`:""}${count("missing")?` · ${plural(count("missing"),"app")} not installed`:""}</p><ul class="import-list">${rows.map(row=>`<li data-fate="${row.fate}"><span>${breakable(row.name)}</span><span class="import-fate">${fates[row.fate]}</span></li>`).join("")}</ul><p class="small">From ${escape(file.name)}. The CLI checks each profile again when it runs.</p>`;
-        // "App not installed" is only the estimate above, so it never blocks the import; only a list of profiles that all exist (or none) does.
-        const submit=$("#dialog-submit"),nothing=rows.every(row=>row.fate==="exists");submit.textContent=create?`Create ${plural(create,"profile")}`:nothing?"Nothing to create":"Import profiles";submit.disabled=nothing;
+        preview.hidden=false;preview.innerHTML='<p class="muted" role="status">Checking the file with aidentity…</p>';
+        // The file input is locked while the plan loads, so no second file can race this one.
+        input.disabled=true;
+        const result=await readOutput("import",{document:data,plan:true},null);
+        if(!input.isConnected)return;
+        importDocument=data;
+        preview.innerHTML=`<pre class="output import-plan">${escape(result.stdout||"")}</pre><p class="small">From ${escape(file.name)}.</p>`;
+        const creates=result.creates||0;submit.disabled=!(creates>0);submit.textContent=creates>0?`Create ${plural(creates,"profile")}`:"Nothing to create";
         schedulePreview(0);
-      }catch(error){showFormError(error.message);}
+      }catch(error){if(!input.isConnected)return;importDocument=null;preview.hidden=true;submit.disabled=true;showFormError(error.message);}
+      finally{input.disabled=false;if(input.isConnected&&document.activeElement===document.body)input.focus({preventScroll:true});}
     };
   }
   async function exportSetup(el){
@@ -1057,7 +1064,8 @@
     if(name==="rebuild-all")return confirmAction("Rebuild all launchers?",`Makes ${plural(inventory.profiles.length,"launcher")} again from saved settings. Profile data is not touched.`,"","Rebuild all","rebuild",{all:true});
     if(name==="prune"){
       const names=(state.unclaimed||[]).map(entry=>entry.name);
-      return confirmAction("Clear unclaimed data?",`${plural(names.length,"profile folder")} that no launcher uses will move to the Trash.`,"Restore any you want to keep first.","Clear unclaimed data","prune",{confirmed:true},true,targetList(names));
+      // names is the list shown: the server refuses (409) if the unclaimed folders changed since, so only what was approved moves.
+      return confirmAction("Clear unclaimed data?",`${plural(names.length,"profile folder")} that no launcher uses will move to the Trash.`,"Restore any you want to keep first.","Clear unclaimed data","prune",{confirmed:true,names},true,targetList(names));
     }
     if(name==="doctor")return action("doctor",{},el);
     if(name==="doctor-fix")return confirmAction("Check and repair the workspace?","Doctor checks your setup, then rebuilds the launchers it can fix.","","Check and repair","doctor",{fix:true});
@@ -1069,6 +1077,8 @@
       const command=guideCommand=$("#help-command").value,params=name==="help"?(command?{command}:{}):{shell:guideShell=$("#completion-shell").value};
       try{guideText=(await readOutput(name,params,el)).stdout;}
       catch(error){toast(name==="help"?"Could not read the help":"Could not generate completion",error.message===OFFLINE?"":error.message,true);return;}
+      // The user may have left Help while it loaded: keep the text for their return, but leave the page they are on alone.
+      if(view!=="guide")return;
       // In one column (900px and below) the output sits under the controls: bring its top into view.
       renderGuide();$(`[data-action="${name}"]`,main)?.focus({preventScroll:true});
       const output=$(".guide-output",main);if(output&&output.getBoundingClientRect().top>innerHeight*.6)output.scrollIntoView({block:"start",behavior:reducedMotion.matches?"instant":"smooth"});
@@ -1076,7 +1086,7 @@
     }
     if(name==="copy-guide"&&guideText){try{await navigator.clipboard.writeText(guideText);}catch{toast("Could not copy the output","Select it and press ⌘C instead.",true);return;}toast("Copied","Command output copied to your clipboard.");}
   }
-  // The visible button runs it (the panel's own copy is hidden from 768px), so its spinner and focus return show where the user looks.
+  // The visible button runs it (from 768px the panel's own copy hides while the selected card is shown), so its spinner and focus return show where the user looks.
   function runPrimary(){
     const el=profileSpot(selected);
     if(el?.hasAttribute("data-locked"))return;
