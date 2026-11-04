@@ -27,7 +27,6 @@ cmd_dashboard() {
   if [ "$stop" = 1 ] && [ "$port_set$no_open" != 00 ]; then
     die "--stop cannot be combined with --port or --no-open."
   fi
-  [ "$(uname)" = Darwin ] || die "aidentity dashboard requires macOS."
   python=$(command -v python3) || die "The dashboard needs Python 3.9 or newer.
     Install Python 3, then run 'aidentity dashboard' again.
     All other aidentity commands work without Python."

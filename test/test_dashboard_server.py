@@ -66,6 +66,9 @@ class DashboardTests(unittest.TestCase):
             "  sys.exit(143)\n"
             " signal.signal(signal.SIGTERM,cleanup); time.sleep(5)\n"
             "elif a == ['help','flood']: print('x' * (5 * 1024 * 1024))\n"
+            "elif a == ['help','where']:\n"
+            " print(json.dumps({'cwd': os.getcwd(), 'pwd': os.environ.get('PWD'), 'apps': os.environ['AIDENTITY_APPS_DIR'],"
+            "'data': os.environ['AIDENTITY_DATA_ROOT'], 'dirs': os.environ['AIDENTITY_APP_DIRS']}))\n"
             "elif os.path.exists(os.path.join(os.environ['HOME'],'reply')):\n"
             " r=json.load(open(os.path.join(os.environ['HOME'],'reply')))\n"
             " sys.stdout.write(r['stdout']); sys.stderr.write(r['stderr'])\n"
@@ -541,6 +544,34 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(stopped.returncode, 0, stopped.stdout + stopped.stderr)
         self.assertIn("Dashboard stopped.", stopped.stdout)
         self.assertTrue((self.root / "cleaned").exists(), "Stopping the dashboard skipped the CLI's cleanup.")
+
+    def test_background_dashboard_leaves_its_launch_directory_and_keeps_its_relative_paths(self):
+        launch = self.root / "launch"
+        launch.mkdir()
+        here = launch.resolve()  # a process reads its directory with symlinks resolved
+        env = dict(self.backend.env, PWD=str(launch), AIDENTITY_APPS_DIR="Launchers", AIDENTITY_DATA_ROOT="../Data",
+                   AIDENTITY_APP_DIRS="Installed:/Abs/Apps::more/")
+        command = [sys.executable, "-I", str(SERVER_PATH), self.cli, "--state", str(self.root / "dashboard.json")]
+        run = dict(env=env, cwd=launch, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+        started = subprocess.run(command + ["--no-open"], **run)
+        try:
+            self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+            self.port = int(re.search(r"http://127\.0\.0\.1:(\d+)", started.stdout)[1])
+            self.origin = "http://127.0.0.1:" + str(self.port)
+            self.token = self.request("GET", "/api/state")[2]["csrf_token"]
+            launch.rmdir()  # a CLI started from a deleted directory cannot even ask where it is
+            _, _, result = self.action({"action": "help", "command": "where"})
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(json.loads(result["stdout"]), {
+                "cwd": "/", "pwd": None, "apps": str(here / "Launchers"), "data": str(here.parent / "Data"),
+                "dirs": str(here / "Installed") + ":/Abs/Apps::" + str(here / "more")})
+        finally:
+            subprocess.run(command + ["--stop"], **dict(run, cwd=None))
+
+    def test_unclaimed_names_split_on_newlines_only(self):
+        done = lambda out: {"ok": True, "stdout": out, "stderr": ""}
+        state = self.backend.inventory(done("[]"), done(""), done(""), done("one\u2028two\nthree\x85four\n"), done("aidentity 1.6.1"))
+        self.assertEqual(state["unclaimed"], [{"name": "one\u2028two"}, {"name": "three\x85four"}])
 
     def test_timeout_allows_cli_rollback_trap_to_run(self):
         _, _, result = self.action({"action": "help", "command": "cleanup"})

@@ -8,8 +8,9 @@
 # Two separate things can be removed, and this script treats them separately:
 #
 #   1. The aidentity command itself. Removed without asking — that is what you
-#      ran this for. Deleting it does not affect any launcher you already built;
-#      each launcher is a standalone .app that holds no reference to the tool.
+#      ran this for. A dashboard still running is stopped first. Deleting the
+#      command does not affect any launcher you already built; each launcher is
+#      a standalone .app that holds no reference to the tool.
 #
 #   2. Your launchers and their profile data. Offered, never assumed. This is
 #      the part that signs accounts out and takes local app state away, so it
@@ -385,6 +386,24 @@ human_size() {
 
 # ------------------------------------------------- 1. the command itself --
 
+# The dashboard runs in the background until --stop, and the command that can
+# stop it is about to go. Without its state file none was started here, and
+# --stop would only create the folder. --stop takes the dashboard's lock, so it
+# never signals a stale pid; a command from before the dashboard fails, and
+# that is skipped. Only once it succeeds, with the lock free, does the state
+# file go, and only if the dashboard wrote it: the folder above the data root
+# can be any folder.
+stop_dashboard() {
+  local out state
+  state="$(dirname "$DATA_ROOT")/dashboard.json"
+  [ -e "$state" ] || return 0
+  out=$("$1" dashboard --stop 2>/dev/null </dev/null) || return 0
+  [ "$out" != "Dashboard stopped." ] || ok "Stopped the dashboard"
+  if [ ! -s "$state" ] || grep -Eq '^\{"pid": [0-9]+, "port": [0-9]+\}$' "$state"; then
+    rm -f "$state"
+  fi
+}
+
 remove_binary() {
   local candidates="" dir found removed=0 blocked=0 p
   local DIRS=()
@@ -456,6 +475,7 @@ $found" ;;
       continue
     fi
 
+    stop_dashboard "$p"
     if [ -w "$(dirname "$p")" ]; then
       if rm -f "$p"; then
         ok "Removed $p"

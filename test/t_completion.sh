@@ -136,8 +136,10 @@ has_line "it lists a profile whose launcher was removed" "$RUN_OUT" "Fake Gone"
 lacks_line "and not one that still has a launcher" "$RUN_OUT" "Fake Work"
 
 # prune moves every folder no launcher uses, restore record or not, so the
-# dashboard names each one before it asks.
-mkdir -p "$DATA/loose folder" "$DATA/bad${ESC}[31mname"
+# dashboard names each one before it asks. A control character in a name is
+# shown as ? rather than hiding the folder.
+TAB=$(printf '\t')
+mkdir -p "$DATA/loose folder" "$DATA/bad${ESC}[31mname" "$DATA/tab${TAB}name"
 ln -s "$SRC" "$DATA/linked out"
 ai_stdout __complete orphans
 assert_rc "__complete orphans exits 0" 0 "$RUN_RC" "$RUN_ERR"
@@ -146,12 +148,14 @@ has_line "it lists an orphan by the launcher its restore record rebuilds" "$RUN_
 has_line "and one with no restore record by its folder name" "$RUN_OUT" "loose folder"
 lacks_line "and not a profile that still has a launcher" "$RUN_OUT" "Fake Work"
 lacks_line "and not a link out of the data root" "$RUN_OUT" "linked out"
-assert_not_contains "a folder name with an escape character is left out" "$RUN_OUT" "$ESC"
+assert_not_contains "no escape character is printed" "$RUN_OUT" "$ESC"
+has_line "a folder name with an escape character is listed, the escape shown as ?" "$RUN_OUT" "bad?[31mname"
+has_line "and one with a tab, the tab shown as ?" "$RUN_OUT" "tab?name"
 assert_not_contains "and no path is printed" "$RUN_OUT" "/"
 ai_stdout __complete restorable
 has_line "__complete restorable still lists the recorded orphan" "$RUN_OUT" "Fake Gone"
 lacks_line "and not the one with no restore record" "$RUN_OUT" "loose folder"
-rm -rf "$DATA/loose folder" "$DATA/bad${ESC}[31mname" "$DATA/linked out"
+rm -rf "$DATA/loose folder" "$DATA/bad${ESC}[31mname" "$DATA/tab${TAB}name" "$DATA/linked out"
 
 for what in bogus ""; do
   ai_stdout __complete "$what"

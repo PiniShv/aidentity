@@ -38,7 +38,8 @@ EOF
         [ -n "$dir" ] || continue
         data_is_ours "$dir" || continue   # prune skips these too
         label=$(restore_label "$dir") || label=$(basename "$dir")
-        case "$label" in *[[:cntrl:]]*) continue ;; esac
+        # Prune moves the folder whatever it is called: list it, with the control characters made visible.
+        label=$(printf '%s' "$label" | LC_ALL=C tr '[:cntrl:]' '?')
         printf '%s\n' "$label"
       done <<EOF
 $(orphan_dirs)

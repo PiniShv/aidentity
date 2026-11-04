@@ -227,6 +227,13 @@ class Dashboard:
     def __init__(self, cli, env=None, timeout=120, bulk_timeout=1800):
         self.cli = os.path.abspath(cli)
         self.env = dict(os.environ if env is None else env)
+        # main() leaves the launch directory, so a relative path the CLI reads from here on keeps the meaning it had at launch.
+        for key in ("AIDENTITY_APPS_DIR", "AIDENTITY_DATA_ROOT"):
+            if self.env.get(key):
+                self.env[key] = os.path.abspath(self.env[key])
+        if self.env.get("AIDENTITY_APP_DIRS"):
+            self.env["AIDENTITY_APP_DIRS"] = ":".join(
+                os.path.abspath(d) if d else d for d in self.env["AIDENTITY_APP_DIRS"].split(":"))
         self.timeout = timeout
         self.bulk_timeout = bulk_timeout
         self.csrf_token = secrets.token_urlsafe(32)
@@ -382,7 +389,7 @@ class Dashboard:
             "profiles": profiles,
             "apps": [{"name": name, "icon": name in self.icons} for name in names],
             "restorable": [{"name": name} for name in restorable["stdout"].splitlines() if name] if restorable["ok"] else [],
-            "unclaimed": [{"name": name} for name in orphans["stdout"].splitlines() if name] if orphans["ok"] else [],
+            "unclaimed": [{"name": name} for name in orphans["stdout"].split("\n") if name] if orphans["ok"] else [],
             # A failed read is not an empty list; the page must not claim "Nothing to restore" for one.
             "restorable_ok": restorable["ok"], "unclaimed_ok": orphans["ok"],
             "paths": {
@@ -696,9 +703,7 @@ def make_server(dashboard, port=0, assets=None):
         def do_OPTIONS(self):
             self.respond(405, {"ok": False, "error": "Cross-origin requests are not supported."})
 
-    server = LoopbackServer(("127.0.0.1", port), Handler)
-    server.daemon_threads = True
-    return server
+    return LoopbackServer(("127.0.0.1", port), Handler)
 
 
 def take_lock(fd):
@@ -809,6 +814,9 @@ def main(argv=None, assets=None):
     try:
         # Its own session and no terminal or pipe: a closed terminal or `| cat` neither ends nor waits for it.
         os.setsid()
+        # The launch directory may be deleted, or sit on a volume to eject; every CLI child inherits this one.
+        os.chdir("/")
+        dashboard.env.pop("PWD", None)
         devnull = os.open(os.devnull, os.O_RDWR)
         for fd in (0, 1, 2):
             os.dup2(devnull, fd)
