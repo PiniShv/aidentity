@@ -10,6 +10,7 @@
 #   aidentity add Claude --profile Work
 #   aidentity list
 #   aidentity ui                  # full-screen menu
+#   aidentity dashboard           # localhost visual workspace (Python 3.9+)
 #   aidentity rm "Claude Work" --purge
 #   aidentity update --check
 #
@@ -20,8 +21,8 @@
 #   AIDENTITY_APP_DIRS    colon-separated folders searched for apps
 #                         (default: /Applications:~/Applications)
 #
-# The network is used by one command only: `aidentity update`, which asks
-# GitHub for the latest release over HTTPS. Nothing else connects anywhere.
+# Only `aidentity update` accesses the internet (GitHub over HTTPS).
+# The optional dashboard serves bundled assets over loopback while it runs.
 #
 # https://github.com/PiniShv/aidentity
 #
@@ -39,7 +40,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Requires macOS. No dependencies beyond what ships with the OS.
+# Requires macOS. The optional dashboard also needs Python 3.9+.
 #
 # This file is built from the src/ folder of the repository by
 # scripts/build.sh. To change it, edit those files and run `make build`.

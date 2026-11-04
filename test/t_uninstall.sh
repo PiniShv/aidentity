@@ -450,3 +450,78 @@ assert_contains "the end says something was left" "$RUN_OUT" "some things were l
 rm -rf "$APPS/Private" "$DATA/fake-bye" "$DATA/fake-stray-unsure"
 mkdir -p "$DATA"
 trash_reset
+
+# A dashboard started before the uninstall does not outlive the command that
+# started it, and its state file, inside the data root, does not keep that
+# folder. A dashboard.json that the dashboard did not write is not its to
+# delete, and a dashboard that does not stop keeps the command that stops it.
+# The data root is a folder of its own, so the folder above it can be checked.
+if command -v python3 >/dev/null 2>&1 \
+    && python3 -I -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
+  UN_DASH="$SANDBOX/un-dash/aidentity"
+  # A failed assertion, or an interrupted run, must not leave a server behind.
+  un_holder=""
+  trap '[ -z "$un_holder" ] || kill -9 "$un_holder" 2>/dev/null
+    AIDENTITY_DATA_ROOT="$UN_DASH/profiles" "$BASH_BIN" "$AIDENTITY" dashboard --stop >/dev/null 2>&1 </dev/null; cleanup' EXIT INT TERM
+  rm -rf "$SANDBOX/un-dash"
+  mkdir -p "$UN_DASH/profiles/stray-dash"
+  cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
+  AIDENTITY_DATA_ROOT="$UN_DASH/profiles" detached "$BASH_BIN" "$UN_BIN/aidentity" dashboard --no-open \
+    >"$SANDBOX/un-dash.out" 2>&1 </dev/null
+  un_url=$(sed -n 's|^aidentity dashboard: \(http://127\.0\.0\.1:[0-9][0-9]*\)$|\1|p' "$SANDBOX/un-dash.out")
+  assert_eq "the dashboard answers before the uninstall" 200 \
+    "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "$un_url/" 2>&1)"
+  AIDENTITY_DATA_ROOT="$UN_DASH/profiles" un_tty 'delete\n'
+  assert_rc "the uninstall of a machine with a dashboard running exits 0" 0 "$RUN_RC" "$RUN_OUT"
+  assert_contains "it says it stopped the dashboard" "$RUN_OUT" "Stopped the dashboard"
+  curl -s -o /dev/null --max-time 2 "$un_url/"
+  assert_rc_nonzero "the dashboard's port refuses connections" "$?"
+  assert_no_file "the command is gone" "$UN_BIN/aidentity"
+  assert_dir "the data went to the Trash" "$UN_TRASH/stray-dash"
+  assert_no_dir "and the data root, with the dashboard's state file, is gone" "$UN_DASH"
+  assert_contains "the end says aidentity is gone" "$RUN_OUT" "aidentity is gone"
+
+  # Before its state file goes, so that a server the checks above found still running ends here.
+  AIDENTITY_DATA_ROOT="$UN_DASH/profiles" "$BASH_BIN" "$AIDENTITY" dashboard --stop >/dev/null 2>&1 </dev/null
+  rm -rf "$SANDBOX/un-dash"
+  mkdir -p "$UN_DASH/profiles/stray-dash"
+  printf 'my own notes\n' > "$UN_DASH/profiles/dashboard.json"
+  cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
+  AIDENTITY_DATA_ROOT="$UN_DASH/profiles" un_tty 'delete\n'
+  assert_file "a dashboard.json that is not the dashboard's is left alone" "$UN_DASH/profiles/dashboard.json"
+  assert_eq "with what was in it" "my own notes" "$(cat "$UN_DASH/profiles/dashboard.json")"
+  assert_dir "so the data root it is in stays" "$UN_DASH/profiles"
+  assert_contains "and the end says something was left" "$RUN_OUT" "some things were left in place"
+
+  # A dashboard that will not stop: it holds the lock, names itself in the state
+  # file and ignores SIGTERM. --stop waits TERM_GRACE + 2 seconds for it
+  # (dashboard/server.py), so this case takes about 12 seconds.
+  rm -rf "$SANDBOX/un-dash"
+  mkdir -p "$UN_DASH/profiles/stray-dash"
+  python3 -I -c 'import fcntl, os, signal, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+f = open(sys.argv[1], "a+")
+fcntl.flock(f, fcntl.LOCK_EX)
+f.seek(0); f.truncate(); f.write("{\"pid\": %d, \"port\": 1}" % os.getpid()); f.flush()
+time.sleep(60)' "$UN_DASH/profiles/dashboard.json" &
+  un_holder=$!
+  n=0
+  until grep -q '"port": 1}$' "$UN_DASH/profiles/dashboard.json" 2>/dev/null || [ "$n" -ge 50 ]; do
+    sleep 0.1; n=$((n + 1))
+  done
+  cp "$REPO_DIR/bin/aidentity" "$UN_BIN/aidentity"
+  AIDENTITY_DATA_ROOT="$UN_DASH/profiles" un_tty 'delete\n'
+  assert_contains "a dashboard that does not stop is named" "$RUN_OUT" "Could not stop the dashboard"
+  assert_file "the command is kept" "$UN_BIN/aidentity"
+  assert_contains "and the end says something was left" "$RUN_OUT" "some things were left in place"
+  assert_not_contains "not that aidentity is gone" "$RUN_OUT" "aidentity is gone"
+  kill -9 "$un_holder" 2>/dev/null
+  wait "$un_holder" 2>/dev/null
+  un_holder=""
+  rm -rf "$SANDBOX/un-dash" "$SANDBOX/un-dash.out" "$UN_BIN/aidentity"
+  trap cleanup EXIT INT TERM
+else
+  _skip "an uninstall stops a running dashboard and removes its state file" "Python 3.9 or newer is not installed"
+fi
+mkdir -p "$DATA"
+trash_reset

@@ -8,8 +8,9 @@
 # Two separate things can be removed, and this script treats them separately:
 #
 #   1. The aidentity command itself. Removed without asking — that is what you
-#      ran this for. Deleting it does not affect any launcher you already built;
-#      each launcher is a standalone .app that holds no reference to the tool.
+#      ran this for. A dashboard still running is stopped first. Deleting the
+#      command does not affect any launcher you already built; each launcher is
+#      a standalone .app that holds no reference to the tool.
 #
 #   2. Your launchers and their profile data. Offered, never assumed. This is
 #      the part that signs accounts out and takes local app state away, so it
@@ -385,6 +386,36 @@ human_size() {
 
 # ------------------------------------------------- 1. the command itself --
 
+# The dashboard runs in the background until --stop, and the command that can
+# stop it is about to go. Its state file is in the data root; without it none
+# was started here, and --stop would only create it. --stop takes the
+# dashboard's lock, so it never signals a stale pid. Only once it succeeds,
+# with the lock free, does the state file go, and only if the dashboard wrote
+# it. When --stop fails (a command from before the dashboard, no python3, a
+# dashboard that did not stop in time) and the file still names a live Python
+# process, that dashboard is still running: this fails, so the command that
+# stops it is kept. Otherwise nothing it could stop is left, and it succeeds.
+stop_dashboard() {
+  local out state pid
+  state="$DATA_ROOT/dashboard.json"
+  [ -e "$state" ] || return 0
+  if ! out=$("$1" dashboard --stop 2>/dev/null </dev/null); then
+    pid=$(sed -nE 's/^\{"pid": ([0-9]+), "port": [0-9]+\}$/\1/p' "$state" 2>/dev/null)
+    if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then return 0; fi
+    case "$(ps -o comm= -p "$pid" 2>/dev/null)" in
+      *[Pp]ython*) ;;
+      *) return 0 ;;
+    esac
+    warn "Could not stop the dashboard (process $pid). Kept $1, the command that stops it."
+    dim "  Run 'aidentity dashboard --stop', then this script again."
+    return 1
+  fi
+  [ "$out" != "Dashboard stopped." ] || ok "Stopped the dashboard"
+  if [ ! -s "$state" ] || grep -Eq '^\{"pid": [0-9]+, "port": [0-9]+\}$' "$state"; then
+    rm -f "$state"
+  fi
+}
+
 remove_binary() {
   local candidates="" dir found removed=0 blocked=0 p
   local DIRS=()
@@ -456,6 +487,7 @@ $found" ;;
       continue
     fi
 
+    stop_dashboard "$p" || { blocked=$((blocked + 1)); continue; }
     if [ -w "$(dirname "$p")" ]; then
       if rm -f "$p"; then
         ok "Removed $p"

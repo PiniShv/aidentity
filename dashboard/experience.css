@@ -1,0 +1,125 @@
+/* Explore: a focus panel with the chosen app's profiles as keys (every profile action lives there), beside a navigator of apps. */
+.xp-wrap{color:var(--text);min-width:0} /* no padding or fill: #main's gutters and the ambient ground, the same in every view */
+/* A control Explore holds for its own reason (aria-disabled) only dims, so filled buttons keep their colour. */
+.xp-wrap button[aria-disabled="true"]{opacity:.55;cursor:default}
+
+/* The page title is styles.css's .title-row; a notice sits under it. */
+.xp-wrap>.notice{margin-bottom:28px}
+
+/* Buttons: neutral by default. Only a running key's Bring to front takes the app hue. */
+.xp-button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 12px;border:1px solid var(--control);border-radius:8px;background:var(--surface);font-size:13px;font-weight:500;white-space:nowrap;transition:background-color 160ms ease,border-color 160ms ease,transform var(--motion-control) var(--spring-control)}
+.xp-button svg{width:15px;height:15px;flex-shrink:0}
+.xp-button:hover:not([aria-disabled="true"]){background:var(--raised);border-color:var(--muted)}
+.xp-button:active:not([aria-disabled="true"]){transform:scale(.97);transition-duration:var(--motion-press)}
+/* One Open everywhere: the secondary, a Raised fill with a 1px field-border edge. A running key's Bring to front is the hue fill with Lampblack ink. */
+.xp-key-action{background:var(--raised);border-color:var(--field-border)}
+.xp-key-action:hover:not([aria-disabled="true"]){background:var(--active);border-color:var(--field-border)}
+.xp-key-running .xp-key-action,.xp-key-running .xp-key-action:hover:not([aria-disabled="true"]){background:var(--app-color,var(--text));border-color:transparent;color:var(--ground)}
+.xp-key-running .xp-key-action:hover:not([aria-disabled="true"]){background:color-mix(in srgb,var(--app-color,var(--text)) 90%,var(--text))}
+/* The Bone primary: Add profile while the app has no profiles, and the state with no apps at all. Neither has an app hue. */
+.xp-primary,.xp-primary:hover:not([aria-disabled="true"]){background:var(--text);border-color:transparent;color:var(--ground)}
+
+/* The panel takes the width; the navigator is a narrow column. fitSticky drops sticky when the panel is taller than the view. */
+.xp-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,300px);align-items:start;gap:28px}
+.xp-preview{position:sticky;top:24px;display:flex;flex-direction:column;gap:16px;padding:18px;border:1px solid var(--border);border-radius:14px;min-width:0;background:var(--card);scroll-margin-top:24px;container:xp-panel/inline-size}
+.xp-preview.xp-tall{position:relative;top:auto}
+/* Pager: Prev, "N of M" and Next, on phones only, where the navigator sits below the panel; hidden when only one app is listed. */
+.xp-pager{display:none;align-items:center;gap:8px;color:var(--muted);font-size:12px;line-height:16px}
+.xp-position{min-width:6ch;text-align:center;font-variant-numeric:tabular-nums}
+.xp-prev,.xp-next{width:36px;flex:none;padding:0}
+.xp-prev svg,.xp-next svg{width:18px;height:18px}
+/* The app identity. A change stacks the old and new faces in one cell and crossfades them (experience.js). */
+.xp-ident{display:grid}
+.xp-ident>*{grid-area:1/1}
+.xp-face{display:flex;align-items:center;gap:14px;min-width:0}
+/* The app-art tile: a solid app hue with Lampblack ink, or graphite with Bone ink for an app without a hue. */
+.xp-app-icon,.xp-list-icon{display:grid;place-items:center;flex:none;background:var(--app-color,var(--raised));color:var(--app-ink,var(--text))}
+.xp-app-icon{width:44px;height:44px;border-radius:10px;font-size:20px;font-weight:600}
+.xp-app-icon svg{width:24px;height:24px}
+.xp-face-text{min-width:0}
+.xp-card-name{margin:0;font-size:22px;font-weight:550;line-height:1.2;letter-spacing:-.03em;overflow-wrap:anywhere} /* Card */
+.xp-card-foot{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;margin:3px 0 0;color:var(--muted);font-size:12px;line-height:1.5;font-variant-numeric:tabular-nums}
+/* One running mark everywhere: a Mint dot and Mint text. Not running carries no dot. */
+.xp-run{display:inline-flex;align-items:center;gap:6px;color:var(--positive)}
+.xp-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--positive)}
+/* The ring: the app's profiles side by side as keys. 200px columns keep a state such as "Not running · Original" on one line. */
+.xp-keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.xp-key{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto 1fr;grid-template-areas:"badge name" "badge state" "act act";align-items:center;column-gap:10px;min-width:0;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.xp-key-name{grid-area:name;font-size:17px;font-weight:550;line-height:1.35;letter-spacing:-.015em;overflow-wrap:anywhere;text-wrap:balance} /* Title */
+.xp-key-state{grid-area:state;font-size:12px;line-height:18px;color:var(--muted)}
+.xp-key-action,.xp-key-reason{grid-area:act;align-self:end;margin-top:12px}
+.xp-key-action{width:100%}
+.xp-key-reason{font-size:12px;line-height:1.5;color:var(--muted)}
+.xp-key-missing .xp-key-state{color:var(--negative)}
+/* A running key keeps a 1px app-hue edge. No glow; keys rest flat. */
+.xp-key-running{border-color:var(--app-color,var(--text))}
+/* The authored moment: a key that starts running draws its edge once and its running dot arrives (static under reduced motion).
+   A profile card does the same (styles.css .lit), and the ambient field sends its ring from the key (experience.js). */
+.xp-key-lit{animation:card-edge 900ms var(--ease)}
+.xp-key-lit .xp-dot{animation:dot-in var(--motion-control) var(--spring-control)}
+.xp-key-add{width:100%}
+.xp-preview>.xp-help{margin-top:-8px}
+/* A narrow panel (phones, and tablets beside the navigator) lays each key out as one row. */
+@container xp-panel (max-width:380px){
+  .xp-keys{grid-template-columns:minmax(0,1fr)}
+  .xp-key{grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto auto;grid-template-areas:"badge name act" "badge state act";padding:10px 12px}
+  .xp-key-name{font-size:15px;line-height:1.3} /* Title compact */
+  .xp-key-action,.xp-key-reason{align-self:center;margin-top:0;width:auto}
+  .xp-key-reason{max-width:14ch}
+}
+
+/* One badge everywhere: a filled rounded square in the saved colour, ink by the Ink Rule. */
+.xp-key-badge{grid-area:badge;display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:var(--identity);color:var(--identity-ink);font-size:13px;font-weight:600}
+/* A profile with no badge shows the app's own icon, as its launcher does. */
+.xp-key-badge-app{background:var(--app-color,var(--raised));color:var(--app-ink,var(--text))}
+.xp-key-badge-app svg{width:20px;height:20px}
+/* An app's own installed icon fills its tile whole, on nothing (styles.css .app-icon). */
+.xp-app-icon:has(>.app-icon),.xp-list-icon:has(>.app-icon),.xp-key-badge-app:has(>.app-icon){position:relative;background:none}
+.xp-app-icon>.app-icon,.xp-list-icon>.app-icon,.xp-key-badge-app>.app-icon{position:absolute;inset:0;width:100%;height:100%}
+
+/* Navigator: one row per app, apps with profiles first. A row chooses the app; profile actions live only on the keys. */
+.xp-nav{display:grid;gap:4px;margin:0 0 16px;padding:0;list-style:none}
+.xp-nav-item{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:10px 12px;border:1px solid transparent;border-radius:12px;background:none;text-align:left;transition:background-color 160ms ease,border-color 160ms ease}
+.xp-nav-item:hover{background:var(--raised)}
+.xp-nav-item[aria-current="true"]{border-color:var(--app-color,var(--muted));background:var(--surface)}
+.xp-nav-text{min-width:0}
+.xp-app-name{display:block;font-size:15px;line-height:1.3;letter-spacing:-.015em;font-weight:550;overflow-wrap:anywhere;color:var(--text)}
+.xp-app-meta{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;margin-top:2px;color:var(--muted);font-size:12px;line-height:1.5;font-variant-numeric:tabular-nums}
+.xp-list-icon{width:36px;height:36px;border-radius:8px;font-size:16px;font-weight:600}
+.xp-list-icon svg{width:20px;height:20px}
+.xp-help{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin:0}
+.xp-inline-feedback{font-size:12px;line-height:1.5;color:var(--negative);margin:0;overflow-wrap:anywhere}
+
+/* Empty states */
+.xp-empty{padding:32px 24px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+.xp-empty h2{font-size:22px;font-weight:550;line-height:1.2;letter-spacing:-.03em;margin:0 0 8px}
+.xp-empty p{color:var(--muted);font-size:14px;margin:0}
+.xp-empty-refresh{width:auto;margin-top:20px}
+/* Inside the panel the no-profiles words are a placeholder, drawn like every other one (dashed Control, no fill): never a card in a card. */
+.xp-preview>.xp-empty{padding:20px;background:none;border-style:dashed;border-color:var(--control)}
+.xp-preview>.xp-empty p{font-size:13px}
+
+/* Breakpoints */
+@media(max-width:1100px) and (min-width:768px){
+  .xp-layout{gap:20px;grid-template-columns:minmax(0,1fr) minmax(220px,260px)}
+}
+@media(max-width:767px){
+  .xp-layout{grid-template-columns:minmax(0,1fr);gap:22px}
+  .xp-preview{position:relative;top:auto;padding:14px;gap:14px;border-radius:12px}
+  .xp-pager{display:flex}
+  .xp-prev,.xp-next{width:44px;min-height:44px}
+  .xp-app-icon{width:40px;height:40px;font-size:17px}
+  .xp-app-icon svg{width:22px;height:22px}
+  .xp-card-name,.xp-empty h2{font-size:19px} /* Card compact: under the 24px page title */
+  .xp-key-action,.xp-key-add{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){
+  .xp-wrap .xp-button:active:not([aria-disabled="true"]){transform:none;opacity:.78} /* the press stays visible without movement */
+}
+
+/* The ambient ground, adapted from 21st.dev's Background ASCII Dither (nikolas-sapa): a Bone glyph field drawn by experience.js.
+   The shell paints above it; the skip link (z 100) sits outside the shell, and dialogs and toasts are in the top layer. */
+.ambient{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;color:var(--text)}
+.app-shell{position:relative;z-index:1}
+/* Increased contrast and forced colours return the solid ground; experience.js draws nothing either. */
+@media(prefers-contrast:more),(forced-colors:active){.ambient{display:none}}

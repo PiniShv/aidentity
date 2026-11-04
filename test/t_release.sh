@@ -136,8 +136,10 @@ rc_fresh() {
   mkdir -p "$RC_DIR/bin" "$RC_DIR/scripts" "$RC_DIR/test"
   cp "$REPO_DIR/bin/aidentity" "$RC_DIR/bin/"
   cp -R "$REPO_DIR/src" "$RC_DIR/"
+  cp -R "$REPO_DIR/dashboard" "$RC_DIR/"
   cp "$REPO_DIR/uninstall.sh" "$REPO_DIR/SHA256SUMS" "$REPO_DIR/CHANGELOG.md" "$RC_DIR/"
   cp "$REPO_DIR/scripts/"*.sh "$RC_DIR/scripts/"
+  cp "$REPO_DIR/scripts/bundle-dashboard.py" "$RC_DIR/scripts/"
   cp "$REPO_DIR/test/"*.sh "$RC_DIR/test/"
   sed "s|^REF=.*|REF=\"\${AIDENTITY_REF:-v$rc_version}\"|" "$REPO_DIR/install.sh" > "$RC_DIR/install.sh"
 }
@@ -254,6 +256,13 @@ echo after'
 # bin/aidentity is built from src/. A change made in it alone would be lost at
 # the next build, so the guards refuse it, even with a matching checksum.
 rc_guard "a script edited by hand, not built from src/, is refused" "is not the build of src/" '2s/.*/# edited by hand/'
+# src/83-dashboard-bundle.sh is built from dashboard/. A stale bundle is part
+# of src/, so the check above passes it; the guards check it on their own.
+rc_fresh
+printf '// edited without make build\n' >> "$RC_DIR/dashboard/app.js"
+rc_run "v$rc_version"
+assert_rc "a dashboard edited without make build is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
+assert_contains "with the guard's message" "$RUN_ERR" "is not the build of dashboard/"
 
 # install.sh carries a pasted copy of the download code. A copy that drifted,
 # or a function defined again after it, fails the guards.

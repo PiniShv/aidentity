@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>aidentity — your account workspace</title>
+  <!-- The official app icon (assets/icon.svg), unchanged but cropped to its plate. Inline: the server serves only its registered assets. -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='100 100 824 824'%3E%3Cdefs%3E%3ClinearGradient id='ic-bg' x1='100' y1='100' x2='924' y2='924' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%231B2333'/%3E%3Cstop offset='0.55' stop-color='%23131A27'/%3E%3Cstop offset='1' stop-color='%230B111B'/%3E%3C/linearGradient%3E%3ClinearGradient id='ic-strand' x1='512' y1='836' x2='512' y2='236' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%231D4ED8'/%3E%3Cstop offset='0.45' stop-color='%232E7DF6'/%3E%3Cstop offset='1' stop-color='%2338BDF8'/%3E%3C/linearGradient%3E%3ClinearGradient id='ic-node' x1='460' y1='430' x2='564' y2='534' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%2367E8F9'/%3E%3Cstop offset='1' stop-color='%2322D3EE'/%3E%3C/linearGradient%3E%3Cfilter id='ic-glow' x='-30%25' y='-30%25' width='160%25' height='160%25'%3E%3CfeGaussianBlur stdDeviation='14' result='b'/%3E%3CfeMerge%3E%3CfeMergeNode in='b'/%3E%3CfeMergeNode in='SourceGraphic'/%3E%3C/feMerge%3E%3C/filter%3E%3ClinearGradient id='ic-sheen' x1='512' y1='100' x2='512' y2='560' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%23FFFFFF' stop-opacity='0.10'/%3E%3Cstop offset='1' stop-color='%23FFFFFF' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='100' y='100' width='824' height='824' rx='185' ry='185' fill='url(%23ic-bg)'/%3E%3Crect x='100' y='100' width='824' height='824' rx='185' ry='185' fill='url(%23ic-sheen)'/%3E%3Crect x='100.5' y='100.5' width='823' height='823' rx='184.5' ry='184.5' fill='none' stroke='%23FFFFFF' stroke-opacity='0.08' stroke-width='1'/%3E%3Cg filter='url(%23ic-glow)' transform='translate(512 512) scale(1.28) translate(-256 -256)'%3E%3Cg fill='none' stroke='url(%23ic-strand)' stroke-width='15' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M166 64 V 278 C 166 350 196 372 232 398 V 468'/%3E%3Cpath d='M198 64 V 278 C 198 340 226 358 256 382 V 468'/%3E%3Cpath d='M314 64 V 278 C 314 340 286 358 256 382 V 468'/%3E%3Cpath d='M346 64 V 278 C 346 350 316 372 280 398 V 468'/%3E%3C/g%3E%3Cg stroke='url(%23ic-node)' stroke-width='6' stroke-linecap='round' fill='none'%3E%3Cpath d='M256 268 L 285 285 L 285 319 L 256 336 L 227 319 L 227 285 Z'/%3E%3Cpath d='M256 268 L 256 302 M 285 285 L 256 302 M 285 319 L 256 302 M 256 336 L 256 302 M 227 319 L 256 302 M 227 285 L 256 302'/%3E%3C/g%3E%3Cg fill='url(%23ic-node)'%3E%3Ccircle cx='256' cy='268' r='9'/%3E%3Ccircle cx='285' cy='285' r='9'/%3E%3Ccircle cx='285' cy='319' r='9'/%3E%3Ccircle cx='256' cy='336' r='9'/%3E%3Ccircle cx='227' cy='319' r='9'/%3E%3Ccircle cx='227' cy='285' r='9'/%3E%3Ccircle cx='256' cy='302' r='11' fill='%23A5F3FC'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/experience.css">
+  <script src="/experience.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <canvas class="ambient" aria-hidden="true"></canvas>
+  <a class="skip-link" href="#main">Skip to workspace</a>
+  <div class="app-shell">
+    <button id="nav-scrim" class="nav-scrim" aria-label="Close navigation" hidden></button>
+    <nav id="sidebar" class="sidebar" aria-label="Main">
+      <button id="nav-close" class="icon-button nav-close" aria-label="Close navigation" title="Close navigation"><span data-icon="x"></span></button>
+      <a href="#explore" class="brand" title="aidentity">
+        <!-- The official mark (assets/logo.svg), unchanged but cropped to its glow. --><svg class="brand-mark" viewBox="140 34 232 464" aria-hidden="true"><defs><linearGradient id="aid-strand" x1="256" y1="472" x2="256" y2="56" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1D4ED8"/><stop offset="0.45" stop-color="#2E7DF6"/><stop offset="1" stop-color="#38BDF8"/></linearGradient><linearGradient id="aid-node" x1="222" y1="266" x2="290" y2="334" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#22D3EE"/><stop offset="1" stop-color="#0EA5E9"/></linearGradient><filter id="aid-glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g filter="url(#aid-glow)"><g fill="none" stroke="url(#aid-strand)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"><path d="M166 64 V 278 C 166 350 196 372 232 398 V 468"/><path d="M198 64 V 278 C 198 340 226 358 256 382 V 468"/><path d="M314 64 V 278 C 314 340 286 358 256 382 V 468"/><path d="M346 64 V 278 C 346 350 316 372 280 398 V 468"/></g><g stroke="url(#aid-node)" stroke-width="6" stroke-linecap="round" fill="none" opacity="1"><path d="M256 268 L 285 285 L 285 319 L 256 336 L 227 319 L 227 285 Z"/><path d="M256 268 L 256 302 M 285 285 L 256 302 M 285 319 L 256 302 M 256 336 L 256 302 M 227 319 L 256 302 M 227 285 L 256 302"/></g><g fill="url(#aid-node)"><circle cx="256" cy="268" r="9"/><circle cx="285" cy="285" r="9"/><circle cx="285" cy="319" r="9"/><circle cx="256" cy="336" r="9"/><circle cx="227" cy="319" r="9"/><circle cx="227" cy="285" r="9"/><circle cx="256" cy="302" r="11" fill="#7DD3FC"/></g></g></svg>
+        <span class="nav-label">aidentity<span class="brand-sub">One app. Every account.</span></span>
+      </a>
+      <div class="scope" role="status" title="Connected to this Mac"><span class="connection-dot"></span><span class="nav-label"><span id="connection-state">Connected</span> · this Mac</span></div>
+      <div id="primary-nav"></div>
+      <div class="nav-apps"><div class="nav-group-title nav-label">Your apps</div><div id="app-nav"></div></div>
+      <div class="sidebar-foot">
+        <button class="nav-item section-guide" data-view="guide" title="Help"><span class="tile" aria-hidden="true"><span data-icon="book"></span></span><span class="nav-label">Help</span></button>
+        <div class="version-row"><span id="version">aidentity</span><button id="collapse-nav" class="icon-button" aria-label="Collapse sidebar" title="Collapse sidebar"><span data-icon="panel"></span></button></div>
+      </div>
+    </nav>
+    <div class="main-shell">
+      <header class="topbar">
+        <div class="topbar-leading"><button id="mobile-nav" class="icon-button" aria-label="Open navigation" aria-expanded="false"><span data-icon="menu"></span></button><span id="topbar-title" class="topbar-title" aria-hidden="true"></span></div>
+        <div class="topbar-actions"><span id="freshness" class="freshness">Connecting…</span><button id="refresh" class="icon-button" aria-label="Refresh" title="Refresh"><span data-icon="refresh"></span></button><button class="button button-primary" id="header-add"><span data-icon="plus"></span><span>Add profile</span></button></div>
+      </header>
+      <div id="connection-banner" class="connection-banner" role="alert" hidden></div>
+      <main id="main" tabindex="-1"><div class="initial-loading"><span class="spinner" aria-hidden="true"></span><h1>Connecting to your workspace</h1><p>Reading apps and profile launchers on this Mac.</p></div></main>
+      <button id="activity-toggle" class="activity-toggle" aria-expanded="false" aria-controls="activity-panel" hidden><span data-icon="terminal"></span><span id="activity-summary">Activity · Nothing run yet</span><span data-icon="chevron"></span></button>
+      <section id="activity-panel" class="activity-panel" aria-label="Operation activity" hidden><div class="panel-heading"><h2 id="activity-title" tabindex="-1">Activity</h2><button id="activity-close" class="icon-button" aria-label="Close activity"><span data-icon="x"></span></button></div><div id="activity-content"><p class="muted">Nothing run yet. Each action you run shows up here with its command.</p></div></section>
+    </div>
+  </div>
+  <dialog id="dialog" aria-labelledby="dialog-title" aria-describedby="dialog-description"></dialog>
+  <section id="toast-viewport" class="toast-viewport" aria-label="Notifications"></section>
+</body>
+</html>

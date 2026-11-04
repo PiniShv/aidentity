@@ -10,7 +10,7 @@ macOS runs an app only once, so you get one account at a time. To check your per
 
 - **Verified with** Claude Desktop. Also tested with ChatGPT, Slack, VS Code, Cursor, Notion and other apps built on Chromium (the engine inside Google Chrome) or Electron. See [Which apps work](#which-apps-work).
 - **Your real app is not changed.** It is never copied, patched or re-signed. See [Is this safe?](#is-this-safe)
-- **One shell script** (a text file of Terminal commands). It makes no network calls except when you run `aidentity update`, never uses `sudo` (admin rights) and runs nothing in the background.
+- **One executable file.** The shell commands need nothing extra. The optional dashboard uses Python 3.9+ and listens on localhost from `aidentity dashboard` until `aidentity dashboard --stop`. Only `aidentity update` accesses the internet; nothing starts by itself, and there is no `sudo` (admin rights).
 - **Set up once in Terminal.** After that, you open each account by clicking its icon, like any other app.
 
 ---
@@ -266,7 +266,7 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 
 ## Is this safe?
 
-`aidentity` is one shell script, about 5,600 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The repository also keeps it in [`src/`](../src), split by subject into smaller files that are joined to make that one.
+`aidentity` ships as one executable file. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The shell code lives in [`src/`](../src); the optional dashboard's Python, HTML, CSS and JavaScript live in [`dashboard/`](../dashboard) and are embedded by `make build`.
 
 ### What it touches
 
@@ -290,8 +290,8 @@ One thing does change. While a profile is running, clicking the app itself switc
 - **Delete profile data.** `--purge`, `prune` and the uninstaller move a data folder to the Trash, where you can still get it back. Emptying the Trash is what deletes it. If the folder cannot be moved there, it stays where it was.
 - **Touch profile data outside its profiles folder.** `--purge`, `prune` and the uninstaller move a data folder only if it is inside `~/Library/Application Support/aidentity/profiles`, or the folder set by `AIDENTITY_DATA_ROOT`.
 - **Move or rename a profile's data while the profile is running.** If it cannot tell, it treats the profile as running and stops.
-- **Use the network, except when you run `aidentity update`.** No telemetry, no analytics, no automatic update check, no crash reports. `aidentity update` (and `update --check`) is the only code in the script that connects anywhere, and only to GitHub. Apart from it, only the installer downloads anything, and only when you run it. [What `update` does](#aidentity-update).
-- **Use `sudo` or run in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
+- **Access the internet, except when you run `aidentity update`.** No telemetry, analytics, automatic update checks or crash reports. `aidentity update` (and `update --check`) connects only to GitHub. The dashboard serves bundled assets on `127.0.0.1`; it loads no external scripts or fonts. Apart from update, only the installer downloads anything, when you run it. [What `update` does](#aidentity-update).
+- **Use `sudo` or start itself in the background.** It adds no login item, no launch agent and no daemon. These are ways macOS starts a program by itself, at login or in the background. The dashboard runs in the background only after you start it, until `aidentity dashboard --stop`. When the installer, the uninstaller or `aidentity update` needs admin rights, it prints a `sudo` line for you to run.
 - **Edit your shell files.** If you need a `PATH` line, the installer prints it, and you add it.
 - **Control other apps.** It does not use System Events, so it needs no Accessibility permission. The one thing it does to a running app is `aidentity quit`, which asks that one app to quit, as its Quit menu item does. That needs no permission either.
 - **Trust an import file.** `import` checks every value as `add` does, finds each app by its bundle ID among the apps installed here, ignores any path in the file, and shows what it will build, and asks before it builds anything. Only `-y` skips that question. A launcher that exists is skipped, never changed.
@@ -439,6 +439,7 @@ Type `aidentity` and a command. Put a name that has a space in quotes, like `"Cl
 |---|---|---|
 | [`setup`](#aidentity-setup) | `init`, `wizard` | Guided walkthrough. Start here. |
 | [`ui`](#aidentity-ui) | | A menu in your terminal: open, quit, add, rename, recolour or remove profiles with one key. |
+| [`dashboard`](#aidentity-dashboard) | | Open the visual account workspace at localhost. Requires Python 3.9+. |
 | [`add [app]`](#aidentity-add) | | Create one profile directly. |
 | [`list`](#aidentity-list) | `ls` | Show every profile and whether it is running. `--json` prints it for scripts. |
 | [`open NAME`](#aidentity-open) | | Open a profile from Terminal. |
@@ -477,6 +478,53 @@ It asks, in this order:
 At the end it offers to open `~/Applications`, so you can drag the new icons to your Dock. If one profile fails, the walkthrough says so and continues.
 
 It needs a terminal. In a script, use `add` with its options instead.
+
+### `aidentity dashboard`
+
+```sh
+aidentity dashboard
+```
+
+Opens the visual account manager in your default browser at `127.0.0.1`, using
+an available port. It shows only Claude and ChatGPT and your profiles for those
+apps. Explore shows one app at a time with its profiles. The list beside it
+has one row per app, apps with profiles first; choose a row, or use the arrows
+and the app picker, to switch apps. Each profile has Open there, or Bring to
+front when it is running. An app with no profiles yet shows Add profile in its
+panel. The page never moves when you switch apps. Reduced motion swaps
+the app without the short fade.
+
+The workspace can create, open, quit, rename and customize profiles, including
+Main accounts, Claude seeding, badges, launch switches, environment settings
+and separate editor extensions. Recovery offers restore and clearing unclaimed
+data (`prune`). Maintenance offers check, check and repair (doctor), rebuild and
+update actions. Import & export downloads the CLI's export format and imports
+it back. Help has plain-word terms, the command documentation and shell
+completion.
+
+Removing a profile or clearing unclaimed data requires confirmation in the UI. Existing environment
+values stay hidden; appearance changes preserve them. Export can contain
+sensitive launch settings, just like `aidentity export`.
+
+The server runs in the background, so the command gives the prompt back at
+once. It keeps running after the terminal closes, until you run
+`aidentity dashboard --stop`. Running `aidentity dashboard` again while it runs
+opens the same dashboard; to use another `--port`, stop it first. It is
+available only on this Mac; it creates no startup service.
+Profile reads and actions are restricted to the same macOS account using the
+system's connection-owner information. No API key or account setup is needed.
+
+```sh
+aidentity dashboard --port 8765   # choose a fixed port
+aidentity dashboard --no-open     # print the address for manual opening
+aidentity dashboard --stop        # stop the running dashboard
+```
+
+`--port` accepts 0 through 65535; 0 chooses a free port. An occupied explicit
+port produces an error. Python 3.9 or newer is required only for this command,
+with no pip packages. Install Python 3 if startup reports it is missing.
+The full dashboard is embedded in the executable, so a copied or installed
+`aidentity` works without the source checkout.
 
 ### `aidentity ui`
 
@@ -1154,7 +1202,7 @@ bash uninstall.sh
 
 What it does:
 
-1. **Removes the command, without asking.** It looks in the usual install folders and wherever your `PATH` finds it. It leaves a Homebrew install and a repository checkout alone, and tells you so. If it cannot delete the file, it prints a `sudo rm -f` line for you to run. It never runs `sudo` itself.
+1. **Removes the command, without asking.** It looks in the usual install folders and wherever your `PATH` finds it. If you started the [dashboard](#aidentity-dashboard), it stops it first; if the dashboard does not stop, it keeps the command so you can run `aidentity dashboard --stop`, and says so. It leaves a Homebrew install and a repository checkout alone, and tells you so. If it cannot delete the file, it prints a `sudo rm -f` line for you to run. It never runs `sudo` itself.
 2. **Lists everything else, with sizes.** That means every launcher that carries the marker, and every data folder, including data that no launcher points at any more.
 3. **Stops if any listed profile is running.** The command is already gone by then, so quit that app yourself, for example with **Cmd + Q** in its window. Then run the script again.
 4. **Removes only after you type `delete`.** It deletes the launchers and moves the profile data to the Trash. Any other answer keeps your launchers and data. They keep working without the command.
@@ -1186,7 +1234,13 @@ Do these steps in order, one block at a time. Quit every profile first.
    aidentity prune
    ```
 
-4. Remove the command. If you installed with Homebrew:
+4. If you started the dashboard, stop it. It runs in the background until you do, and it needs the command, so do this before step 5:
+
+   ```bash
+   aidentity dashboard --stop
+   ```
+
+5. Remove the command. If you installed with Homebrew:
 
    ```bash
    brew uninstall aidentity
@@ -1198,13 +1252,19 @@ Do these steps in order, one block at a time. Quit every profile first.
    rm -f "$(command -v aidentity)"
    ```
 
-5. Remove the empty data folders. `rmdir` deletes a folder only if it is empty, so it stops if anything is left in it:
+6. Remove the empty data folders. If you started the dashboard, it left a small file, `dashboard.json`, in the `profiles` folder. Delete it first:
+
+   ```bash
+   rm -f ~/Library/Application\ Support/aidentity/profiles/dashboard.json
+   ```
+
+   Then remove the folders. `rmdir` deletes a folder only if it is empty, so it stops if anything is left in it:
 
    ```bash
    rmdir ~/Library/Application\ Support/aidentity/profiles ~/Library/Application\ Support/aidentity
    ```
 
-   If you set `AIDENTITY_DATA_ROOT`, use that folder instead.
+   If you set `AIDENTITY_DATA_ROOT`, use that folder instead. `dashboard.json` is in it.
 
    If `rmdir` says `Directory not empty`, look inside with `ls -A`. A file named `.DS_Store` is only Finder's view settings. Delete it, then run `rmdir` again:
 

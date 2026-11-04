@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------- update --
 #
-# `aidentity update` is the only code in this script that uses the network.
+# `aidentity update` is the only command that contacts an external service.
 # It asks GitHub which release is the latest and, unless --check was given,
 # downloads that release's bin/aidentity and SHA256SUMS and puts the new script
 # in place of this one. Every check below must pass first; any failure leaves

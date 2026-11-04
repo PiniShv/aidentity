@@ -48,6 +48,7 @@ install: ## Copy bin/aidentity into BINDIR
 		exit 1; \
 	fi
 	@bash scripts/build.sh --check
+	@python3 scripts/bundle-dashboard.py --check
 	@if [ ! -d "$(BINDIR)" ] && ! mkdir -p "$(BINDIR)" 2>/dev/null; then \
 		printf 'Cannot create %s.\n  Try:  sudo make install PREFIX=%s\n' "$(BINDIR)" "$(PREFIX)" >&2; \
 		exit 1; \
@@ -75,6 +76,7 @@ uninstall: ## Remove aidentity from BINDIR (leaves launchers and profile data al
 # The code is written in src/ and shipped as the one file bin/aidentity, which
 # is committed: install.sh, `aidentity update` and Homebrew fetch it alone.
 build: ## Rebuild bin/aidentity from src/, and SHA256SUMS with it
+	@python3 scripts/bundle-dashboard.py
 	@bash scripts/build.sh
 	@$(MAKE) --no-print-directory checksums
 
@@ -92,7 +94,12 @@ test: ## Run the test suite (test/run_tests.sh); AREA=ui runs one area
 guards: ## Run the source guards CI runs (scripts/guards.sh)
 	@bash scripts/guards.sh
 
-check: lint test guards ## Everything CI checks, in one go
+check: lint test guards dashboard-check ## Everything CI checks, in one go
+
+.PHONY: dashboard-check
+dashboard-check: ## Verify the embedded dashboard and test its server
+	@python3 scripts/bundle-dashboard.py --check
+	@python3 -m unittest discover -s test -p 'test_dashboard*.py'
 
 lint: ## shellcheck every shell file, or syntax-check them if shellcheck is absent
 	@bash scripts/build.sh --check

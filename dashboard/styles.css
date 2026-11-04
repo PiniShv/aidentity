@@ -1,0 +1,789 @@
+/* 21st.dev adaptations: starc007/animated-sidebar, rmahammad/animated-dialog,
+   originui/input and button, educalvolpz/animated-tabs, ravikatiyar162/animated-profile-card,
+   cnippet-dev/toast, uiable/uiable-spinner-button, kedhareswer/glass-folder-cards. See docs/dashboard-components.md. */
+
+/* Tokens. Names match DESIGN.md; hues are read by app.js and experience.js. */
+:root {
+  --ground:#060606; --surface:#0c0c0c; --raised:#141413; --active:#1f1f1d;
+  --border:#1c1c1b; --control:#262624; --field-border:#6f6d66; --tip:#050505;
+  --button-edge:#4d4c48; /* outlined button edge: at least 2.1:1 on ground, surface, card and raised */
+  --danger-edge:#8a2f26; /* danger button edge: at least 2.2:1 on the same surfaces */
+  --card-top:#0f0f0f; --card-bottom:#090909; --card:linear-gradient(180deg,var(--card-top),var(--card-bottom));
+  --text:#f3f2ee; --muted:#8d8b84;
+  --accent:#5fe08a; --positive:#5fe08a; --negative:#ff6b5b; --warning:#f7c15f;
+  --badbg:#2a1210; --warnbg:#2a2412;
+  --hue-mint:#5fe08a; --hue-periwinkle:#7c8cff; --hue-teal:#2fd4c0; --hue-orange:#ff8a3d;
+  --hue-pink:#ff6fb5; --hue-gold:#ffd166; --hue-sky:#4cc3ff; --hue-violet:#b26bff;
+  /* Section tiles: deep fills with Bone glyphs (at least 4.6:1); each section owns one; --tile-danger marks destructive operations. */
+  --tile-explore:#5a56c7; --tile-profiles:#9c3b96; --tile-apps:#116bb5; --tile-recovery:#047879;
+  --tile-maintenance:#aa5212; --tile-transfer:#137d41; --tile-help:#566577; --tile-danger:#b63132;
+  --app-ink:var(--ground); /* --app-color is set only on an app-toned element (app.js); everything else stays neutral */
+  --scrim:#0009; --ring-accent:#5fe08a26;
+  --shadow-dialog:0 24px 70px #0008; --shadow-toast:0 10px 30px #0005;
+  /* Floating chrome (activity bar and panel, phone top bar): a translucent layer content scrolls under; solid where blur is off. */
+  --material-bar:#060606e0; --material-panel:#0c0c0ceb; --material-blur:blur(20px) saturate(140%);
+  /* Folder glass (Applications only; DESIGN.md, The Folder Glass Rule): smoked glass in front of a translucent graphite back,
+     so the files and the ambient field frost through it; solid wherever the floating chrome turns solid. */
+  --glass:linear-gradient(180deg,#0c0c0c14 0%,#0a0a0a80 40%,#060606db 72%,#060606f0 100%); --glass-blur:blur(16px);
+  --glass-sheen:#f3f2ee12; --glass-rim:#f3f2ee29; --folder-back:linear-gradient(180deg,#1414139e,#0c0c0cb8); --folder-shadow:#000000a6;
+  /* Motion: critically damped springs (damping 1.0). Every surface here opens on a click, not a flick, so nothing overshoots.
+     The duration sets the response: 340ms is 0.25s (controls), 480ms is 0.35s (surfaces), 420ms is 0.3s (dialogs). */
+  --ease:cubic-bezier(.2,0,0,1);
+  --spring-control:cubic-bezier(.16,1,.3,1); --spring-surface:cubic-bezier(.16,1,.3,1);
+  --motion-press:85ms; --motion-control:340ms; --motion-surface:480ms;
+  --motion-dialog:420ms; --motion-exit:200ms; --motion-fade:140ms;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sidebar-width:216px; --activity-height:45dvh; --activity-open:0px;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:var(--text); background:var(--ground); font-size:14px; color-scheme:dark;
+  caret-color:var(--accent); scrollbar-color:var(--field-border) transparent;
+}
+/* x(t) = 1 - (1 + wt)e^(-wt) sampled to wt = 8.6, so it is 99.8% settled at the end: one shape for both tokens. */
+@supports(transition-timing-function:linear(0,1)){
+  :root{--spring:linear(0 0%, 0.07 5%, 0.2135 10%, 0.3705 15%, 0.514 20%, 0.6341 25%, 0.7297 30%, 0.8032 35%, 0.8584 40%, 0.899 45%, 0.9286 50%, 0.9498 55%, 0.9649 60%, 0.9756 65%, 0.9831 70%, 0.9884 75%, 0.992 80%, 0.9945 85%, 0.9962 90%, 0.9974 95%, 1 100%);--spring-control:var(--spring);--spring-surface:var(--spring)}
+}
+@property --tabs-fade{syntax:"<length>";inherits:false;initial-value:0px}
+@property --detail-fade{syntax:"<length>";inherits:false;initial-value:0px}
+
+/* Base */
+*{box-sizing:border-box}
+::selection{background:var(--accent);color:var(--ground)}
+body{margin:0}
+button,input,select,textarea{font:inherit}
+button,a,input,textarea,select{-webkit-tap-highlight-color:transparent}
+button{color:inherit;cursor:pointer;border:0;background:none}
+a{color:inherit;text-decoration:none}
+button:disabled{cursor:wait;color:var(--muted)}
+[hidden]{display:none!important}
+h1,h2,h3,p{margin:0}
+h1{font-size:28px;line-height:1.2;letter-spacing:-.035em;font-weight:600}
+h2,h3{font-size:17px;line-height:1.35;letter-spacing:-.015em;font-weight:550} /* Title */
+/* Card: dialog, empty-state and loading titles (Explore's panel name and empty title in experience.css). 19px below 768px, except in a dialog. */
+.dialog-header h2,.empty-state h2,.initial-loading h1{font-size:22px;line-height:1.2;letter-spacing:-.03em}
+h1,h2,h3{text-wrap:balance}
+p{line-height:1.55;text-wrap:pretty}
+dd{text-wrap:pretty}
+svg{display:block;flex:none}
+.icon{width:18px;height:18px;stroke-width:1.5}
+:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+h1[tabindex="-1"]:focus,#activity-title:focus{outline:none} /* focus targets for navigation, not controls */
+.muted{color:var(--muted)}
+.small{font-size:12px;color:var(--muted)}
+.num,time{font-variant-numeric:tabular-nums}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;-webkit-user-select:none;user-select:none} /* a hidden copy of visible text is not pasted twice */
+.skip-link{position:fixed;left:20px;top:-70px;z-index:100;background:var(--text);color:var(--ground);padding:12px}
+.skip-link:focus{top:10px}
+
+/* Section tiles */
+.section-explore{--section:var(--tile-explore)} .section-profiles{--section:var(--tile-profiles)} .section-apps{--section:var(--tile-apps)}
+.section-recovery{--section:var(--tile-recovery)} .section-maintenance{--section:var(--tile-maintenance)} .section-transfer{--section:var(--tile-transfer)}
+.section-guide{--section:var(--tile-help)} .section-danger{--section:var(--tile-danger)}
+.tile{display:inline-grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;background:var(--section,var(--tile-help));color:var(--text)}
+.tile .icon{width:20px;height:20px}
+
+/* Shell and sidebar (starc007 animated sidebar). Desktop shell is 216px + a fluid canvas; workspace gutters are 32px.
+   The sidebar scrolls on short viewports; the app list keeps min(content, 40dvh) and pads 8px so focus rings stay unclipped. */
+.app-shell{display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar-width);flex:none;position:sticky;top:0;height:100dvh;padding:27px 14px 18px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden auto;scrollbar-width:thin;overscroll-behavior:contain;transition:none}
+/* The 16x32 mark centres over the 24px section tiles (16px in) and the wordmark starts on the nav labels' line (15px gap), in the rail too. */
+.brand{display:flex;gap:15px;align-items:center;padding:0 16px;margin-bottom:27px;white-space:nowrap}
+.brand-mark{width:16px;height:32px;flex:none}
+.brand>.nav-label{font-size:19px;letter-spacing:-.04em;font-weight:650}
+.brand-sub{display:block;font-size:12px;letter-spacing:0;font-weight:400;color:var(--muted);margin-top:5px}
+/* Connection status: one quiet row; in the collapsed rail only its dot. */
+.scope{display:flex;align-items:center;gap:10px;min-height:28px;padding:0 12px;margin-bottom:18px;white-space:nowrap;font-size:12px;color:var(--muted)}
+.scope #connection-state{color:var(--text);font-weight:500}
+.connection-dot{width:6px;height:6px;background:var(--accent);border-radius:50%;flex:none}
+.is-offline .connection-dot{background:var(--negative)}
+.nav-item{position:relative;display:flex;gap:11px;align-items:center;width:100%;min-height:40px;margin:2px 0;padding:0 12px;border-radius:8px;text-align:left;color:var(--muted);white-space:nowrap}
+.nav-item:hover{color:var(--text);background:var(--surface)}
+/* The current item's fill is a ::before that app.js slides from the item it left. Lighten keeps every label above it in flight. */
+.nav-item[aria-current=page]{color:var(--text);background:transparent}
+.nav-item[aria-current=page]::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:color-mix(in srgb,var(--section) 28%,var(--raised));mix-blend-mode:lighten}
+.nav-item>.nav-label{overflow:hidden;text-overflow:ellipsis}
+.nav-item .tile{width:24px;height:24px;border-radius:7px}
+.nav-item .tile .icon{width:15px;height:15px}
+.nav-apps{flex:none;max-height:40dvh;margin:28px -8px 0;padding:0 8px 6px;overflow-y:auto}
+.nav-group-title{padding:0 12px 10px;font-size:12px;color:var(--muted)}
+/* Collapsed rail: a keyboard-focused item's name, beside the rail in the top layer (app.js positions it). */
+.rail-tip{position:fixed;inset:auto;margin:0;translate:0 -50%;padding:6px 10px;border:1px solid var(--control);border-radius:8px;background:var(--tip);color:var(--text);font-size:12px;white-space:nowrap;pointer-events:none}
+.nav-app{min-height:36px;font-size:12px}
+.nav-app .app-mini{width:18px;flex:none;display:grid;place-items:center}
+.nav-app-dot{display:block;width:8px;height:8px;border-radius:50%;background:var(--app-color,var(--muted))}
+.nav-app-initial{display:none;place-items:center;width:24px;height:24px;border-radius:6px;font-size:12px;font-weight:600;background:var(--app-color,var(--muted));color:var(--app-ink)}
+.app-mini>.app-icon{width:16px;height:16px}
+#nav-close{display:none}
+.sidebar-foot{margin-top:auto;padding-top:28px}
+.version-row{display:flex;align-items:center;justify-content:space-between;padding:14px 10px 0;color:var(--muted);font-size:12px}
+.icon-button{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;flex:none;color:var(--muted)}
+.icon-button:hover{background:var(--raised);color:var(--text)}
+
+/* Topbar and main canvas. .main-shell clips so transform-only sidebar shifts stay inside the canvas. */
+.main-shell{min-width:0;flex:1;padding-bottom:max(var(--activity-open) + 45px, var(--toast-inset, 0px));overflow-x:clip} /* --toast-inset: app.js */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 32px;border-bottom:1px solid var(--border);gap:15px;height:68px}
+.topbar-leading,.topbar-actions{display:flex;align-items:center}
+.topbar-leading{gap:12px;font-size:12px;color:var(--muted)}
+.topbar-title{display:none} /* the page name, on phones only: the desktop top bar carries no breadcrumb */
+.topbar-actions{gap:10px}
+.freshness{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+#mobile-nav{display:none}
+/* Shown while the local server is unreachable; app.js fills it and clears it on the next good poll. */
+.connection-banner{display:flex;align-items:center;gap:8px;margin:16px 32px 0;padding:6px 6px 6px 16px;border-radius:8px;background:var(--badbg);color:var(--text);font-size:13px;line-height:1.55}
+.connection-banner p{flex:1;min-width:0;padding:6px 0}
+.connection-banner code{display:inline-block;max-width:100%;overflow-wrap:anywhere;font-family:var(--font-mono);font-size:12px;padding:1px 6px;border-radius:6px;background:var(--ground)} /* the command moves to the next line whole */
+#main{outline:none;padding:30px 32px}
+/* Focus scrolls content clear of the fixed activity bar (and the open panel). Scroll-margin, not root
+   scroll-padding: the sticky sidebar and topbar take none, so focusing them never jumps the page. */
+#main *{scroll-margin-bottom:max(var(--activity-open) + 56px, var(--toast-inset, 0px))}
+
+/* Collapsed sidebar */
+.sidebar-collapsed{--sidebar-width:72px}
+.sidebar-collapsed .sidebar{padding-left:12px;padding-right:12px}
+.sidebar-collapsed .nav-label{opacity:0;pointer-events:none;width:0;overflow:hidden}
+.sidebar-collapsed .brand-sub{white-space:nowrap} /* a zero-width label must not wrap the tagline word by word */
+.sidebar-collapsed .scope{padding:0;justify-content:center;gap:0}
+.sidebar-collapsed .nav-app-dot{display:none}
+.sidebar-collapsed .nav-app-initial{display:grid}
+.sidebar-collapsed .nav-app .app-mini{width:24px}
+.sidebar-collapsed .app-mini>.app-icon{width:24px;height:24px}
+.sidebar-collapsed .nav-group-title{height:18px}
+.sidebar-collapsed .version-row>span{display:none}
+.sidebar-collapsed .version-row{padding-left:7px}
+
+/* Buttons: Origin UI variants + loading content overlay; uiable spinner geometry. */
+.button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:0 14px;border:1px solid var(--button-edge);border-radius:8px;font-weight:500;white-space:nowrap;background:transparent;font-size:13px}
+.button:hover{background:var(--raised);border-color:var(--muted)}
+.button-primary{background:var(--text);border-color:var(--text);color:var(--ground)}
+.button-primary:hover{background:var(--text);border-color:var(--text)}
+.button-secondary{border-color:var(--field-border);background:var(--raised)} /* Open, everywhere it is not running */
+.button-danger{color:var(--negative);border-color:var(--danger-edge)}
+.button-danger:hover{background:var(--badbg);border-color:var(--negative)}
+.button-small{min-height:36px;padding:0 10px}
+.link-button{min-height:36px;padding:0 4px;font-size:13px;font-weight:500;text-decoration:underline;text-underline-offset:3px;border-radius:6px}
+.button:disabled{opacity:.7;pointer-events:none}
+[data-locked]{opacity:.55;pointer-events:none} /* waits for a running action or a reconnect; aria-disabled carries it to AT */
+.button[data-loading=true]{opacity:1}
+.button[data-loading=true]>.button-content{visibility:hidden}
+.button-loader{position:absolute;inset:0;display:grid;place-items:center}
+.spinner{display:block;width:16px;height:16px;border:2px solid currentColor;border-left-color:transparent;border-radius:50%;animation:spin .75s linear infinite}
+.button .icon{width:16px;height:16px}
+
+/* Page header */
+.title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:24px}
+.title-main{display:flex;gap:14px;align-items:flex-start;min-width:0}
+.title-main>.tile{margin-top:-1px} /* centres the tile on the h1's capitals */
+.title-app{position:relative;flex:none;width:36px;height:36px;margin-top:-1px}
+.title-actions{display:flex;gap:8px;align-items:center}
+
+/* Inputs and toolbar: Origin UI input with leading search icon, clear action and focus ring. */
+.search-field{position:relative;display:flex;align-items:center;min-width:180px;width:320px}
+.search-field>.icon{position:absolute;left:12px;color:var(--muted);pointer-events:none;width:16px}
+.search-field input{padding-left:37px;padding-right:34px}
+.search-field .icon-button{position:absolute;right:2px;top:2px;width:36px;height:36px}
+.input,select,textarea{display:block;width:100%;min-height:40px;border:1px solid var(--field-border);border-radius:8px;color:var(--text);padding:9px 12px;transition:border-color .16s,box-shadow .16s;background:var(--raised)}
+.input::placeholder,textarea::placeholder{color:var(--muted)}
+.input:focus,textarea:focus,select:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--ring-accent)}
+input[type=search]::-webkit-search-cancel-button{appearance:none}
+.toolbar{display:flex;align-items:center;justify-content:space-between;margin:20px 0;gap:16px}
+.toolbar select{width:auto;padding:6px 32px 6px 10px}
+.toolbar .input,.toolbar select{min-height:40px;font-size:13px}
+.toolbar-end{display:flex;gap:12px;align-items:center;font-size:12px;color:var(--muted)}
+
+/* Tabs: educalvolpz Animated Tabs, movable underline; roving keyboard focus in app.js. */
+.tabs{display:flex;position:relative;border-bottom:1px solid var(--border);gap:24px}
+.tabs button{position:relative;padding:0 1px 11px;border-radius:6px;color:var(--muted);white-space:nowrap;transition:color var(--motion-fade) ease-out,transform var(--motion-control) var(--spring-control);font-size:13px;font-weight:500;min-height:44px}
+.tabs button[aria-selected=true]{color:var(--text)}
+.tab-indicator{position:absolute;left:0;bottom:0;height:2px;background:var(--text);width:0;pointer-events:none;transform-origin:left center;transition:none}
+.tabs .tab-count{color:var(--muted);padding-left:2px;font-variant-numeric:tabular-nums}
+.tab-count.positive{color:var(--positive)}
+.tab-count.warning{color:var(--warning)}
+/* Without a toolbar the grid follows the tabs directly: keep the toolbar's 20px so a card's outline never meets the tab line. */
+.tabs+.profile-layout{margin-top:20px}
+
+/* Profiles: layout, grid, card and detail panel. The grid fills by width, never by selection. */
+.profile-layout{display:grid;align-items:start;gap:24px;grid-template-columns:minmax(0,1fr) 320px}
+/* no-selection: no card in this tab or filter and no chosen profile, so an empty state spans the width. auto-fit: fewer cards than columns stretch instead of leaving an empty column before the
+   detail column; one or two cards stop at 360px rather than become banners. */
+.profile-layout.no-selection{grid-template-columns:1fr}
+.profile-grid{display:grid;align-items:stretch;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:20px}
+.profile-grid:has(>.profile-card:first-child:nth-last-child(-n+2)){grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),360px))}
+.profile-card{position:relative;display:flex;flex-direction:column;min-width:0;padding:20px;border-radius:16px;background:var(--card);border:1px solid var(--border);outline:1px solid transparent;outline-offset:0}
+.profile-card:focus-within{outline-color:var(--muted)}
+.profile-card.selected{outline:2px solid var(--text);outline-offset:2px} /* selection stays on the neutral ramp; the 1px hue edge means running */
+.profile-head{display:flex;align-items:center;gap:12px;min-width:0}
+.profile-title{flex:1;min-width:0}
+.profile-title h2{font:inherit;letter-spacing:normal}
+/* The whole name, never cut off: it wraps at a space or after an underscore (app.js breakable()), and inside a word only when one is wider
+   than the card. One line still makes the 36px target (44px on phones): the padding is what the line leaves. */
+.profile-name{display:block;max-width:100%;min-height:36px;margin:0 -4px;padding:calc((36px - 1.35em) / 2) 4px;border-radius:6px;text-align:left;font-size:17px;font-weight:550;letter-spacing:-.015em;line-height:1.35;overflow-wrap:anywhere;text-wrap:balance}
+.profile-name:focus-visible{outline-offset:0}
+.profile-app{color:var(--muted);font-size:13px;line-height:1.3;margin-top:3px} /* clears the name's focus ring */
+/* A name over 24 characters (app.js long-name) sets under its tile, across the card, where the column beside the tile would be under
+   about 195px (card content under 250px: the grid beside the detail column, tablets, phones under 328px): two or three lines, not four. */
+.profile-card{container-type:inline-size}
+@container (max-width:249px){.long-name .profile-head{flex-direction:column;align-items:stretch;gap:12px}}
+/* App tile: the app's hue as a solid fill with Lampblack ink; neutral graphite for an app with no hue. */
+.app-art{position:relative;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex:none;border-radius:12px;background:var(--active);color:var(--text);line-height:1;font-weight:650;font-size:20px}
+.app-tone .app-art{background:var(--app-color);color:var(--app-ink)}
+.app-art .app-vector{width:26px;height:26px}
+/* An app's own installed icon (app.js appIcon) shows whole, on nothing: no fill, border, clip or tint behind it. macOS draws an icon's
+   body on 824 of its 1024px, so the image is 1.24× its box and the body fills the tile it replaces.
+   shortcut: assumes Apple's icon grid; a full-bleed legacy icon draws 24% past its tile. */
+.app-icon{display:block;scale:1.24}
+.app-art>.app-icon,.title-app>.app-icon{position:absolute;inset:0;width:100%;height:100%}
+.app-art:has(>.app-icon){background:none}
+/* Profile badge: a filled rounded square in its saved color, ink by contrast; no stripe or shadow. A 2px ring in the surface
+   it sits on cuts it out of the tile, so even a badge in the tile's own color reads as a separate chip. */
+.identity-badge{position:absolute;right:-6px;bottom:-6px;display:grid;place-items:center;min-width:20px;height:20px;padding:0 4px;border-radius:6px;color:var(--identity-ink,var(--ground));font-size:12px;font-weight:600;line-height:1;background:var(--identity-color);outline:2px solid var(--badge-ring,var(--card-top))}
+.profile-state{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.profile-state-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:36px;margin:16px 0 12px}
+.profile-state-row>.profile-state{margin-right:auto}
+.running-dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none;background:var(--positive)}
+.status-missing{color:var(--negative)}
+.status-running{color:var(--positive)}
+.profile-meta{color:var(--muted);font-size:12px;margin:-4px 0 14px}
+.profile-card .open-profile{width:100%;margin-top:auto}
+.profile-card .open-profile,.detail-panel .open-profile{min-height:40px}
+.empty-state{padding:38px 24px;background:var(--surface);border-radius:16px;grid-column:1/-1}
+.empty-state h2{margin-bottom:8px;overflow-wrap:anywhere}
+.empty-state p{color:var(--muted);max-width:430px;margin-bottom:22px}
+.detail-panel{border-radius:16px;min-width:0;position:sticky;top:24px;padding:24px;background:var(--card);border:1px solid var(--border)}
+.detail-top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.detail-top .app-art{width:48px;height:48px;font-size:21px}
+.detail-heading{flex:1;min-width:0}
+.detail-panel h2{word-break:break-word}
+.detail-app{color:var(--muted);font-size:13px;margin-top:2px}
+.detail-panel .profile-state-row{margin:10px 0 12px}
+.detail-panel .open-profile{width:100%}
+.detail-command{margin-top:16px}
+/* Settings and Rename, then Remove at the far end. */
+.detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 18px}
+.detail-actions .button-danger{margin-left:auto}
+.detail-defaults{padding:11px 0;border-top:1px solid var(--border);font-size:13px;color:var(--muted)}
+.detail-rebuild{display:grid;justify-items:start;gap:10px;padding:11px 0 6px;border-top:1px solid var(--border)}
+.detail-rebuild p{font-size:12px;color:var(--muted)}
+/* The reserved detail column before a choice (901px and up). */
+.detail-placeholder{position:sticky;top:24px;padding:24px;border:1px dashed var(--control);border-radius:16px;color:var(--muted);font-size:13px}
+.details{margin:0}
+.details div{padding:11px 0;border-top:1px solid var(--border)}
+.details dt{color:var(--muted);margin-bottom:6px;font-size:12px}
+.details dd{margin:0;line-height:1.6;overflow-wrap:anywhere;font-size:13px}
+.details code{font-size:12px}
+.detail-more{border-top:1px solid var(--border);padding-top:4px}
+.detail-more .details{padding-top:4px}
+.detail-back{display:none}
+
+/* Apps, panels and operation cards */
+/* Applications: each app is a glass folder, adapted from kedhareswer's Glass Folder Cards (21st.dev). The stage is drawn at
+   340 x 272 and scaled to the folder's width (--k, app.js); --headroom is the room its open fan needs above it, measured by
+   app.js, so opening never reflows. Glass, translucency and the folder's own shadow are these folders' exception (DESIGN.md,
+   The Folder Glass Rule); the hue stays the app tile, the 1px rim and the focus ring. */
+.apps-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:24px 32px;align-items:end}
+.folder{--k:1;--headroom:16;--hinge:0deg;--spread:0;--rise:2;--step:9;--fan:0;--jitter:1;position:relative;width:min(340px,100%);height:calc((var(--headroom) + 272) * var(--k) * 1px);pointer-events:none} /* the headroom above takes no clicks */
+.gf-stage{position:absolute;left:0;top:0;width:340px;height:272px;transform-origin:0 0;transform:translateY(calc(var(--headroom) * var(--k) * 1px)) scale(var(--k));pointer-events:auto;cursor:pointer}
+.gf-tilt{position:absolute;inset:0;transition:transform var(--motion-surface) var(--spring-surface)}
+.gf-shadow{position:absolute;left:18px;right:18px;bottom:-6px;height:60px;border-radius:50%;background:var(--folder-shadow);filter:blur(22px);transform:translateX(calc(var(--px,0) * -8px));transition:transform var(--motion-surface) var(--spring-surface)}
+.gf-back{position:absolute;inset:0;background:var(--folder-back)}
+.gf-rim{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;fill:none}
+.gf-back-rim{width:340px;height:272px;stroke:var(--glass-rim);stroke-width:1}
+/* The front panel hinges on its bottom edge: it leans toward you on hover or focus and falls further open. Its clip-path cuts
+   the rim's stroke in half, so 2 draws the 1px border and 5 the focus ring. */
+.gf-front{position:absolute;left:0;top:74px;width:340px;height:198px;z-index:10;-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);transform-origin:50% 100%;transform:perspective(900px) rotateX(var(--hinge));transition:transform var(--motion-surface) var(--spring-surface)}
+.gf-glass{position:absolute;inset:0;background:radial-gradient(260px 200px at calc(50% + var(--px,0) * 46%) calc(30% + var(--py,0) * 40%),var(--glass-sheen),transparent 70%),var(--glass)}
+.gf-front-rim{width:340px;height:198px;stroke:var(--glass-rim);stroke-width:2;transition:stroke var(--motion-fade) ease-out}
+.gf-label{position:absolute;left:22px;right:128px;bottom:22px;z-index:2;display:flex;align-items:center;gap:12px;pointer-events:none}
+.gf-label>div{min-width:0}
+.gf-label h2{overflow-wrap:anywhere}
+.gf-count{display:flex;gap:0 10px;margin-top:2px;font-size:12px;line-height:1.4;color:var(--muted);font-variant-numeric:tabular-nums}
+.gf-run{display:inline-flex;align-items:flex-start;gap:6px} /* the one running mark, on the glass: closed, the files' own marks are under it */
+/* One line, so the label never rises off the 80% glass: where it is full, "running" wraps out of sight and the dot and count stay. */
+.gf-count>span{flex:none}
+.gf-count>.gf-run{flex:0 1 auto;min-width:0;height:1lh;overflow:hidden}
+.gf-run>.running-dot{align-self:center}
+.gf-run>span:last-child{min-width:0}
+.gf-hit{position:absolute;inset:0;z-index:3;width:100%;height:100%}
+.gf-hit:focus-visible{outline:none}
+.gf-front:has(.gf-hit:focus-visible) .gf-front-rim{stroke:var(--accent);stroke-width:5}
+/* Files: a stack in the pocket, cut off at its bottom. At rest only their tops show; on hover or focus they lift; open, each one
+   rises to its measured --open-y. A file is a profile: its badge, its whole name and the running mark. */
+.gf-files{position:absolute;inset:0;z-index:5;margin:0;padding:0;list-style:none;pointer-events:none;clip-path:inset(-400px -400px 10px -400px)}
+.gf-slot{--y:calc(var(--rise) - var(--depth) * var(--step));position:absolute;left:34px;top:96px;width:272px;height:184px;transform-origin:50% 100%;transform:translate(calc((var(--jx) * var(--jitter) + var(--slot) * var(--spread)) * 1px),calc(var(--y) * 1px)) rotate(calc((var(--jr) * var(--jitter) + var(--slot) * var(--fan)) * 1deg));transition:transform var(--motion-surface) var(--spring-surface) calc(var(--depth) * 30ms),opacity var(--motion-fade) ease-out}
+.gf-sheet{display:flex;flex-direction:column;width:100%;height:100%;padding:0;border-radius:12px;overflow:hidden;text-align:left;pointer-events:auto;background:linear-gradient(180deg,var(--active),var(--raised));box-shadow:inset 0 1px 0 var(--glass-rim),0 0 0 1px var(--border),0 10px 26px -8px var(--folder-shadow);transition:translate var(--motion-control) var(--spring-control),box-shadow var(--motion-fade) ease-out}
+.gf-sheet:focus-visible{outline-offset:2px}
+.gf-head{display:flex;align-items:flex-start;gap:10px;padding:10px 14px 11px}
+.gf-chip{display:grid;place-items:center;flex:none;width:20px;height:20px;border-radius:6px;background:var(--identity-color);color:var(--identity-ink);font-size:12px;font-weight:600;line-height:1}
+.gf-chip-app{background:var(--app-color,var(--raised));color:var(--app-ink)}
+.gf-chip-more{background:var(--raised);color:var(--muted)}
+.gf-chip svg{width:14px;height:14px}
+.gf-name{flex:1;min-width:0;font-size:15px;font-weight:550;line-height:1.3;letter-spacing:-.015em;overflow-wrap:anywhere}
+.gf-state{display:flex;align-items:center;gap:6px;flex:none;font-size:12px;line-height:19.5px}
+.gf-state:not(.status-running,.status-missing){color:var(--muted)}
+/* Nothing colored sits under the glass: closed, even on hover, the front file's badge is under it, so the badges and the running
+   mark show once the folder is open and the files clear it. The names wait too: a lifted file would show a name cut by the glass's tab. */
+.gf-chip,.gf-state,.gf-name{opacity:0;transition:opacity var(--motion-fade) ease-out}
+.folder[data-open] :is(.gf-chip,.gf-state,.gf-name){opacity:1;transition-delay:120ms}
+.gf-note{display:block;margin-top:4px;font-size:13px;font-weight:400;line-height:1.55;letter-spacing:0;color:var(--muted)}
+.gf-sheet-empty{background:var(--surface);border:1px dashed var(--control);box-shadow:none} /* a blank file: solid, so the back panel's edge does not show through */
+.gf-slot:has(.gf-sheet-empty){opacity:0} /* an empty folder shows its note only when opened */
+@media(hover:hover){.folder:hover{--hinge:-11deg;--spread:6;--rise:-30;--step:12;--fan:.6}.folder:hover .gf-front-rim{stroke:var(--app-color,var(--muted))}}
+.folder:focus-within{--hinge:-11deg;--spread:6;--rise:-30;--step:12;--fan:.6}
+.folder[data-open]{--hinge:-20deg;--spread:14;--fan:1.4;--jitter:.5}
+.folder[data-open] .gf-slot{--y:var(--open-y,-96)}
+.folder[data-open] .gf-slot:has(.gf-sheet-empty){opacity:1}
+.folder[data-open] .gf-front-rim{stroke:var(--app-color,var(--muted))}
+.folder[data-open] .gf-running{box-shadow:inset 0 1px 0 var(--glass-rim),0 0 0 1px var(--app-color,var(--muted)),0 10px 26px -8px var(--folder-shadow)} /* one running mark: Mint status and the 1px hue edge */
+.folder[data-open] .gf-sheet:is(:hover,:focus-visible){translate:0 -8px;box-shadow:inset 0 1px 0 var(--glass-rim),0 0 0 1px var(--app-color,var(--muted)),0 18px 34px -12px var(--folder-shadow)}
+/* + and ···: solid keys on the glass. + takes the Bone fill while the folder is empty: the first profile is its one next step. */
+.gf-keys{position:absolute;right:20px;bottom:20px;z-index:12;display:flex;gap:8px}
+.gf-key{display:grid;place-items:center;width:44px;height:44px;border:1px solid var(--button-edge);border-radius:12px;background:var(--raised);color:var(--text)}
+.gf-key:hover{border-color:var(--muted)}
+.gf-key-primary,.gf-key-primary:hover{background:var(--text);border-color:var(--text);color:var(--ground)}
+.gf-key .icon{width:20px;height:20px}
+.gf-keys [data-locked]{pointer-events:auto;cursor:wait} /* a locked key still takes the click, so it never falls through to the glass and toggles the folder */
+.gf-menu{position:absolute;right:20px;bottom:74px;z-index:20;display:flex;flex-direction:column;min-width:208px;padding:6px;border:1px solid var(--control);border-radius:12px;background:var(--material-panel);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur);box-shadow:var(--shadow-toast);transform-origin:100% 100%;cursor:default}
+.gf-menu [role=menuitem]{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:500;text-align:left;white-space:nowrap}
+.gf-menu [role=menuitem]:hover,.gf-menu [role=menuitem]:focus-visible{background:var(--raised)}
+.gf-menu [role=menuitem]:focus-visible{outline-offset:-2px}
+.gf-menu .icon{width:16px;height:16px;color:var(--muted)}
+/* A profile added here drops into its folder (critically damped, no rebound), the pocket gives once as it lands and the count rolls. */
+.gf-drop{animation:folder-drop var(--motion-surface) var(--spring-surface) 220ms both}
+.gf-landed .gf-front{animation:folder-bump var(--motion-control) var(--ease) 560ms}
+.gf-landed .gf-count{animation:folder-roll var(--motion-control) var(--spring-control) 560ms both}
+.panel{border-radius:16px;padding:24px;background:var(--card);border:1px solid var(--border)}
+.panel-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}
+.operation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.operation-card{border-radius:16px;padding:24px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;border:1px solid var(--border);background:var(--card)}
+.operation-card>.tile{margin-bottom:6px}
+.operation-card>h2+p{margin-top:-4px} /* a heading sits 8px over its own text, against 12px between blocks */
+.panel>.tile{margin-bottom:18px}
+.panel>.tile+.panel-heading{margin-bottom:8px}
+.operation-card p,.panel>p{font-size:13px;color:var(--muted);max-width:440px}
+.button-row{display:flex;flex-wrap:wrap;gap:8px}
+.operation-card .button-row{margin-top:auto;padding-top:10px}
+.operation-card.wide{grid-column:1/-1}
+.callout{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:8px;background:var(--warnbg);color:var(--text);font-size:13px;line-height:1.55}
+.callout>.icon{flex:none;width:16px;height:16px;margin-top:2px;color:var(--warning)}
+
+/* Views: recovery, maintenance, guide, notices, loading */
+.recovery-list{display:flex;flex-direction:column;gap:0}
+.recovery-row{padding:17px 0;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border)}
+.recovery-row:last-child{border:0}
+.recovery-row>h3{min-width:0;overflow-wrap:anywhere}
+.section-gap{margin-top:26px}
+.health-result{align-self:stretch;display:grid;align-content:start;gap:12px;padding:14px 16px;border-radius:12px;background:var(--surface)}
+.health-result p{max-width:none}
+.health-summary{display:flex;flex-wrap:wrap;gap:4px 16px}
+.health-summary strong{color:var(--text);font-weight:500}
+.health-summary .positive>strong{color:var(--positive)}
+.health-summary .warning>strong{color:var(--warning)}
+.health-summary .negative>strong{color:var(--negative)}
+.health-summary time{margin-left:auto;font-size:12px}
+.health-findings{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.health-findings li{display:grid;grid-template-columns:16px 58px minmax(0,1fr);gap:8px;align-items:start;font-size:12px;line-height:1.55;color:var(--muted)}
+.health-findings .icon{width:16px;height:16px;margin-top:1px}
+.health-findings li[data-level=warn],.health-findings li[data-level=error]{color:var(--text)}
+.health-findings li[data-level=error]>.icon,.health-findings li[data-level=error]>.finding-level{color:var(--negative)}
+.health-findings li[data-level=warn]>.icon,.health-findings li[data-level=warn]>.finding-level{color:var(--warning)}
+.health-findings li[data-level=ok]>.icon{color:var(--positive)}
+.health-findings strong,.finding-level{font-weight:500}
+.health-result .output{max-height:220px;padding:12px;background:var(--ground)}
+.operation-card .health-next{font-size:12px}
+.health-next strong{color:var(--text);font-weight:500}
+.operation-card .update-status{color:var(--text)}
+/* Local storage is reference, not an operation: no fill, a muted label, a definition list. */
+.storage-panel{margin-top:16px;padding:18px 24px 8px;border:1px solid var(--border);border-radius:16px}
+.storage-panel h2{font-size:13px;font-weight:500;letter-spacing:normal;color:var(--muted);margin-bottom:8px}
+.storage-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px}
+.guide-layout{display:grid;grid-template-columns:270px minmax(0,1fr);gap:20px;align-items:start}
+.guide-controls{display:grid;gap:17px}
+.output{padding:20px;background:var(--surface);border-radius:12px;max-height:500px;overflow:auto;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;margin:0;font-family:var(--font-mono)}
+.guide-output{min-height:210px}
+.guide-empty{min-height:210px;padding:20px;border:1px dashed var(--control);border-radius:12px;color:var(--muted);font-size:13px}
+/* Terms: plain-word definitions above the CLI help. */
+.terms{margin-bottom:20px;padding:20px 24px;border:1px solid var(--border);border-radius:16px}
+.terms h2{font-size:13px;font-weight:500;letter-spacing:normal;color:var(--muted);margin-bottom:6px}
+.terms dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 24px;margin:0}
+.terms dl>div{padding:10px 0;border-top:1px solid var(--border)}
+.terms dt{font-size:13px;font-weight:500}
+.terms dd{margin:4px 0 0;font-size:13px;line-height:1.55;color:var(--muted)}
+.terms dl>.terms-keys{grid-column:1/-1}
+kbd{font-family:var(--font-mono);font-size:12px;padding:1px 6px;border:1px solid var(--button-edge);border-radius:6px;color:var(--text)}
+.health-empty{color:var(--muted)}
+.update-status time{margin-left:6px}
+.notice{padding:14px 16px;border-radius:8px;background:var(--raised);font-size:12px;line-height:1.6;color:var(--muted);margin-top:16px;max-height:200px;overflow:auto;overflow-wrap:anywhere} /* an inventory error quotes the CLI's stderr, which can be long */
+.notice.error{background:var(--badbg);color:var(--text)}
+.initial-loading{min-height:330px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px}
+.initial-loading p{color:var(--muted)}
+.initial-loading .spinner{width:24px;height:24px;color:var(--accent)}
+
+/* Dialogs: rmahammad Animated Dialog adaptation. Scale/slide entry, pinned header/footer,
+   native dialog focus management, mobile bottom sheet, reduced motion. */
+dialog{width:560px;max-width:calc(100vw - 32px);max-height:85dvh;margin:auto;border:1px solid var(--control);border-radius:20px;padding:0;color:var(--text);box-shadow:var(--shadow-dialog);overflow:hidden;background:var(--surface)}
+/* Mirrors --scrim as a literal: ::backdrop inherits custom properties only from Chrome 122 / Safari 17.4. */
+dialog::backdrop{background:#0009}
+dialog[open]{animation:dialog-in var(--motion-dialog) var(--spring-surface)}
+dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;pointer-events:none}
+.dialog-inner{display:flex;flex-direction:column;max-height:85dvh}
+.dialog-header{padding:24px 26px 20px;position:relative;flex:none;border-bottom:1px solid var(--border)}
+.dialog-header h2{padding-right:30px;overflow-wrap:anywhere}
+.dialog-header p{color:var(--muted);margin-top:8px;padding-right:15px;font-size:13px}
+.dialog-header>.icon-button{position:absolute;top:16px;right:15px}
+.dialog-body{--body-inline:26px;position:relative;min-height:0;overflow-y:auto;padding:20px var(--body-inline) 24px} /* position: .sr-only copies belong to this scroller, as in .target-list */
+.dialog-body>:first-child{margin-top:0} /* a confirmation whose description says it all opens on its list or Runs line */
+.dialog-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:17px 26px 22px;border-top:1px solid var(--control);flex:none}
+.dialog-footer .button{min-height:40px}
+.dialog-status{margin-right:auto;min-width:0;font-size:12px;line-height:1.4;color:var(--muted)}
+.fields{display:grid;gap:17px}
+.field label,.field-label{display:block;font-weight:500;margin-bottom:8px;font-size:13px;line-height:inherit}
+.field .hint{color:var(--muted);line-height:1.5;margin-top:7px;font-size:12px}
+.check-row{display:flex;align-items:flex-start;gap:10px;min-height:36px;color:var(--text);padding:5px 0;font-size:13px}
+.check-row input{appearance:auto;width:16px;height:16px;flex:none;margin:1px 0 0;accent-color:var(--text)}
+.check-row span span{display:block;color:var(--muted);margin-top:5px;line-height:1.5;font-size:12px}
+.advanced{padding-top:7px}
+.advanced summary{display:flex;align-items:center;gap:8px;min-height:36px;cursor:pointer;list-style:none;font-size:13px;font-weight:500;color:var(--text)}
+.advanced summary::-webkit-details-marker{display:none}
+.advanced summary .icon{width:16px;height:16px;color:var(--muted);transform:rotate(90deg);transition:transform var(--motion-fade) ease-out}
+.advanced[open]>summary .icon{transform:rotate(180deg)}
+.advanced>.fields{padding-top:15px}
+.color-options{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.color-swatch{width:32px;height:32px;border-radius:50%;background:var(--swatch);border:3px solid var(--surface);outline:1px solid transparent}
+.color-swatch[aria-pressed=true]{outline-color:var(--text)}
+.color-swatch:hover:not([aria-pressed=true]){outline-color:var(--muted)}
+.color-swatch:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+.color-swatch[data-color="262624"]{box-shadow:inset 0 0 0 1px var(--field-border)} /* Graphite is 1.3:1 on the dialog surface */
+.color-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px;margin-top:8px;font-size:13px}
+.color-current{color:var(--muted);font-variant-numeric:tabular-nums}
+#custom-color{margin-top:8px}
+.preview-row{--badge-ring:var(--raised);display:flex;gap:12px;align-items:center;padding:13px 16px;border-radius:12px;margin-bottom:20px;background:var(--raised)}
+.preview-identity{display:flex;gap:13px;align-items:center;flex:1;min-width:0}
+.preview-identity>div{min-width:0}
+.preview-row strong{font-size:14px;font-weight:500;line-height:1.4;display:block;overflow-wrap:anywhere}
+.preview-row .small{display:block}
+.preview-row strong+.small{margin-top:5px}
+.preview-row:has(>[data-quiet]){--badge-ring:var(--surface);padding:0;background:none} /* Settings: the title names the profile, so the preview is the tile alone, with no strip */
+/* Add and Settings: the preview stays at the top of the body while the fields scroll under it, so a swatch, badge or name shows as it is
+   picked. An opaque Surface band flush with the body's top edge; focus scrolls a field clear of it. Only in a dialog that can be 560px
+   tall: 85dvh of a 660px window, or 90dvh of a 623px one below 768px wide. */
+@media(min-height:660px),(max-width:767px) and (min-height:623px){
+  .dialog-body:has(>.preview-dock){padding-top:0;scroll-padding-top:120px}
+  .preview-dock{position:sticky;top:0;z-index:1;margin-inline:calc(var(--body-inline) * -1);padding:20px var(--body-inline);background:var(--surface)} /* full width: a focus ring passing under it stays under it */
+  .preview-dock>.preview-row{margin-bottom:0}
+}
+.form-error{font-size:12px;color:var(--negative);line-height:1.6;padding:12px 14px;border-radius:8px;margin-top:16px;background:var(--badbg);max-height:160px;overflow:auto;overflow-wrap:anywhere;white-space:pre-line;scroll-margin-bottom:24px} /* a long stderr scrolls in place; revealed, it keeps the body's foot padding */
+.target-list{position:relative;list-style:none;margin:14px 0 0;padding:2px 14px;max-height:200px;overflow:auto;border-radius:8px;background:var(--ground);font-size:13px} /* position: the .sr-only name copies belong to this scroller, so revealing one scrolls the list, not the dialog */
+.target-list li{padding:8px 0;border-bottom:1px solid var(--border);line-height:1.4;overflow-wrap:anywhere}
+.target-list li:last-child{border:0}
+/* "Runs:" echoes the server's redacted command for the form as it stands. */
+.command-echo{display:flex;align-items:center;gap:8px;margin-top:20px;padding:2px 2px 2px 12px;border:1px solid var(--border);border-radius:8px;background:var(--ground);font-size:12px;color:var(--muted)}
+.command-echo code{flex:1;min-width:0;padding:7px 0;font-family:var(--font-mono);font-size:12px;line-height:1.7;user-select:text}
+/* app.js wraps each shell word: lines break between words, inside one only when it is wider than the line. */
+.command-word{display:inline-block;max-width:100%;overflow-wrap:anywhere}
+.command-label{flex:none}
+.import-preview{margin-top:17px}
+.import-plan{max-height:240px;padding:12px 15px;background:var(--ground);border-radius:8px;margin-bottom:8px} /* the CLI's own plan, verbatim */
+.file-input{padding:10px;font-size:12px}
+.file-input::file-selector-button{background:var(--raised);color:var(--text);border:0;border-radius:8px;padding:7px 12px;margin-right:12px}
+
+/* Toasts: cnippet-dev stacked Toast adaptation. Status icon, dismiss action, frontmost
+   expanded item, hover expansion, translate/scale entry and timed dismissal. */
+.toast-viewport{position:fixed;z-index:100;margin:0;padding:0;border:0;background:none;color:inherit;overflow:visible;height:auto;display:flex;flex-direction:column-reverse;max-width:calc(100vw - 32px);gap:8px;pointer-events:none;left:calc(var(--sidebar-width) + 32px);right:auto;top:auto;bottom:56px;width:340px}
+dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edge so the form stays readable */
+.toast{position:relative;display:flex;align-items:flex-start;gap:11px;padding:15px;border:1px solid var(--control);border-radius:12px;box-shadow:var(--shadow-toast);pointer-events:auto;animation:toast-in var(--motion-surface) var(--spring-surface);transition:transform var(--motion-surface) var(--spring-surface),opacity var(--motion-fade) ease-out;background:var(--tip)}
+.toast>.icon{color:var(--positive);width:17px;margin-top:1px}
+.toast.error>.icon{color:var(--negative)}
+.toast.warn>.icon{color:var(--warning)}
+.toast.info>.icon{color:var(--muted)}
+.toast>div{flex:1;min-width:0}
+.toast strong{display:block;font-weight:500;font-size:13px;line-height:1.4;text-wrap:balance}
+.toast strong,.toast p{overflow-wrap:anywhere}
+.toast p{color:var(--muted);margin-top:5px;font-size:12px}
+.toast>.icon-button{margin:-9px -9px -9px auto} /* its 36px box overhangs the padding, so a title-only toast ends with its title */
+.toast-actions{display:flex;flex-wrap:wrap;gap:0 16px;margin-top:2px}
+.toast .toast-action{min-height:36px;padding:0;text-align:left;text-decoration:underline;font-size:12px}
+.toast .toast-primary{font-weight:500}
+.toast.dismiss{transform:translateY(12px) scale(.98);opacity:0;transition:transform var(--motion-exit) var(--ease),opacity var(--motion-exit) ease-out;pointer-events:none}
+.toast-viewport:not(:hover)>.toast:nth-child(2){transform:scale(.98);opacity:1}
+.toast-viewport:not(:hover)>.toast:nth-child(3){transform:scale(.96);opacity:1}
+
+/* Activity bar */
+.activity-toggle{position:fixed;bottom:0;right:0;left:var(--sidebar-width);height:40px;background:var(--material-bar);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur);border-top:1px solid var(--border);display:flex;gap:9px;align-items:center;padding:0 32px;font-size:12px;color:var(--muted);z-index:20}
+.activity-toggle:focus-visible{outline-offset:-2px}
+/* index.html icons are hydrated inside their <span>, so the spans are the toggle's first and last children. */
+.activity-toggle>:first-child .icon{width:16px;height:16px}
+.activity-toggle>:last-child .icon{width:14px;height:14px}
+.activity-toggle>:last-child{margin-left:auto;transition:transform var(--motion-fade) ease-out}
+#activity-summary{display:flex;gap:.3em;min-width:0;white-space:nowrap}
+.activity-summary-title{overflow:hidden;text-overflow:ellipsis}
+.activity-summary-more{flex:none}
+.activity-toggle[aria-expanded=true]>:last-child{transform:rotate(180deg)}
+.activity-panel{position:fixed;bottom:40px;right:0;left:var(--sidebar-width);background:var(--material-panel);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur);border-top:1px solid var(--control);padding:20px 32px;max-height:var(--activity-height);overflow:auto;z-index:25;animation:none}
+:root:has(#activity-panel:not([hidden])){--activity-open:var(--activity-height)}
+.activity-entry{margin-bottom:17px}
+.activity-entry-title{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:12px;margin-bottom:9px}
+.activity-entry-title strong{min-width:0;font-size:13px;font-weight:500;line-height:1.4;overflow-wrap:anywhere} /* Label, as the toast that announced it */
+.activity-entry-title time{flex:none;font-size:12px;color:var(--muted)}
+.activity-entry .output{padding:13px;background:var(--ground);font-size:12px;max-height:220px}
+.activity-error{color:var(--negative)}
+.activity-command{display:block;margin-bottom:8px;font-family:var(--font-mono);font-size:12px;line-height:1.7;user-select:text} /* .command-word spans: breaks at spaces only */
+
+/* Motion: the press is the one spatial feedback on controls. It lands on pointer-down in 85ms and springs back on release.
+   Hover is frequent, so it changes fill and border only, never position (HIG Motion: avoid motion on frequent interactions). */
+.nav-label{transition:opacity var(--motion-fade) ease-out}
+.button,.icon-button,.nav-item,.color-swatch,.gf-key{transition:transform var(--motion-control) var(--spring-control),background-color var(--motion-fade) ease-out,color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
+.button:active,.icon-button:active,.nav-item:active,.color-swatch:active,.gf-key:active{transform:scale(.97);transition-duration:var(--motion-press);transition-timing-function:ease-out}
+.profile-card{transition:outline-color var(--motion-fade) ease-out,border-color var(--motion-fade) ease-out}
+.profile-card:hover{border-color:var(--muted)}
+.tabs button:active{transform:scale(.97);transition-duration:var(--motion-press)}
+/* Page change (app.js showView): only #main crossfades; the old page fades out faster than the new one rises 8px in.
+   The root takes no snapshot, so the sidebar and top bar stay live and clickable: clicks pass through the snapshots, and the
+   next click starts the next change. Snapshots draw above everything, so the layers floating over the page are captured too
+   (unanimated, on top; a captured element takes no clicks until the change ends), and main's is clipped at its own top edge.
+   app.js names #main main only while a change runs. */
+:root{view-transition-name:none}
+.activity-toggle,.activity-panel,.toast-viewport{view-transition-name:match-element;view-transition-class:chrome}
+::view-transition{pointer-events:none}
+/* No slide from the old scroll position: the old page is offset to where it was, and nothing shows above main's top. */
+::view-transition-group(main){animation:none;clip-path:polygon(0 0,100% 0,100% calc(100% + 100vh),0 calc(100% + 100vh))}
+::view-transition-old(main){translate:0 calc(var(--page-scroll,0px) * -1);animation:page-out var(--motion-exit) var(--ease) both}
+::view-transition-new(main){animation:page-in var(--motion-surface) var(--spring-surface) both}
+::view-transition-group(*.chrome),::view-transition-new(*.chrome){animation:none}
+::view-transition-old(*.chrome){display:none}
+
+/* App tone. An app with profiles has one hue (app.js sets --app-color on .app-tone). It appears only as a solid fill
+   with Lampblack ink (the scope's primary button, the app tile), a plain dot, a 1px border (hover, running)
+   and focus rings; never as a gradient, glow, tinted text or tinted background. The header Add stays Bone. */
+.app-tone{--accent:var(--app-color)} /* on purpose: --accent is mint globally and the app's hue inside an app-toned scope */
+.app-tone .button-primary{background:var(--app-color);border-color:var(--app-color);color:var(--app-ink)}
+.app-tone .button-primary:hover{background:color-mix(in srgb,var(--app-color) 90%,var(--text));border-color:var(--app-color);color:var(--app-ink)}
+.app-tone .input:focus,.app-tone textarea:focus,.app-tone select:focus{border-color:var(--app-color);box-shadow:0 0 0 3px color-mix(in srgb,var(--app-color) 15%,transparent)}
+.app-tone.profile-card:hover{border-color:var(--app-color)}
+.app-tone.profile-card.running{border-color:var(--app-color)} /* one running mark: Mint status, plus the app's 1px hue edge */
+/* A profile that starts running (app.js lit): its card draws that edge once and its running dot arrives, as an Explore key does;
+   the ambient field sends its ring from the card's button. Static under reduced motion. */
+.profile-card.lit{animation:card-edge 900ms var(--ease)}
+.lit .running-dot{animation:dot-in var(--motion-control) var(--spring-control)}
+
+/* Keyframes (sheet-in/out live in the mobile block) */
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{50%{opacity:.35}}
+@keyframes tabs-fade{from{--tabs-fade:32px}to{--tabs-fade:0px}}
+@keyframes detail-fade{from{--detail-fade:48px}to{--detail-fade:0px}}
+@keyframes dialog-in{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes dialog-out{to{opacity:0;transform:translateY(14px) scale(.96)}}
+@keyframes toast-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes page-out{to{opacity:0}}
+@keyframes page-in{from{opacity:0;transform:translateY(8px)}}
+@keyframes card-edge{from{border-color:var(--border)}}
+@keyframes dot-in{from{scale:0}}
+@keyframes folder-drop{from{translate:0 -190px;rotate:-6deg;opacity:0}}
+@keyframes folder-bump{40%{scale:1.012 .985}}
+@keyframes folder-roll{from{opacity:0;translate:0 7px;filter:blur(3px)}}
+@keyframes topbar-title{to{opacity:1}}
+
+/* Breakpoints, widest first; min-width and reduced-motion blocks last */
+@media(max-width:1200px){
+  #main{padding:26px 24px}
+  .profile-layout{gap:20px}
+  .detail-panel{padding:20px}
+  .toast-viewport{left:calc(var(--sidebar-width) + 24px)}
+}
+@media(max-width:1150px){
+  :root{--sidebar-width:190px}
+  .sidebar{padding-left:10px;padding-right:10px}
+  .topbar{padding:0 24px}
+  .connection-banner{margin:16px 24px 0}
+}
+@media(max-width:900px){
+  .detail-panel{position:relative;max-height:none}
+  .detail-placeholder{display:none}
+  .detail-panel .details{display:grid;grid-template-columns:1fr 1fr;gap:0 24px}
+  .detail-actions{margin:16px 0}
+  .guide-layout{grid-template-columns:1fr}
+  .guide-controls{grid-template-columns:1fr 1fr}
+  .terms dl{grid-template-columns:1fr 1fr}
+  .guide-output{margin-top:5px}
+  .profile-layout{grid-template-columns:1fr}
+}
+/* Mobile: drawer sidebar, bottom-sheet dialogs, 44px touch targets */
+@media(max-width:767px){
+  :root{--sidebar-width:0px;--activity-height:50dvh;--topbar-height:64px}
+  .sidebar{width:248px;position:fixed;left:0;z-index:51;background:var(--ground);transform:translateX(-100%);padding:24px 16px 18px;transition:transform var(--motion-surface) var(--spring-surface)}
+  .mobile-nav-open .sidebar{transform:translateX(0)}
+  .nav-scrim{position:fixed;inset:0;z-index:50;background:var(--scrim)}
+  .sidebar-collapsed .nav-label{opacity:1;width:auto}
+  .sidebar-collapsed .sidebar{padding:24px 16px 18px}
+  .sidebar-collapsed .scope{padding:0 12px;justify-content:flex-start;gap:10px}
+  .sidebar-collapsed .nav-app-dot{display:block}
+  .sidebar-collapsed .nav-app-initial{display:none}
+  .sidebar-collapsed .nav-app .app-mini{width:18px}
+  .sidebar-collapsed .app-mini>.app-icon{width:16px;height:16px}
+  #nav-close{display:inline-flex;position:absolute;top:14px;right:10px}
+  .sidebar-collapsed .version-row>span{display:block}
+  #collapse-nav{display:none}
+  .nav-item,.nav-app{min-height:44px}
+  #mobile-nav{display:flex}
+  .topbar-title{display:block;font-size:15px;font-weight:550;letter-spacing:-.015em;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* The h1 names the page until half of it is under the bar; then the bar does, switched on at once, never half faded. The h1's own view
+     timeline (inset by the bar) measures that, so the switch follows the title wherever it sits: a banner above it, a wrapped title.
+     A page that scrolls less keeps its h1 readable and the bar blank; without view timelines the bar always names it. */
+  @supports(timeline-scope:--page-title) and (animation-timeline:view()){
+    .main-shell{timeline-scope:--page-title}
+    #main h1{view-timeline:--page-title block;view-timeline-inset:var(--topbar-height) 0px}
+    .topbar-title{opacity:0;animation:topbar-title steps(1,jump-end) both;animation-timeline:--page-title;animation-range:exit 0% exit 50%}
+  }
+  .topbar-actions{gap:4px}
+  .topbar-leading{gap:5px}
+  .topbar .button>.icon{width:14px}
+  .title-row{gap:12px;margin-bottom:20px}
+  .title-actions{gap:5px}
+  .title-actions .button{padding:0 9px}
+  .toolbar .search-field{width:auto;min-width:0;flex:1}
+  .toolbar-end>.small{display:none}
+  .detail-panel{display:none;padding:22px;max-height:none}
+  .profile-layout.mobile-detail .profile-grid{display:none}
+  .profile-layout.mobile-detail .detail-panel{display:block}
+  .detail-back{display:inline-flex;margin-bottom:18px}
+  .detail-top>.icon-button{display:none} /* Back is the one close control on a phone */
+  .storage-list{grid-template-columns:1fr}
+  .storage-panel{padding:16px 20px 6px}
+  .connection-banner{margin:12px 18px 0}
+  .operation-grid{grid-template-columns:1fr}
+  .operation-card{padding:22px}
+  .gf-menu [role=menuitem]{min-height:44px}
+  .guide-controls{grid-template-columns:1fr}
+  .panel{padding:20px}
+  .activity-toggle{left:0;padding:0 18px}
+  .activity-panel{left:0;padding:16px 18px}
+  .freshness{display:none}
+  .check-row{padding:8px 0;min-height:44px}
+  dialog{width:100%;max-width:100%;max-height:90dvh;margin:auto 0 0;border-radius:20px 20px 0 0;animation-name:sheet-in}
+  .dialog-inner{max-height:90dvh}
+  .dialog-header{padding:24px 22px 18px}
+  .dialog-body{--body-inline:22px}
+  .dialog-footer{flex-wrap:wrap;padding:16px 22px 20px}
+  .dialog-status:not(:empty){flex-basis:100%} /* a running status takes its own line, so a long submit label never squeezes it */
+  .initial-loading{min-height:300px;text-align:center}
+  .initial-loading p{font-size:12px}
+  .topbar{height:var(--topbar-height);padding:0 16px;position:sticky;top:0;z-index:30;background:var(--material-bar);-webkit-backdrop-filter:var(--material-blur);backdrop-filter:var(--material-blur)}
+  .topbar .button,.topbar .icon-button{min-height:44px}
+  .topbar .button{font-size:13px;padding:0 13px}
+  .topbar #refresh{width:40px}
+  .topbar .button span:last-child{font-size:13px}
+  #main{padding:24px 18px}
+  #main *{scroll-margin-top:72px}
+  .title-row h1{font-size:24px}
+  .title-main>.tile{width:32px;height:32px;border-radius:9px}
+  .title-main>.tile .icon{width:18px;height:18px}
+  .title-app{width:32px;height:32px}
+  /* Scroller padded 6px for focus rings (a scroller clips at its padding box, so the strip line is a background
+     1px under the tabs, not the border); the right edge fades only while more tabs sit off-screen. */
+  .tabs{gap:16px;overflow-x:auto;scrollbar-width:none;padding:6px 6px 7px;margin:-6px;border-bottom:0;background:linear-gradient(var(--border) 0 0) left bottom 6px/100% 1px no-repeat;mask-image:linear-gradient(90deg,black calc(100% - var(--tabs-fade)),transparent);animation:tabs-fade linear both;animation-timeline:scroll(self inline)}
+  .tab-indicator{bottom:7px}
+  .tabs+.profile-layout{margin-top:16px}
+  .toolbar{margin:16px 0;gap:10px;flex-wrap:nowrap}
+  .toolbar .input,.toolbar select{min-height:44px}
+  .toolbar-end{gap:0}
+  .profile-grid{grid-template-columns:1fr;gap:16px}
+  .profile-name{min-height:44px;padding-block:calc((44px - 1.35em) / 2)}
+  .profile-card .button,.detail-panel .button,.link-button{min-height:44px}
+  .profile-state-row{min-height:44px}
+  .button,.button-small,.icon-button{min-height:44px}
+  .icon-button{min-width:44px}
+  .detail-panel h2,.empty-state h2{font-size:19px;line-height:1.2;letter-spacing:-.03em} /* Card compact: under a 24px page title */
+  .detail-panel .details{grid-template-columns:1fr}
+  .dialog-footer .button{min-height:44px}
+  .advanced summary{min-height:44px}
+  .terms dl{grid-template-columns:1fr}
+  .input,select,textarea{font-size:14px;min-height:44px}
+  dialog[open]{animation:sheet-in var(--motion-surface) var(--ease)} /* no overshoot: a full-height slide would lift off the bottom edge */
+  dialog.closing{animation:sheet-out var(--motion-exit) var(--ease) forwards}
+  .toast-viewport{left:16px;right:16px;bottom:8px;width:auto;max-width:none} /* over the activity bar, which names the same entry */
+  dialog .toast-viewport{top:8px;bottom:auto} /* over an open sheet, in the scrim above it: the sheet's footer holds its buttons */
+  .toast-viewport>.toast:nth-child(n+2){display:none}
+  .color-swatch{width:44px;height:44px}
+  .toast>.icon-button{min-width:44px;min-height:44px;margin-block:-13px}
+  .toast .toast-action{min-height:44px}
+  .profile-detail-mobile>.tabs,.profile-detail-mobile>.toolbar{display:none}
+  .profile-detail-mobile>.title-row{margin-bottom:16px}
+  @keyframes sheet-in{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+  @keyframes sheet-out{to{opacity:0;transform:translateY(100%)}}
+}
+@media(max-width:390px){
+  .title-row{flex-wrap:wrap}
+  .title-actions{margin-left:auto}
+}
+/* From 768px, while the selected card is on screen it shows state, Quit and the primary action, so the detail panel leaves them out;
+   a selected profile whose card left the current tab keeps them in the panel.
+   Collapsed rail: "Your apps" becomes a divider. Workspace health puts its result beside its text. */
+@media(min-width:768px){
+  .profile-layout.card-shown .detail-own{display:none}
+  .sidebar-collapsed .nav-apps{margin-top:18px;padding-top:10px;background:linear-gradient(var(--control) 0 0) 12px 0/calc(100% - 24px) 1px no-repeat}
+  .sidebar-collapsed .nav-group-title{height:0;padding:0}
+  .sidebar-collapsed .scope>.nav-label{position:absolute;width:1px;height:1px;clip-path:inset(50%)} /* visually hidden, still read: zero-size text can be skipped */
+  .operation-card.wide{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:12px 32px;align-items:start}
+  .operation-card.wide>*{grid-column:1}
+  .operation-card.wide>.health-result,.operation-card.wide>.health-empty{grid-column:2;grid-row:1/span 4;align-self:stretch}
+  .operation-card.wide>.health-empty{display:grid;place-items:center;max-width:none;padding:20px} /* plain text, no box: a box here is a card in a card */
+}
+/* The tagline (138px) is wider than the name column of a 190px sidebar: below the 32px mark, from its left edge, instead of wrapping. */
+@media(min-width:768px) and (max-width:1150px){
+  .brand{align-items:flex-start}
+  .brand>.nav-label{padding-top:4px} /* centres the name on the mark */
+  .brand-sub{margin:10px 0 0 -31px} /* -31px: the 16px mark and its 15px gap */
+}
+/* The detail panel sticks beside the grid and fits between the top bar and the activity bar (68 + 40 + 2 x 24).
+   Its bottom edge fades only while it overflows: the fade runs on the panel's own scroll timeline, which is inactive
+   (fade 0) when nothing scrolls. Below 901px the panel follows the grid and its close button returns. */
+@media(min-width:901px){
+  .detail-panel{overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;max-height:calc(100dvh - 68px - 40px - 48px - var(--activity-open));mask-image:linear-gradient(180deg,black calc(100% - var(--detail-fade)),transparent);animation:detail-fade linear both;animation-timeline:scroll(self)}
+  .detail-close{display:none}
+}
+/* The pointer leans a folder toward itself only with a fine pointer and motion allowed (app.js sets --px and --py). */
+@media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+  .gf-tilt{transform:perspective(1400px) rotateX(calc(var(--py,0) * -3deg)) rotateY(calc(var(--px,0) * 4deg))}
+}
+@media(prefers-reduced-motion:reduce){
+  .gf-slot,.gf-chip,.gf-state,.gf-name{transition-delay:0s} /* open shows the files at once, without travel or a stagger */
+  .gf-drop,.gf-landed .gf-front,.gf-landed .gf-count{animation:none} /* a new file and the count swap in, with no hidden phase */
+  *:not(.spinner),*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+  .button:active,.icon-button:active,.nav-item:active,.color-swatch:active,.tabs button:active,.gf-key:active{transform:none;opacity:.78} /* the press stays visible without movement */
+  .toast-viewport:not(:hover)>.toast:nth-child(2),.toast-viewport:not(:hover)>.toast:nth-child(3){transform:none}
+  .toast.dismiss{transform:none}
+  .spinner{animation:pulse 1.2s ease-in-out infinite} /* busy buttons keep a non-spatial progress cue */
+}
+/* The floating chrome turns solid when blur is unavailable or transparency is reduced. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  :root{--material-bar:var(--ground);--material-panel:var(--surface);
+    --glass:var(--card);--glass-blur:none;--glass-sheen:transparent;--folder-back:linear-gradient(180deg,var(--raised),var(--surface))}
+}
+@media(prefers-reduced-transparency:reduce){
+  :root{--material-bar:var(--ground);--material-panel:var(--surface);--material-blur:none;
+    --glass:var(--card);--glass-blur:none;--glass-sheen:transparent;--folder-back:linear-gradient(180deg,var(--raised),var(--surface))}
+}
+/* Increased contrast: Muted reaches 7.3:1 or more on every surface (#b4b2aa), and hairlines and edges move up one step. */
+@media(prefers-contrast:more){
+  :root{--muted:#b4b2aa;--border:#4d4c48;--control:#6f6d66;--button-edge:#8d8b84;--field-border:#9a988f;--danger-edge:var(--negative);
+    --material-bar:var(--ground);--material-panel:var(--surface);--material-blur:none;
+    --glass:var(--card);--glass-blur:none;--glass-sheen:transparent;--glass-rim:var(--button-edge);--folder-back:linear-gradient(180deg,var(--raised),var(--surface))}
+}
+/* Forced colours drop box-shadow and non-system colours, so focus and selection get system-colour outlines. */
+@media(forced-colors:active){
+  .input:focus,textarea:focus,select:focus{outline:2px solid Highlight}
+  .tab-indicator{background:Highlight}
+  .nav-item[aria-current=page],.profile-card.selected,.xp-nav-item[aria-current=true]{outline:2px solid Highlight}
+  .tile{border:1px solid CanvasText}
+  .gf-back,.gf-glass{background:Canvas}
+  .gf-front{-webkit-backdrop-filter:none;backdrop-filter:none}
+  .gf-rim{stroke:CanvasText}
+  .gf-front:has(.gf-hit:focus-visible) .gf-front-rim{stroke:Highlight}
+  .gf-sheet,.gf-key,.gf-menu{border:1px solid CanvasText}
+  .gf-shadow{display:none}
+  .running-dot,.xp-dot{border:4px solid CanvasText} /* forced colors drop the Mint fill; the dot stays, beside "Running" */
+  .connection-dot{border:3px solid CanvasText} /* the whole connection mark in the collapsed rail */
+  .color-swatch{forced-color-adjust:none;border-color:Canvas} /* a swatch is a color sample, so it keeps its color; the ring around it matches the page */
+  .color-swatch[aria-pressed=true],.color-swatch:focus-visible{outline-color:Highlight}
+}
+/* Forced colours drop the gradient strip line on the mobile tab scroller; a border below the ring padding replaces it. */
+@media(forced-colors:active) and (max-width:767px){
+  .tabs{border-bottom:1px solid CanvasText;margin-bottom:-7px}
+}

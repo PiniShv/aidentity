@@ -36,12 +36,19 @@ make build    # after every change in src/
 | `70-update.sh` | `update`, and the download checks `install.sh` shares |
 | `80-ui.sh` | the menu: drawing and the terminal |
 | `81-ui-keys.sh` | the menu: keys and actions |
+| `82-dashboard.sh` | dashboard startup and options |
+| `83-dashboard-bundle.sh` | generated dashboard; edit `dashboard/` instead |
 | `90-command-table.sh` | the table every command is listed in |
 | `91-command-help.sh` | help text |
 | `92-completion.sh` | shell completion |
 | `99-dispatch.sh` | `main`, and the last line |
 
 The number sets the order in `bin/aidentity`; a new file needs a free one.
+The dashboard's editable source is in `dashboard/`. `make build` first runs
+`scripts/bundle-dashboard.py`, which embeds those assets and the Python server
+into `src/83-dashboard-bundle.sh`, then joins all shell files as before.
+Commit the dashboard source, generated bundle, executable and checksum together.
+Building and testing the dashboard requires Python 3.9+ but no third-party packages.
 Bash errors and shellcheck name lines of `bin/aidentity`. To find the line to
 edit:
 
@@ -95,6 +102,12 @@ make test AREA=ui                     # the same, through make
 | `help` | help for each command, and `--help` never running one |
 | `completion` | shell completion |
 | `update` | `aidentity update` |
+| `dashboard` | dashboard help and option validation |
+
+`make dashboard-check` also checks the embedded assets are current and runs
+`test/test_dashboard_server.py`. The server tests use an isolated CLI fixture;
+browser/lifecycle QA must also use isolated `HOME`, `AIDENTITY_APPS_DIR`,
+`AIDENTITY_DATA_ROOT` and `AIDENTITY_APP_DIRS`.
 
 An area gives the same results alone as in the full suite, and CI runs each
 one alone to show it. Before each area, the runner empties the work space
@@ -202,10 +215,11 @@ back regardless of what else it does.
    re-signing has been tried; an ad-hoc signature cannot claim the vendor's team
    ID and the copy dies at launch.
 
-5. **No third-party dependencies.** Icon badging uses `iconutil` and
+5. **No third-party runtime packages.** Icon badging uses `iconutil` and
    `osascript -l JavaScript`; plists use `PlistBuddy` and `plutil`. Everything
-   ships with macOS. A PR that reaches for ImageMagick, Python packages, Node or
-   `jq` will not be merged.
+   ships with macOS. The optional dashboard uses Python 3.9+ and its standard
+   library; ordinary CLI commands must remain independent of it. Do not add
+   ImageMagick, Python packages, a Node runtime or `jq`.
 
 6. **Icon failures are never fatal.** `build_icon` falling back to the app's
    plain icon is correct behaviour. Keep new cosmetic code on the same footing.
