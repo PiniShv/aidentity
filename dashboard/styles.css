@@ -53,7 +53,7 @@ button,input,select,textarea{font:inherit}
 button,a,input,textarea,select{-webkit-tap-highlight-color:transparent}
 button{color:inherit;cursor:pointer;border:0;background:none}
 a{color:inherit;text-decoration:none}
-button:disabled:where(:not(.xp-wrap *)){cursor:wait;color:var(--muted)} /* Explore dims its own disabled buttons and keeps their tint (experience.css) */
+button:disabled{cursor:wait;color:var(--muted)}
 [hidden]{display:none!important}
 h1,h2,h3,p{margin:0}
 h1{font-size:28px;line-height:1.2;letter-spacing:-.035em;font-weight:600}
@@ -418,7 +418,7 @@ kbd{font-family:var(--font-mono);font-size:12px;padding:1px 6px;border:1px solid
 
 /* Dialogs: rmahammad Animated Dialog adaptation. Scale/slide entry, pinned header/footer,
    native dialog focus management, mobile bottom sheet, reduced motion. */
-dialog{width:560px;max-width:calc(100vw - 32px);max-height:85dvh;margin:auto;border:1px solid var(--control);border-radius:20px;padding:0;color:var(--text);box-shadow:var(--shadow-dialog);overflow:hidden;background:var(--surface);border-color:var(--control)}
+dialog{width:560px;max-width:calc(100vw - 32px);max-height:85dvh;margin:auto;border:1px solid var(--control);border-radius:20px;padding:0;color:var(--text);box-shadow:var(--shadow-dialog);overflow:hidden;background:var(--surface)}
 /* Mirrors --scrim as a literal: ::backdrop inherits custom properties only from Chrome 122 / Safari 17.4. */
 dialog::backdrop{background:#0009}
 dialog[open]{animation:dialog-in var(--motion-dialog) var(--spring-surface)}
@@ -494,7 +494,7 @@ dialog.closing{animation:dialog-out var(--motion-exit) var(--ease) forwards;poin
    expanded item, hover expansion, translate/scale entry and timed dismissal. */
 .toast-viewport{position:fixed;z-index:100;margin:0;padding:0;border:0;background:none;color:inherit;overflow:visible;height:auto;display:flex;flex-direction:column-reverse;max-width:calc(100vw - 32px);gap:8px;pointer-events:none;left:calc(var(--sidebar-width) + 32px);right:auto;top:auto;bottom:56px;width:340px}
 dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edge so the form stays readable */
-.toast{position:relative;display:flex;align-items:flex-start;gap:11px;padding:15px;border:1px solid var(--control);border-radius:12px;box-shadow:var(--shadow-toast);pointer-events:auto;animation:toast-in var(--motion-surface) var(--spring-surface);transition:transform var(--motion-surface) var(--spring-surface),opacity var(--motion-fade) ease-out;background:var(--tip);border-color:var(--control)}
+.toast{position:relative;display:flex;align-items:flex-start;gap:11px;padding:15px;border:1px solid var(--control);border-radius:12px;box-shadow:var(--shadow-toast);pointer-events:auto;animation:toast-in var(--motion-surface) var(--spring-surface);transition:transform var(--motion-surface) var(--spring-surface),opacity var(--motion-fade) ease-out;background:var(--tip)}
 .toast>.icon{color:var(--positive);width:17px;margin-top:1px}
 .toast.error>.icon{color:var(--negative)}
 .toast.warn>.icon{color:var(--warning)}
@@ -775,7 +775,7 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
 @media(forced-colors:active){
   .input:focus,textarea:focus,select:focus{outline:2px solid Highlight}
   .tab-indicator{background:Highlight}
-  .nav-item[aria-current=page],.profile-card.selected{outline:2px solid Highlight}
+  .nav-item[aria-current=page],.profile-card.selected,.xp-nav-item[aria-current=true]{outline:2px solid Highlight}
   .tile{border:1px solid CanvasText}
   .gf-back,.gf-glass{background:Canvas}
   .gf-front{-webkit-backdrop-filter:none;backdrop-filter:none}
@@ -784,6 +784,9 @@ dialog .toast-viewport{left:16px} /* over an open dialog, toasts keep to the edg
   .gf-sheet,.gf-key,.gf-menu{border:1px solid CanvasText}
   .gf-shadow{display:none}
   .running-dot,.xp-dot{border:4px solid CanvasText} /* forced colors drop the Mint fill; the dot stays, beside "Running" */
+  .connection-dot{border:3px solid CanvasText} /* the whole connection mark in the collapsed rail */
+  .color-swatch{forced-color-adjust:none;border-color:Canvas} /* a swatch is a color sample, so it keeps its color; the ring around it matches the page */
+  .color-swatch[aria-pressed=true],.color-swatch:focus-visible{outline-color:Highlight}
 }
 /* Forced colours drop the gradient strip line on the mobile tab scroller; a border below the ring padding replaces it. */
 @media(forced-colors:active) and (max-width:767px){

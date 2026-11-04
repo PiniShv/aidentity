@@ -33,8 +33,6 @@
     play:'<path d="M18.89 12.85C18.54 14.19 16.87 15.14 13.53 17.04C10.3 18.87 8.68 19.79 7.38 19.42C6.84 19.27 6.35 18.98 5.96 18.58C5 17.61 5 15.74 5 12C5 8.26 5 6.39 5.96 5.42C6.35 5.02 6.84 4.73 7.38 4.58C8.68 4.21 10.3 5.13 13.53 6.96C16.87 8.86 18.54 9.81 18.89 11.15C19.04 11.71 19.04 12.29 18.89 12.85Z"/>',
     stop:'<path d="M4 12C4 8.72 4 7.08 4.81 5.92C5.11 5.49 5.49 5.11 5.92 4.81C7.08 4 8.72 4 12 4C15.28 4 16.92 4 18.08 4.81C18.51 5.11 18.89 5.49 19.19 5.92C20 7.08 20 8.72 20 12C20 15.28 20 16.92 19.19 18.08C18.89 18.51 18.51 18.89 18.08 19.19C16.92 20 15.28 20 12 20C8.72 20 7.08 20 5.92 19.19C5.49 18.89 5.11 18.51 4.81 18.08C4 16.92 4 15.28 4 12Z"/>',
     more:'<path d="M6 12.5V12M18 12.5V12M12 12.5V12M7 12.5C7 11.95 6.56 11.5 6 11.5C5.45 11.5 5 11.95 5 12.5C5 13.05 5.45 13.5 6 13.5C6.56 13.5 7 13.05 7 12.5ZM19 12.5C19 11.95 18.56 11.5 18 11.5C17.45 11.5 17 11.95 17 12.5C17 13.05 17.45 13.5 18 13.5C18.56 13.5 19 13.05 19 12.5ZM13 12.5C13 11.95 12.56 11.5 12 11.5C11.45 11.5 11 11.95 11 12.5C11 13.05 11.45 13.5 12 13.5C12.56 13.5 13 13.05 13 12.5Z"/>',
-    settings:'<path d="M3 12H11"/><path d="M14 5L21 5"/><path d="M12 19L21 19"/><path d="M3 5H10M10 5V3M10 5V7"/><path d="M3 19H8M8 19V17M8 19V21"/><path d="M15 12L21 12M15 12V10M15 12V14"/>',
-    rename:'<path d="M15.21 5.98L16.62 4.58C17.39 3.81 18.65 3.81 19.42 4.58C20.19 5.35 20.19 6.61 19.42 7.38L18.02 8.79M15.21 5.98L6.98 14.22C5.93 15.26 5.41 15.78 5.06 16.42C4.7 17.06 4.34 18.56 4 20C5.44 19.66 6.94 19.3 7.58 18.94C8.22 18.59 8.74 18.07 9.78 17.02L18.02 8.79M15.21 5.98L18.02 8.79"/><path d="M11 20H17"/>',
     trash:'<path d="M18.85 16.37L19.5 6H4.5L5.15 16.37C5.32 19.04 5.4 20.37 6.26 21.19C7.13 22 8.47 22 11.14 22H12.86C15.53 22 16.87 22 17.74 21.19C18.6 20.37 18.68 19.04 18.85 16.37Z"/><path d="M16 6H21M16 6L15.38 4.34C15 3.34 14.81 2.83 14.44 2.5C14.32 2.4 14.19 2.31 14.05 2.23C13.61 2 13.07 2 12 2C10.93 2 10.39 2 9.95 2.23C9.81 2.31 9.68 2.4 9.56 2.5C9.19 2.83 9 3.34 8.62 4.34L8 6M16 6H8M3 6H8"/><path d="M9.5 11V17M14.5 11V17"/>',
     shield:'<path d="M18.71 3.5C16.82 2.55 14.5 2 12 2C9.5 2 7.18 2.55 5.29 3.5C4.36 3.96 3.9 4.19 3.45 4.91C3 5.64 3 6.34 3 7.75V11.24C3 16.92 7.54 20.08 10.17 21.43C10.91 21.81 11.27 22 12 22C12.73 22 13.09 21.81 13.83 21.43C16.46 20.08 21 16.92 21 11.24L21 7.75C21 6.34 21 5.64 20.55 4.91C20.1 4.19 19.64 3.96 18.71 3.5Z"/><path d="M9 11.5C9 11.5 10.41 11.75 11 13.5C11 13.5 12.5 10.5 15 9.5"/>',
     download:'<path d="M3 17C3 17.93 3 18.4 3.1 18.78C3.38 19.81 4.19 20.62 5.22 20.9C5.6 21 6.07 21 7 21L17 21C17.93 21 18.39 21 18.78 20.9C19.81 20.62 20.62 19.81 20.9 18.78C21 18.4 21 17.93 21 17"/><path d="M16.5 11.5C16.5 11.5 13.19 16 12 16C10.81 16 7.5 11.5 7.5 11.5M12 15V3"/>',
@@ -45,7 +43,6 @@
     chevron:'<path d="M18 15C18 15 13.58 9 12 9C10.42 9 6 15 6 15"/>',
     check:'<path d="M22 12C22 6.48 17.52 2 12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12Z"/><path d="M8 12.5L10.5 15L16 9"/>',
     alert:'<circle cx="12" cy="12" r="10"/><path d="M12 8V12"/><path d="M12.12 15.75H12M12.25 15.75C12.25 15.89 12.14 16 12 16C11.86 16 11.75 15.89 11.75 15.75C11.75 15.61 11.86 15.5 12 15.5C12.14 15.5 12.25 15.61 12.25 15.75Z"/>',
-    folder:'<path d="M13.67 6.49H16C18.83 6.49 20.24 6.49 21.12 7.37C22 8.25 22 9.67 22 12.49V14.5C22 17.33 22 18.74 21.12 19.62C20.24 20.5 18.83 20.5 16 20.5H8C5.17 20.5 3.76 20.5 2.88 19.62C2 18.74 2 17.33 2 14.5V8.99C2 6.65 2 5.49 2.62 4.68C2.78 4.47 2.97 4.28 3.18 4.12C3.99 3.5 5.15 3.5 7.49 3.5C8.17 3.5 8.5 3.5 8.81 3.6C8.9 3.63 8.98 3.67 9.06 3.71C9.35 3.85 9.59 4.09 10.07 4.56L10.85 5.33C11.43 5.91 11.71 6.19 12.08 6.34C12.45 6.49 12.85 6.49 13.67 6.49Z"/>',
     copy:'<path d="M7.5 14.5C7.5 11.2 7.5 9.55 8.53 8.53C9.55 7.5 11.2 7.5 14.5 7.5C17.8 7.5 19.45 7.5 20.47 8.53C21.5 9.55 21.5 11.2 21.5 14.5C21.5 17.8 21.5 19.45 20.47 20.47C19.45 21.5 17.8 21.5 14.5 21.5C11.2 21.5 9.55 21.5 8.53 20.47C7.5 19.45 7.5 17.8 7.5 14.5Z"/><path d="M7.5 16.5C6.1 16.5 5.41 16.5 4.84 16.3C3.84 15.95 3.05 15.16 2.7 14.16C2.5 13.59 2.5 12.9 2.5 11.5V9.5C2.5 6.2 2.5 4.55 3.53 3.53C4.55 2.5 6.2 2.5 9.5 2.5H11.5C12.9 2.5 13.59 2.5 14.16 2.7C15.16 3.05 15.95 3.84 16.3 4.84C16.5 5.41 16.5 6.1 16.5 7.5"/>',
   };
   const icon = name => `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name] || iconPaths.grid}</svg>`;
@@ -376,6 +373,7 @@
         icon,
         appAccent,
         inkFor,
+        breakable,
         statusLabel,
         addProfile:app=>addDialog(app || ""),
         refreshApps:()=>refresh({notify:true,force:true}),
@@ -675,7 +673,7 @@
   const verbs={open:"open",quit:"quit",add:"add the profile",set:"save the settings",rename:"rename",remove:"remove",restore:"restore",rebuild:"rebuild",prune:"clear unclaimed data",doctor:"check the workspace",import:"import",export:"export",update:"update",help:"read the help",completion:"generate completion"};
   const doing={open:"Opening…",quit:"Closing…",add:"Adding the profile…",set:"Saving the settings…",rename:"Renaming…",remove:"Removing…",restore:"Restoring…",rebuild:"Rebuilding…",prune:"Clearing unclaimed data…",doctor:"Running doctor…",import:"Importing…",export:"Exporting…",update:"Updating aidentity…",help:"Loading the help…",completion:"Generating completion…"};
   async function action(name,params={},element=null,{quiet=false}={}){
-    // A dialog's own action reports a failure in its form error, so no toast says it again over the form.
+    // A dialog's own action reports a failure in its form error while that form is on screen, so no toast says it again over it.
     const inDialog=element?.id==="dialog-submit";
     if(busy||offline||!state?.csrf_token){
       const error=busy?Object.assign(new Error("Another action is still running. Try again when it finishes."),{busy:true}):new Error(OFFLINE);
@@ -718,7 +716,7 @@
     }catch(error){
       const failure=error.busy?"Still working":error.message===OFFLINE?"Disconnected":`Could not ${verbs[name]||name}${params.name?` ${params.name}`:""}`;
       if(entry)entry.title=failure;
-      if(!quiet&&!inDialog&&!error.reported){toast(failure,error.message===OFFLINE?"":String(error.message),error.busy?"info":true);error.reported=true;}
+      if(!quiet&&!(inDialog&&dialog.open)&&!error.reported){toast(failure,error.message===OFFLINE?"":String(error.message),error.busy?"info":true);error.reported=true;}
       renderActivity();
       throw error;
     }finally{clearInterval(ticker);$(".dialog-status",dialog)?.replaceChildren();busy=false;setBusy(element,false);syncControls();returnFocus(from);}
@@ -745,7 +743,7 @@
       const sum=result.summary;
       if(!sum)return {title:params.fix?"Check and repair finished":"Check finished",text:"The full report is in Activity."};
       const issues=(sum.warn||0)+(sum.error||0),away=view!=="maintenance";
-      return {title:`Checked ${plural(before.profiles.length,"profile")}: ${issues?`${issues} ${issues===1?"needs":"need"} attention`:"all healthy"}`,text:issues?(away?"The findings are in Maintenance.":"The findings are in Workspace health."):"",kind:sum.error?"error":sum.warn?"warn":"ok",extra:issues&&away?{label:"Show findings",run:()=>showView("maintenance",{focus:true})}:null};
+      return {title:`Checked ${plural(inventory.profiles.length,"profile")}: ${issues?`${issues} ${issues===1?"needs":"need"} attention`:"all healthy"}`,text:issues?(away?"The findings are in Maintenance.":"The findings are in Workspace health."):"",kind:sum.error?"error":sum.warn?"warn":"ok",extra:issues&&away?{label:"Show findings",run:()=>showView("maintenance",{focus:true})}:null};
     }
     if(name==="update"&&params.check){
       const {installed,available}=result;
@@ -1080,9 +1078,9 @@
   }
   // The visible button runs it (the panel's own copy is hidden from 768px), so its spinner and focus return show where the user looks.
   function runPrimary(){
-    const item=profile(selected),el=$$(".open-profile",main).find(button=>button.dataset.name===item.name&&button.checkVisibility());
+    const el=profileSpot(selected);
     if(el?.hasAttribute("data-locked"))return;
-    action("open",{name:item.name},el).catch(()=>{});
+    action("open",{name:selected},el).catch(()=>{});
   }
   // Animated Sidebar adaptation: desktop rail, mobile modal navigation, Cmd+B.
   function closeNavigation(){
@@ -1151,7 +1149,7 @@
     if(event.target.matches?.(".detail-more"))detailMore=event.target.open?selected:"";
   },true);
   document.addEventListener("keydown",event=>{
-    if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="b"){event.preventDefault();toggleNavigation();}
+    if(event.metaKey&&event.key.toLowerCase()==="b"){event.preventDefault();toggleNavigation();}
     if(event.key==="Escape"&&document.body.classList.contains("mobile-nav-open")){closeNavigation();$("#mobile-nav").focus();return;}
     if(event.key==="/"&&!event.metaKey&&!event.ctrlKey&&!event.altKey&&!dialog.open&&!event.target.closest?.("input,textarea,select,[contenteditable]")){const search=$("#workspace-search");if(search){event.preventDefault();search.focus();search.select();}}
     // Folder menu: arrows, Home and End move between its items and Tab leaves it closed; Escape closes it, then the open folder.
@@ -1177,7 +1175,12 @@
     }
   });
   dialog.addEventListener("cancel",event=>{event.preventDefault();closeDialog();});
-  dialog.addEventListener("click",event=>{if(event.target===dialog){const rect=dialog.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)closeDialog();}});
+  // Chrome lets a dialog block Esc once per user activation, so a second Esc closes it natively: whatever closes it hands the toasts back to the page.
+  dialog.addEventListener("close",hostToasts);
+  // A click lands on the nearest common ancestor of the press and the release, so a drag that selects text in a field and lets go outside would close the dialog: the press must begin on the backdrop too.
+  let pressedBackdrop=false;
+  dialog.addEventListener("pointerdown",event=>{pressedBackdrop=event.target===dialog;});
+  dialog.addEventListener("click",event=>{if(pressedBackdrop&&event.target===dialog){const rect=dialog.getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)closeDialog();}});
   $("#header-add").onclick=()=>{if(!$("#header-add").hasAttribute("data-locked"))addDialog();};
   $("#refresh").onclick=()=>refresh({force:true,notify:true});
   $("#mobile-nav").onclick=toggleNavigation;

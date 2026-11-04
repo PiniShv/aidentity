@@ -6,8 +6,6 @@
   "use strict";
   const esc = value => String(value ?? "").replace(/[&<>"']/g, c =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  // As app.js breakable(): breaks after an underscore, and assistive tech reads the plain name, not the <wbr> spaces.
-  const breakable = value => { const text = esc(value); return text.includes("_") ? `<span aria-hidden="true">${text.replace(/_/g, "_<wbr>")}</span><span class="xp-sr-only">${text}</span>` : text; };
   // The first code point, so an emoji name is not split into a lone surrogate.
   const badgeChar = profile => profile.badge || [...(profile.profile || profile.name || "A")][0];
   // A data refresh remounts Explore in the same task as cleanup. Only that
@@ -56,6 +54,8 @@
       ? callbacks.renderAppIcon(name) : `<span aria-hidden="true">${esc([...name][0] || "A")}</span>`;
     // The dashboard's drawn icon set (app.js), so Prev/Next match every other icon.
     const uiIcon = name => callbacks.icon?.(name) ?? "";
+    // A name breaks after an underscore, as everywhere else (app.js).
+    const breakable = value => callbacks.breakable?.(value) ?? esc(value);
     const profileCount = count => `${count} ${count === 1 ? "profile" : "profiles"}`;
     // The badge ink rule is app.js's (callbacks.inkFor): Lampblack or white, whichever contrasts more.
     const badgeStyle = profile => {
@@ -89,7 +89,7 @@
     const launchingState = (button, on) => { block(button, on); if (on) button.setAttribute("aria-busy", "true"); else button.removeAttribute("aria-busy"); };
     const blocked = button => button.getAttribute("aria-disabled") === "true";
     const positionText = i => `${nav[i].name}, ${i + 1} of ${nav.length}, ${profileCount(nav[i].profiles.length)}`;
-    const positionHtml = i => `<span aria-hidden="true">${i + 1} of ${nav.length}</span><span class="xp-sr-only">${esc(positionText(i))}</span>`;
+    const positionHtml = i => `<span aria-hidden="true">${i + 1} of ${nav.length}</span><span class="sr-only">${esc(positionText(i))}</span>`;
     const listen = (element, event, handler, options) => {
       element.addEventListener(event, handler, options);
       cleanup.push(() => element.removeEventListener(event, handler, options));
@@ -119,7 +119,7 @@
     };
     const navRow = (group, i) => `<li><button type="button" class="xp-nav-item" data-xp-app="${esc(group.name)}" data-xp-select="${i}" style="${accentStyle(group)}" aria-describedby="xp-select-hint" aria-current="${i === active}"><span class="xp-list-icon" aria-hidden="true">${icon(group.name)}</span><span class="xp-nav-text"><span class="xp-app-name">${esc(group.name)}</span><span class="xp-app-meta"><span>${profileCount(group.profiles.length)}${group.installed ? "" : inventoryFailed ? " · Inventory unavailable" : " · App not found"}</span>${appRunning(group)}</span></span></button></li>`;
     root.innerHTML = `<div class="xp-wrap">
-      <header class="xp-header"><span class="tile section-explore" aria-hidden="true">${uiIcon("explore")}</span><h1 tabindex="-1">Explore</h1></header>${errorNotice}
+      <div class="title-row"><div class="title-main"><span class="tile section-explore" aria-hidden="true">${uiIcon("explore")}</span><h1 tabindex="-1">Explore</h1></div></div>${errorNotice}
       ${nav.length ? `<div class="xp-layout">
         <section class="xp-preview" data-xp-preview="${esc(nav[active].name)}" aria-label="Selected app">
           <div class="xp-pager"${nav.length > 1 ? "" : " hidden"}><button type="button" class="xp-button xp-prev" aria-label="Previous app">${uiIcon("back")}</button><span class="xp-position" data-at="${active}">${positionHtml(active)}</span><button type="button" class="xp-button xp-next" aria-label="Next app">${uiIcon("arrow")}</button></div>
@@ -129,7 +129,7 @@
           <p class="xp-inline-feedback" role="status" aria-live="polite" hidden></p>
           <button type="button" class="xp-button xp-key-add" data-xp-run>${uiIcon("plus")}Add profile</button>
           <p class="xp-help" id="xp-add-help" hidden></p>
-          <p class="xp-sr-only" role="status" data-xp-live></p>
+          <p class="sr-only" role="status" data-xp-live></p>
         </section>
         <div class="xp-app-list" role="region" aria-label="Apps">
           <span id="xp-select-hint" hidden>Shows this app's profiles</span>
@@ -212,7 +212,8 @@
       try {
         await callbacks.launchProfile(profile);
       } catch (error) {
-        if (!disposed) {
+        // The panel may show another app by now: the toast names the profile, and a line there would read as that app's.
+        if (!disposed && nav[active].profiles.includes(profile)) {
           // One line beside the key: the toast and Activity hold a long CLI error in full.
           const reason = String(error?.message || "").trim().split("\n")[0];
           feedback.textContent = `Couldn’t open ${profile.profile || profile.name}. ${reason.length > 160 ? `${reason.slice(0, 160).trimEnd()}…` : reason || "Try again, or check the profile on Profiles."}`;
