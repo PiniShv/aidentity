@@ -3,16 +3,30 @@
 # `aidentity __complete SHELL CWORD WORD...` prints what Tab can offer for the
 # words typed so far, in the form SHELL's script reads (see complete_words).
 # `aidentity __complete WHAT` prints the names of one kind (launchers,
-# restorable or apps), the form that scripts saved from 1.4.0 use; orphans is
-# for the dashboard, which names what prune would move. The scripts
-# call it on every Tab, so it prints nothing on stderr and always exits 0,
-# whatever is wrong with the folders it reads.
+# restorable or apps), the form that scripts saved from 1.4.0 use; orphans
+# names what prune would move. The scripts call it on every Tab, so it prints
+# nothing on stderr and always exits 0, whatever is wrong with the folders it
+# reads; the dashboard reads restorable and orphans through __inventory instead.
 cmd_complete() {
   case "${1:-}" in
     bash|zsh|fish) ( complete_words "$@" ) 2>/dev/null ;;
     *) ( complete_candidates "${1:-}" ) 2>/dev/null ;;
   esac
   return 0
+}
+
+# `aidentity __inventory restorable|orphans` prints what __complete prints for
+# them, for the dashboard, which must tell a data root it cannot read from an
+# empty one: so it fails, with the error on stderr, where Tab stays quiet.
+cmd_inventory() {
+  case "${1:-}" in
+    restorable|orphans) ;;
+    *) die "Usage: aidentity __inventory restorable|orphans" ;;
+  esac
+  if [ -d "$DATA_ROOT" ] && ! { [ -r "$DATA_ROOT" ] && [ -x "$DATA_ROOT" ]; }; then
+    die "Cannot read $DATA_ROOT."
+  fi
+  complete_candidates "$1"
 }
 
 complete_candidates() {

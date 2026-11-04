@@ -56,6 +56,11 @@ if command -v python3 >/dev/null 2>&1 \
   assert_contains "dashboard says how to stop it" "$RUN_OUT" "aidentity dashboard --stop"
   assert_eq "the background dashboard answers" 200 \
     "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "$url/" 2>&1)"
+  assert_file "its state file is in the data root" "$DATA/dashboard.json"
+  # A data root beside this one, with the same parent, has a dashboard of its own.
+  AIDENTITY_DATA_ROOT="$SB/other data" ai dashboard --stop
+  assert_contains "a data root beside it has no dashboard running" "$RUN_OUT" "No dashboard is running."
+  rm -rf "$SB/other data"
 
   ai dashboard --no-open
   assert_rc "a second dashboard reuses the running one" 0 "$RUN_RC" "$RUN_OUT"
@@ -71,6 +76,7 @@ if command -v python3 >/dev/null 2>&1 \
   assert_contains "--stop says the dashboard stopped" "$RUN_OUT" "Dashboard stopped."
   curl -s -o /dev/null --max-time 2 "$url/"
   assert_rc_nonzero "the stopped dashboard's port refuses connections" "$?"
+  rm -f "$DATA/dashboard.json"   # the area must leave the data root empty
   trap cleanup EXIT INT TERM
 else
   _skip "dashboard runs in the background and --stop stops it" "Python 3.9 or newer is not installed"

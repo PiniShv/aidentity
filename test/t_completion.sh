@@ -155,6 +155,25 @@ assert_not_contains "and no path is printed" "$RUN_OUT" "/"
 ai_stdout __complete restorable
 has_line "__complete restorable still lists the recorded orphan" "$RUN_OUT" "Fake Gone"
 lacks_line "and not the one with no restore record" "$RUN_OUT" "loose folder"
+# The dashboard reads the same lists through __inventory, which fails out loud
+# where __complete stays quiet: an unreadable data root is not an empty one.
+for what in orphans restorable; do
+  ai_stdout __complete "$what"
+  want="$RUN_OUT"
+  ai_stdout __inventory "$what"
+  assert_rc "__inventory $what exits 0" 0 "$RUN_RC" "$RUN_ERR"
+  assert_eq "and prints what __complete $what prints" "$want" "$RUN_OUT"
+done
+trap 'chmod 700 "$DATA"; cleanup' EXIT INT TERM
+chmod 000 "$DATA"
+ai_stdout __inventory orphans
+inv_rc=$RUN_RC inv_err=$RUN_ERR
+ai_stdout __complete orphans
+chmod 700 "$DATA"
+trap cleanup EXIT INT TERM
+assert_rc_nonzero "__inventory orphans over an unreadable data root fails" "$inv_rc" "$inv_err"
+assert_contains "and says it cannot read it" "$inv_err" "Cannot read $DATA."
+assert_eq "while __complete orphans still exits 0 and prints nothing" "0::" "$RUN_RC:$RUN_OUT:$RUN_ERR"
 rm -rf "$DATA/loose folder" "$DATA/bad${ESC}[31mname" "$DATA/tab${TAB}name" "$DATA/linked out"
 
 for what in bogus ""; do
@@ -162,6 +181,10 @@ for what in bogus ""; do
   assert_rc "__complete [$what] exits 0" 0 "$RUN_RC" "$RUN_ERR"
   assert_eq "__complete [$what] prints nothing" "" "$RUN_OUT"
   assert_eq "__complete [$what] says nothing on stderr" "" "$RUN_ERR"
+done
+for what in bogus "" launchers; do
+  ai_stdout __inventory "$what"
+  assert_rc_nonzero "__inventory [$what] is refused" "$RUN_RC" "$RUN_ERR"
 done
 ai_stdout __complete
 assert_rc "__complete with no argument exits 0" 0 "$RUN_RC" "$RUN_ERR"
@@ -172,6 +195,13 @@ for what in launchers restorable orphans apps; do
     AIDENTITY_APP_DIRS="$SB/no/such/apps" detached "$BASH_BIN" "$AIDENTITY" __complete "$what" 2>"$SANDBOX/stderr" </dev/null)
   RUN_RC=$?
   assert_rc "__complete $what over folders that do not exist exits 0" 0 "$RUN_RC" "$RUN_OUT"
+  assert_eq "and prints nothing" "" "$RUN_OUT$(cat "$SANDBOX/stderr")"
+done
+for what in restorable orphans; do
+  RUN_OUT=$(AIDENTITY_DATA_ROOT="$SB/no/such/data" \
+    detached "$BASH_BIN" "$AIDENTITY" __inventory "$what" 2>"$SANDBOX/stderr" </dev/null)
+  RUN_RC=$?
+  assert_rc "__inventory $what with no data root exits 0" 0 "$RUN_RC" "$RUN_OUT"
   assert_eq "and prints nothing" "" "$RUN_OUT$(cat "$SANDBOX/stderr")"
 done
 
@@ -234,6 +264,8 @@ comp_case "--colour completes a colour as well" "teal" set "Fake Work" --colour 
 comp_case "a value that has no list offers nothing" "" add --profile ""
 comp_case "an unknown command offers nothing" "" definitely-not-a-command ""
 comp_case "a hidden command offers nothing" "" --help ""
+comp_case "no hidden command is offered" "" __
+comp_case "nor anything after __inventory" "" __inventory ""
 # The help tests check each row against its usage line, which says NAME for
 # both kinds of profile name. So this one is pinned here.
 comp_case "restore offers only profiles that can be restored" "Fake Gone" restore ""

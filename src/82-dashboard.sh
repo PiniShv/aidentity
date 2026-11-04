@@ -33,8 +33,9 @@ cmd_dashboard() {
   "$python" -I -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null \
     || die "The dashboard needs Python 3.9 or newer."
   [ -f "$SELF_PATH" ] || die "Run dashboard from an installed aidentity file."
-  # Beside the data root, so each data root (and each test sandbox) has its own dashboard.
-  args=(--state "$(dirname "$DATA_ROOT")/dashboard.json")
+  # Inside the data root, so each data root (and each test sandbox) has its own
+  # dashboard, however its path is spelled: the lock on this file is the key.
+  args=(--state "$DATA_ROOT/dashboard.json")
   if [ "$stop" = 1 ]; then
     args+=(--stop)
   else

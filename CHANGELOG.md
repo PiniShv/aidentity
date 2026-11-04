@@ -27,7 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The uninstaller stops a running dashboard and removes its state file.
+- The uninstaller stops a running dashboard and removes its state file. If the
+  dashboard does not stop, it keeps the command that stops it and says the
+  uninstall left things in place.
 
 ## [1.6.2] - 2026-11-01
 

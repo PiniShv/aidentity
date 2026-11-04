@@ -1202,7 +1202,7 @@ bash uninstall.sh
 
 What it does:
 
-1. **Removes the command, without asking.** It looks in the usual install folders and wherever your `PATH` finds it. If you started the [dashboard](#aidentity-dashboard), it stops it first. It leaves a Homebrew install and a repository checkout alone, and tells you so. If it cannot delete the file, it prints a `sudo rm -f` line for you to run. It never runs `sudo` itself.
+1. **Removes the command, without asking.** It looks in the usual install folders and wherever your `PATH` finds it. If you started the [dashboard](#aidentity-dashboard), it stops it first; if the dashboard does not stop, it keeps the command so you can run `aidentity dashboard --stop`, and says so. It leaves a Homebrew install and a repository checkout alone, and tells you so. If it cannot delete the file, it prints a `sudo rm -f` line for you to run. It never runs `sudo` itself.
 2. **Lists everything else, with sizes.** That means every launcher that carries the marker, and every data folder, including data that no launcher points at any more.
 3. **Stops if any listed profile is running.** The command is already gone by then, so quit that app yourself, for example with **Cmd + Q** in its window. Then run the script again.
 4. **Removes only after you type `delete`.** It deletes the launchers and moves the profile data to the Trash. Any other answer keeps your launchers and data. They keep working without the command.
@@ -1252,10 +1252,10 @@ Do these steps in order, one block at a time. Quit every profile first.
    rm -f "$(command -v aidentity)"
    ```
 
-6. Remove the empty data folders. If you started the dashboard, it left a small file, `dashboard.json`, in the `aidentity` folder. Delete it first:
+6. Remove the empty data folders. If you started the dashboard, it left a small file, `dashboard.json`, in the `profiles` folder. Delete it first:
 
    ```bash
-   rm -f ~/Library/Application\ Support/aidentity/dashboard.json
+   rm -f ~/Library/Application\ Support/aidentity/profiles/dashboard.json
    ```
 
    Then remove the folders. `rmdir` deletes a folder only if it is empty, so it stops if anything is left in it:
@@ -1264,7 +1264,7 @@ Do these steps in order, one block at a time. Quit every profile first.
    rmdir ~/Library/Application\ Support/aidentity/profiles ~/Library/Application\ Support/aidentity
    ```
 
-   If you set `AIDENTITY_DATA_ROOT`, use that folder instead. `dashboard.json` is in the folder above it.
+   If you set `AIDENTITY_DATA_ROOT`, use that folder instead. `dashboard.json` is in it.
 
    If `rmdir` says `Directory not empty`, look inside with `ls -A`. A file named `.DS_Store` is only Finder's view settings. Delete it, then run `rmdir` again:
 
