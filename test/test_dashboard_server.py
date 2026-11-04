@@ -20,6 +20,17 @@ import urllib.parse
 import zlib
 
 SERVER_PATH = Path(__file__).resolve().parents[1] / "dashboard" / "server.py"
+# What bin/aidentity import /dev/stdin prints without --yes and without a terminal: the plan on stdout,
+# then its question and die on stderr, exit 1 (recorded from a scratch run of the real CLI).
+PLAN_STDOUT = ("The launchers in /dev/stdin:\n\n"
+               "  create  Claude Work\n"
+               "          flags  --proxy-server=https://bob:pw@proxy.example:8080 --lang=de\n"
+               "          proxy  HTTPS_PROXY=https://***@proxy.example:3128\n"
+               "          env    NO_PROXY (values hidden)\n"
+               "  create  Claude Main \u2014 opens the original account\n"
+               "  skip    Slack Work \u2014 no app with the bundle ID com.tinyspeck.slackmacgap is installed\n\n")
+PLAN_STDERR = "Create 2 launchers? Type yes to confirm: \u2717 Nothing to confirm with.\n"
+PRUNE_CHANGED = "The unclaimed data changed since it was listed. Review the list again."
 
 
 @unittest.skipUnless(sys.platform == "darwin", "The dashboard uses macOS TCP connection ownership.")
@@ -48,9 +59,13 @@ class DashboardTests(unittest.TestCase):
             "'args':['--proxy-server=https://alice:private@proxy.example:8080'],"
             "'env':['HTTPS_PROXY'], 'own_extensions':False}]))\n"
             "elif a == ['__complete','apps']: print('Claude\\nVisual Studio Code')\n"
-            "elif a == ['__complete','restorable']: print('Claude Personal')\n"
-            "elif a == ['__complete','orphans']: print('Claude Personal\\nstray-folder')\n"
+            "elif a == ['__inventory','restorable']: print('Claude Personal')\n"
+            "elif a == ['__inventory','orphans']: print('Claude Personal\\nstray-folder')\n"
             "elif a == ['version']: print('aidentity 1.6.1')\n"
+            "elif a == ['import','/dev/stdin']:\n"
+            " open(os.path.join(os.environ['HOME'],'stdin'),'wb').write(sys.stdin.buffer.read())\n"
+            " r=json.load(open(os.path.join(os.environ['HOME'],'reply')))\n"
+            " sys.stdout.write(r['stdout']); sys.stderr.write(r['stderr']); sys.exit(r['code'])\n"
             "elif a and a[0] == 'import':\n"
             " d=json.load(sys.stdin); print(json.dumps({'imported':len(d['launchers'])}))\n"
             "elif a and a[0] == 'export':\n"
@@ -66,12 +81,14 @@ class DashboardTests(unittest.TestCase):
             "  sys.exit(143)\n"
             " signal.signal(signal.SIGTERM,cleanup); time.sleep(5)\n"
             "elif a == ['help','flood']: print('x' * (5 * 1024 * 1024))\n"
+            "elif a == ['help','split']:\n"
+            " sys.stdout.write('o' * (3 * 1024 * 1024)); sys.stdout.flush(); sys.stderr.write('e' * (3 * 1024 * 1024))\n"
             "elif a == ['help','where']:\n"
             " print(json.dumps({'cwd': os.getcwd(), 'pwd': os.environ.get('PWD'), 'apps': os.environ['AIDENTITY_APPS_DIR'],"
             "'data': os.environ['AIDENTITY_DATA_ROOT'], 'dirs': os.environ['AIDENTITY_APP_DIRS']}))\n"
             "elif os.path.exists(os.path.join(os.environ['HOME'],'reply')):\n"
             " r=json.load(open(os.path.join(os.environ['HOME'],'reply')))\n"
-            " sys.stdout.write(r['stdout']); sys.stderr.write(r['stderr'])\n"
+            " sys.stdout.write(r['stdout']); sys.stderr.write(r['stderr']); sys.exit(r['code'])\n"
             "else: print(json.dumps(a))\n",
             encoding="utf-8",
         )
@@ -138,9 +155,9 @@ class DashboardTests(unittest.TestCase):
     def preview(self, payload, **kwargs):
         return self.request("POST", "/api/preview", payload, **kwargs)
 
-    def reply(self, stdout, stderr=""):
-        """Make the fixture CLI answer the next unrecognized command with recorded output."""
-        (self.root / "reply").write_text(json.dumps({"stdout": stdout, "stderr": stderr}))
+    def reply(self, stdout, stderr="", code=0):
+        """Make the fixture CLI answer the next unrecognized command, or an import plan, with recorded output."""
+        (self.root / "reply").write_text(json.dumps({"stdout": stdout, "stderr": stderr, "code": code}))
 
     def calls(self):
         return [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
@@ -233,14 +250,14 @@ class DashboardTests(unittest.TestCase):
         run = self.backend.run
         failed = {"ok": False, "exit_code": 1, "stdout": "half a list\n", "stderr": "cannot read the data root"}
         with mock.patch.object(self.backend, "run",
-                               side_effect=lambda argv: failed if argv == ["__complete", "orphans"] else run(argv)):
+                               side_effect=lambda argv: failed if argv == ["__inventory", "orphans"] else run(argv)):
             state = self.backend.state()
         self.assertEqual(state["unclaimed"], [])
         self.assertEqual(state["errors"], ["Unclaimed data: cannot read the data root"])
 
     def test_a_failed_recovery_read_is_flagged_so_the_page_never_claims_an_empty_list(self):
-        for argv, failed, other in ((["__complete", "orphans"], "unclaimed", "restorable"),
-                                    (["__complete", "restorable"], "restorable", "unclaimed")):
+        for argv, failed, other in ((["__inventory", "orphans"], "unclaimed", "restorable"),
+                                    (["__inventory", "restorable"], "restorable", "unclaimed")):
             with self.subTest(failed=failed):
                 (self.root / "fail").write_text(json.dumps(argv))
                 state = self.backend.state(fresh=True)
@@ -296,7 +313,8 @@ class DashboardTests(unittest.TestCase):
     def test_destructive_commands_require_explicit_confirmation(self):
         for payload in (
             {"action": "remove", "name": "Claude Work", "purge": True},
-            {"action": "prune"}, {"action": "import", "document": {}}):
+            {"action": "prune"}, {"action": "prune", "confirmed": True},
+            {"action": "import", "document": {}}):
             with self.subTest(payload=payload):
                 status, _, result = self.action(payload)
                 self.assertEqual(status, 400)
@@ -305,8 +323,61 @@ class DashboardTests(unittest.TestCase):
 
     def test_confirmed_removal_and_pruning_use_yes(self):
         self.action({"action": "remove", "name": "Claude Work", "purge": True, "confirmed": True})
-        self.action({"action": "prune", "confirmed": True})
-        self.assertEqual(self.calls(), [["rm", "Claude Work", "--purge", "--yes"], ["prune", "--yes"]])
+        self.action({"action": "prune", "confirmed": True, "names": ["Claude Personal", "stray-folder"]})
+        self.assertEqual(self.calls(), [["rm", "Claude Work", "--purge", "--yes"],
+                                        ["__inventory", "orphans"], ["prune", "--yes"]])
+
+    def test_prune_runs_only_for_the_folders_the_user_saw(self):
+        listed = ["Claude Personal", "stray-folder"]
+        self.backend.state()
+        for names in (["stray-folder"], listed + ["other"], listed + ["stray-folder"],
+                      ["Claude Personal", "Claude Personal"]):
+            with self.subTest(names=names):
+                status, _, result = self.action({"action": "prune", "confirmed": True, "names": names})
+                self.assertEqual((status, result), (409, {"ok": False, "error": PRUNE_CHANGED}))
+                self.assertIsNone(self.backend.state_cache)
+        (self.root / "fail").write_text(json.dumps(["__inventory", "orphans"]))
+        status, _, result = self.action({"action": "prune", "confirmed": True, "names": listed})
+        self.assertEqual((status, result), (409, {"ok": False, "error": PRUNE_CHANGED}))
+        self.assertNotIn(["prune", "--yes"], self.calls())
+        (self.root / "fail").unlink()
+        status, _, result = self.action({"action": "prune", "confirmed": True, "names": listed[::-1]})
+        self.assertEqual((status, result["ok"], result["command"]), (200, True, "aidentity prune --yes"))
+        self.assertEqual(self.calls()[-2:], [["__inventory", "orphans"], ["prune", "--yes"]])
+
+    def test_import_plan_shows_what_the_cli_would_create_and_creates_nothing(self):
+        document = {"aidentity_export": 1, "launchers": [
+            {"name": "Claude Work", "bundle_id": "com.anthropic.claudefordesktop", "profile": "Work",
+             "env": ["HTTPS_PROXY=https://alice:private@proxy.example:3128", "NO_PROXY=localhost"]}]}
+        self.reply(PLAN_STDOUT, PLAN_STDERR, code=1)
+        status, _, result = self.action({"action": "import", "document": json.dumps(document), "plan": True})
+        self.assertEqual((status, result["ok"], result["creates"]), (200, True, 2))
+        self.assertEqual(result["command"], "aidentity import /dev/stdin < recipe.json")
+        self.assertEqual(self.calls(), [["import", "/dev/stdin"]])
+        self.assertEqual(json.loads((self.root / "stdin").read_text()), document)
+        for line in ("  create  Claude Work\n", "          proxy  HTTPS_PROXY=https://[hidden]@proxy.example:3128\n",
+                     "  skip    Slack Work \u2014 no app"):
+            self.assertIn(line, result["stdout"])
+        self.assertNotIn("bob:pw", result["stdout"])  # the CLI prints --proxy-server as given; the server hides it
+
+    def test_import_plan_hides_document_env_values_and_reports_other_failures(self):
+        document = {"launchers": [{"name": "Claude Work", "env": ["API_TOKEN=hunter2secret"]}]}
+        self.reply("  create  Claude Work\n          env    API_TOKEN=hunter2secret\n\n", PLAN_STDERR, code=1)
+        _, _, result = self.action({"action": "import", "document": document, "plan": True})
+        self.assertEqual((result["ok"], result["creates"]), (True, 1))
+        self.assertIn("API_TOKEN=[hidden]", result["stdout"])
+        self.assertNotIn("hunter2secret", json.dumps(result))
+        self.reply("", "\u2717 Cannot read /dev/stdin\n", code=1)
+        _, _, result = self.action({"action": "import", "document": document, "plan": True})
+        self.assertEqual((result["ok"], result["exit_code"], result["creates"]), (False, 1, 0))
+        self.reply("The launchers in /dev/stdin:\n\n  skip    Slack Work \u2014 no app\n\nNothing to create.\n")
+        _, _, result = self.action({"action": "import", "document": document, "plan": True})
+        self.assertEqual((result["ok"], result["creates"]), (True, 0))
+
+    def test_import_plan_and_confirmation_cannot_be_combined(self):
+        status, _, result = self.action({"action": "import", "document": {}, "plan": True, "confirmed": True})
+        self.assertEqual((status, result["error"]), (400, "Choose a plan or a confirmed import, not both."))
+        self.assertEqual(self.calls(), [])
 
     def test_remaining_commands_preserve_cli_parity(self):
         pairs = [
@@ -498,6 +569,62 @@ class DashboardTests(unittest.TestCase):
         self.assertIn("too much output", result["error"])
         self.assertLessEqual(len(result["stdout"]), 4 * 1024 * 1024)
 
+    def test_output_limit_is_shared_by_stdout_and_stderr(self):
+        self.backend.timeout = 5
+        _, _, result = self.action({"action": "help", "command": "split"})
+        self.assertFalse(result["ok"])
+        self.assertIn("too much output", result["error"])
+        self.assertLessEqual(len(result["stdout"].encode()) + len(result["stderr"].encode()), self.module.MAX_OUTPUT)
+
+    def dashboard_command(self):
+        return ([sys.executable, "-I", str(SERVER_PATH), self.cli, "--state", str(self.root / "dashboard.json")],
+                dict(env=self.backend.env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30))
+
+    def test_a_symlinked_state_file_is_refused_before_anything_is_written(self):
+        target, state = self.root / "notes.txt", self.root / "dashboard.json"
+        target.write_text("keep me\n")
+        state.symlink_to(target)
+        command, run = self.dashboard_command()
+        expected = str(state) + " cannot be used as the dashboard state file (Too many levels of symbolic links). Move it aside."
+        for option in ("--no-open", "--stop"):
+            with self.subTest(option=option):
+                done = subprocess.run(command + [option], **run)
+                try:
+                    self.assertEqual((done.returncode, done.stdout, done.stderr.strip()), (1, "", expected))
+                    self.assertEqual(target.read_text(), "keep me\n")
+                    self.assertTrue(state.is_symlink())
+                finally:
+                    if option == "--no-open" and done.returncode == 0:
+                        subprocess.run(command + ["--stop"], **run)
+
+    def test_a_state_file_the_dashboard_did_not_write_is_left_alone(self):
+        state = self.root / "dashboard.json"
+        command, run = self.dashboard_command()
+        for content in ("my notes\n", '{"pid": 12, "port": 0}', '{"pid": 12, "port": 80, "note": "x"}', "[]"):
+            with self.subTest(content=content):
+                state.write_text(content)
+                started = subprocess.run(command + ["--no-open"], **run)
+                try:
+                    self.assertEqual((started.returncode, started.stderr.strip()),
+                                     (1, str(state) + " is not a dashboard state file. Move it aside."))
+                    self.assertEqual(state.read_text(), content)
+                finally:
+                    if started.returncode == 0:
+                        subprocess.run(command + ["--stop"], **run)
+
+    def test_a_stale_dashboard_record_still_starts(self):
+        gone = subprocess.Popen(["/usr/bin/true"])
+        gone.wait()
+        (self.root / "dashboard.json").write_text(json.dumps({"pid": gone.pid, "port": 1}))
+        command, run = self.dashboard_command()
+        started = subprocess.run(command + ["--no-open"], **run)
+        try:
+            self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
+            self.assertIn("aidentity dashboard: http://127.0.0.1:", started.stdout)
+        finally:
+            stopped = subprocess.run(command + ["--stop"], **run)
+        self.assertIn("Dashboard stopped.", stopped.stdout)
+
     def test_stopping_dashboard_kills_active_cli(self):
         self.backend.timeout = 5
         results = []
@@ -592,8 +719,10 @@ class DashboardTests(unittest.TestCase):
             {"action": "restore", "all": True}, {"action": "rebuild", "all": True},
             {"action": "doctor", "fix": True}, {"action": "update"},
             {"action": "import", "document": {"launchers": []}, "confirmed": True},
+            {"action": "import", "document": {"launchers": []}, "plan": True},
         ):
             with self.subTest(payload=payload):
+                self.reply("Nothing to create.\n")
                 _, _, result = self.action(payload)
                 self.assertNotIn("error", result)
         _, _, result = self.action({"action": "update", "check": True})
@@ -765,6 +894,12 @@ class DashboardTests(unittest.TestCase):
             {"action": "completion", "shell": "bash; touch sentinel"},
             {"action": "restore", "all": True, "name": "Claude Work"},
             {"action": "prune", "confirmed": 1},
+            {"action": "prune", "confirmed": True, "names": "stray-folder"},
+            {"action": "prune", "confirmed": True, "names": ["stray-folder"] * 5001},
+            {"action": "prune", "confirmed": True, "names": ["stray-folder", 7]},
+            {"action": "prune", "confirmed": True, "names": [""]},
+            {"action": "prune", "confirmed": True, "names": ["x" * 1025]},
+            {"action": "import", "document": {}, "plan": "yes"},
         ]
         for payload in invalid:
             with self.subTest(payload=payload):
@@ -829,7 +964,8 @@ class DashboardTests(unittest.TestCase):
             {"action": "rename", "name": "Claude Work", "new_name": "Client"},
             {"action": "restore", "all": True}, {"action": "restore", "name": "Claude Personal"},
             {"action": "rebuild", "all": True}, {"action": "rebuild", "name": "Claude Work"},
-            {"action": "prune", "confirmed": True}, {"action": "doctor", "fix": True},
+            {"action": "prune", "confirmed": True, "names": ["Claude Personal", "stray-folder"]},
+            {"action": "doctor", "fix": True},
             {"action": "export"},
             {"action": "import", "confirmed": True,
              "document": {"launchers": [{"name": "Claude Work", "env": ["KEY=topsecret99"]}]}},
@@ -846,6 +982,8 @@ class DashboardTests(unittest.TestCase):
         _, _, imported = self.preview({"action": "import", "confirmed": True,
                                        "document": {"launchers": [{"env": ["KEY=topsecret99"]}]}})
         self.assertEqual(imported["command"], "aidentity import /dev/stdin --yes < recipe.json")
+        _, _, planned = self.preview({"action": "import", "plan": True, "document": {"launchers": []}})
+        self.assertEqual(planned["command"], "aidentity import /dev/stdin < recipe.json")
 
     def test_preview_of_an_invalid_payload_names_the_field_and_runs_nothing(self):
         status, _, result = self.preview({"action": "rename", "name": "Claude Work", "new_name": "-x"})
@@ -862,7 +1000,7 @@ class DashboardTests(unittest.TestCase):
         popen.assert_not_called()
         with self.backend.lock, self.backend.action_lock:
             started = time.monotonic()
-            status, _, result = self.preview({"action": "prune", "confirmed": True})
+            status, _, result = self.preview({"action": "prune", "confirmed": True, "names": []})
             self.assertLess(time.monotonic() - started, 1)
         self.assertEqual((status, result["command"]), (200, "aidentity prune --yes"))
 

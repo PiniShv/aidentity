@@ -70,7 +70,9 @@ class InstalledDashboardTests(unittest.TestCase):
                 self.assertEqual(state["apps"], [])
                 self.assertTrue(state["csrf_token"])
                 self.assertEqual(list((folder / "launchers").iterdir()), [])
-                self.assertEqual(list((folder / "profiles").iterdir()), [])
+                # The dashboard keeps its state file in the data root; nothing else is written there.
+                self.assertEqual([entry.name for entry in (folder / "profiles").iterdir()], ["dashboard.json"])
+                self.assertTrue((folder / "profiles" / "dashboard.json").is_file())
             finally:
                 # The server runs in its own session, out of the launcher's process group.
                 stopped = subprocess.run(

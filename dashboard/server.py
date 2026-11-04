@@ -36,6 +36,7 @@ PROXY_ARGUMENT = re.compile(r"(--proxy-server=)([^\s\"']+)")
 PROXY_PREFIX = re.compile(r"(?:(?:https?|ftp|socks)=)?(?:[a-zA-Z][a-zA-Z0-9+.-]{0,31}://)?")
 SECRET = "•••"  # what a shown command prints in place of a hidden value
 BUSY = "Another action is still running. Wait for it to finish."
+PRUNE_CHANGED = "The unclaimed data changed since it was listed. Review the list again."
 DOCTOR_FACT = re.compile(r"  (macOS|aidentity|bash|launcher dir|codesign|compatible apps|profiles) {2,}(.*)")
 DOCTOR_MARK = re.compile(r" {0,2}([✓!✗]) (.*)")
 DOCTOR_VERDICT = re.compile(r"No problems found\.|\d+ problem\(s\) found\.")
@@ -270,6 +271,7 @@ class Dashboard:
             return {"ok": False, "exit_code": None, "stdout": "", "stderr": "",
                     "error": "Could not start aidentity. Restart the dashboard from an installed CLI."}
         chunks = [bytearray(), bytearray()]
+        budget = threading.Lock()  # MAX_OUTPUT bounds stdout and stderr together
         overflow = threading.Event()
 
         def stop():
@@ -281,8 +283,9 @@ class Dashboard:
                     piece = pipe.read(8192)
                     if not piece:
                         break
-                    room = MAX_OUTPUT - len(chunks[index])
-                    chunks[index].extend(piece[:room])
+                    with budget:
+                        room = MAX_OUTPUT - len(chunks[0]) - len(chunks[1])
+                        chunks[index].extend(piece[:room])
                     if len(piece) > room:
                         overflow.set()
                         stop()
@@ -336,8 +339,8 @@ class Dashboard:
         return result
 
     def state(self, fresh=False):
-        commands = (["list", "--json"], ["__complete", "apps"], ["__complete", "restorable"],
-                    ["__complete", "orphans"], ["version"])
+        commands = (["list", "--json"], ["__complete", "apps"], ["__inventory", "restorable"],
+                    ["__inventory", "orphans"], ["version"])
         # The reads are independent; the lock still keeps them and every action apart.
         # A poll can delay an action by up to ~1 s (five CLI reads); accepted so a read never sees a half-applied action.
         with self.lock:
@@ -435,8 +438,8 @@ class Dashboard:
             "open": {"name"}, "quit": {"name"}, "rename": {"name", "new_name"},
             "remove": {"name", "purge", "confirmed"},
             "restore": {"name", "all"}, "rebuild": {"name", "all"},
-            "prune": {"confirmed"}, "doctor": {"fix"}, "export": set(),
-            "import": {"document", "confirmed"}, "update": {"check"},
+            "prune": {"confirmed", "names"}, "doctor": {"fix"}, "export": set(),
+            "import": {"document", "confirmed", "plan"}, "update": {"check"},
             "help": {"command"}, "completion": {"shell"},
         }
         if not isinstance(action, str) or action not in allowed:
@@ -498,12 +501,20 @@ class Dashboard:
         elif action == "prune":
             if not flag(payload, "confirmed"):
                 raise RequestError("Confirm pruning before continuing.")
+            # The folders the user saw; action() prunes only while they are still exactly what prune would move.
+            names = payload.get("names")
+            if (not isinstance(names, list) or len(names) > 5000
+                    or any(not isinstance(name, str) or not 1 <= len(name) <= 1024 for name in names)):
+                raise RequestError("names must list at most 5000 folder names.", field="names")
             argv.append("--yes")
         elif action == "doctor":
             if flag(payload, "fix"):
                 argv.append("--fix")
         elif action == "import":
-            if not flag(payload, "confirmed"):
+            plan = flag(payload, "plan")  # without --yes the CLI prints its plan and stops at its question
+            if plan and flag(payload, "confirmed"):
+                raise RequestError("Choose a plan or a confirmed import, not both.")
+            if not plan and not flag(payload, "confirmed"):
                 raise RequestError("Confirm import before continuing.")
             document = payload.get("document")
             if isinstance(document, str):
@@ -522,7 +533,7 @@ class Dashboard:
             for launcher in document.get("launchers", []) if isinstance(document.get("launchers"), list) else []:
                 if isinstance(launcher, dict) and isinstance(launcher.get("env"), list):
                     hidden += [value for value in launcher["env"] if isinstance(value, str) and "=" in value]
-            argv += ["/dev/stdin", "--yes"]
+            argv += ["/dev/stdin"] if plan else ["/dev/stdin", "--yes"]
         elif action == "update":
             if flag(payload, "check"):
                 argv.append("--check")
@@ -549,6 +560,11 @@ class Dashboard:
         try:
             with self.lock:
                 try:
+                    if action == "prune":
+                        listed = self.run(["__inventory", "orphans"])
+                        if not listed["ok"] or sorted(payload["names"]) != sorted(
+                                name for name in listed["stdout"].split("\n") if name):
+                            raise RequestError(PRUNE_CHANGED, 409)
                     result = self.run(argv, stdin, timeout)
                 finally:
                     self.state_cache = None  # the next read must show what the action changed
@@ -561,6 +577,12 @@ class Dashboard:
         elif not result["ok"]:  # a partial recipe holds env values redact cannot see; stderr and error explain it
             result["stdout"] = ""
         result["stderr"] = redact(result["stderr"], hidden)
+        if action == "import" and "--yes" not in argv:
+            last = [line for line in result["stderr"].splitlines() if line.strip()][-1:]
+            # The CLI exits 1 at its question after printing the whole plan: that plan is the result.
+            if result["exit_code"] == 1 and "error" not in result and last and last[0].endswith("Nothing to confirm with."):
+                result["ok"] = True
+            result["creates"] = len(re.findall(r"^  create  ", result["stdout"], re.M))
         # doctor prints its closing tally last: only a run that shows it finished has findings to count.
         if action == "doctor" and "error" not in result:
             if DOCTOR_VERDICT.search(result["stdout"] + "\n" + result["stderr"]):
@@ -772,7 +794,11 @@ def main(argv=None, assets=None):
     if not os.path.isfile(options.cli) or not os.access(options.cli, os.X_OK):
         parser.error("the aidentity executable is not available")
     os.makedirs(os.path.dirname(os.path.abspath(options.state)), mode=0o700, exist_ok=True)
-    state = os.open(options.state, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        # Never through a symlink: another account could aim one at a file this one can write.
+        state = os.open(options.state, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    except OSError as exc:
+        parser.exit(1, "%s cannot be used as the dashboard state file (%s). Move it aside.\n" % (options.state, exc.strerror))
     if options.stop:
         return stop_running(parser, state)
     if not take_lock(state):
@@ -787,6 +813,10 @@ def main(argv=None, assets=None):
         print("Stop it with 'aidentity dashboard --stop'.", flush=True)
         open_browser(url, options.no_open)
         return 0
+    record = read_state(state)
+    if os.pread(state, 4096, 0).strip() and not (set(record) == {"pid", "port"} and number(record, "pid")
+                                                  and number(record, "port")):
+        parser.exit(1, "%s is not a dashboard state file. Move it aside.\n" % options.state)
     os.ftruncate(state, 0)  # a stale address must not be reused while this one starts
     if assets is None:
         assets = globals().get("ASSETS")
