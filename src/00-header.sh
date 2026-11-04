@@ -47,7 +47,7 @@
 
 set -uo pipefail
 
-AIDENTITY_VERSION="1.6.1"
+AIDENTITY_VERSION="1.6.2"
 
 # Every launcher we build carries this key in its Info.plist. It is the ONLY way
 # we recognise our own bundles, and nothing is ever deleted without it. That makes
