@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot name its folder, `update`, `import` and the installer stop and
   change nothing, and a launcher gets the app's own icon.
 
+### Changed (for maintainers and contributors)
+
+- `scripts/guards.sh` fails when `bin/aidentity` or `install.sh` use `TMPDIR`
+  in code. New code makes its temporary folders with `private_tmpdir`. A
+  comment line may still name `TMPDIR`.
+
 ## [1.6.2] - 2026-11-01
 
 ### Added

@@ -287,6 +287,40 @@ rc_run "v$rc_version"
 assert_rc "an installer with a curl call of its own is refused" 1 "$RUN_RC" "$RUN_OUT$RUN_ERR"
 assert_contains "with the guard's message" "$RUN_ERR" "curl may run only in https_fetch in install.sh"
 
+# Temporary folders are made with private_tmpdir, never in TMPDIR. A line of
+# code that names TMPDIR fails the guards, in either script and however it is
+# written. A line that holds only a comment may name it. Lines are planted just
+# before the last one, main "$@", several to a run so that one run shows every
+# spelling, and the guard's own list is read apart from the other guards' output.
+rc_plant() { # file, line
+  { sed '$d' "$RC_DIR/$1"; printf '%s\n' "$2"; tail -n 1 "$RC_DIR/$1"; } > "$RC_DIR/$1.new" \
+    && mv "$RC_DIR/$1.new" "$RC_DIR/$1"
+}
+rc_fresh
+rc_plant bin/aidentity '# a comment that names ${TMPDIR:-/tmp}'
+rc_plant bin/aidentity '    # an indented comment that names $TMPDIR'
+rc_plant bin/aidentity 'tmp=$(mktemp -d "${TMPDIR:-/tmp}/aidentity.XXXXXX")'
+RUN_OUT=$(cd "$SB" && "$BASH_BIN" "$RC_DIR/scripts/guards.sh" 2>&1); RUN_RC=$?
+hits=$(printf '%s\n' "$RUN_OUT" | grep '^bin/aidentity:[0-9]*: ' || true)
+assert_rc "a \${TMPDIR:-/tmp} planted in bin/aidentity fails the guards" 1 "$RUN_RC" "$RUN_OUT"
+assert_contains "with the guard's message" "$RUN_OUT" "bin/aidentity must not use TMPDIR"
+assert_contains "and the line" "$hits" 'tmp=$(mktemp -d "${TMPDIR:-/tmp}/aidentity.XXXXXX")'
+assert_not_contains "but not the two comment lines" "$hits" "comment"
+assert_contains "and install.sh passes" "$RUN_OUT" "install.sh does not use TMPDIR"
+rc_fresh
+tmpdir_uses=('cd "$TMPDIR" || exit 1' 'work="${TMPDIR}/aidentity"' 'TMPDIR=/somewhere some_command')
+rc_plant install.sh '    # an indented comment that names $TMPDIR'
+for use in "${tmpdir_uses[@]}"; do rc_plant install.sh "$use"; done
+RUN_OUT=$(cd "$SB" && "$BASH_BIN" "$RC_DIR/scripts/guards.sh" 2>&1); RUN_RC=$?
+hits=$(printf '%s\n' "$RUN_OUT" | grep '^install.sh:[0-9]*: ' || true)
+assert_rc "TMPDIR planted in install.sh fails the guards" 1 "$RUN_RC" "$RUN_OUT"
+assert_contains "with the guard's message" "$RUN_OUT" "install.sh must not use TMPDIR"
+for use in "${tmpdir_uses[@]}"; do
+  assert_contains "and the line [$use]" "$hits" "$use"
+done
+assert_not_contains "but not the comment line" "$hits" "comment"
+assert_contains "and bin/aidentity passes" "$RUN_OUT" "bin/aidentity does not use TMPDIR"
+
 # The source guards run too, and their failure stops the release.
 rc_fresh
 rc_sed uninstall.sh 's/^running_on_profile() {/running_on_profile() { :;/'
