@@ -616,10 +616,34 @@ if [ -f "$SYSTEM_ICNS" ]; then
     "$APPS/Icony Iconed.app/Contents/Resources/icon.icns"
   ai rm "Icony Iconed" --purge -y
   assert_rc "the icon profile is removed cleanly" 0 "$RUN_RC" "$RUN_OUT"
+  # The icon is made in a folder getconf names for this account, so TMPDIR
+  # plays no part. Here TMPDIR names a folder that does not exist, and getconf
+  # is the real one.
+  TMPDIR="$SANDBOX/no-such-folder" ai add "$ICON_APP" --profile Tmpdir --color purple --badge T
+  assert_rc "add works when TMPDIR names a folder that does not exist" 0 "$RUN_RC" "$RUN_OUT"
+  assert_not_contains "and still builds the badged icon" "$RUN_OUT" "Could not badge the icon"
+  ai rm "Icony Tmpdir" --purge -y
+  # When getconf names no folder, the launcher gets the app's own icon, as for
+  # any other icon failure.
+  undefined_run ai add "$ICON_APP" --profile Nofolder --color purple --badge N
+  assert_rc "add still works when getconf names no folder" 0 "$RUN_RC" "$RUN_OUT"
+  assert_contains "and says it uses the app's own icon" "$RUN_OUT" \
+    "Could not badge the icon; using the app's own icon instead."
+  if cmp -s "$APPS/Icony Nofolder.app/Contents/Resources/icon.icns" "$ICON_APP/Contents/Resources/app.icns"; then
+    _pass "the launcher has the app's own icon"
+  else
+    _fail "the launcher has the app's own icon" "its icon.icns is missing or differs from the app's"
+  fi
+  assert_eq "and nothing is made in the folder add ran in" "./undefined" "$UNDEF_LEFT"
+  ai rm "Icony Nofolder" --purge -y
 else
-  _skip "add succeeds for an app that has an icon" "no system .icns available"
-  _skip "the launcher ends up with an icon" "no system .icns available"
-  _skip "the icon profile is removed cleanly" "no system .icns available"
+  for t in "add succeeds for an app that has an icon" "the launcher ends up with an icon" \
+           "the icon profile is removed cleanly" \
+           "add works when TMPDIR names a folder that does not exist" "and still builds the badged icon" \
+           "add still works when getconf names no folder" "and says it uses the app's own icon" \
+           "the launcher has the app's own icon" "and nothing is made in the folder add ran in"; do
+    _skip "$t" "no system .icns available"
+  done
 fi
 
 # A missing icon must not be fatal.

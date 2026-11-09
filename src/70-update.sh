@@ -240,8 +240,8 @@ cmd_update() {
     Run it by its full path, for example: /usr/local/bin/aidentity update"
   fi
 
-  tmp="${TMPDIR:-/tmp}"
-  UPDATE_TMP=$(mktemp -d "${tmp%/}/aidentity-update.XXXXXX" 2>/dev/null) \
+  tmp=$(private_tmpdir) \
+    && UPDATE_TMP=$(mktemp -d "$tmp/aidentity-update.XXXXXX" 2>/dev/null) \
     || { UPDATE_TMP=""; die "Could not create a temporary folder."; }
 
   info "Checking for the latest release of aidentity …"

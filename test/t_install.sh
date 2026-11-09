@@ -84,6 +84,21 @@ assert_rc "an mv without -h first on PATH does not break the install" 0 "$RUN_RC
 assert_file "the file is installed" "$SB/inst g/aidentity"
 rm -f "$CURL_STUB/mv"
 
+# install.sh downloads into a folder getconf names for this account, so TMPDIR
+# plays no part. Here TMPDIR names a folder that does not exist, and getconf
+# is the real one.
+inst "$SB/inst t" "TMPDIR=$SANDBOX/no-such-folder"
+assert_rc "install.sh works when TMPDIR names a folder that does not exist" 0 "$RUN_RC" "$RUN_OUT"
+assert_file "and installs the script" "$SB/inst t/aidentity"
+# When getconf names no folder, install.sh stops before it downloads anything.
+undefined_run inst "$SB/inst u"
+assert_rc_nonzero "install.sh stops when getconf names no folder" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says it could not create a temporary folder" "$RUN_OUT" \
+  "Could not create a temporary folder."
+assert_not_contains "before it downloads anything" "$RUN_OUT" "Downloading"
+assert_no_file "and installs nothing" "$SB/inst u/aidentity"
+assert_eq "and makes nothing in the folder it ran in" "./undefined" "$UNDEF_LEFT"
+
 # make formula against a tag that cannot be downloaded must change nothing.
 # It used to hash the empty download and write that checksum into the formula.
 FORMULA_SB="$SB/formula-copy"

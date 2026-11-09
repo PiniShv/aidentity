@@ -74,6 +74,24 @@ lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 # A profile's default badge: its first letter, upper-cased. Names are ASCII.
 first_upper() { printf '%s' "$1" | cut -c1 | tr '[:lower:]' '[:upper:]'; }
 
+# ----------------------------------------------------- temporary folders --
+
+# This account's own temporary folder, without a trailing "/". Make temporary
+# folders in it, with mktemp -d, never in TMPDIR: TMPDIR can name a folder
+# that other accounts can write to, and then one of them could put its own
+# files in place of ours. macOS makes the folder getconf names for this
+# account alone. getconf can succeed and still print "undefined" or nothing,
+# so any answer that is not a full path fails: mktemp would make a folder on
+# a relative path in the current folder.
+private_tmpdir() {
+  local t
+  t=$(/usr/bin/getconf DARWIN_USER_TEMP_DIR 2>/dev/null) || t=""
+  case "$t" in
+    /*) printf '%s\n' "${t%/}" ;;
+    *) return 1 ;;
+  esac
+}
+
 # ---------------------------------------------------------------- guards --
 
 [ "$(uname)" = "Darwin" ] || die "aidentity is macOS only (this is $(uname))."
