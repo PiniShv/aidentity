@@ -36,7 +36,7 @@ auto_color() {
 # If anything here fails we fall back to the app's plain icon — never fatal.
 build_icon() {
   local tmp rc
-  tmp=$(mktemp -d "${TMPDIR:-/tmp}/aidentity.XXXXXX") || return 1
+  tmp=$(private_tmpdir) && tmp=$(mktemp -d "$tmp/aidentity.XXXXXX" 2>/dev/null) || return 1
   _build_icon_in "$1" "$2" "$3" "$4" "$tmp"
   rc=$?
   rm -rf "$tmp"

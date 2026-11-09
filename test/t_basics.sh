@@ -5,7 +5,8 @@
 # shellcheck disable=SC2016
 #
 # Area "basics": help, version and exit codes; apps and doctor; profile name validation;
-# the letter checks under a UTF-8 locale; slugify and shquote; json_str; colours.
+# the letter checks under a UTF-8 locale; slugify and shquote; json_str; colours;
+# the temporary folder.
 # Sourced by test/run_tests.sh after test/lib.sh. Run it alone with:
 #   bash test/run_tests.sh basics
 
@@ -286,3 +287,27 @@ assert_nonempty "auto_color returns a colour for a profile" "$RUN_OUT"
 AUTO_ONCE="$RUN_OUT"
 libcall auto_color "Fake Work"
 assert_eq "auto_color is stable for the same profile" "$AUTO_ONCE" "$RUN_OUT"
+
+group "the temporary folder"
+
+# private_tmpdir is the folder getconf names for this account, never TMPDIR.
+# With the real getconf, a TMPDIR that does not exist plays no part.
+TMPDIR="$SANDBOX/no-such-folder" libcall private_tmpdir
+TMP_REAL=$(/usr/bin/getconf DARWIN_USER_TEMP_DIR)
+assert_eq "the temporary folder is the one getconf names, not TMPDIR" "${TMP_REAL%/}" "$RUN_OUT"
+# Then getconf answers through GETCONF_STUB: a full path is used without its
+# trailing slash; any other answer, or a getconf that fails, is no folder.
+tmp_answer() { # what getconf prints, its exit status
+  BASH_ENV="$GETCONF_STUB" GETCONF_TMP="$1" GETCONF_RC="$2" libcall private_tmpdir
+}
+tmp_answer "$SANDBOX/T/" 0
+assert_eq "getconf's trailing slash is dropped" "$SANDBOX/T" "$RUN_OUT"
+tmp_answer "$SANDBOX/T" 0
+assert_eq "a folder without one is kept as it is" "$SANDBOX/T" "$RUN_OUT"
+for a in undefined "" "T/" "./T"; do
+  tmp_answer "$a" 0
+  assert_rc "an answer of [$a] is no folder" 1 "$RUN_RC" "$RUN_OUT"
+  assert_eq "and nothing is printed for it" "" "$RUN_OUT"
+done
+tmp_answer "$SANDBOX/T/" 1
+assert_rc "a getconf that fails gives no folder, whatever it prints" 1 "$RUN_RC" "$RUN_OUT"

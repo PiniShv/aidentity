@@ -129,8 +129,9 @@ upd_latest() { # tag
   printf '{\n  "url": "https://api.github.com/repos/PiniShv/aidentity/releases/1",\n  "tag_name": "%s",\n  "body": "Notes: \\"tag_name\\": \\"v99.0.0\\""\n}\n' \
     "$1" > "$UPD_SRV/releases/latest"
 }
-# Run `update` from the copy at $1, with the stub curl first on PATH, TMPDIR
-# inside the sandbox and no Homebrew variables from the developer's shell.
+# Run `update` from the copy at $1, with the stub curl first on PATH, getconf
+# naming UPD_TMP as the temporary folder (see GETCONF_STUB) and no Homebrew
+# variables from the developer's shell.
 # VAR=value arguments after the path are set for the run; the rest go to
 # update itself.
 upd() { # script, [VAR=value …], [update's arguments]
@@ -141,8 +142,8 @@ upd() { # script, [VAR=value …], [update's arguments]
   done
   : > "$UPD_LOG"
   RUN_OUT=$(env -u HOMEBREW_PREFIX -u HOMEBREW_CELLAR \
-      HOME="$SANDBOX/upd-home" TMPDIR="$UPD_TMP" PATH="$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" \
-      ${envs[@]+"${envs[@]}"} /usr/bin/perl -MPOSIX -e '
+      HOME="$SANDBOX/upd-home" BASH_ENV="$GETCONF_STUB" GETCONF_TMP="$UPD_TMP/" \
+      PATH="$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" ${envs[@]+"${envs[@]}"} /usr/bin/perl -MPOSIX -e '
       my $pid = fork; die "fork: $!\n" unless defined $pid;
       if ($pid) { waitpid($pid, 0); exit($? & 127 ? 128 + ($? & 127) : $? >> 8) }
       POSIX::setsid(); exec @ARGV or exit 127' -- "$BASH_BIN" "$script" update "$@" 2>&1 </dev/null)
@@ -362,7 +363,8 @@ fi
 # The script read from stdin has no file to replace. $0 is then the shell,
 # which must never be taken for the script.
 : > "$UPD_LOG"
-RUN_OUT=$(env -u HOMEBREW_PREFIX -u HOMEBREW_CELLAR HOME="$SANDBOX/upd-home" TMPDIR="$UPD_TMP" \
+RUN_OUT=$(env -u HOMEBREW_PREFIX -u HOMEBREW_CELLAR HOME="$SANDBOX/upd-home" \
+  BASH_ENV="$GETCONF_STUB" GETCONF_TMP="$UPD_TMP/" \
   PATH="$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" "$BASH_BIN" -s update < "$U" 2>&1); RUN_RC=$?
 assert_rc_nonzero "a script read from stdin refuses to update" "$RUN_RC" "$RUN_OUT"
 assert_contains "and says it cannot find its file" "$RUN_OUT" "Could not find the file"
@@ -417,8 +419,8 @@ upd_signal() { # signal, stub folder, script
   local pid pg="" i=0
   rm -f "$UPD_READY"
   env -u HOMEBREW_PREFIX -u HOMEBREW_CELLAR \
-      HOME="$SANDBOX/upd-home" TMPDIR="$UPD_TMP" PATH="$2:$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" \
-      /usr/bin/perl -MPOSIX -e '
+      HOME="$SANDBOX/upd-home" BASH_ENV="$GETCONF_STUB" GETCONF_TMP="$UPD_TMP/" \
+      PATH="$2:$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" /usr/bin/perl -MPOSIX -e '
       my $pid = fork; die "fork: $!\n" unless defined $pid;
       if ($pid) { waitpid($pid, 0); exit($? & 127 ? 128 + ($? & 127) : $? >> 8) }
       $SIG{INT} = "DEFAULT"; POSIX::setsid(); exec @ARGV or exit 127' -- "$BASH_BIN" "$3" update \
@@ -442,6 +444,29 @@ upd_signal INT "$UPD_SLOW_SUM" "$U"
 assert_contains "a staged copy sat beside the old file" "$UPD_BUSY_DIR" ".aidentity."
 assert_rc "Ctrl-C while the new copy is staged exits 130" 130 "$RUN_RC" "$RUN_OUT"
 same_file "and the old file is kept" "$U" "$U_SAVED"
+only_script_in "$U_DIR"
+
+# The download folder is made in the folder getconf names for this account,
+# so TMPDIR plays no part. Here TMPDIR names a folder that does not exist,
+# and getconf is the real one: BASH_ENV is empty.
+upd "$U" BASH_ENV= "TMPDIR=$SANDBOX/no-such-folder"
+assert_rc "update works when TMPDIR names a folder that does not exist" 0 "$RUN_RC" "$RUN_OUT"
+same_file "and installs the release" "$U" "$UPD_SRV/v2.0.0/bin/aidentity"
+UPD_DL=$(sed -n 's|.* -o \(.*\)/aidentity https:.*|\1|p' "$UPD_LOG")
+UPD_REAL_TMP=$(/usr/bin/getconf DARWIN_USER_TEMP_DIR)
+assert_contains "the download went to this account's temporary folder" "$UPD_DL" \
+  "${UPD_REAL_TMP%/}/aidentity-update."
+assert_no_dir "and that folder is gone afterwards" "$UPD_DL"
+upd_copy "$U" 1.0.0
+# When getconf names no folder, update stops before it downloads anything.
+# upd sets GETCONF_TMP itself, so it is given the word too.
+undefined_run upd "$U" GETCONF_TMP=undefined
+assert_rc_nonzero "update stops when getconf names no folder" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says it could not create a temporary folder" "$RUN_OUT" \
+  "Could not create a temporary folder."
+assert_eq "before any network call" "0" "$(calls)"
+assert_eq "and makes nothing in the folder it ran in" "./undefined" "$UNDEF_LEFT"
+same_file "and the file is kept" "$U" "$U_SAVED"
 only_script_in "$U_DIR"
 
 upd "$U" --no-such-flag
@@ -476,7 +501,7 @@ break_release() { # row
   esac
 }
 R_DIR="$SB/refusal bin"
-R_ENV=("PATH=$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" "TMPDIR=$UPD_TMP")
+R_ENV=("PATH=$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" "BASH_ENV=$GETCONF_STUB" "GETCONF_TMP=$UPD_TMP/")
 upd_latest v2.0.0
 while IFS='|' read -r row says; do
   break_release "$row"
@@ -560,7 +585,7 @@ esac
 printf '%064d  %s\n' 0 "\$f"
 STUB
 chmod +x "$AT_STUB/mktemp" "$AT_STUB/shasum"
-AT_ENV=("PATH=$AT_STUB:$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" "TMPDIR=$UPD_TMP")
+AT_ENV=("PATH=$AT_STUB:$UPD_STUB:/usr/bin:/bin:/usr/sbin:/sbin" "BASH_ENV=$GETCONF_STUB" "GETCONF_TMP=$UPD_TMP/")
 upd_release v2.0.0
 upd_latest v2.0.0
 while IFS='|' read -r row says; do

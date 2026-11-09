@@ -19,7 +19,7 @@ make build    # after every change in src/
 | File in `src/` | What it holds |
 |---|---|
 | `00-header.sh` | the version, the directories, the environment |
-| `10-output.sh` | messages, prompts, the macOS check |
+| `10-output.sh` | messages, prompts, the temporary folder, the macOS check |
 | `20-validation.sh` | profile names, quoting, JSON strings |
 | `30-apps.sh` | finding Chromium and Electron apps |
 | `40-colours-icons.sh` | badge colours and icons |
@@ -77,7 +77,7 @@ make test AREA=ui                     # the same, through make
 
 | Area | What it tests |
 |---|---|
-| `basics` | help, version, exit codes, `apps`, name rules, quoting, colours |
+| `basics` | help, version, exit codes, `apps`, name rules, quoting, colours, the temporary folder |
 | `lifecycle` | app detection, the marker key, `add`, `list`, `rm`, `--purge`, `--seed`, icons, refusals, `rename`, `set` |
 | `running` | the check for a profile that is running |
 | `quit` | `quit`, against real processes: finding one profile's copy of an app, the quit request, what it never touches, and the other copies left running |

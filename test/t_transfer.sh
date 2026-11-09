@@ -9,13 +9,19 @@
 
 # The VS Code-style app needs a short profile folder (see the settings area),
 # so every launcher this area builds keeps its data in VSC_DATA. import makes a
-# temporary folder: TMPDIR points into the sandbox, so a test can see that it
-# is gone afterwards.
+# temporary folder: getconf names TR_TMP as the place for it (see
+# GETCONF_STUB), so a test can see that it is gone afterwards.
 TR_TMP="$SANDBOX/transfer-tmp"
 mkdir -p "$TR_TMP"
-tx() { TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$VSC_DATA" ai "$@"; }
-tx_stdout() { TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$VSC_DATA" ai_stdout "$@"; }
-tx_in() { TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$VSC_DATA" ai_in "$@"; }
+# A runner and its arguments, run with the data root $1.
+tx_at() { # data root, runner, its arguments
+  local root="$1"
+  shift
+  BASH_ENV="$GETCONF_STUB" GETCONF_TMP="$TR_TMP/" AIDENTITY_DATA_ROOT="$root" "$@"
+}
+tx() { tx_at "$VSC_DATA" ai "$@"; }
+tx_stdout() { tx_at "$VSC_DATA" ai_stdout "$@"; }
+tx_in() { tx_at "$VSC_DATA" ai_in "$@"; }
 tr_tmp_gone() { assert_eq "$1 leaves no temporary folder" "" "$(ls -A "$TR_TMP")"; }
 
 # A string as JSON, by the script's own json_str.
@@ -648,7 +654,7 @@ rmdir "$APPS/Filed"
 # The same folder reached by another path: the data root through a link.
 ln -s "$VSC_DATA" "$SANDBOX/v-link"
 tr_file "$TR_F" "$(tr_entry profile='"Work-2"')"
-TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$SANDBOX/v-link" ai import "$TR_F" -y
+tx_at "$SANDBOX/v-link" ai import "$TR_F" -y
 assert_contains "the same folder spelled another way is found too" "$RUN_OUT" \
   "skip    Fake Work-2 — would share a profile folder with 'Fake Work 2'"
 rm -f "$SANDBOX/v-link"
@@ -700,13 +706,13 @@ assert_no_dir "and no profile folder is made" "$VSC_DATA/fake-unseen"
 # the plan.
 tr_file "$TR_F" "$(tr_entry profile="\"$(repeat_char 40 a)\"" bundle_id='"com.example.codey"')" \
   "$(tr_entry profile="\"$(repeat_char 40 b)\"")"
-TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$VSC_DATA/$(repeat_char 40 d)" ai import "$TR_F" -y
+tx_at "$VSC_DATA/$(repeat_char 40 d)" ai import "$TR_F" -y
 assert_rc "a profile folder too deep for a VS Code-style app: the import exits 0" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "it is skipped" "$RUN_OUT" \
   "skip    Codey $(repeat_char 40 a) — Codey cannot open 'Codey $(repeat_char 40 a)': its profile folder path is too long."
 assert_contains "another app's profile there is built" "$RUN_OUT" "1 created, 1 skipped, 0 failed."
 assert_no_dir "no launcher is left for the skipped one" "$APPS/Codey $(repeat_char 40 a).app"
-TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$VSC_DATA/$(repeat_char 40 d)" ai rm "Fake $(repeat_char 40 b)" --purge -y
+tx_at "$VSC_DATA/$(repeat_char 40 d)" ai rm "Fake $(repeat_char 40 b)" --purge -y
 rm -rf "${VSC_DATA:?}/$(repeat_char 40 d)"
 
 # The closing hint names a new profile, never a main launcher: that opens the
@@ -889,6 +895,25 @@ assert_rc "an export with no launchers is fine" 0 "$RUN_RC" "$RUN_OUT"
 assert_contains "and says there is nothing to do" "$RUN_OUT" "lists no launchers"
 
 
+group "import: its temporary folder"
+
+# import reads its file in a folder getconf names for this account, so TMPDIR
+# plays no part. Here TMPDIR names a folder that does not exist, and getconf
+# is the real one.
+tr_file "$TR_F" "$(tr_entry profile='"Tmpdir"')"
+TMPDIR="$SANDBOX/no-such-folder" AIDENTITY_DATA_ROOT="$VSC_DATA" ai import "$TR_F" -y
+assert_rc "import works when TMPDIR names a folder that does not exist" 0 "$RUN_RC" "$RUN_OUT"
+assert_dir "and builds the launcher" "$APPS/Fake Tmpdir.app"
+tx rm "Fake Tmpdir" --purge -y
+# When getconf names no folder, import stops before it reads the file.
+AIDENTITY_DATA_ROOT="$VSC_DATA" undefined_run ai import "$TR_F" -y
+assert_rc_nonzero "import stops when getconf names no folder" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says it could not create a temporary folder" "$RUN_OUT" \
+  "Could not create a temporary folder."
+assert_no_dir "and builds nothing" "$APPS/Fake Tmpdir.app"
+assert_eq "and makes nothing in the folder it ran in" "./undefined" "$UNDEF_LEFT"
+
+
 group "import: the plan shows the proxy server"
 
 # A proxy variable sends the profile's traffic through the server it names,
@@ -945,7 +970,7 @@ TR_OUT="$SB/race.out"
   while ! grep -q "Type yes to confirm" "$TR_OUT" && [ "$w" -lt 300 ]; do sleep 0.1; w=$((w + 1)); done
   tx add "$ELECTRON_APP" --profile Race
   printf 'yes\n'
-} | TMPDIR="$TR_TMP" AIDENTITY_DATA_ROOT="$VSC_DATA" detached "$BASH_BIN" "$AIDENTITY" import "$TR_F" > "$TR_OUT" 2>&1
+} | tx_at "$VSC_DATA" detached "$BASH_BIN" "$AIDENTITY" import "$TR_F" > "$TR_OUT" 2>&1
 RUN_RC=${PIPESTATUS[1]}
 RUN_OUT=$(cat "$TR_OUT")
 assert_rc "a launcher made while the question waits: the import exits 0" 0 "$RUN_RC" "$RUN_OUT"

@@ -512,8 +512,9 @@ import_proxy_shown() { # variable, proxy value
 # nothing, unless it is an export in this format. Sets IMPORT_N, the number
 # of launchers it lists.
 import_load() { # file, its name as printed
-  local tmp="${TMPDIR:-/tmp}" size status
-  IMPORT_TMP=$(mktemp -d "${tmp%/}/aidentity-import.XXXXXX" 2>/dev/null) \
+  local tmp size status
+  tmp=$(private_tmpdir) \
+    && IMPORT_TMP=$(mktemp -d "$tmp/aidentity-import.XXXXXX" 2>/dev/null) \
     || { IMPORT_TMP=""; die "Could not create a temporary folder."; }
   head -c $((IMPORT_MAX_BYTES + 1)) < "$1" > "$IMPORT_TMP/file" 2>/dev/null \
     || die "Could not read $2"

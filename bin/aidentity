@@ -164,6 +164,24 @@ lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
 # A profile's default badge: its first letter, upper-cased. Names are ASCII.
 first_upper() { printf '%s' "$1" | cut -c1 | tr '[:lower:]' '[:upper:]'; }
 
+# ----------------------------------------------------- temporary folders --
+
+# This account's own temporary folder, without a trailing "/". Make temporary
+# folders in it, with mktemp -d, never in TMPDIR: TMPDIR can name a folder
+# that other accounts can write to, and then one of them could put its own
+# files in place of ours. macOS makes the folder getconf names for this
+# account alone. getconf can succeed and still print "undefined" or nothing,
+# so any answer that is not a full path fails: mktemp would make a folder on
+# a relative path in the current folder.
+private_tmpdir() {
+  local t
+  t=$(/usr/bin/getconf DARWIN_USER_TEMP_DIR 2>/dev/null) || t=""
+  case "$t" in
+    /*) printf '%s\n' "${t%/}" ;;
+    *) return 1 ;;
+  esac
+}
+
 # ---------------------------------------------------------------- guards --
 
 [ "$(uname)" = "Darwin" ] || die "aidentity is macOS only (this is $(uname))."
@@ -475,7 +493,7 @@ auto_color() {
 # If anything here fails we fall back to the app's plain icon — never fatal.
 build_icon() {
   local tmp rc
-  tmp=$(mktemp -d "${TMPDIR:-/tmp}/aidentity.XXXXXX") || return 1
+  tmp=$(private_tmpdir) && tmp=$(mktemp -d "$tmp/aidentity.XXXXXX" 2>/dev/null) || return 1
   _build_icon_in "$1" "$2" "$3" "$4" "$tmp"
   rc=$?
   rm -rf "$tmp"
@@ -3973,8 +3991,9 @@ import_proxy_shown() { # variable, proxy value
 # nothing, unless it is an export in this format. Sets IMPORT_N, the number
 # of launchers it lists.
 import_load() { # file, its name as printed
-  local tmp="${TMPDIR:-/tmp}" size status
-  IMPORT_TMP=$(mktemp -d "${tmp%/}/aidentity-import.XXXXXX" 2>/dev/null) \
+  local tmp size status
+  tmp=$(private_tmpdir) \
+    && IMPORT_TMP=$(mktemp -d "$tmp/aidentity-import.XXXXXX" 2>/dev/null) \
     || { IMPORT_TMP=""; die "Could not create a temporary folder."; }
   head -c $((IMPORT_MAX_BYTES + 1)) < "$1" > "$IMPORT_TMP/file" 2>/dev/null \
     || die "Could not read $2"
@@ -4358,8 +4377,8 @@ cmd_update() {
     Run it by its full path, for example: /usr/local/bin/aidentity update"
   fi
 
-  tmp="${TMPDIR:-/tmp}"
-  UPDATE_TMP=$(mktemp -d "${tmp%/}/aidentity-update.XXXXXX" 2>/dev/null) \
+  tmp=$(private_tmpdir) \
+    && UPDATE_TMP=$(mktemp -d "$tmp/aidentity-update.XXXXXX" 2>/dev/null) \
     || { UPDATE_TMP=""; die "Could not create a temporary folder."; }
 
   info "Checking for the latest release of aidentity …"

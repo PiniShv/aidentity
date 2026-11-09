@@ -183,6 +183,22 @@ path_set_line() {
   esac
 }
 
+# This account's own temporary folder, without a trailing "/", the same as
+# private_tmpdir in bin/aidentity. The download goes there, not to TMPDIR:
+# TMPDIR can name a folder that other accounts can write to, and then one of
+# them could put its own files in place of the download. getconf can succeed
+# and still print "undefined" or nothing, so any answer that is not a full
+# path fails: mktemp would make a folder on a relative path in the current
+# folder.
+private_tmpdir() {
+  local t
+  t=$(/usr/bin/getconf DARWIN_USER_TEMP_DIR 2>/dev/null) || t=""
+  case "$t" in
+    /*) printf '%s\n' "${t%/}" ;;
+    *) return 1 ;;
+  esac
+}
+
 # ------------------------------------------------- download and checks --
 
 # >>> download block: identical in bin/aidentity and install.sh
@@ -286,8 +302,8 @@ install_atomic() { # checked file, destination, its VERIFIED_SUM
 
 # Download the script and its checksum file from the same ref.
 download() {
-  local tmp="${TMPDIR:-/tmp}"
-  TMP_DIR=$(mktemp -d "${tmp%/}/aidentity-install.XXXXXX") \
+  local tmp
+  tmp=$(private_tmpdir) && TMP_DIR=$(mktemp -d "$tmp/aidentity-install.XXXXXX") \
     || die "Could not create a temporary folder."
 
   info "Downloading aidentity (${REF}) …"

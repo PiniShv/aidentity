@@ -310,6 +310,45 @@ mkdir -p "$STUB_BIN"
 printf '#!/bin/sh\nprintf "stub open: %%s\\n" "$*"\n' > "$STUB_BIN/open"
 chmod +x "$STUB_BIN/open"
 
+# aidentity and install.sh make their temporary folders in the folder that
+# `/usr/bin/getconf DARWIN_USER_TEMP_DIR` names, never in TMPDIR. A run with
+# BASH_ENV="$GETCONF_STUB" gets GETCONF_TMP as that answer instead, and
+# GETCONF_RC (0 when unset) as getconf's exit status. bash reads the file that
+# BASH_ENV names before it runs a script, and it runs a function before it
+# looks for a program, even when the command is a path.
+GETCONF_STUB="$SANDBOX/getconf-stub.sh"
+cat > "$GETCONF_STUB" <<'STUB'
+function /usr/bin/getconf {
+  case "${1:-}" in
+    DARWIN_USER_TEMP_DIR) printf '%s\n' "${GETCONF_TMP-}"; return "${GETCONF_RC:-0}" ;;
+  esac
+  command /usr/bin/getconf "$@"
+}
+STUB
+
+# Run a command from folder $1, then go back. RUN_OUT and RUN_RC are kept.
+from_dir() { # folder, command…
+  local back="$PWD"
+  cd "$1" || exit 1
+  shift
+  "$@"
+  cd "$back" || exit 1
+}
+
+# Run a runner with getconf printing "undefined", as it can with no answer,
+# from a folder that holds only an empty folder of that name. A script that
+# took the word for a path would make its temporary folder in there and carry
+# on. UNDEF_LEFT is what the folder holds afterwards: "./undefined" when the
+# run made nothing in it. A runner that sets GETCONF_TMP itself must be given
+# GETCONF_TMP=undefined among its own settings.
+UNDEF_CWD="$SANDBOX/undefined-cwd"
+undefined_run() { # runner, its arguments
+  rm -rf "$UNDEF_CWD"
+  mkdir -p "$UNDEF_CWD/undefined"
+  BASH_ENV="$GETCONF_STUB" GETCONF_TMP=undefined from_dir "$UNDEF_CWD" "$@"
+  UNDEF_LEFT=$(cd "$UNDEF_CWD" && find . -mindepth 1 -print | LC_ALL=C sort)
+}
+
 plist_key() { /usr/libexec/PlistBuddy -c "Print :$2" "$1/Contents/Info.plist" 2>/dev/null; }
 
 # Read JSON with the JavaScript engine that ships with macOS, so the check
