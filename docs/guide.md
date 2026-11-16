@@ -700,6 +700,7 @@ aidentity restore --all            # restore all of them
 ```
 
 - `restore` reads the restore record in the data folder.
+- If it could not read a folder inside your launcher folder, it warns. A profile in the list may then still have a launcher, so check before you restore it. Fix the permissions of that folder and the warning goes away.
 - If the app moved, it finds it again: first by name, then by bundle ID (the name macOS uses for an app, such as `com.anthropic.claudefordesktop`).
 - It builds the launcher with the same look and settings. It checks everything in the record as if you had typed it.
 - Profiles made before version 1.2.0 have no record yet. They get one the next time their launcher is rebuilt, and `aidentity doctor --fix` does that for you.
