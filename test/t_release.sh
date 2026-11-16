@@ -321,6 +321,27 @@ done
 assert_not_contains "but not the comment line" "$hits" "comment"
 assert_contains "and bin/aidentity passes" "$RUN_OUT" "bin/aidentity does not use TMPDIR"
 
+# TMPDIR is also used without being named. A mktemp that is given no folder
+# makes its file there, and NSTemporaryDirectory gives the same folder. Both
+# fail the guards. A mktemp whose folder comes from a variable passes.
+# uninstall.sh is checked like the other two scripts.
+rc_fresh
+unnamed_uses=('tmp=$(mktemp -d)' 'tmp=$(mktemp -t aidentity)' 'f=$(mktemp)' 'tmp=$(mktemp -d "/tmp/aidentity.XXXXXX")' 'var t = $.NSTemporaryDirectory()')
+rc_plant uninstall.sh '# a comment that names mktemp -d and NSTemporaryDirectory'
+rc_plant uninstall.sh 'ok_tmp=$(mktemp -d "$dir/.aidentity.XXXXXX")'
+for use in "${unnamed_uses[@]}"; do rc_plant uninstall.sh "$use"; done
+RUN_OUT=$(cd "$SB" && "$BASH_BIN" "$RC_DIR/scripts/guards.sh" 2>&1); RUN_RC=$?
+hits=$(printf '%s\n' "$RUN_OUT" | grep '^uninstall.sh:[0-9]*: ' || true)
+assert_rc "a mktemp with no folder planted in uninstall.sh fails the guards" 1 "$RUN_RC" "$RUN_OUT"
+assert_contains "with the guard's message" "$RUN_OUT" "uninstall.sh must not use TMPDIR"
+for use in "${unnamed_uses[@]}"; do
+  assert_contains "and the line [$use]" "$hits" "$use"
+done
+assert_not_contains "but not the comment line" "$hits" "comment"
+assert_not_contains "and not the mktemp whose folder comes from a variable" "$hits" "ok_tmp"
+assert_contains "and bin/aidentity passes" "$RUN_OUT" "bin/aidentity does not use TMPDIR"
+assert_contains "and install.sh passes" "$RUN_OUT" "install.sh does not use TMPDIR"
+
 # The source guards run too, and their failure stops the release.
 rc_fresh
 rc_sed uninstall.sh 's/^running_on_profile() {/running_on_profile() { :;/'

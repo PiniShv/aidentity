@@ -174,15 +174,21 @@ fi
 
 # 9. Temporary folders are made in this account's own temporary folder, with
 #    private_tmpdir (src/10-output.sh; install.sh has its own copy), never in
-#    TMPDIR. TMPDIR can name a folder that other accounts on the Mac can write
-#    to, and then one of them could change a file the script is about to use.
-#    Any line that holds code and names it fails, whether it is $TMPDIR or a
-#    ${TMPDIR:-/tmp} fallback. A line that holds only a comment may name it,
-#    as the helper's own comment does.
-for f in bin/aidentity install.sh; do
-  hits=$(perl -ne 'print "$ARGV:$.: $_" if !/^\s*#/ && /\bTMPDIR\b/' "$f")
+#    TMPDIR. TMPDIR can name a folder that another account owns, or a shared
+#    folder where any account may rename or delete files, and then that
+#    account could change a file the script is about to use.
+#    A line that holds code fails when it names TMPDIR, whether it is $TMPDIR
+#    or a ${TMPDIR:-/tmp} fallback. It also fails when it uses TMPDIR without
+#    naming it: NSTemporaryDirectory gives the same folder, and so does a
+#    mktemp that is given no folder, such as "mktemp -d" alone or
+#    "mktemp -t name". The folder for mktemp must come from a variable, as in
+#    mktemp -d "$tmp/aidentity.XXXXXX". A line that holds only a comment may
+#    name any of these, as the helper's own comment does. uninstall.sh makes
+#    no temporary files today, and is checked so that it stays that way.
+for f in bin/aidentity install.sh uninstall.sh; do
+  hits=$(perl -ne 'print "$ARGV:$.: $_" if !/^\s*#/ && (/\b(?:TMPDIR|NSTemporaryDirectory)\b/ || /\bmktemp\b(?!(?:\s+-d)?\s+"\$\{?[A-Za-z_])/)' "$f")
   if [ -n "$hits" ]; then
-    bad "$f must not use TMPDIR. Make temporary folders with private_tmpdir (src/10-output.sh; install.sh has its own copy):"
+    bad "$f must not use TMPDIR, by name or through a mktemp that is given no folder. Make temporary folders with private_tmpdir (src/10-output.sh; install.sh has its own copy):"
     printf '%s\n' "$hits" >&2
   else
     pass "$f does not use TMPDIR"
