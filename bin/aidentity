@@ -2704,17 +2704,21 @@ EOF
 }
 
 # The identity of every data directory a launcher points at, space-separated.
+# Fails, after printing what it found, when all_launchers could not search
+# everywhere: a launcher it missed leaves its data directory looking unclaimed.
 claimed_dir_ids() {
-  local app d id ids=" "
+  local app d id ids=" " list rc=0
+  list=$(all_launchers) || rc=1
   while IFS= read -r app; do
     [ -n "$app" ] || continue
     d=$(plist_get "$app" "AIdentityDataDir")
     [ -n "$d" ] || continue
     id=$(dir_id "$d") && ids="$ids$id "
   done <<EOF
-$(all_launchers)
+$list
 EOF
   printf '%s' "$ids"
+  return "$rc"
 }
 
 human_bytes() {
@@ -2934,16 +2938,19 @@ cmd_set() {
 # line. Compared by directory identity, not by spelling: a string match made a
 # live profile look orphaned whenever its launcher recorded the root
 # differently — a symlinked root, a trailing slash, /tmp against /private/tmp.
+# Fails, after printing every directory, when the launcher search was
+# incomplete (see claimed_dir_ids): one of them may still have a launcher.
 orphan_dirs() {
-  local claimed d id
+  local claimed d id rc=0
   [ -d "$DATA_ROOT" ] || return 0
-  claimed=$(claimed_dir_ids)
+  claimed=$(claimed_dir_ids) || rc=1
   for d in "$DATA_ROOT"/*; do
     [ -d "$d" ] || continue
     id=$(dir_id "$d") || continue
     case "$claimed" in *" $id "*) continue ;; esac
     printf '%s\n' "$d"
   done
+  return "$rc"
 }
 
 # The launcher name a profile directory's restore record would rebuild, e.g.
@@ -3036,13 +3043,14 @@ cmd_restore() {
   done
   [ -n "$want" ] && [ "$all" -eq 1 ] && die "Give a name or --all, not both."
 
-  local dirs=() labels=() d label
+  local dirs=() labels=() d label list searched=1
+  list=$(orphan_dirs) || searched=0
   while IFS= read -r d; do
     [ -n "$d" ] || continue
     label=$(restore_label "$d") || continue
     dirs+=("$d"); labels+=("$label")
   done <<EOF
-$(orphan_dirs)
+$list
 EOF
 
   if [ "${#dirs[@]}" -eq 0 ]; then
@@ -3050,6 +3058,9 @@ EOF
     [ -z "$want" ] && [ "$all" -eq 0 ] && return 0
     return 1
   fi
+  # A launcher in a folder that could not be read would not be seen, and its
+  # profile would show here as if it had none.
+  [ "$searched" -eq 1 ] || warn "A folder in $APPS_DIR could not be read, so a profile below may still have a launcher in it."
 
   local i=0
   if [ -z "$want" ] && [ "$all" -eq 0 ]; then

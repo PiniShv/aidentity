@@ -190,3 +190,20 @@ assert_eq "re-adding keeps the profile's own folder" "$DATA/fake-hue" \
   "$(plist_key "$APPS/Fake Hue.app" AIdentityDataDir)"
 assert_no_dir "and makes no new one under the other root" "$SB/other-root/fake-hue"
 ai rm "Fake Hue" --purge -y
+
+# A folder in the launcher directory that cannot be read could hold the
+# launcher of a profile listed here, so restore says the list may be wrong.
+ai add "$ELECTRON_APP" --profile Unsure
+ai rm "Fake Unsure" -y
+mkdir -p "$APPS/Private"
+chmod 000 "$APPS/Private"
+ai restore
+chmod 755 "$APPS/Private"
+assert_rc "restore still lists when a launcher folder cannot be read" 0 "$RUN_RC" "$RUN_OUT"
+assert_contains "it lists the profile" "$RUN_OUT" "Fake Unsure"
+assert_contains "and warns that one may still have a launcher" "$RUN_OUT" \
+  "could not be read, so a profile below may still have a launcher in it."
+ai restore
+assert_not_contains "with every folder readable it does not warn" "$RUN_OUT" "could not be read"
+rmdir "$APPS/Private"
+rm -rf "$DATA/fake-unsure"
