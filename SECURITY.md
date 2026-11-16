@@ -2,7 +2,10 @@
 
 ## Reporting a vulnerability
 
-Email **contact@pinishv.com**. Put "aidentity" in the subject line.
+Email **contact@pinishv.com**. Put "aidentity" in the subject line. Or use
+**Report a vulnerability** on the repository's
+[Security tab](https://github.com/PiniShv/aidentity/security). It opens a
+private report.
 
 Do not open a public issue for anything that lets one user's code or data reach
 another user's applications, profile data or credentials.
@@ -147,12 +150,13 @@ reads the provenance from GitHub:
 gh attestation verify aidentity --repo PiniShv/aidentity
 ```
 
-To also name the workflow and the tag, add them:
+To also name the workflow and the tag, add them. Put the tag of the release
+you downloaded in place of `vX.Y.Z`:
 
 ```sh
 gh attestation verify aidentity --repo PiniShv/aidentity \
   --signer-workflow PiniShv/aidentity/.github/workflows/release.yml \
-  --source-ref refs/tags/v1.4.0
+  --source-ref refs/tags/vX.Y.Z
 ```
 
 What a pass proves:

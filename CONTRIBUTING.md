@@ -284,6 +284,9 @@ just say so, so nobody chases a name mismatch.
 
 ## Pull requests
 
+- For a big change, open an issue first and agree on the idea: a new command,
+  a new dependency, or more than a few hundred lines. A large PR that arrives
+  without one may be closed without a full review.
 - One change per PR. A refactor and a fix in the same diff take three times as
   long to review.
 - Match the surrounding style: two-space indent, `local` on every function
@@ -291,6 +294,8 @@ just say so, so nobody chases a name mismatch.
 - Update `--help` and `docs/` when you change behaviour. Undocumented flags do
   not exist.
 - Bump `AIDENTITY_VERSION` only when asked. Releases are cut deliberately.
+- Your contribution is licensed under Apache-2.0, like the rest of the
+  project.
 
 ## Prose in docs and help text
 

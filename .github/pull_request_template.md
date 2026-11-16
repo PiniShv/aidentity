@@ -11,7 +11,7 @@
 
 <!-- Tick what you ran, and say which macOS version you ran it on. -->
 
-- [ ] `make lint` and `make test`
+- [ ] `make check` (lint, tests and guards)
 - [ ] The test suite under macOS's own `/bin/bash` (3.2)
 - [ ] On a real app: <!-- which app and version, and did two accounts stay signed in at once? -->
 

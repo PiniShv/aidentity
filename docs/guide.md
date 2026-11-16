@@ -266,7 +266,7 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 
 ## Is this safe?
 
-`aidentity` is one shell script, about 5,600 lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The repository also keeps it in [`src/`](../src), split by subject into smaller files that are joined to make that one.
+`aidentity` is one shell script, a few thousand lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The repository also keeps it in [`src/`](../src), split by subject into smaller files that are joined to make that one.
 
 ### What it touches
 
