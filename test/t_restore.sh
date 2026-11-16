@@ -46,6 +46,25 @@ assert_eq "and points the launcher at its new place" "$MOVER_DIR/Mover.app" \
 ai rm "Mover Far" --purge -y
 rm -rf "$MOVER_DIR"
 
+# The app moved and was renamed, so only its bundle identifier finds it. A
+# Spotlight hit outside the app folders is passed over; the one inside is used,
+# and the launcher still points at this profile's own folder.
+make_electron_app "$SRC/Lost.app"
+ai add "$SRC/Lost.app" --profile Bid
+rm -rf "$APPS/Lost Bid.app"
+mkdir -p "$SB/bid-apps"
+mv "$SRC/Lost.app" "$SB/bid-apps/Renamed.app"
+BID_STUB="$SB/bid-stub"; mkdir -p "$BID_STUB"
+printf '#!/bin/sh\nprintf "%%s\\n" "/Volumes/Installer/Other.app" "%s/bid-apps/Renamed.app"\n' "$SB" > "$BID_STUB/mdfind"
+chmod +x "$BID_STUB/mdfind"
+RUN_OUT=$(PATH="$BID_STUB:$PATH" AIDENTITY_APP_DIRS="$APPS:$SB/bid-apps" detached "$BASH_BIN" "$AIDENTITY" restore "Lost Bid" 2>&1 </dev/null); RUN_RC=$?
+assert_rc "restore finds an app by bundle identifier" 0 "$RUN_RC" "$RUN_OUT"
+assert_eq "the launcher points at the app inside the app folders" "$SB/bid-apps/Renamed.app" \
+  "$(plist_key "$APPS/Renamed Bid.app" AIdentityTargetApp)"
+assert_eq "and at the profile's own data folder" "$DATA/lost-bid" "$(plist_key "$APPS/Renamed Bid.app" AIdentityDataDir)"
+ai rm "Renamed Bid" --purge -y
+rm -rf "$SB/bid-apps" "$BID_STUB"
+
 # A record cannot smuggle in a bad name.
 ai add "$ELECTRON_APP" --profile Bent
 rm -rf "$APPS/Fake Bent.app"

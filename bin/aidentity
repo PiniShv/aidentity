@@ -2985,11 +2985,12 @@ restore_one() {
     # unpacked download would otherwise be handed this signed-in profile.
     found=$(refind_app "$src" || true)
     if [ -z "$found" ] && [ -n "$bid" ] && command -v mdfind >/dev/null 2>&1; then
-      local hit dir
+      # sdir, not dir: dir is the profile folder this function restores.
+      local hit sdir
       while IFS= read -r hit; do
         [ -n "$hit" ] || continue
-        while IFS= read -r dir; do
-          case "$hit" in "${dir%/}"/*) found="$hit"; break ;; esac
+        while IFS= read -r sdir; do
+          case "$hit" in "${sdir%/}"/*) found="$hit"; break ;; esac
         done <<EOF
 $(app_search_dirs)
 EOF
