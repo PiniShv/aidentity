@@ -83,22 +83,25 @@ Steps 3 and 8 are one-time and already done. For a routine release, see
    ```
 
 7. **Verify the path a stranger takes.** Uninstall your local build first so you
-   are testing the tap and not leftovers.
+   are testing the tap and not leftovers. `HOMEBREW_NO_AUTOREMOVE=1` stops
+   Homebrew from also removing other packages that it thinks nothing needs.
 
    ```sh
-   brew uninstall aidentity
+   HOMEBREW_NO_AUTOREMOVE=1 brew uninstall aidentity
    brew untap PiniShv/tap 2>/dev/null
-   brew tap PiniShv/tap
-   brew install aidentity
+   brew install pinishv/tap/aidentity
    aidentity version
    ```
 
-8. **Put the install lines in the README** so people never have to find this
-   file. Done — the README lists both spellings alongside the `curl` installer:
+   Install by the full name, as a new user does. Homebrew 6 and later loads a
+   formula from a third-party tap by its short name only after the user trusts
+   it, and installing by the full name does that.
+
+8. **Put the install line in the README** so people never have to find this
+   file. Done — the README gives it alongside the `curl` installer:
 
    ```sh
    brew install pinishv/tap/aidentity
-   brew tap pinishv/tap && brew install aidentity
    ```
 
 ## Releasing a new version later
@@ -118,10 +121,18 @@ Homebrew installs and the `curl` installer both pin to it.
    `SHA256SUMS` and runs the guards. Check `bin/aidentity version` prints
    `X.Y.Z`: the formula's `test do` block only checks the format, so that
    `--HEAD` builds pass.
-2. **Commit, open a PR, let CI pass, merge.**
+
+   `make release` does not change the version in the examples of
+   `docs/guide.md`. Change those by hand: search the guide for the old version.
+   Leave the sentences that say which release something came in.
+2. **Commit, open a PR, let CI pass, merge.** Merge it yourself, at a time when
+   you can do step 3 straight after. Do not set a release PR to merge on its
+   own.
 3. **Tag the merge commit and push the tag — right after the merge.** From
-   the merge on, `main`'s installer asks for `vX.Y.Z`; until that tag exists,
-   `curl | bash` fails with a download error.
+   the merge on, `main`'s installer asks for `vX.Y.Z`. Until that tag exists,
+   anyone who runs `main`'s installer gets a download error. The install line
+   in the README runs the installer of the latest release, so it keeps
+   working, but older copies of the line do not.
 
    The workflow's first check is a script you can run yourself, in a checkout
    of the merge commit, before you tag:
@@ -162,11 +173,12 @@ Homebrew installs and the `curl` installer both pin to it.
    ```
 
    If a check fails before the release is created, the tag is on the wrong
-   commit or the commit is not ready. Nothing was published and the formula
-   does not point at the tag yet, so this is the one time a tag may go: delete
-   it (`git push origin :refs/tags/vX.Y.Z`), fix the cause on `main` and tag
-   again. If a later step fails, re-run the failed job. To see the release
-   notes before you tag, run `bash scripts/release-notes.sh X.Y.Z`.
+   commit or the commit is not ready. Nothing was published. The tag stays:
+   this repository's rules do not let a `v*` tag be moved or deleted. Fix the
+   cause on `main` and release the next patch version. Running
+   `scripts/release-check.sh` before you tag, as above, makes this unlikely.
+   If a later step fails, re-run the failed job. To see the release notes
+   before you tag, run `bash scripts/release-notes.sh X.Y.Z`.
 
 4. **Point the formula at the tag.** The tarball's checksum exists only once
    the tag does.
@@ -178,8 +190,8 @@ Homebrew installs and the `curl` installer both pin to it.
    Commit that change to this repository, copy `Formula/aidentity.rb` into the
    tap, and test it through the tap (step 5 above) before you push the tap.
 
-Users get it with `brew update && brew upgrade aidentity`, and the `curl`
-installer serves it as soon as `main` carries the new default ref.
+Users get it with `brew update && brew upgrade aidentity`. The `curl` install
+line in the README serves it as soon as the release is published.
 
 ## Notes
 

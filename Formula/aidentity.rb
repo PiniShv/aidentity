@@ -1,7 +1,6 @@
 # Homebrew formula for the PiniShv/homebrew-tap tap.
 #
-#   brew tap PiniShv/tap
-#   brew install aidentity
+#   brew install pinishv/tap/aidentity
 #
 # See docs/homebrew-tap.md for how to publish and how to fill in the sha256.
 

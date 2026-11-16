@@ -98,7 +98,7 @@ bash install.sh
 
 </details>
 
-**Homebrew.** This uses a third-party tap (an extra package list that this project keeps), not homebrew-core, Homebrew's main list. `brew tap pinishv/tap && brew install aidentity` does the same in two steps.
+**Homebrew.** This uses a third-party tap (an extra package list that this project keeps), not homebrew-core, Homebrew's main list. Type the full name, as below. Homebrew then trusts this one formula. Homebrew 6 and later needs that trust before you can use the short name `brew install aidentity`.
 
 ```bash
 brew install pinishv/tap/aidentity
