@@ -8,11 +8,11 @@
 class Aidentity < Formula
   desc "Run several accounts of the same Mac app at the same time"
   homepage "https://github.com/PiniShv/aidentity"
-  url "https://github.com/PiniShv/aidentity/archive/refs/tags/v1.6.1.tar.gz"
+  url "https://github.com/PiniShv/aidentity/archive/refs/tags/v1.6.2.tar.gz"
   # Get the real value with:
-  #   curl -sL https://github.com/PiniShv/aidentity/archive/refs/tags/v1.6.1.tar.gz | shasum -a 256
-  sha256 "420f3da4b82ea2bc42695391292bcfbe54fb9c3aa187025da99bfeecc9e90959"
-  license "MIT"
+  #   curl -sL https://github.com/PiniShv/aidentity/archive/refs/tags/v1.6.2.tar.gz | shasum -a 256
+  sha256 "258c5bf6aa6f468970dc03d8534b9eccc3bf3fd1557523439c0cd8d73168c57d"
+  license "Apache-2.0"
   head "https://github.com/PiniShv/aidentity.git", branch: "main"
 
   # aidentity builds macOS .app bundles and calls iconutil, PlistBuddy, codesign
