@@ -24,7 +24,7 @@ You need a Mac and the Terminal app. To open Terminal, press **Cmd + Space**, ty
 **1. Install.** Paste this line into Terminal and press **Return**:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash
+curl -fsSL https://github.com/PiniShv/aidentity/releases/latest/download/install.sh | bash
 ```
 
 This puts one file, the `aidentity` command, on your Mac. It checks the download first. It never uses `sudo` (admin rights), it does not edit your shell settings, and it starts nothing in the background. Want to read it first, or use Homebrew? See [Install and upgrade](#install-and-upgrade).
@@ -85,7 +85,7 @@ This page describes version 1.6.2. You need macOS and the `bash` that comes with
 <summary>Read the install script before you run it</summary>
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh
+curl -fsSLO https://github.com/PiniShv/aidentity/releases/latest/download/install.sh
 ```
 
 ```bash

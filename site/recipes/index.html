@@ -440,7 +440,7 @@ html:not(.js) .builder{display:none}
 <div class="cm"># 1. Install aidentity. Run this line on its own first.</div>
 <div class="cm">#    When it asks to set up your first account, type n and press Return.</div>
 <div class="cm">#    If it says aidentity is "not on your PATH", do the 2 steps it shows, then go on.</div>
-<div class="ln"><span class="ps" aria-hidden="true">$</span><code>curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash</code></div>
+<div class="ln"><span class="ps" aria-hidden="true">$</span><code>curl -fsSL https://github.com/PiniShv/aidentity/releases/latest/download/install.sh | bash</code></div>
 <div class="gap"></div>
 <div class="cm"># 2. Add your accounts.</div>
 <div class="ln"><span class="ps" aria-hidden="true">$</span><code>aidentity add Claude --profile Work --color blue</code></div>
@@ -984,7 +984,7 @@ function analyse(){
 
 /* ---------- Commands ---------- */
 var INSTALL={
-  curl:[['cmd','curl'],['flag','-fsSL'],['url','https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh'],['op','|'],['cmd','bash']],
+  curl:[['cmd','curl'],['flag','-fsSL'],['url','https://github.com/PiniShv/aidentity/releases/latest/download/install.sh'],['op','|'],['cmd','bash']],
   brew:[['cmd','brew'],['sub','install'],['arg','pinishv/tap/aidentity']]
 };
 function addParts(app,x){
