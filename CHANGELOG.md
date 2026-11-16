@@ -12,19 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `update`, `import`, the installer and the code that draws a launcher's
   badged icon now make their temporary folders in the temporary folder that
   macOS keeps for your account alone. They used to make them in `TMPDIR`.
-  When `TMPDIR` named a folder that other accounts on the Mac could write to,
-  another account could change the files in those folders while aidentity
-  used them. Then `update` or the installer could install a script that was
-  not the release, and the icon code could run another account's code as
-  you. The default `TMPDIR` is already private to your account. If macOS
-  cannot name its folder, `update`, `import` and the installer stop and
-  change nothing, and a launcher gets the app's own icon.
+  That was unsafe when `TMPDIR` named a folder that another account owns, or
+  a shared folder where any account may rename or delete files. `/tmp` is not
+  such a folder. Another account could then change the files while aidentity
+  used them. `update` or the installer could install a script that was not
+  the release, and the icon code could run that account's code as you. The
+  default `TMPDIR` is already private to your account. If macOS cannot name
+  its folder, `update`, `import` and the installer stop and change nothing,
+  and a launcher gets the app's own icon.
 
 ### Changed (for maintainers and contributors)
 
-- `scripts/guards.sh` fails when `bin/aidentity` or `install.sh` use `TMPDIR`
-  in code. New code makes its temporary folders with `private_tmpdir`. A
-  comment line may still name `TMPDIR`.
+- `scripts/guards.sh` fails when `bin/aidentity`, `install.sh` or
+  `uninstall.sh` use `TMPDIR` in code, by name or through a `mktemp` that is
+  given no folder. New code makes its temporary folders with
+  `private_tmpdir`. A comment line may still name `TMPDIR`.
 
 ## [1.6.2] - 2026-11-01
 
