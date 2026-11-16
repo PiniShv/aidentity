@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its folder, `update`, `import` and the installer stop and change nothing,
   and a launcher gets the app's own icon.
 
+### Fixed
+
+- `restore` built the launcher for an app folder, not for the profile's data
+  folder, when the app had moved and was found again by its bundle ID.
+- `restore` warns when a folder inside the launcher folder could not be read.
+  The list may then include a profile that still has a launcher.
+
 ### Changed (for maintainers and contributors)
 
 - `scripts/guards.sh` fails when `bin/aidentity`, `install.sh` or
