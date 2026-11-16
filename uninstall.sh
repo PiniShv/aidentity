@@ -900,7 +900,7 @@ main() {
     fi
   else
     info ""
-    dim "  Reinstall any time: curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash"
+    dim "  Reinstall any time: curl -fsSL https://github.com/PiniShv/aidentity/releases/latest/download/install.sh | bash"
     # No terminal to confirm on is not success: a script calling this must not
     # read "exit 0" as "everything was removed". Declining is a fine answer.
     if [ "$rc" -eq 2 ]; then exit 1; fi

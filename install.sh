@@ -3,7 +3,7 @@
 # aidentity installer
 # ===================
 #
-#   curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash
+#   curl -fsSL https://github.com/PiniShv/aidentity/releases/latest/download/install.sh | bash
 #
 # aidentity is a single shell script with no dependencies beyond what ships with
 # macOS. Installing it means putting one file on your PATH. That is all this

@@ -18,7 +18,7 @@ Built for AI desktop apps like Claude and ChatGPT. Also tested with Slack, VS Co
 [Install](#30-seconds) · [How it works](#how-it-works) · [Which apps work](#which-apps-work) · [FAQ](#frequently-asked) · [Full guide](docs/guide.md)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash
+curl -fsSL https://github.com/PiniShv/aidentity/releases/latest/download/install.sh | bash
 ```
 
 <a href="https://aidentity.pinishv.com/assets/film.mp4"><img src="assets/film-poster.jpg" alt="Play the 31-second film, with sound: signing out and in again to switch accounts, then the same chat app open three times at once, one window for each account, each one signed in" width="800"></a>
@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh |
 Open Terminal (press **Cmd + Space**, type `Terminal`, press **Return**) and paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/PiniShv/aidentity/main/install.sh | bash
+curl -fsSL https://github.com/PiniShv/aidentity/releases/latest/download/install.sh | bash
 ```
 
 Or use Homebrew:
