@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `restore` warns when a folder inside the launcher folder could not be read.
   The list may then include a profile that still has a launcher.
 
+### Changed
+
+- The install line in the README, the guide and on the site now runs the
+  installer of the latest release. The old line ran the installer on `main`,
+  which fails between the merge of a release and the push of its tag. The
+  uninstaller prints the new line too.
+
 ### Changed (for maintainers and contributors)
 
 - `scripts/guards.sh` fails when `bin/aidentity`, `install.sh` or
