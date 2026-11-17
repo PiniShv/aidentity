@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-11-17
+
 ### Security
 
 - `update`, `import`, the installer and the code that draws a launcher's
@@ -770,7 +772,8 @@ auto-update intact. Nothing needs re-running when the app updates.
   aidentity is for when you want the accounts signed in at the same time, in
   separate windows.
 
-[Unreleased]: https://github.com/PiniShv/aidentity/compare/v1.6.2...HEAD
+[Unreleased]: https://github.com/PiniShv/aidentity/compare/v1.6.3...HEAD
+[1.6.3]: https://github.com/PiniShv/aidentity/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/PiniShv/aidentity/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/PiniShv/aidentity/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/PiniShv/aidentity/compare/v1.5.0...v1.6.0
