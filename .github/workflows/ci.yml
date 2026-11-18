@@ -118,6 +118,11 @@ jobs:
     # The suite runs twice, and runner speed varies a lot, so keep this well
     # above what a slow runner needs.
     timeout-minutes: 40
+    env:
+      # The last group of the window area opens the real window, kept off the
+      # screen. Where there is no desktop session it would be skipped; here
+      # that is a failure, so a green run always opened the window.
+      AIDENTITY_TEST_REQUIRE_WINDOW: "1"
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -125,6 +130,7 @@ jobs:
       - name: Show the environment
         run: |
           sw_vers
+          printf 'session    %s\n' "$(launchctl managername 2>/dev/null || echo unknown)"
           printf '/bin/bash  %s\n' "$(/bin/bash --version | head -1)"
           printf 'bash       %s\n' "$(bash --version | head -1)"
           xcode-select -p || true
