@@ -36,6 +36,9 @@ make build    # after every change in src/
 | `70-update.sh` | `update`, and the download checks `install.sh` shares |
 | `80-ui.sh` | the menu: drawing and the terminal |
 | `81-ui-keys.sh` | the menu: keys and actions |
+| `82-ui-window.sh` | the window: the hidden `__window` command it runs for its list and for each action |
+| `83-ui-window-host.sh` | the window: the `osascript` program that draws it |
+| `84-ui-window-page.sh` | the window: the page it shows |
 | `90-command-table.sh` | the table every command is listed in |
 | `91-command-help.sh` | help text |
 | `92-completion.sh` | shell completion |
@@ -88,6 +91,7 @@ make test AREA=ui                     # the same, through make
 | `json` | `list --json` |
 | `transfer` | `export` and `import`: the file's contents, a round trip, and every refusal of a file or an entry |
 | `ui` | the menu |
+| `window` | `ui --window`: its list and each action as the window asks for them, what is refused, and the real window, kept off the screen |
 | `launcher` | the generated launcher's sign-in guard |
 | `install` | `install.sh`, `make formula` and `make release` input checks |
 | `release` | release notes, the release check, the build from `src/` |
@@ -117,7 +121,23 @@ Run the suite before you open a PR and again after review changes. It is fast.
 second bash and smoke-tests the CLI. Without shellcheck installed, `make lint`
 only checks syntax and says so. The completion tests that need zsh or fish run
 when that shell is installed and are skipped, with a note, when it is not. CI
-installs fish; zsh comes with macOS.
+installs fish; zsh comes with macOS. The last group of the `window` area opens
+the real window, kept off the screen, and needs a desktop session: in an SSH
+login it is skipped, with a note. CI sets `AIDENTITY_TEST_REQUIRE_WINDOW=1`,
+which turns that skip into a failure, so a green run always opened the window.
+
+No test can look at a screen. Before a release that changes the window, open
+it once with `aidentity ui --window`, against throwaway folders as shown
+below, and check by hand:
+
+- the window comes to the front and takes the keyboard;
+- the red button, Cmd-W, Cmd-Q and Ctrl-C in the terminal each end the command;
+- Tab reaches every button, also while Keyboard navigation is off in the
+  macOS settings (it is off at first), and Return and Esc work in each dialog;
+- VoiceOver reads a card, a dialog, a result and an error;
+- Cmd-plus, Cmd-=, Cmd-minus and Cmd-0 change the text size;
+- closing the window, and Cmd-Q, while a slow action runs: the action finishes;
+- light and dark mode, a narrow window and a long profile name.
 
 You can drive the script the same way by hand:
 
@@ -203,7 +223,8 @@ back regardless of what else it does.
    ID and the copy dies at launch.
 
 5. **No third-party dependencies.** Icon badging uses `iconutil` and
-   `osascript -l JavaScript`; plists use `PlistBuddy` and `plutil`. Everything
+   `osascript -l JavaScript`; plists use `PlistBuddy` and `plutil`; the window
+   of `ui --window` is drawn by `osascript` with AppKit and WebKit. Everything
    ships with macOS. A PR that reaches for ImageMagick, Python packages, Node or
    `jq` will not be merged.
 

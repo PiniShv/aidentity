@@ -58,6 +58,7 @@ Day to day:
 
 ```bash
 aidentity ui                                       # a menu in your terminal
+aidentity ui --window                              # the same, in a window
 aidentity add Claude --profile Work --color blue   # one more account, no questions
 aidentity list                                     # every profile, and which are running
 aidentity rename "Claude Work" Client              # stays signed in
@@ -76,7 +77,7 @@ aidentity help rm                                  # options for one command (al
 
 Moving to another Mac? `aidentity export > profiles.json` saves how each launcher looks and starts, and `aidentity import profiles.json` builds them there. The file holds no account data, so each profile starts signed out. It does hold launch settings such as proxy values, so keep it private. `export` warns on standard error when it finds variable values, or a password in a switch. [More](docs/guide.md#aidentity-export)
 
-Prefer a menu? `aidentity ui` shows every profile on one screen; pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it.
+Prefer a menu? `aidentity ui` shows every profile on one screen; pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it. `aidentity ui --window` shows the same profiles as cards in a window, with each launcher's icon. It opens no port and runs no server. Close it and it ends, after any action that is still running. [More](docs/guide.md#aidentity-ui---window)
 
 <div align="center">
 
@@ -108,7 +109,7 @@ There is still one `Claude.app`. [The full picture](docs/guide.md#how-it-works)
 ## Why aidentity
 
 - **Your app stays untouched.** It is never copied, changed or signed again, so it keeps its signature, its keychain access and its own updates.
-- **One script you can read.** A few thousand lines of bash. [Read it](bin/aidentity) before you run it. It needs nothing extra; the Xcode Command Line Tools are optional. It makes no network calls except when you run `aidentity update`, never uses `sudo` and runs nothing in the background.
+- **One script you can read.** A few thousand lines, mostly bash; the window's page and the small program that draws it are in the same file. [Read it](bin/aidentity) before you run it. It needs nothing extra; the Xcode Command Line Tools are optional. It makes no network calls except when you run `aidentity update`, never uses `sudo` and runs nothing in the background.
 - **Easy to undo.** Deleted an icon? `aidentity restore` brings it back, still signed in. Something looks wrong? `aidentity doctor --fix`. `rm` keeps your data unless you add `--purge`, and even then it moves the data to the Trash, so you can move it back. The [uninstaller](docs/guide.md#uninstall) asks before it removes any profile, and it also moves the data to the Trash.
 - **Your original account stays one click away.** While a profile runs, clicking `Claude.app` takes you to that profile. `aidentity add Claude --main` builds a Main launcher that opens your original account instead. [Why](docs/guide.md#opening-your-original-account-while-a-profile-runs)
 

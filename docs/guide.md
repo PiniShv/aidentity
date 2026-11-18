@@ -60,6 +60,7 @@ Not sure what to type? [Build your recipe](https://aidentity.pinishv.com/recipes
 |---|---|
 | Add another account, in this app or another one | [`aidentity add`](#aidentity-add) |
 | Use a menu instead of typing commands | [`aidentity ui`](#aidentity-ui) |
+| Use a window instead of the terminal | [`aidentity ui --window`](#aidentity-ui---window) |
 | Open my original account while another one runs | [Opening your original account](#opening-your-original-account-while-a-profile-runs) |
 | Tell the running windows apart | [The rough edge: Dock tiles](#the-rough-edge-dock-tiles-show-the-original-app) |
 | Quit one account and leave the others open | [`aidentity quit`](#aidentity-quit) |
@@ -266,7 +267,7 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 
 ## Is this safe?
 
-`aidentity` is one shell script, a few thousand lines of bash. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The repository also keeps it in [`src/`](../src), split by subject into smaller files that are joined to make that one.
+`aidentity` is one shell script, a few thousand lines, mostly bash. The page that [`ui --window`](#aidentity-ui---window) shows, and the small AppleScript program that draws its window, are in the same file. It runs as you, with your own permissions. [Read it](../bin/aidentity) before you run it. The repository also keeps it in [`src/`](../src), split by subject into smaller files that are joined to make that one.
 
 ### What it touches
 
@@ -278,6 +279,7 @@ By default, each launcher shows the app's own icon with a coloured circle and on
 | The Trash | `rm --purge`, `prune` and the uninstaller move a profile's data folder into the Trash, with a plain rename. They never empty the Trash, and never delete anything from it. | Move the folder back, then run `aidentity restore` (or `aidentity add`). [How](#data-in-the-trash) |
 | A running app | `aidentity quit` asks one profile's copy of the app to quit, the way the app's Quit menu item does. It acts only on a copy that macOS knows as an app, and only on your own processes. It never stops a command-line tool. | Open the profile again. |
 | A file for `import` | `aidentity import` reads the file you name and builds launchers from it, like `add`. It never changes a launcher that exists. | `aidentity rm "Claude Work"` for each one |
+| Two WebKit folders, for `ui --window` | `aidentity` writes no file for the window, and the page in it keeps no data of its own. macOS may keep WebKit's own housekeeping files for the program that draws the window, in two folders named `com.apple.osascript`: one in `~/Library/WebKit` and one in `~/Library/Caches`. | Delete the two folders. |
 | Your real app | Read only. It looks at the app's `Info.plist`, its icon and its files, to check that it is a Chromium or Electron app. | Nothing to undo |
 | Your original account | Never moved or changed. One exception: `--seed` reads Claude Desktop's `claude_desktop_config.json` and copies it into the new profile. | Nothing to undo |
 
@@ -438,7 +440,7 @@ Type `aidentity` and a command. Put a name that has a space in quotes, like `"Cl
 | Command | Also spelled | What it does |
 |---|---|---|
 | [`setup`](#aidentity-setup) | `init`, `wizard` | Guided walkthrough. Start here. |
-| [`ui`](#aidentity-ui) | | A menu in your terminal: open, quit, add, rename, recolour or remove profiles with one key. |
+| [`ui [--window]`](#aidentity-ui) | | A menu in your terminal: open, quit, add, rename, recolour or remove profiles with one key. `--window` shows a window instead. |
 | [`add [app]`](#aidentity-add) | | Create one profile directly. |
 | [`list`](#aidentity-list) | `ls` | Show every profile and whether it is running. `--json` prints it for scripts. |
 | [`open NAME`](#aidentity-open) | | Open a profile from Terminal. |
@@ -516,10 +518,33 @@ Each row is one launcher, the same ones `aidentity list` shows, with the same st
 
 - **The keys run the normal commands.** The menu has no rules of its own, so every check is the one the command has. For example, a running profile cannot be renamed or removed. Questions and messages look as they do on the command line. Except for Enter and `s`, the menu steps aside while the command runs, asks you to press a key, and then draws itself again. When a command fails, its message shows in red, not green.
 - **A Main launcher** (your original account) can be removed with `d` then `k`. `p` only tells you that `aidentity` never deletes the app's own data.
-- **It needs a terminal.** Both input and output must be a terminal, and it must be able to move the cursor. If not, `aidentity ui` changes nothing and exits with an error. In a script, use [`list --json`](#for-scripts-list---json). It takes no options other than `--help`.
+- **It needs a terminal.** Both input and output must be a terminal, and it must be able to move the cursor. If not, `aidentity ui` changes nothing and exits with an error. In a script, use [`list --json`](#for-scripts-list---json). It takes no options other than `--window` and `--help`. [`--window`](#aidentity-ui---window) needs no terminal.
 - **`aidentity` on its own still shows the help.** It does not open the menu.
 - **It leaves your terminal as it found it.** The menu draws on a separate screen, like the one `less` uses, so your scrollback stays as it was. Quit with `q`. Ctrl-C and closing the window also put the terminal back. While a command waits for an answer, Ctrl-C only cancels that command and returns to the menu. Ctrl-Z puts the menu aside like any program, and `fg` brings it back and draws it again. Only a forced stop (`kill -9`) can leave the terminal in the menu's state; `reset` fixes that.
 - **Limits.** The menu manages launchers only, like `list`. It does not show data folders or launch settings, and it has no keys for `rebuild`, `restore`, `prune`, `export`, `import` or `set --arg`. Use the commands for those. `s` has no way to force an app to quit: if the app is still running after 10 seconds, the menu says so, and you look at its window. There is no mouse support. Esc takes about a second to register, because an arrow key starts with the same key code. `q` is instant. A narrow window gets a shorter layout, and colour is off when `NO_COLOR` is set.
+
+#### `aidentity ui --window`
+
+The same profiles, in a window.
+
+```bash
+aidentity ui --window
+```
+
+Each profile is a card with its launcher's icon, its name and whether it is running. A card has the buttons **Open**, **Quit** (while the profile runs), **Edit** and **Remove**. **Edit** changes the name, the badge and the colour. **Remove** can keep the data or move it to the Trash, as `aidentity rm` does. Above the cards, **Add profile** makes a new profile, **Check** runs `doctor` (then **Fix** fixes what it can, after it asks you), and **Refresh** reads everything again. Profiles whose launcher was removed, but whose data is still there, are listed under **Removed profiles**, and **Restore** brings the launcher back. Each action shows the command it ran and its output under the cards.
+
+- **How it works.** It opens no port and runs no server. A small `osascript` program draws the window. For each thing you click, it runs the `aidentity` command for it and shows the answer. Edit can run two: `set`, then `rename`. The window ends when you close it, or when you press Ctrl-C in the terminal, and nothing keeps running after that. If you close it or quit while an action runs, that action finishes first, and then the command ends.
+- **The actions are the normal commands.** They run with the same checks, so a running profile cannot be renamed or removed here either. There is no terminal to ask on, so a command that would ask a question fails instead of waiting. When a command refuses something, such as a name it does not take, the dialog stays open with the reason and with what you typed. An action that has started cannot be cancelled: its dialog waits for it. After 2 minutes with no answer, the window says that the action may still be working; choose **Refresh** then to see the list as it is.
+- **A card acts only on the profile it shows.** If you rename or remove profiles in a terminal while the window is open, a card can be out of date. An action from such a card is refused, and the list is read again. Nothing is done to the profile that has that name now.
+- **Changes made elsewhere** show when you come back to the window, after each action, and after **Refresh**. In between, the window does not check by itself. A newly installed app shows after **Refresh**.
+- **A Main launcher** can be removed here, which leaves your original account alone. The window cannot make one: use [`aidentity add --main`](#aidentity-add).
+- **Names that start with a hyphen** cannot be passed to the commands safely. Their cards say so, and their buttons are turned off. In the terminal, `./` before the name works with every command, for example `aidentity open "./-Odd Work"`.
+- **Removed profiles are not listed if a launcher folder could not be read.** The window then says so, because a profile in the list might still have a launcher. Check the permissions of the folders in `~/Applications`, then choose **Refresh**.
+- **It needs macOS 12.3 or later and a desktop you are logged in to.** It is tested on macOS 15 and later; on macOS 12.3 to 14 it has not been tried. It does not work in an SSH session. If the window cannot open, `aidentity` says why, and you can use `aidentity ui` instead. While the window is open, the terminal waits for it.
+- **In the Dock it is called `osascript`.** That is the program of macOS that draws the window, so the Dock and the app switcher show its name and a plain icon while the window is open.
+- **Keys.** Tab and Shift-Tab move through the buttons and fields. In a dialog, Return in a text field confirms and Esc cancels. Cmd-W and Cmd-Q close the window.
+- **Text size.** Cmd-plus (or Cmd-=) and Cmd-minus make everything in the window larger or smaller, and Cmd-0 puts it back.
+- **Limits.** The window does what the menu does, and restore. It has no buttons for launch settings (`set --arg`, `--env`), `rebuild`, `prune`, `export` or `import`. Use the commands for those.
 
 ### `aidentity add`
 
@@ -1228,11 +1253,11 @@ Nothing here deletes profile data: it all goes to the Trash. Empty the Trash whe
 
 ## Requirements
 
-- **macOS.** There is no Linux or Windows version. No minimum macOS version is set. `aidentity doctor` shows yours. Two things for VS Code, Cursor and Kiro need macOS 12 or later: `--own-extensions`, and the check that keeps the profile folder path short. Both read the app's `product.json` with `plutil -extract … raw`, which older macOS does not have, so there the length check is skipped and `--own-extensions` is refused.
+- **macOS.** There is no Linux or Windows version. No minimum macOS version is set. `aidentity doctor` shows yours. Two things for VS Code, Cursor and Kiro need macOS 12 or later: `--own-extensions`, and the check that keeps the profile folder path short. Both read the app's `product.json` with `plutil -extract … raw`, which older macOS does not have, so there the length check is skipped and `--own-extensions` is refused. `ui --window` needs macOS 12.3 or later.
 - **The `bash` that comes with macOS** (version 3.2). You do not need a newer one.
 - **Tools that come with macOS**, such as `PlistBuddy`, `plutil`, `iconutil`, `osascript` and `open`. It uses no Python, Node, Perl or `jq`.
 - **Optional: the Xcode Command Line Tools.** Without them, launchers are unsigned. They still run. The tools also provide `strings`, which `add` uses for a slower, deeper check of an app with an unusual layout. `aidentity doctor` shows how to install the tools.
-- **To install or update:** `curl` and `shasum` for the install script and for `aidentity update`, or `git` and `make` for a source install. `aidentity ui` needs a terminal.
+- **To install or update:** `curl` and `shasum` for the install script and for `aidentity update`, or `git` and `make` for a source install. `aidentity ui` needs a terminal. `aidentity ui --window` needs a desktop you are logged in to.
 
 ---
 

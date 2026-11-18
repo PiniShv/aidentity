@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `aidentity ui --window` shows your profiles in a window: a card for each
+  profile with its icon, and buttons to open, quit, add, edit, remove and
+  restore profiles and to run `doctor`. Each button runs the same command you
+  would type, with the same checks, and the window shows that command and its
+  output. It opens no port and runs no server. When you close it, it ends,
+  after any action that is still running. It needs macOS 12.3 or later.
+
 ### Fixed
 
 - `restore` with a name or `--all`, and `prune`, now stop when a folder inside
