@@ -272,6 +272,11 @@ fix_launcher() { # launcher, launcher list
   return "$rc"
 }
 
+# What the last doctor in this shell found: how many problems, and how many of
+# them --fix can mend. For a caller that runs doctor as a function (the
+# window), so it need not read the report's words.
+DOCTOR_PROBLEMS=0; DOCTOR_FIXABLE=0
+
 cmd_doctor() {
   local problems=0 fixable=0 fix=0
   while [ $# -gt 0 ]; do
@@ -370,6 +375,7 @@ EOF
   else
     warn "$problems problem(s) found."
   fi
+  DOCTOR_PROBLEMS=$problems; DOCTOR_FIXABLE=$fixable
   # doctor reports; it does not fail. Only a --fix that could not fix
   # something exits non-zero.
   [ "$fix" -eq 1 ] && [ "${failed:-0}" -gt 0 ] && return 1
