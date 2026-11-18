@@ -15,7 +15,7 @@ cmd_complete() {
 }
 
 complete_candidates() {
-  local app name dir label i=0
+  local app name dir label list i=0
   case "$1" in
     launchers)   # the names open, rm, set, rename and rebuild take
       launcher_rows names
@@ -24,12 +24,14 @@ complete_candidates() {
         i=$((i + 1))
       done ;;
     restorable)  # the names restore takes: profiles whose launcher is gone
+      # restore NAME refuses when the launcher search was incomplete, so offer none
+      list=$(orphan_dirs) || return 0
       while IFS= read -r dir; do
         [ -n "$dir" ] || continue
         label=$(restore_label "$dir") || continue
         printf '%s\n' "$label"
       done <<EOF
-$(orphan_dirs)
+$list
 EOF
       ;;
     apps)        # the names add takes

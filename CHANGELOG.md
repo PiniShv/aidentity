@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the launcher folder could not be read. A launcher in that folder is not
   seen, so its profile looked as if it had none. `doctor` says so, and then
   no longer counts data folders with no launcher.
+- Tab after `restore` no longer offers profile names when a folder inside
+  the launcher folder could not be read. `restore` with a name refuses then,
+  so it would have refused them.
 
 ## [1.6.3] - 2026-11-17
 
