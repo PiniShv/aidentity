@@ -135,6 +135,16 @@ assert_rc "__complete restorable exits 0" 0 "$RUN_RC" "$RUN_ERR"
 has_line "it lists a profile whose launcher was removed" "$RUN_OUT" "Fake Gone"
 lacks_line "and not one that still has a launcher" "$RUN_OUT" "Fake Work"
 
+# restore NAME refuses when a folder in the launcher folder cannot be read, so
+# Tab does not offer a name it would refuse.
+mkdir "$APPS/Private"
+chmod 000 "$APPS/Private"
+ai_stdout __complete restorable
+chmod 755 "$APPS/Private"
+assert_rc "__complete restorable exits 0 when a launcher folder cannot be read" 0 "$RUN_RC" "$RUN_ERR"
+assert_eq "and offers no name" "" "$RUN_OUT$RUN_ERR"
+rmdir "$APPS/Private"
+
 for what in bogus ""; do
   ai_stdout __complete "$what"
   assert_rc "__complete [$what] exits 0" 0 "$RUN_RC" "$RUN_ERR"
