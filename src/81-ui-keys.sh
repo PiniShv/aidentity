@@ -341,7 +341,13 @@ ui_loop() {
 }
 
 cmd_ui() {
-  [ $# -eq 0 ] || die "Unexpected argument: $1  (ui takes no arguments)"
+  # The window needs no terminal, so it goes before the terminal checks.
+  if [ "${1:-}" = --window ]; then
+    [ $# -eq 1 ] || die "Unexpected argument: $2  (ui --window takes nothing else)"
+    ui_window
+    return
+  fi
+  [ $# -eq 0 ] || die "Unexpected argument: $1  (ui takes no arguments other than --window)"
   if [ ! -t 0 ] || [ ! -t 1 ]; then
     die "aidentity ui needs a terminal. In a script, use: aidentity list --json"
   fi

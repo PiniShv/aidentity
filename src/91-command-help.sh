@@ -319,7 +319,7 @@ EOF
     ;;
     ui) cat <<'EOF'
 USAGE
-  aidentity ui
+  aidentity ui [--window]
 
 A full-screen menu in Terminal: every profile, what is running, and keys to
 open, stop (quit a profile), add, rename, recolour, change the badge, remove,
@@ -327,8 +327,19 @@ and run doctor. Each key runs the same command you would type, with the same
 checks. It needs a terminal; in a script, use the commands themselves or
 aidentity list --json. Press ? in the menu for its keys, and q to leave.
 
+With --window, the same profiles open in a window: a card for each profile
+with its icon, and buttons to open, quit, add, edit, remove and restore
+profiles and to run doctor. Each button runs the same command too, and the
+window shows that command and its output. Nothing listens on the network. The
+window ends when you close it, after any action that is still running. It
+needs macOS 12.3 or later and a desktop session, and no terminal.
+
+OPTIONS
+  --window             Open a window instead of the menu in the terminal
+
 EXAMPLES
   aidentity ui
+  aidentity ui --window
 EOF
     ;;
     completion) cat <<'EOF'

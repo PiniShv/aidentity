@@ -14,7 +14,7 @@
 # added here reaches all of them. The command runs as the function cmd_ and its
 # name, without the __: cmd_add, cmd_overview.
 COMMANDS='setup|init wizard|-||Guided walkthrough that sets up accounts (start here)
-ui||-||Full-screen menu over your profiles
+ui||-|--window|Full-screen menu over your profiles, or a window with --window
 add||apps|--profile/-p= --badge/-b= --color/--colour/-c= --no-badge --seed --main --arg= --env= --own-extensions|Create a profile for an app
 list|ls|-|--json|Show every profile and what is running
 open||launchers||Open a profile
@@ -34,7 +34,8 @@ completion||shells||Print a tab-completion script
 version|--version -v|-||Print the version
 help||commands||Show help for all commands or for one
 __overview|-h --help|-||List every command
-__complete||-||Print what Tab can offer'
+__complete||-||Print what Tab can offer
+__window||-||Answer the window that ui --window opens'
 
 # command_row WORD: find the row whose name or other spelling is WORD, and set
 # CMD_NAME, CMD_ALIASES, CMD_ARG, CMD_OPTS and CMD_SUMMARY from it. Returns 1,

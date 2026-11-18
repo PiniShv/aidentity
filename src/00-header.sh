@@ -10,6 +10,7 @@
 #   aidentity add Claude --profile Work
 #   aidentity list
 #   aidentity ui                  # full-screen menu
+#   aidentity ui --window         # the same, in a window
 #   aidentity rm "Claude Work" --purge
 #   aidentity update --check
 #
