@@ -205,5 +205,25 @@ assert_contains "and warns that one may still have a launcher" "$RUN_OUT" \
   "could not be read, so a profile below may still have a launcher in it."
 ai restore
 assert_not_contains "with every folder readable it does not warn" "$RUN_OUT" "could not be read"
+# doctor says it could not look, and counts nothing. Rebuilding from that list
+# could give a profile a second launcher, so a name and --all are refused.
+chmod 000 "$APPS/Private"
+ai doctor; DOC_RC=$RUN_RC; DOC_OUT=$RUN_OUT
+ai restore "Fake Unsure"; ONE_RC=$RUN_RC; ONE_OUT=$RUN_OUT
+ai restore --all
+chmod 755 "$APPS/Private"
+assert_rc "doctor still exits 0" 0 "$DOC_RC" "$DOC_OUT"
+assert_contains "doctor says it could not look" "$DOC_OUT" \
+  "could not be read, so profile folders without a launcher are not counted"
+assert_not_contains "and counts none as having no launcher" "$DOC_OUT" "have no launcher"
+assert_rc_nonzero "restore NAME refuses when a launcher folder cannot be read" "$ONE_RC" "$ONE_OUT"
+assert_contains "it says why" "$ONE_OUT" \
+  "could not be read, so a profile may still have a launcher in it. Nothing was restored."
+assert_contains "and what to check" "$ONE_OUT" "Check the permissions of the folders in $APPS, then run this again."
+assert_rc_nonzero "restore --all refuses too" "$RUN_RC" "$RUN_OUT"
+assert_contains "and says so" "$RUN_OUT" "Nothing was restored."
+assert_no_dir "neither builds the launcher" "$APPS/Fake Unsure.app"
+ai doctor
+assert_contains "with every folder readable doctor counts them" "$RUN_OUT" "profile folder(s) have no launcher"
 rmdir "$APPS/Private"
 rm -rf "$DATA/fake-unsure"

@@ -423,8 +423,13 @@ EOF
     return 1
   fi
   # A launcher in a folder that could not be read would not be seen, and its
-  # profile would show here as if it had none.
-  [ "$searched" -eq 1 ] || warn "A folder in $APPS_DIR could not be read, so a profile below may still have a launcher in it."
+  # profile would show here as if it had none. Rebuilding it would give that
+  # profile a second launcher, so only the list goes on.
+  if [ "$searched" -eq 0 ]; then
+    [ -z "$want" ] && [ "$all" -eq 0 ] || die "A folder in $APPS_DIR could not be read, so a profile may still have a launcher in it. Nothing was restored.
+    Check the permissions of the folders in $APPS_DIR, then run this again."
+    warn "A folder in $APPS_DIR could not be read, so a profile below may still have a launcher in it."
+  fi
 
   local i=0
   if [ -z "$want" ] && [ "$all" -eq 0 ]; then
@@ -463,18 +468,23 @@ cmd_prune() {
 
   [ -d "$DATA_ROOT" ] || { info "No profile data directory yet — nothing to prune."; return 0; }
 
-  local orphans=() d n=0 label
+  local orphans=() d n=0 label list searched=1
+  list=$(orphan_dirs) || searched=0
   while IFS= read -r d; do
     [ -n "$d" ] || continue
     orphans+=("$d"); n=$((n+1))
   done <<EOF
-$(orphan_dirs)
+$list
 EOF
 
   if [ "$n" -eq 0 ]; then
     ok "No orphaned profile data — every directory belongs to a launcher."
     return 0
   fi
+  # A launcher in a folder that could not be read would not be seen, and its
+  # data would be listed here. Nobody is asked about a list that may be wrong.
+  [ "$searched" -eq 1 ] || die "A folder in $APPS_DIR could not be read, so a profile folder may still have a launcher in it. Nothing was moved.
+    Check the permissions of the folders in $APPS_DIR, then run this again."
 
   info "${C_BOLD}Profile data with no launcher pointing at it:${C_RESET}"
   info ""
