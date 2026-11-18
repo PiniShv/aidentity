@@ -83,6 +83,20 @@ Read this before deciding whether a finding is a bug.
 - **Each profile folder holds a small restore record** (`.aidentity-profile.plist`)
   that `aidentity restore` reads. Its contents are checked as if typed on the
   command line.
+- **`aidentity ui --window` opens no port and runs no server.** A small
+  `osascript` program draws the window with the web view that is part of
+  macOS. The page in it comes from the script itself. It loads nothing from
+  outside, and its content policy lets nothing else run. For each click, the
+  program runs `aidentity` itself: the words of the request go to it as
+  separate arguments, never through a shell, and it checks each one. That
+  runs the command you would type, and the window shows it; Edit can run two,
+  `set` and then `rename`. It runs with no terminal prompts, so a question
+  fails and nothing waits for an answer. An action on a profile names it by its launcher's
+  name and by its data folder. It runs only while that launcher still opens
+  that folder, so a profile that was renamed or made again elsewhere is
+  refused, not guessed at. Names and command output are shown as text, never
+  as markup. aidentity writes no file for the window, and the window ends
+  when you close it, after any action that is still running.
 
 ## In scope
 
@@ -116,6 +130,10 @@ Read this before deciding whether a finding is a bug.
 - **Profile-name validation**: any input accepted by `validate_profile_name`
   that then misbehaves as a directory name, a bundle name, a slug, or a string
   embedded in the launcher.
+- **`aidentity ui --window`**: anything that makes it run a command other
+  than the one it shows, act on a profile other than the one on the card,
+  show text from a profile, an app or a command as markup or as script, or
+  load anything from outside.
 
 ## Out of scope
 
