@@ -154,14 +154,23 @@ ai rm "Fake Back" --purge -y
 trash_reset
 
 # Not knowing is not "no launcher": a folder in the launcher directory that
-# cannot be read could hold one.
+# cannot be read could hold one. prune then lists nothing and asks nothing.
 mkdir -p "$DATA/fake-unsure" "$APPS/Private"
 chmod 000 "$APPS/Private"
-ai prune -y
+ai_in yes prune
 chmod 755 "$APPS/Private"
 assert_rc_nonzero "a search that fails makes prune exit non-zero" "$RUN_RC" "$RUN_OUT"
-assert_contains "it says why" "$RUN_OUT" "Skipping fake-unsure — could not search all of $APPS for a launcher that uses it."
+assert_contains "it says why" "$RUN_OUT" \
+  "could not be read, so a profile folder may still have a launcher in it. Nothing was moved."
+assert_contains "and what to check" "$RUN_OUT" "Check the permissions of the folders in $APPS, then run this again."
+assert_not_contains "and asks nothing" "$RUN_OUT" "Type yes to confirm"
 assert_dir "and keeps the folder" "$DATA/fake-unsure"
+# The same folder made unreadable while the question waits.
+answer_late 'chmod 000 "$APPS/Private"' yes prune
+chmod 755 "$APPS/Private"
+assert_rc_nonzero "a search that fails after the question exits non-zero too" "$RUN_RC" "$RUN_OUT"
+assert_contains "it skips the folder, and says why" "$RUN_OUT" "Skipping fake-unsure — could not search all of $APPS for a launcher that uses it."
+assert_dir "and keeps it" "$DATA/fake-unsure"
 rmdir "$APPS/Private" "$DATA/fake-unsure"
 
 # Opened while the question waits: a pgrep that reports the profile only once

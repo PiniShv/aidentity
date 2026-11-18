@@ -689,6 +689,8 @@ To undo, move a folder back into the profiles folder. If the list marked it `can
 
 Before it calls a folder an orphan, `prune` looks for launchers in your launcher folder, in the app folders and through Spotlight. If you keep a launcher somewhere else, its data shows up in the list. Read the list before you type `yes`.
 
+If `prune` cannot read a folder inside your launcher folder, a launcher in that folder would not be seen. So if it finds data with no launcher, it stops before the list: it asks nothing, moves nothing and exits with 1. Fix the permissions of that folder, then run `prune` again.
+
 ### `aidentity restore`
 
 Rebuilds the launcher of a profile whose launcher is gone. The account opens again, still signed in.
@@ -700,7 +702,7 @@ aidentity restore --all            # restore all of them
 ```
 
 - `restore` reads the restore record in the data folder.
-- If it could not read a folder inside your launcher folder, it warns. A profile in the list may then still have a launcher, so check before you restore it. Fix the permissions of that folder and the warning goes away.
+- If it could not read a folder inside your launcher folder, the list comes with a warning: a profile in it may still have a launcher in that folder. `restore` with a name or with `--all` then restores nothing and exits with 1, so no profile gets a second launcher. Fix the permissions of that folder, then run it again.
 - If the app moved, it finds it again: first by name, then by bundle ID (the name macOS uses for an app, such as `com.anthropic.claudefordesktop`).
 - It builds the launcher with the same look and settings. It checks everything in the record as if you had typed it.
 - Profiles made before version 1.2.0 have no record yet. They get one the next time their launcher is rebuilt, and `aidentity doctor --fix` does that for you.
@@ -869,6 +871,7 @@ At the top it shows your macOS version, the `aidentity` version and the bash ver
 - an app that moved, is gone, or no longer looks like Chromium or Electron
 - a data folder that is missing, outside the profiles folder, shared with another launcher, or readable by other users
 - data folders with no launcher
+- a folder inside the launcher folder that it could not read. A launcher in that folder would not be seen, so then it does not count the data folders with no launcher.
 
 The last line counts the problems, and says how many `--fix` can repair.
 

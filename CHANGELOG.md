@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `restore` with a name or `--all`, and `prune`, now stop when a folder inside
+  the launcher folder could not be read. A launcher in that folder is not
+  seen, so its profile looked as if it had none. `doctor` says so, and then
+  no longer counts data folders with no launcher.
+
 ## [1.6.3] - 2026-11-17
 
 ### Security

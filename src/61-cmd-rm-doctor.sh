@@ -347,11 +347,18 @@ EOF
     done
   fi
 
-  local orphans; orphans=$(orphan_dirs | grep -c . || true)
-  if [ "${orphans:-0}" -gt 0 ]; then
+  # A launcher in a folder that cannot be read is not seen, so its profile
+  # folder would be counted here as having none.
+  local orphans
+  if ! orphans=$(orphan_dirs); then
+    info ""
+    printf '  %s!%s A folder in %s could not be read, so profile folders without a launcher are not counted — check the permissions of the folders in it\n' \
+      "$C_YELLOW" "$C_RESET" "$APPS_DIR"
+    problems=$((problems+1))
+  elif [ -n "$orphans" ]; then
     info ""
     printf '  %s!%s %s profile folder(s) have no launcher — see: aidentity restore, aidentity prune\n' \
-      "$C_YELLOW" "$C_RESET" "$orphans"
+      "$C_YELLOW" "$C_RESET" "$(printf '%s\n' "$orphans" | grep -c .)"
     problems=$((problems+1))
   fi
 
