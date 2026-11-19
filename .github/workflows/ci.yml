@@ -2,9 +2,10 @@ name: CI
 
 # aidentity is one shell script, so CI is deliberately small:
 #
-#   lint  (ubuntu)  cheap syntax + shellcheck gate, catches typos in seconds
-#   test  (macOS)   the real thing — the test suite builds its own fake .app
-#                   bundles, so it needs no Chromium or Electron app installed
+#   lint    (ubuntu)  cheap syntax + shellcheck gate, catches typos in seconds
+#   test    (macOS)   the real thing — the test suite builds its own fake .app
+#                     bundles, so it needs no Chromium or Electron app installed
+#   window  (macOS)   the window area again on macOS 15, Apple silicon and Intel
 #
 # The blocking shellcheck run uses the same exclusion list as `make lint`, so a
 # green local lint means a green CI lint. A second run with nothing excluded is
@@ -221,6 +222,35 @@ jobs:
             echo "An unknown command should exit non-zero." >&2
             exit 1
           fi
+
+  # The window is drawn by parts of macOS itself: osascript and the system web
+  # view. The test job runs them on the newest runner only. This job runs the
+  # window area alone on macOS 15, on Apple silicon and on Intel, so that a
+  # difference between versions or processors shows up here.
+  window:
+    name: Window (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-15-intel]
+    env:
+      # As in the test job: a run that could not open the window fails.
+      AIDENTITY_TEST_REQUIRE_WINDOW: "1"
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Show the environment
+        run: |
+          sw_vers
+          printf 'machine    %s\n' "$(uname -m)"
+          printf 'session    %s\n' "$(launchctl managername 2>/dev/null || echo unknown)"
+          printf '/bin/bash  %s\n' "$(/bin/bash --version | head -1)"
+
+      - name: Window tests — macOS system bash 3.2
+        run: /bin/bash test/run_tests.sh window
 
   guards:
     name: Source guards
