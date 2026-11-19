@@ -542,7 +542,7 @@ Each profile is a card with its launcher's icon, its name and whether it is runn
 - **Removed profiles are not listed if a launcher folder could not be read.** The window then says so, because a profile in the list might still have a launcher. Check the permissions of the folders in `~/Applications`, then choose **Refresh**.
 - **It needs macOS 12.3 or later and a desktop you are logged in to.** It is tested on macOS 15 and later; on macOS 12.3 to 14 it has not been tried. It does not work in an SSH session. If the window cannot open, `aidentity` says why, and you can use `aidentity ui` instead. While the window is open, the terminal waits for it.
 - **In the Dock it is called `osascript`.** That is the program of macOS that draws the window, so the Dock and the app switcher show its name and a plain icon while the window is open.
-- **Keys.** Tab and Shift-Tab move through the buttons and fields. In a dialog, Return in a text field confirms and Esc cancels. Cmd-W and Cmd-Q close the window.
+- **Keys.** Tab and Shift-Tab move through the buttons and fields. In a dialog, Return in a text field confirms, and Esc cancels as long as the action has not started. Cmd-W and Cmd-Q close the window.
 - **Text size.** Cmd-plus (or Cmd-=) and Cmd-minus make everything in the window larger or smaller, and Cmd-0 puts it back.
 - **Limits.** The window does what the menu does, and restore. It has no buttons for launch settings (`set --arg`, `--env`), `rebuild`, `prune`, `export` or `import`. Use the commands for those.
 
