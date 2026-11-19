@@ -125,6 +125,9 @@ installs fish; zsh comes with macOS. The last group of the `window` area opens
 the real window, kept off the screen, and needs a desktop session: in an SSH
 login it is skipped, with a note. CI sets `AIDENTITY_TEST_REQUIRE_WINDOW=1`,
 which turns that skip into a failure, so a green run always opened the window.
+CI also runs the `window` area alone on macOS 15, on Apple silicon and on
+Intel, because the parts of macOS that draw the window can differ between
+versions and processors.
 
 No test can look at a screen. Before a release that changes the window, open
 it once with `aidentity ui --window`, against throwaway folders as shown
