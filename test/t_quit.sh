@@ -15,10 +15,14 @@ group "quit — one copy of the app, found and asked to quit"
 
 # The fake app's executable is a symlink to /bin/bash. macOS stops a copy of a
 # system binary as it starts; a link runs, and ps shows the link's path, as it
-# shows a real app's executable. Each process waits on a FIFO for at most 60
-# seconds and starts no child, so nothing is left behind for long even if this
-# area is stopped half way. A helper sits inside the app's Frameworks folder,
-# where Electron and Chromium keep theirs.
+# shows a real app's executable. Each process waits on a FIFO for at most 600
+# seconds and starts no child. The area ends them by PID when it exits, so the
+# limit is only a backstop for a suite that is killed hard: a stray process
+# then ends by itself. It must not be shorter than the longest time a test
+# needs a process to run: one is needed from early in this area to near its
+# end, about 30 seconds on a normal machine and several minutes on one under
+# heavy load. A helper sits inside the app's Frameworks folder, where Electron
+# and Chromium keep theirs.
 QUIT_APP="$SRC/Quitty.app"
 make_electron_app "$QUIT_APP"
 rm -f "$QUIT_APP/Contents/MacOS/stub"
@@ -28,8 +32,8 @@ ln -s /bin/bash "$QUIT_APP/Contents/Frameworks/Quitty Helper.app/Contents/MacOS/
 QUIT_FIFO="$SANDBOX/quit-fifo"
 rm -f "$QUIT_FIFO"
 mkfifo "$QUIT_FIFO"
-QUIT_WAIT='read -t 60 x <> "$0"'
-QUIT_NO_TERM='trap "" TERM; read -t 60 x <> "$0"'
+QUIT_WAIT='read -t 600 x <> "$0"'
+QUIT_NO_TERM='trap "" TERM; read -t 600 x <> "$0"'
 QUIT_PIDS=""
 
 # Start a fake process: its executable, the script it runs, its arguments. It
