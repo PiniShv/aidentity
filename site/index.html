@@ -611,7 +611,7 @@ html:not(.js) .chapters{display:none}
 <!-- 1. Hero -->
 <section class="hero" aria-labelledby="h-hero">
 <div class="wrap">
-<a class="eyebrow" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-ui"><b>New</b><span><code>aidentity ui</code>, a menu in your terminal</span><svg class="i" aria-hidden="true"><use href="#i-right"/></svg></a>
+<a class="eyebrow" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-ui---window"><b>New</b><span><code>aidentity ui --window</code>, your profiles in a window</span><svg class="i" aria-hidden="true"><use href="#i-right"/></svg></a>
 <h1 id="h-hero">Stop signing out to <span class="grad">switch accounts.</span></h1>
 <p class="lead">One app, every account, all open at once. Each one stays signed in.</p>
 <p class="sub">A free, open-source command-line tool for Chromium and Electron apps on your Mac. It never changes your app. It opens it again, with one data folder per account.</p>
@@ -703,7 +703,7 @@ html:not(.js) .chapters{display:none}
 <li class="rv" style="--d:0"><strong>Free.</strong><span>Open source, Apache-2.0 licence.</span></li>
 <li class="rv" style="--d:1"><strong>Untouched.</strong><span>Your app is never copied, changed or signed again.</span></li>
 <li class="rv" style="--d:2"><strong>No sudo.</strong><span>Nothing runs in the background.</span></li>
-<li class="rv" style="--d:3"><strong>One script.</strong><span>Written in bash. Nothing extra to install.</span></li>
+<li class="rv" style="--d:3"><strong>One script.</strong><span>Mostly bash. Nothing extra to install.</span></li>
 <li class="rv" style="--d:4"><strong>Mac only.</strong><span>For Chromium and Electron apps.</span></li>
 </ul>
 </div>
@@ -890,7 +890,7 @@ html:not(.js) .chapters{display:none}
 <div class="menu-demo">
 <div class="mh rv">
 <h3 id="h-menu-demo">Prefer a menu? <code>aidentity ui</code></h3>
-<p>Every profile on one screen. Pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it.</p>
+<p>Every profile on one screen. Pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it. Prefer buttons? <code>aidentity ui --window</code> shows the same profiles in a window.</p>
 <details class="tx">
 <summary>Read the menu demo as text <svg class="i" aria-hidden="true"><use href="#i-down"/></svg></summary>
 <ol>
@@ -970,6 +970,7 @@ html:not(.js) .chapters{display:none}
 <ul class="cmdlist" role="list">
 <li><code>aidentity apps</code><span class="d">Which of your apps can take extra accounts.</span></li>
 <li><code>aidentity ui</code><span class="d">A menu in your terminal. Pick a profile with the arrow keys, then open, quit, rename, recolour or remove it.</span></li>
+<li><code>aidentity ui --window</code><span class="d">The same profiles in a window, with buttons. Needs macOS 12.3 or later.</span></li>
 <li><code>aidentity add Claude <span class="nw">--profile Work</span> <span class="nw">--color blue</span></code><span class="d">One more account, no questions.</span></li>
 <li><code>aidentity list</code><span class="d">Every profile, and which are running.</span></li>
 <li><code>aidentity list <span class="nw">--json</span></code><span class="d">The same list as JSON, for scripts.</span></li>
@@ -1042,7 +1043,7 @@ html:not(.js) .chapters{display:none}
 <li class="rv">
 <div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-file"/></svg>Source</div>
 <div><h3>Read it before you run it</h3>
-<p>One script, written in bash, with nothing extra to install. <a href="https://github.com/PiniShv/aidentity/blob/main/bin/aidentity">Read the script</a> on GitHub before you run it.</p></div>
+<p>One script, mostly bash, with nothing extra to install. <a href="https://github.com/PiniShv/aidentity/blob/main/bin/aidentity">Read the script</a> on GitHub before you run it.</p></div>
 </li>
 <li class="rv">
 <div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-user"/></svg>Original account</div>
@@ -1117,7 +1118,7 @@ html:not(.js) .chapters{display:none}
 </div>
 <h3 class="sub-h rv">What aidentity is not</h3>
 <ul class="nots" role="list">
-<li class="rv" style="--d:0"><span><strong>Not an app with its own window.</strong> You set up in Terminal, then click icons.</span></li>
+<li class="rv" style="--d:0"><span><strong>Not an app that keeps running.</strong> You set up in Terminal, or in a window with <code>aidentity ui --window</code>, then click icons.</span></li>
 <li class="rv" style="--d:1"><span><strong>Not for Windows or Linux.</strong> It is macOS only.</span></li>
 <li class="rv" style="--d:2"><span><strong>Not self-updating.</strong> You upgrade it when you choose.</span></li>
 <li class="rv" style="--d:0"><span><strong>Not encrypted.</strong> Profile folders hold live sign-ins, like the app's own folder.</span></li>
