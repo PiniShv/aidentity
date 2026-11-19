@@ -136,7 +136,8 @@ below, and check by hand:
 - the window comes to the front and takes the keyboard;
 - the red button, Cmd-W, Cmd-Q and Ctrl-C in the terminal each end the command;
 - Tab reaches every button, also while Keyboard navigation is off in the
-  macOS settings (it is off at first), and Return and Esc work in each dialog;
+  macOS settings (it is off at first);
+- Esc cancels each dialog, and Return in a text field confirms it;
 - VoiceOver reads a card, a dialog, a result and an error;
 - Cmd-plus, Cmd-=, Cmd-minus and Cmd-0 change the text size;
 - closing the window, and Cmd-Q, while a slow action runs: the action finishes;
