@@ -7,10 +7,10 @@
 class Aidentity < Formula
   desc "Run several accounts of the same Mac app at the same time"
   homepage "https://github.com/PiniShv/aidentity"
-  url "https://github.com/PiniShv/aidentity/archive/refs/tags/v1.6.3.tar.gz"
+  url "https://github.com/PiniShv/aidentity/archive/refs/tags/v1.7.0.tar.gz"
   # Get the real value with:
-  #   curl -sL https://github.com/PiniShv/aidentity/archive/refs/tags/v1.6.3.tar.gz | shasum -a 256
-  sha256 "06ac6cb092172727cd41dfb62ec4441e6746c5aa3d2b2a6cc71ba0899fb5967f"
+  #   curl -sL https://github.com/PiniShv/aidentity/archive/refs/tags/v1.7.0.tar.gz | shasum -a 256
+  sha256 "f743ee7dcf9c02538bbb207a4aa12a16193623026971342fbea0531ce61de257"
   license "Apache-2.0"
   head "https://github.com/PiniShv/aidentity.git", branch: "main"
 
