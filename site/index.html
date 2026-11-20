@@ -6,29 +6,28 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>aidentity: use several Claude accounts at once on your Mac</title>
-<meta name="description" content="Stop signing out to switch accounts. One app, every account, all open at once, and each one stays signed in. Free and open source, for your Mac.">
+<meta name="description" content="Every account, open at once. aidentity opens the same Mac app once for each account, and each one stays signed in. Free and open source.">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://aidentity.pinishv.com/">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://aidentity.pinishv.com/">
 <meta property="og:site_name" content="aidentity">
 <meta property="og:title" content="aidentity: use several Claude accounts at once on your Mac">
-<meta property="og:description" content="One app, every account, all open at once. Each one stays signed in. Verified with Claude Desktop. Tested with ChatGPT, Slack, VS Code and more. Free and open source.">
+<meta property="og:description" content="Every account, open at once. Each one stays signed in. Verified with Claude Desktop. Tested with ChatGPT, Slack, VS Code and more. Free and open source.">
 <meta property="og:image" content="https://aidentity.pinishv.com/assets/og.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="aidentity: Stop signing out to switch accounts. One app, every account, all open at once. Each one stays signed in.">
+<meta property="og:image:alt" content="aidentity: Every account. Open at once. Stop signing out to switch accounts.">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image:alt" content="aidentity: Stop signing out to switch accounts. One app, every account, all open at once. Each one stays signed in.">
+<meta name="twitter:image:alt" content="aidentity: Every account. Open at once. Stop signing out to switch accounts.">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-title" content="aidentity">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"aidentity","url":"https://aidentity.pinishv.com/","description":"A command-line tool that opens the same Chromium or Electron Mac app once for each account, all at the same time, each one signed in.","applicationCategory":"DeveloperApplication","operatingSystem":"macOS","license":"https://spdx.org/licenses/Apache-2.0.html","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"downloadUrl":"https://github.com/PiniShv/aidentity/releases/latest","image":"https://aidentity.pinishv.com/assets/og.png","screenshot":"https://aidentity.pinishv.com/assets/demo-poster.jpg","sameAs":"https://github.com/PiniShv/aidentity","author":{"@type":"Person","name":"Pini Shvartsman","url":"https://pinishv.com"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"aidentity","url":"https://aidentity.pinishv.com/","description":"A command-line tool that opens the same Chromium or Electron Mac app once for each account, all at the same time, each one signed in.","applicationCategory":"DeveloperApplication","operatingSystem":"macOS","license":"https://spdx.org/licenses/Apache-2.0.html","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"downloadUrl":"https://github.com/PiniShv/aidentity/releases/latest","image":"https://aidentity.pinishv.com/assets/og.png","screenshot":"https://aidentity.pinishv.com/assets/window-dark.png","sameAs":"https://github.com/PiniShv/aidentity","author":{"@type":"Person","name":"Pini Shvartsman","url":"https://pinishv.com"}}
 </script>
 <script>document.documentElement.className="js"</script>
 <style>
@@ -37,521 +36,448 @@
   color-scheme:light dark;
   --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  --sec:#fff;--sec-alt:#f5f5f7;--card:#f5f5f7;--card-alt:#fff;
-  --text:#1d1d1f;--muted:#636366;--line:rgba(0,0,0,.16);--line2:rgba(0,0,0,.09);
-  --accent:#0066cc;--btn:#0071e3;--btn-h:#0066cc;--btn-fg:#fff;--focus:#0071e3;
-  --ok:#1e7e34;--warn:#8a5a00;--bad:#c4281c;--chip:rgba(0,0,0,.06);
-  --nav:rgba(255,255,255,.92);--nav-solid:#fff;
-  --glow:rgba(0,113,227,.13);--glow2:rgba(34,211,238,.10);--glow3:rgba(46,125,246,.08);
-  --grad:linear-gradient(95deg,#004fb0 0%,#0071e3 55%,#1a8cff 100%);
-  --inv-bg:#1d1d1f;--inv-text:#f5f5f7;--inv-muted:#a1a1a6;--inv-chip:rgba(255,255,255,.12);
-  --film-shadow:0 0 0 1px rgba(0,0,0,.06),0 60px 120px -50px rgba(0,60,150,.55),0 24px 48px -30px rgba(0,0,0,.45);
-  --t-bg:#1c1c1e;--t-bar:#2c2c2e;--t-line:rgba(255,255,255,.14);--t-text:#f5f5f7;--t-muted:#a1a1a6;--t-ok:#30d158;--t-acc:#2997ff;
+  --gut:clamp(20px,5vw,44px);--nav:52px;
+  --bg:#fff;--bg2:#f5f5f7;--tile:#f5f5f7;--tile2:#fff;
+  --text:#1d1d1f;--muted:#6e6e73;--dim:#8e8e93;--line:#d2d2d7;--line2:rgba(0,0,0,.08);
+  --link:#0066cc;--btn:#0071e3;--btn-h:#0077ed;--focus:#0071e3;
+  --ok:#1b7f37;--warn:#8a5a00;--bad:#c4281c;--hot:#bf4800;--chip:rgba(0,0,0,.05);
+  --shadow:0 0 0 1px rgba(0,0,0,.08),0 40px 80px -36px rgba(0,0,0,.35);
+  --mac:#fff;--mac-bar:#ececee;--mac-t:#6e6e73;
 }
 @media (prefers-color-scheme:dark){
   :root{
-    --sec:#000;--sec-alt:#101012;--card:#1c1c1e;--card-alt:#1c1c1e;
-    --text:#f5f5f7;--muted:#a1a1a6;--line:rgba(255,255,255,.2);--line2:rgba(255,255,255,.1);
-    --accent:#2997ff;--focus:#64b5ff;--ok:#30d158;--warn:#ffd60a;--bad:#ff6961;--chip:rgba(255,255,255,.1);
-    --nav:rgba(22,22,23,.92);--nav-solid:#161617;
-    --glow:rgba(41,151,255,.32);--glow2:rgba(34,211,238,.13);--glow3:rgba(46,125,246,.16);
-    --grad:linear-gradient(95deg,#6cb8ff 0%,#2997ff 42%,#22d3ee 100%);
-    --inv-bg:#f5f5f7;--inv-text:#1d1d1f;--inv-muted:#515154;--inv-chip:rgba(0,0,0,.07);
-    --film-shadow:0 0 0 1px rgba(255,255,255,.12),0 50px 120px -40px rgba(41,151,255,.55),0 30px 60px -30px rgba(0,0,0,.9);
+    --bg:#000;--bg2:#0c0c0e;--tile:#161617;--tile2:#161617;
+    --text:#f5f5f7;--muted:#98989d;--dim:#6e6e73;--line:#424245;--line2:rgba(255,255,255,.1);
+    --link:#2997ff;--focus:#64b5ff;--ok:#30d158;--warn:#ffd60a;--bad:#ff6961;--hot:#ff9f0a;--chip:rgba(255,255,255,.1);
+    --shadow:0 0 0 1px rgba(255,255,255,.12),0 40px 80px -36px #000;
+    --mac:#1e1e20;--mac-bar:#2a2a2d;--mac-t:#98989d;
   }
-  .sec+.sec:not(.stage){border-top:1px solid var(--line2)}
 }
 .dk{
   color:var(--text);
-  --sec:#000;--sec-alt:#000;--card:#1c1c1e;--card-alt:#1c1c1e;
-  --text:#f5f5f7;--muted:#a1a1a6;--line:rgba(255,255,255,.2);--line2:rgba(255,255,255,.1);
-  --accent:#2997ff;--focus:#64b5ff;--ok:#30d158;--warn:#ffd60a;--bad:#ff6961;--chip:rgba(255,255,255,.1);
+  --bg:#000;--bg2:#000;--tile:#161617;--tile2:#161617;
+  --text:#f5f5f7;--muted:#98989d;--dim:#6e6e73;--line:#424245;--line2:rgba(255,255,255,.1);
+  --link:#2997ff;--focus:#64b5ff;--ok:#30d158;--warn:#ffd60a;--bad:#ff6961;--hot:#ff9f0a;--chip:rgba(255,255,255,.1);
+  --shadow:0 0 0 1px rgba(255,255,255,.12),0 40px 80px -36px #000;
+  --mac:#1e1e20;--mac-bar:#2a2a2d;--mac-t:#98989d;
 }
 *,*::before,*::after{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:68px;background:var(--sec)}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:calc(var(--nav) + 8px);background:#000}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
-body{margin:0;background:var(--sec);color:var(--text);font:400 1.0625rem/1.47 var(--sans);-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
+body{margin:0;background:var(--bg);color:var(--text);font:400 1.0625rem/1.47 var(--sans);letter-spacing:-.01em;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
 img,video{max-width:100%}
 figure{margin:0}
-a{color:var(--accent);text-underline-offset:.2em}
-a:hover{text-decoration-thickness:2px}
-code,kbd{font-family:var(--mono)}
+a{color:var(--link);text-decoration:none;text-underline-offset:.2em}
+a:hover{text-decoration:underline}
+code,kbd{font-family:var(--mono);letter-spacing:0}
 p{margin:0 0 1em}
-h1,h2,h3{margin:0;font-weight:700;text-wrap:balance}
-.lead,.sub,.intro,.tile p,.ba p.d,.steps p,.steps3 p{text-wrap:pretty}
+h1,h2,h3{margin:0;font-weight:600;text-wrap:balance}
 ul,ol{margin:0;padding:0}
 [role=list]{list-style:none}
 [hidden]{display:none!important}
-:focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:6px}
+:focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:8px}
 main:focus{outline:none}
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
-.nw{display:inline-block}
+.nw{white-space:nowrap}
 .i{width:1.1em;height:1.1em;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.17em}
-.skip{position:absolute;left:16px;top:-5em;z-index:50;background:var(--btn);color:var(--btn-fg);padding:.7rem 1.1rem;border-radius:999px;font-weight:600;text-decoration:none}
-.skip:focus{top:10px}
-.wrap{width:100%;max-width:1200px;margin-inline:auto;padding-inline:clamp(16px,5vw,40px)}
-.wrap.film-w{max-width:1360px}
-:where(p,li,dd,summary) code{padding:.1em .4em;border-radius:6px;background:var(--chip);font-size:.88em;white-space:nowrap}
+.skip{position:absolute;left:16px;top:-5em;z-index:50;background:var(--btn);color:#fff;padding:.7rem 1.1rem;border-radius:999px}
+.skip:focus{top:8px}
+.wrap{width:min(100% - 2*var(--gut),1200px);margin-inline:auto}
+:where(p,li,dd,summary) code{padding:.1em .38em;border-radius:6px;background:var(--chip);font-size:.88em}
 kbd{padding:.1em .45em;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;font-size:.85em}
+sup a{padding:0 .15em;font-size:.7em;font-weight:400}
 
-/* ---------- Type scale ---------- */
-.eyebrow-s{margin:0 0 14px;font-size:1.0625rem;font-weight:600;letter-spacing:-.005em;color:var(--accent)}
-h2{font-size:clamp(2.125rem,1.1rem + 3.9vw,4rem);line-height:1.05;letter-spacing:-.04em}
-h3{font-size:1.5rem;line-height:1.15;letter-spacing:-.022em}
-.intro{margin:20px auto 0;max-width:34em;color:var(--muted);font-size:clamp(1.1875rem,1.05rem + .55vw,1.5rem);line-height:1.38;letter-spacing:-.012em}
-.head{text-align:center;margin-bottom:clamp(40px,6vw,72px)}
-.sec{position:relative;padding-block:clamp(80px,11vw,160px);background:var(--sec);color:var(--text)}
-.sec.alt{background:var(--sec-alt);--card:var(--card-alt)}
-.more{margin:20px 0 0;color:var(--muted);font-size:1rem}
+/* ---------- Type and sections ---------- */
+h1{font-size:clamp(2.75rem,.9rem + 6.1vw,5.25rem);line-height:1.04;letter-spacing:-.022em}
+h2{font-size:clamp(2.125rem,1.2rem + 3.6vw,4rem);line-height:1.06;letter-spacing:-.02em}
+h3{font-size:1.5rem;line-height:1.16;letter-spacing:-.015em}
+.sec{position:relative;padding-block:clamp(84px,11vw,150px);background:var(--bg);color:var(--text)}
+.sec.alt{background:var(--bg2);--tile:var(--tile2)}
+.head{max-width:900px;margin:0 auto clamp(40px,5.6vw,72px);text-align:center}
+.lede{margin:20px auto 0;max-width:34em;color:var(--muted);font-size:clamp(1.1875rem,1.06rem + .5vw,1.4375rem);line-height:1.38;font-weight:600;letter-spacing:-.012em;text-wrap:pretty}
+.lede b{color:var(--text);font-weight:600}
+.lede code{font-weight:500}
+.more{margin:28px 0 0;text-align:center}
+.more .go,.fine .go,.verify .go{display:inline-flex;align-items:center;min-height:44px}
+.go::after{content:"\203A";content:"\203A" / "";margin-left:.3em;display:inline-block;transition:transform .15s}
+.go:hover::after{transform:translateX(3px)}
 
 /* ---------- Buttons ---------- */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:52px;padding:0 30px;border-radius:999px;border:1px solid transparent;font:500 1.0625rem/1.2 var(--sans);letter-spacing:-.01em;text-decoration:none;cursor:pointer;white-space:nowrap}
-.btn .i{width:1.05em;height:1.05em}
-.btn-primary{background:var(--btn);color:var(--btn-fg)}
-.btn-primary:hover{background:var(--btn-h);text-decoration:none}
-.btn-ghost{border-color:var(--accent);color:var(--accent);background:transparent}
-.btn-ghost:hover{background:var(--chip);text-decoration:none}
-.btn-ghost .i{fill:currentColor;stroke:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 26px;border:0;border-radius:999px;background:var(--btn);color:#fff;font:400 1.0625rem/1 var(--sans);letter-spacing:-.01em;white-space:nowrap;cursor:pointer;transition:background-color .15s,box-shadow .15s,transform .15s}
+.btn:hover{background:var(--btn-h);text-decoration:none}
+.btn-2{background:transparent;color:var(--link);box-shadow:inset 0 0 0 1px currentColor}
+.btn-2:hover{background:var(--chip)}
+.btn .i{width:.95em;height:.95em;fill:currentColor;stroke:none}
+@media (hover:hover) and (pointer:fine){.btn:hover{transform:translateY(-1px)}}
+.btn:active{transform:translateY(1px) scale(.985);transition-duration:.09s}
 
-/* ---------- Local nav ---------- */
-.top{position:sticky;top:0;z-index:40;background:var(--nav-solid);color:var(--text);border-bottom:1px solid var(--line2)}
-@supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)){.top{background:var(--nav);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}}
-.bar{display:flex;align-items:center;gap:8px;min-height:52px}
-.brand{display:inline-flex;align-items:center;gap:10px;margin-right:auto;min-height:44px;color:var(--text);text-decoration:none;font-size:1.3125rem;font-weight:600;letter-spacing:-.02em}
+/* ---------- Nav: dark glass in both themes ---------- */
+.top{position:sticky;top:0;z-index:40;background:#161617;border-bottom:1px solid rgba(255,255,255,.1)}
+@supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)){.top{background:rgba(22,22,23,.9);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}}
+.bar{display:flex;align-items:center;gap:6px;min-height:var(--nav)}
+.brand{display:inline-flex;align-items:center;gap:9px;margin-right:auto;min-height:44px;color:var(--text);font-size:1.25rem;font-weight:600;letter-spacing:-.02em}
 .brand:hover{text-decoration:none}
-.brand img{display:block;width:26px;height:26px}
-.links ul{display:flex;align-items:center;gap:clamp(2px,1vw,14px)}
-.links a{display:inline-flex;align-items:center;min-height:44px;padding:0 8px;color:var(--muted);text-decoration:none;font-size:.8125rem;letter-spacing:-.005em;white-space:nowrap;border-radius:6px}
-.links a:hover,.links a[aria-current=true]{color:var(--text)}
-.inst{display:inline-flex;align-items:center;min-height:32px;margin-left:8px;padding:0 15px;border-radius:999px;background:var(--btn);color:#fff;font-size:.8125rem;font-weight:500;text-decoration:none;white-space:nowrap}
+.brand img{display:block;width:22px;height:22px}
+.links ul{display:flex;align-items:center;gap:clamp(0px,.8vw,10px)}
+.links a{display:inline-flex;align-items:center;min-height:44px;padding:0 9px;color:var(--muted);font-size:.8125rem;letter-spacing:0;white-space:nowrap;border-radius:6px;transition:color .15s}
+.links a:hover,.links a[aria-current=true]{color:var(--text);text-decoration:none}
+.inst{position:relative;display:inline-flex;align-items:center;min-height:30px;margin-left:10px;padding:0 14px;border-radius:999px;background:var(--btn);color:#fff;font-size:.8125rem;letter-spacing:0;white-space:nowrap;transition:background-color .15s}
+.inst::after{content:"";position:absolute;inset:-8px -4px}
 .inst:hover{background:var(--btn-h);text-decoration:none}
 .mnav{display:none}
-.mnav summary{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 10px;color:var(--text);font-size:.9375rem;cursor:pointer;list-style:none;border-radius:999px}
+.mnav summary{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 10px;color:var(--text);font-size:.875rem;cursor:pointer;list-style:none;border-radius:999px}
 .mnav summary::-webkit-details-marker{display:none}
 .mnav summary::after{content:"";width:7px;height:7px;margin:-3px 0 0 2px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
 .mnav details[open] summary::after{transform:rotate(225deg);margin-top:3px}
-.mnav ul{position:absolute;left:0;right:0;top:100%;padding:6px clamp(16px,5vw,40px) 18px;background:var(--nav-solid);border-bottom:1px solid var(--line2);max-height:calc(100vh - 53px);overflow:auto;box-shadow:0 30px 40px -30px rgba(0,0,0,.35)}
-.mnav li+li{border-top:1px solid var(--line2)}
-.mnav li a{display:flex;align-items:center;min-height:52px;color:var(--text);text-decoration:none;font-size:1.375rem;font-weight:600;letter-spacing:-.02em}
+.mnav ul{position:absolute;left:0;right:0;top:100%;padding:4px var(--gut) 20px;background:#161617;border-bottom:1px solid rgba(255,255,255,.1);max-height:calc(100vh - var(--nav) - 1px);overflow:auto}
+.mnav li+li{border-top:1px solid rgba(255,255,255,.1)}
+.mnav li a{display:flex;align-items:center;min-height:54px;color:var(--text);font-size:1.5rem;font-weight:600;letter-spacing:-.02em}
 @media (max-width:859px){.links{display:none}.mnav{display:block}}
-@media (max-width:359px){.brand{font-size:1.125rem;gap:8px}.brand img{width:22px;height:22px}.mnav summary{padding:0 6px}.inst{padding:0 12px;margin-left:2px}}
+
+/* ---------- A picture drawn at a fixed size (--w by --h) that shrinks to fit its box ---------- */
+.fit{container-type:inline-size}
+.art{--s:min(1,tan(atan2(100cqw,var(--w))));position:relative;width:var(--w);height:var(--h);margin:0 auto calc(var(--h)*(var(--s) - 1));transform:scale(var(--s));transform-origin:0 0}
+/* The scale needs container units and the trigonometric functions. A browser without both
+   cannot work it out: there the picture is cut to its box. */
+@supports not ((width:1cqw) and (width:calc(1px*tan(45deg)))){.art{max-width:100%;overflow:hidden}}
 
 /* ---------- Hero ---------- */
-.hero{position:relative;isolation:isolate;overflow:hidden;padding:clamp(36px,4.6vw,68px) 0 0;text-align:center;background:var(--sec)}
-.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:
-  radial-gradient(60% 46% at 50% -4%,var(--glow),transparent 72%),
-  radial-gradient(38% 30% at 92% 12%,var(--glow2),transparent 72%),
-  radial-gradient(40% 30% at 6% 18%,var(--glow3),transparent 72%)}
-.eyebrow{display:inline-flex;align-items:center;gap:10px;max-width:100%;margin:0 0 clamp(18px,2.4vw,26px);padding:6px 16px 6px 7px;border-radius:999px;background:var(--chip);border:1px solid var(--line2);color:var(--text);font-size:.9375rem;line-height:1.35;text-decoration:none;text-align:left}
-.eyebrow:hover{border-color:var(--line);text-decoration:none}
-.eyebrow b{flex:none;padding:2px 10px;border-radius:999px;background:var(--btn);color:#fff;font-size:.8125rem;font-weight:600}
-.eyebrow code{background:none;padding:0;font-size:.9em;color:var(--text)}
-.eyebrow .i{color:var(--accent)}
-h1{font-size:clamp(2.5rem,1.15rem + 6.2vw,5rem);line-height:1.02;letter-spacing:-.045em;max-width:12.5em;margin:0 auto}
-.grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
-@media (forced-colors:active){.grad{background:none;-webkit-text-fill-color:currentColor;color:inherit}}
-.lead{margin:clamp(18px,2.2vw,26px) auto 0;max-width:24em;font-size:clamp(1.3125rem,1.05rem + 1.2vw,1.875rem);line-height:1.25;letter-spacing:-.02em;font-weight:500}
-.sub{margin:14px auto 0;max-width:40em;color:var(--muted);font-size:clamp(1.0625rem,1rem + .3vw,1.25rem);line-height:1.4}
-.cta{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:clamp(24px,3.2vw,34px)}
-@media (max-width:479px){.cta{flex-direction:column;align-items:stretch}.cta .btn{width:100%}}
-.film-wrap{margin-top:clamp(36px,5vw,64px)}
+.hero{display:flex;flex-direction:column;min-height:max(calc(100svh - var(--nav) - 1px),640px);padding-top:clamp(40px,6.4vh,84px);overflow:hidden;text-align:center;background:#000}
+.kicker{margin:0 0 10px;font-size:clamp(1.1875rem,1rem + .6vw,1.5rem);font-weight:600;letter-spacing:-.015em;color:var(--muted)}
+.hero h1{max-width:13em;margin-inline:auto}
+.hero h1 span{display:inline-block}
+.hero .lede{max-width:31em;margin-top:clamp(16px,2vw,24px)}
+.cta{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:clamp(22px,2.6vw,32px)}
+@media (max-width:479px){.cta{flex-direction:column;align-items:stretch}}
+.fact{margin:18px auto 0;color:var(--muted);font-size:.875rem;letter-spacing:0;text-wrap:balance}
+.hero .shot{flex:1 1 0;min-height:230px;margin-top:clamp(28px,4.4vh,56px);-webkit-mask-image:linear-gradient(#000 62%,transparent 97%);mask-image:linear-gradient(#000 62%,transparent 97%)}
+.fan{--w:1180px;--h:510px}
+.fan .w-c{left:330px;top:0;scale:.92;opacity:.94}
+.fan .w-w{left:30px;top:132px}
+.fan .w-p{left:630px;top:166px}
+@media (max-width:719px){
+  .fan{--w:660px;--h:600px}
+  .fan .w-c{left:70px;top:0}
+  .fan .w-w{left:0;top:118px}
+  .fan .w-p{left:140px;top:240px}
+}
 
-/* ---------- Video players (film and demos) ---------- */
-.shot{position:relative;background:#000;line-height:0;aspect-ratio:920/592}
-.shot video{display:block;width:100%;height:100%;object-fit:cover;background:#000}
-.js .shot video{cursor:pointer}
-.shot.paused video{filter:brightness(.6) saturate(.9)}
-@media (prefers-reduced-motion:no-preference){.shot video{transition:filter .25s}}
+/* The app's windows: the same stand-in chat app, one for each account. */
+.win{position:absolute;display:grid;grid-template:42px minmax(0,1fr)/35% minmax(0,1fr);width:520px;height:340px;border-radius:14px;overflow:hidden;background:#1e1e20;text-align:left;font:400 13px/1.3 var(--sans);letter-spacing:0;color:#f5f5f7;
+  box-shadow:0 0 0 1px rgba(255,255,255,.13),0 44px 90px -24px #000,0 18px 36px -18px rgba(0,0,0,.8);--a:#2E7DF6;--mac-bar:#2a2a2d;--mac-t:#98989d}
+.win.p{--a:#2FB344}.win.c{--a:#F76B15}
+.win .mac-bar{grid-column:1/-1;height:auto;padding:0 15px;border-bottom:1px solid rgba(0,0,0,.5)}
+.wside{padding:16px 14px;background:#232326;border-right:1px solid rgba(255,255,255,.06)}
+.who{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.av{flex:none;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--a);color:#fff;font-size:15px;font-weight:700}
+.who div{font-size:15px;font-weight:600;line-height:1.2}
+.who small{display:flex;align-items:center;gap:5px;margin-top:2px;font-size:11px;font-weight:500;color:#30d158;white-space:nowrap}
+.who small::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.rw{height:9px;border-radius:5px;background:rgba(255,255,255,.1);margin:13px 0}
+.rw.on{height:30px;margin:10px -6px;border-radius:8px}
+.wmain{display:flex;flex-direction:column;gap:11px;padding:20px 20px 0}
+.bb{height:30px;border-radius:15px;background:rgba(255,255,255,.09)}
+.bb.me{margin-left:auto;background:var(--a)}
+.comp{margin-top:auto;margin-bottom:16px;height:38px;border-radius:19px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04)}
+
+/* The hero comes in once: its lines in the order --e gives, then its windows in the order --n
+   gives. Without motion, or without this animation, it just stands there. */
+@media (prefers-reduced-motion:no-preference){
+  .hero [data-e]{animation:rise .9s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--e)*90ms)}
+  .hero .win{animation:winrise 1.2s cubic-bezier(.16,1,.3,1) both;animation-delay:calc(.42s + var(--n)*.13s)}
+  .hero .who small{animation:pop .5s cubic-bezier(.34,1.56,.64,1) both;animation-delay:calc(1.25s + var(--n)*.13s)}
+}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}}
+@keyframes winrise{from{opacity:0;translate:0 70px}}
+@keyframes pop{from{opacity:0;transform:scale(.7)}}
+
+/* ---------- Video players (the film and the two clips) ---------- */
+.shot-v{position:relative;background:#000;line-height:0}
+.shot-v video{display:block;width:100%;height:100%;object-fit:cover;background:#000}
+.js .shot-v video{cursor:pointer}
+.shot-v.paused video{filter:brightness(.55)}
+@media (prefers-reduced-motion:no-preference){.shot-v video{transition:filter .25s}}
 .ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;pointer-events:none}
 .ov>*{pointer-events:auto}
-.bigplay{display:flex;align-items:center;gap:12px;max-width:100%;min-height:58px;padding:0 28px 0 20px;border-radius:999px;border:1px solid rgba(255,255,255,.28);background:rgba(245,245,247,.94);color:#1d1d1f;font:600 1.0625rem/1.2 var(--sans);cursor:pointer;box-shadow:0 20px 50px -10px rgba(0,0,0,.6)}
-.bigplay:hover{background:#fff}
-.bigplay .i{width:22px;height:22px;fill:currentColor;stroke:none;color:#0066cc}
-.why{margin:0;max-width:44ch;padding:8px 14px;border-radius:12px;background:rgba(0,0,0,.72);color:#f5f5f7;font:500 .9375rem/1.45 var(--sans);text-align:center}
-.why a{color:#64b5ff}
-.prog{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.18)}
-.prog i{display:block;height:100%;transform:scaleX(var(--p,0));transform-origin:0 50%;background:linear-gradient(90deg,#2997ff,#22d3ee)}
-.ctl{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#f5f5f7;font:500 .875rem/1 var(--sans);cursor:pointer}
-.ctl:hover{background:rgba(255,255,255,.16);color:#fff}
-.ctl .i{fill:currentColor;stroke:none}
-.fs .i,.snd .i,.cc .i{fill:none;stroke:currentColor}
-.vtime{display:none;margin-left:auto;font:500 .8125rem var(--mono);color:var(--t-muted);font-variant-numeric:tabular-nums}
-.js .vtime{display:inline}
-@media (max-width:600px){.js .vtime{display:none}.vbtn{margin-left:auto}}
-@media (max-width:420px){.demo .term-title{display:none}}
-.film{width:100%;max-width:1280px;margin:0 auto;background:#000;color:var(--t-text);border-radius:clamp(18px,3vw,34px);overflow:hidden;box-shadow:var(--film-shadow)}
-.film .shot{aspect-ratio:16/9}
-.film :focus-visible{outline-color:#64b5ff}
-.film-bar{display:none;flex-wrap:wrap;align-items:center;gap:8px;padding:12px clamp(12px,2vw,20px);background:#111113;border-top:1px solid rgba(255,255,255,.1)}
-.js .film-bar{display:flex}
-.film-bar .vbtn{margin-left:0}
-.film-bar .vtime{margin-left:auto}
-.snd{color:var(--t-muted)}
-.snd.on{border-color:rgba(41,151,255,.7);background:rgba(41,151,255,.2);color:#fff}
-.cc[aria-pressed=true]{border-color:rgba(41,151,255,.7);background:rgba(41,151,255,.2);color:#fff}
-.eq{display:none;align-items:flex-end;gap:2px;height:12px}
-.snd.on .eq{display:inline-flex}
-.eq i{width:3px;height:100%;border-radius:1px;background:currentColor;transform-origin:50% 100%;transform:scaleY(.4)}
-@media (prefers-reduced-motion:no-preference){.playing .eq i{animation:eq .8s ease-in-out infinite alternate}.eq i:nth-child(2){animation-delay:-.27s}.eq i:nth-child(3){animation-delay:-.53s}}
-@keyframes eq{from{transform:scaleY(.3)}to{transform:scaleY(1)}}
-.watch{position:absolute;left:50%;bottom:clamp(14px,2.4vw,28px);transform:translateX(-50%);display:flex;align-items:center;gap:9px;min-height:48px;padding:0 22px 0 18px;border-radius:999px;border:1px solid rgba(255,255,255,.3);background:rgba(245,245,247,.94);color:#1d1d1f;font:600 1rem/1.2 var(--sans);white-space:nowrap;cursor:pointer;box-shadow:0 14px 40px -8px rgba(0,0,0,.7)}
-.watch:hover{background:#fff}
-.watch .i{color:#0066cc;fill:none;stroke:currentColor}
+.bigplay,.watch{display:inline-flex;align-items:center;border:0;border-radius:999px;background:rgba(245,245,247,.94);color:#1d1d1f;font:500 1.0625rem/1.2 var(--sans);cursor:pointer;transition:background-color .15s,transform .15s}
+.bigplay:hover,.watch:hover{background:#fff}
+.bigplay:active,.watch:active{transform:scale(.97)}
+.bigplay{gap:10px;min-height:52px;padding:0 26px 0 20px}
+.bigplay .i{width:18px;height:18px;fill:currentColor;stroke:none}
+.watch{gap:8px;min-height:40px;padding:0 18px 0 14px;font-size:.9375rem;white-space:nowrap}
+.watch .i{width:17px;height:17px}
+.ov .why{margin:0;max-width:44ch;padding:8px 14px;border-radius:12px;background:rgba(0,0,0,.72);color:#f5f5f7;font:500 .9375rem/1.45 var(--sans);text-align:center}
+.ov .why a{color:#64b5ff}
+.prog{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(255,255,255,.16)}
+.prog i{display:block;height:100%;transform:scaleX(var(--p,0));transform-origin:0 50%;background:#f5f5f7}
+.ctls{display:flex;gap:8px}
+.ctl{display:grid;place-items:center;padding:0;border:0;border-radius:50%;cursor:pointer;transition:background-color .15s,transform .15s}
+.ctl:active{transform:scale(.92)}
+.ctl .i{vertical-align:0}
+.vbtn .i{fill:currentColor;stroke:none}
+.film-ui{position:absolute;left:clamp(10px,1.6vw,20px);right:clamp(10px,1.6vw,20px);bottom:clamp(12px,1.8vw,22px);display:flex;align-items:center;justify-content:space-between;gap:10px;pointer-events:none}
+.film-ui>*{pointer-events:auto}
+.film-ui .ctls{margin-left:auto}
+.film .ctl{width:40px;height:40px;background:rgba(66,66,69,.72);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);color:#f5f5f7}
+.film .ctl:hover{background:rgba(90,90,94,.86)}
+.film .ctl .i{width:17px;height:17px}
+.film .snd.on,.film .cc[aria-pressed=true]{background:#f5f5f7;color:#1d1d1f}
+.film{position:relative;width:100%;max-width:1200px;margin:0 auto;color:#f5f5f7}
+.film .shot-v{aspect-ratio:16/9;border-radius:clamp(14px,2.2vw,28px);overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.1)}
 .ccon .watch{display:none}
-@media (max-width:767px){.film-bar .fsl,.film-bar .ccl,.film-bar .vtime{display:none}.film-bar .fs{margin-left:auto}}
-@media (max-width:480px){.fsl,.ccl{display:none}.watch{min-height:44px;font-size:.9375rem}.film-bar .ctl{padding:0 12px}}
-@media (max-width:359px){.film-bar{padding:8px;gap:6px}.ctl{padding:0 11px;gap:6px}}
-@media (max-width:379px){.film-bar .vlbl,.film-bar .slbl{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+/* On a narrow screen the pill would cover the picture, so it sits under it. */
+@media (max-width:719px){.film-ui{position:static;flex-wrap:wrap;justify-content:center;margin-top:14px}.film-ui .ctls{margin:0}.watch{min-height:44px}.film .ctl{width:44px;height:44px}}
+.cinema{padding-top:clamp(40px,6vw,84px)}
+.cinema .head{margin-bottom:clamp(28px,4vw,48px)}
 
-/* ---------- Terminal cards (dark in both themes) ---------- */
-.term{background:var(--t-bg);color:var(--t-text);border-radius:22px;border:1px solid var(--t-line);overflow:hidden;min-width:0;box-shadow:0 40px 80px -40px rgba(0,0,0,.5)}
-.term :focus-visible{outline-color:#64b5ff}
-.term a{color:#64b5ff}
-.term-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 16px;min-height:52px;background:var(--t-bar);border-bottom:1px solid rgba(255,255,255,.08)}
-.dots{display:flex;gap:8px;flex:none}
-.dots i{width:12px;height:12px;border-radius:50%;background:#ff5f57}
-.dots i:nth-child(2){background:#febc2e}
-.dots i:nth-child(3){background:#28c840}
-.term-title{font:500 .8125rem var(--mono);color:var(--t-muted);overflow-wrap:anywhere}
-.p{color:var(--t-ok);margin-right:.6em;user-select:none;-webkit-user-select:none}
+/* ---------- The statement ---------- */
+.say p{max-width:21em;margin:0;font-size:clamp(1.75rem,.9rem + 3.4vw,3.5rem);line-height:1.12;font-weight:600;letter-spacing:-.02em;text-wrap:pretty}
+.say strong{font-weight:600;color:var(--link)}
+.say .w{transition:color .35s}
+.say .w.off{color:var(--dim)}
 
-/* Install */
-.install{padding-top:clamp(64px,8vw,120px)}
-.js .install .term-title{display:none}
-.tabs{display:none;gap:6px}
-.js .tabs{display:flex;flex-wrap:wrap}
-.tabs button{min-height:36px;padding:0 16px;border-radius:999px;border:1px solid transparent;background:transparent;color:var(--t-muted);font:600 .8125rem var(--mono);cursor:pointer}
-.tabs button:hover{color:var(--t-text)}
-.tabs button[aria-selected=true]{color:#fff;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2)}
-.panel{padding:22px clamp(16px,3vw,28px) 20px;text-align:left}
-html:not(.js) .panel[hidden]{display:block!important}
-html:not(.js) .panel+.panel{border-top:1px solid var(--t-line)}
-.plabel{display:block;margin:0 0 10px;font:600 .75rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--t-muted)}
-.js .plabel{display:none}
-.cmdrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:start}
-.cmdrow+.cmdrow{margin-top:14px}
-.ps{color:var(--t-ok);font:700 1rem/1.6 var(--mono);user-select:none;-webkit-user-select:none}
-.cmd{display:block;font:500 .9375rem/1.6 var(--mono);color:var(--t-text);overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
-.js .ps,.js .cmd{padding-top:9px}
-.copy{display:none;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:999px;border:1px solid #0071e3;background:#0071e3;color:#fff;font:500 .9375rem var(--sans);cursor:pointer}
-.js .copy{display:inline-flex}
-.copy:hover{background:#0a84ff;border-color:#0a84ff}
-.copy.done{background:#30d158;border-color:#30d158;color:#04210d}
-.hint{margin:16px 0 0;color:var(--t-muted);font-size:.9375rem}
-.term :where(p,li) code{padding:0;background:none;color:var(--t-text);white-space:normal}
-@media (max-width:559px){.cmdrow{grid-template-columns:auto minmax(0,1fr)}.js .ps,.js .cmd{padding-top:0}.copy{grid-column:1/-1;width:100%}}
-.install-wrap{max-width:820px;margin:0 auto}
-.recipe-cta{margin:22px 0 0;text-align:center;font-weight:500}
-.recipe-cta a{display:inline-flex;align-items:center;gap:6px;min-height:44px}
-.fine{margin:0 auto;max-width:62ch;color:var(--muted);font-size:1rem;text-align:center}
-.fine summary{display:inline-flex;align-items:center;gap:6px;min-height:44px;cursor:pointer;color:var(--accent);list-style:none}
-.fine summary::-webkit-details-marker{display:none}
-.fine[open] summary .i{transform:rotate(180deg)}
-.fine p{margin:4px 0 0;text-align:left}
-.works{margin:clamp(28px,4vw,40px) auto 0;max-width:40em;text-align:center;color:var(--muted);font-size:1rem}
-.works b{color:var(--text);font-weight:600}
-
-/* ---------- At a glance ---------- */
-.glance{padding:clamp(56px,7vw,96px) 0 0;background:var(--sec)}
-.glance ul{display:grid;gap:22px 32px;grid-template-columns:minmax(0,1fr);padding-block:clamp(28px,4vw,44px);border-block:1px solid var(--line)}
-.glance li{padding-top:20px;border-top:1px solid var(--line2)}
-.glance li:first-child{padding-top:0;border-top:0}
-.glance strong{display:block;font-size:clamp(1.375rem,1.15rem + .6vw,1.625rem);line-height:1.1;font-weight:700;letter-spacing:-.03em;overflow-wrap:normal}
-.glance span{display:block;margin-top:8px;color:var(--muted);font-size:.9375rem;line-height:1.4}
-@media (min-width:640px){
-  .glance ul{grid-template-columns:repeat(6,minmax(0,1fr))}
-  .glance li,.glance li:first-child{grid-column:span 2;padding-top:0;border-top:0}
-  .glance li:nth-child(n+4){grid-column:span 3}
+/* ---------- Launcher icons: the app's own icon (the stand-in, assets/app.svg) with the badge
+   aidentity draws on it. --b is the badge's colour. ---------- */
+.lic{display:block;width:100%;height:auto;overflow:visible;filter:drop-shadow(0 8px 10px rgba(0,0,0,.22))}
+.lic text{font:700 26.4px var(--sans);letter-spacing:0;fill:#fff;text-anchor:middle;dominant-baseline:central}
+.split{display:grid;gap:clamp(36px,6vw,80px);grid-template-columns:minmax(0,1fr);align-items:center}
+@media (min-width:940px){.split{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}}
+.split .lede{margin-inline:0}
+.iconrow{display:flex;justify-content:center;gap:clamp(6px,1.6vw,22px);list-style:none}
+.iconrow li{flex:0 1 164px;min-width:0;text-align:center;font-size:clamp(.75rem,.6rem + .5vw,.9375rem);font-weight:500;line-height:1.25;transform-origin:50% 62%;transition:transform .22s cubic-bezier(.2,.7,.2,1)}
+.iconrow span{display:block;margin-top:6px}
+@media (hover:hover) and (pointer:fine){
+  .iconrow li:hover{transform:scale(1.16) translateY(-5%)}
+  .iconrow li:hover+li,.iconrow li:has(+li:hover){transform:scale(1.06) translateY(-2%)}
 }
-@media (min-width:1000px){
-  .glance ul{grid-template-columns:repeat(5,minmax(0,1fr))}
-  .glance li,.glance li:first-child,.glance li:nth-child(n+4){grid-column:auto;padding-left:24px;border-left:1px solid var(--line2)}
-  .glance li:first-child{padding-left:0;border-left:0}
-}
+.picker{margin-top:30px}
+.pk-l{margin:0 0 12px;font-size:.9375rem;font-weight:600}
+.swatches{display:grid;grid-template-columns:repeat(10,minmax(0,32px));gap:clamp(5px,1.2vw,10px)}
+.swatches button{width:100%;aspect-ratio:1;padding:0;border:0;border-radius:50%;background:var(--c);box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);cursor:pointer;transition:transform .15s,box-shadow .15s}
+.swatches button:hover{transform:scale(1.12)}
+.swatches button:active{transform:scale(.94)}
+.swatches button[aria-checked=true]{box-shadow:0 0 0 3px var(--bg2),0 0 0 5px var(--text)}
+@media (max-width:599px){.swatches{grid-template-columns:repeat(5,44px);gap:12px}}
+.cmdline{margin:18px 0 0;color:var(--muted);font-size:.9375rem}
+.cmdline code{padding:0;background:none;color:var(--text);font-size:.9375rem;overflow-wrap:anywhere}
 
-/* ---------- Statement: without and with ---------- */
-.statement{text-align:center}
-.big{margin:0 auto;max-width:16em;font-size:clamp(2.125rem,.9rem + 4.6vw,4.25rem);line-height:1.05;letter-spacing:-.042em;font-weight:700}
-.big .l1{display:block}
-.big .l2{color:var(--muted)}
-.ba{display:grid;gap:clamp(12px,1.5vw,20px);grid-template-columns:minmax(0,1fr);max-width:1080px;margin:clamp(48px,6vw,80px) auto 0;text-align:left}
-@media (min-width:760px){.ba{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.ba article{display:flex;flex-direction:column;justify-content:space-between;gap:40px;min-height:clamp(260px,28vw,360px);padding:clamp(26px,3.6vw,48px);border-radius:clamp(24px,3vw,36px);background:var(--card)}
-.ba .label{margin:0 0 16px;color:var(--muted);font-size:.9375rem;font-weight:600}
-.ba h3{font-size:clamp(1.75rem,1.2rem + 1.8vw,2.625rem);line-height:1.08;letter-spacing:-.034em;max-width:11em}
-.ba p.d{margin:16px 0 0;color:var(--muted);font-size:1.1875rem;line-height:1.38;max-width:24em}
-.ba .with{background:var(--inv-bg);color:var(--inv-text);--muted:var(--inv-muted)}
-.pills{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
-.pills span{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;background:var(--chip);font-size:.9375rem;font-weight:600}
-.with .pills span{background:var(--inv-chip)}
-.pills i{width:8px;height:8px;border-radius:50%;background:#30d158}
-.pills .off i{background:var(--muted)}
-.pills .arr{padding:0;background:none;color:var(--muted);font-weight:400}
-
-/* ---------- Bento ---------- */
+/* ---------- Tiles ---------- */
 .bento{display:grid;gap:clamp(12px,1.5vw,20px);grid-template-columns:repeat(12,minmax(0,1fr))}
-.tile{position:relative;grid-column:span 12;display:flex;flex-direction:column;min-width:0;overflow:hidden;padding:clamp(26px,3.4vw,44px);border-radius:clamp(24px,3vw,36px);background:var(--card);color:var(--text)}
-.tile .lab{margin:0 0 10px;font-size:.9375rem;font-weight:600;color:var(--muted);letter-spacing:-.005em}
-.tile h3{font-size:clamp(1.5rem,1.1rem + 1.2vw,2.125rem);line-height:1.1;letter-spacing:-.03em;max-width:14em}
-.tile p{margin:14px 0 0;color:var(--muted);font-size:1.0625rem;line-height:1.45;max-width:30em}
-.tile .tags{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 0}
-.tag{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border:1px solid var(--st);border-radius:999px;color:var(--st);font:600 .8125rem/1.5 var(--sans)}
-.tag .i{width:1em;height:1em}
-.v-ok{--st:var(--ok)}
-.v-det{--st:var(--accent)}
-.v-br{--st:var(--warn)}
-.v-no{--st:var(--bad)}
-.tile .vis{margin-top:auto;padding-top:clamp(28px,4vw,48px)}
-.tdk{background:#08142b linear-gradient(165deg,#0b1d3d 0%,#050b18 70%);color:#f5f5f7;--muted:#b4b4ba;--accent:#64b5ff;--ok:#30d158;--chip:rgba(255,255,255,.1);--focus:#64b5ff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
-.tblue{background:#0a4fae linear-gradient(160deg,#0a62c9 0%,#0b3b8f 100%);color:#fff;--muted:#fff;--accent:#fff;--chip:rgba(0,0,0,.24);--focus:#fff;--ok:#fff}
-.tblue p{color:#fff}
-.tblue .tag{color:#fff;border-color:rgba(255,255,255,.7)}
-.bigcode{display:block;margin:0;font:600 clamp(1.375rem,1rem + 1vw,1.625rem)/1.15 var(--mono);letter-spacing:-.04em;overflow-wrap:anywhere}
-@media (min-width:640px) and (max-width:899px){.t-c,.t-d{grid-column:span 6}}
-@media (min-width:900px){.t-a{grid-column:span 7}.t-b{grid-column:span 5}.t-c,.t-d,.t-e{grid-column:span 4}.t-f{grid-column:span 12;flex-direction:row;align-items:center;gap:clamp(24px,4vw,64px)}.t-f>div:first-child{flex:1 1 0}.t-f .vis{flex:1 1 0;margin:0;padding:0}.tile{min-height:340px}.t-a,.t-b{min-height:560px}.t-f{min-height:0}}
+.tile{position:relative;grid-column:span 12;display:flex;flex-direction:column;min-width:0;overflow:hidden;padding:clamp(26px,3.2vw,44px);border-radius:clamp(22px,2.6vw,30px);background:var(--tile);color:var(--text)}
+.tile h3{font-size:clamp(1.5rem,1.15rem + 1vw,2rem);line-height:1.1;letter-spacing:-.02em;max-width:13em}
+.tile p{margin:12px 0 0;max-width:30em;color:var(--muted);text-wrap:pretty}
+.tile .vis{margin-top:auto;padding-top:clamp(28px,3.6vw,44px)}
+.tile .tag{margin:0 0 12px;font-size:.8125rem;font-weight:600;letter-spacing:0;color:var(--hot)}
+@media (min-width:640px) and (max-width:899px){.t4{grid-column:span 6}}
+@media (min-width:900px){.t7{grid-column:span 7}.t5{grid-column:span 5}.t4{grid-column:span 4}.t7,.t5{min-height:480px}.t4{min-height:300px}}
+.pair{--w:560px;--h:260px}
+.pair .win{width:320px;height:210px;box-shadow:0 0 0 1px rgba(255,255,255,.13),0 26px 50px -22px rgba(0,0,0,.6)}
+.pair .wside{padding:14px 12px}
+.pair .who{gap:8px}
+.pair .av{width:28px;height:28px;font-size:13px}
+.pair .who div{font-size:13px}
+.pair .win:nth-child(1){left:0;top:44px}
+.pair .win:nth-child(2){left:240px;top:0}
+.minirow{display:flex;gap:16px}
+.minirow li{width:118px;text-align:center;font-size:.8125rem;font-weight:500;line-height:1.25}
+.minirow span{display:block;margin-top:4px}
 
-/* mini windows */
-.mws{display:grid;grid-template-columns:1fr 1fr;gap:clamp(10px,1.6vw,18px);align-items:end}
-.mw{min-width:0;border-radius:16px;background:#1c1c1e;border:1px solid rgba(255,255,255,.12);box-shadow:0 30px 60px -30px rgba(0,0,0,.8);overflow:hidden}
-.mw-bar{display:flex;align-items:center;gap:6px;padding:10px 12px;background:#2c2c2e;color:#a1a1a6;font:500 .75rem var(--sans)}
-.mw-bar i{width:9px;height:9px;border-radius:50%;background:#ff5f57;flex:none}
-.mw-bar i:nth-child(2){background:#febc2e}
-.mw-bar i:nth-child(3){background:#28c840}
-.mw-bar span{margin-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mw-body{display:grid;gap:10px;padding:clamp(12px,1.6vw,18px);color:#f5f5f7}
-.mw-who{display:flex;align-items:center;gap:9px;font:600 .875rem var(--sans)}
-.av{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#2e5de6;color:#fff;font-size:.8125rem;font-weight:700}
-.av.g{background:#1a7f37}
-.sk{display:block;height:8px;border-radius:4px;background:rgba(255,255,255,.12)}
-.sk.w1{width:78%}.sk.w2{width:52%}.sk.w3{width:64%}
-.bub{display:block;height:22px;margin-left:auto;width:62%;border-radius:11px;background:rgba(41,151,255,.32)}
-.sig{justify-self:start;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;border:1px solid rgba(48,209,88,.5);background:rgba(48,209,88,.12);color:#30d158;font:600 .6875rem var(--sans)}
-.sig::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
-.mws .mw:nth-child(2){margin-bottom:clamp(14px,3vw,36px)}
-@media (max-width:479px){.mws{grid-template-columns:minmax(0,1fr)}.mws .mw:nth-child(2){margin-bottom:0}}
-
-/* app icons */
-.icons{display:flex;flex-wrap:wrap;gap:clamp(14px,2.4vw,28px)}
-.ic{display:flex;flex-direction:column;align-items:center;gap:10px;font:500 .875rem/1.3 var(--sans);color:var(--text);text-align:center}
-.icon{position:relative;display:grid;place-items:center;width:clamp(68px,8vw,92px);aspect-ratio:1;border-radius:22%;background:linear-gradient(160deg,#4a4a50,#2a2a2e);color:#e5e5ea;box-shadow:0 14px 30px -14px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.14)}
-.icon .i{width:clamp(30px,3.6vw,40px);height:clamp(30px,3.6vw,40px)}
-.badge{position:absolute;right:-5px;bottom:-5px;width:24px;height:24px;border-radius:50%;border:4px solid var(--card);background:#2e7df6}
-.badge.b2{background:#af52de}
-.icon.add{background:transparent;border:2px dashed var(--line);box-shadow:none;color:var(--muted)}
-.cline{display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:16px;background:var(--t-bg);color:var(--t-text);font:500 clamp(.875rem,.8rem + .3vw,1.0625rem)/1.5 var(--mono);overflow-wrap:anywhere;border:1px solid rgba(255,255,255,.1)}
-.cline .p{margin:0}
-.empty{display:grid;gap:10px;padding:18px;border-radius:16px;background:var(--t-bg);border:1px solid rgba(255,255,255,.1);color:var(--t-muted);font:500 .8125rem var(--sans)}
-.empty .sk{height:34px;border-radius:10px;background:rgba(255,255,255,.07)}
-.empty .sk.btn2{width:46%;background:rgba(41,151,255,.45)}
+/* A window of macOS around a picture or a terminal. */
+.mac{border-radius:12px;overflow:hidden;background:var(--mac);box-shadow:var(--shadow)}
+.mac-bar{position:relative;display:flex;align-items:center;gap:8px;height:38px;padding:0 14px;background:var(--mac-bar)}
+.mac-bar i{width:12px;height:12px;border-radius:50%;background:#ff5f57}
+.mac-bar i:nth-child(2){background:#febc2e}.mac-bar i:nth-child(3){background:#28c840}
+.mac-bar b{position:absolute;left:0;right:0;text-align:center;font-size:.8125rem;font-weight:600;letter-spacing:0;color:var(--mac-t)}
+.mac img{display:block;width:100%;height:auto}
+@media (max-width:599px){.t-row .mac img{aspect-ratio:4/5;object-fit:cover;object-position:0 0}}
+.mac.t{--mac:var(--tile);box-shadow:0 0 0 1px rgba(255,255,255,.12),0 40px 80px -36px rgba(0,0,0,.6)}
+.clip .shot-v{aspect-ratio:16/10}
+/* A clip's buttons sit in its title bar, so they never cover the terminal's text. */
+.clip .ctls{position:relative;margin:0 -6px 0 auto;gap:2px}
+.clip .ctl{position:relative;width:32px;height:32px;background:transparent;color:var(--muted)}
+.clip .ctl::after{content:"";position:absolute;inset:-6px}
+.clip .ctl:hover{background:rgba(255,255,255,.12);color:var(--text)}
+.clip .ctl .i{width:14px;height:14px}
+.t-row{gap:clamp(28px,4vw,56px)}
+@media (min-width:900px){.t-row{flex-direction:row;align-items:center}.t-row>div:first-child{flex:4 1 0}.t-row .vis{flex:7 1 0;margin:0;padding:0}}
 
 /* ---------- How it works: a dark stage in both themes ---------- */
-.stage{background:radial-gradient(70% 55% at 50% 58%,rgba(41,151,255,.13),transparent 72%),#000}
-.dia{--rh:96px;--g:16px;display:grid;grid-template-columns:minmax(0,1fr);justify-items:stretch}
+.stage{background:radial-gradient(70% 55% at 50% 46%,rgba(41,151,255,.12),transparent 72%),#000}
+.dia{--rh:92px;--g:16px;display:grid;grid-template-columns:minmax(0,1fr);justify-items:stretch}
 .dcol{display:grid;gap:12px}
-.dn{display:flex;flex-direction:column;justify-content:center;min-width:0;padding:16px 22px;border-radius:20px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06)}
-.dn-t{font-size:1.125rem;font-weight:600;letter-spacing:-.015em;overflow-wrap:anywhere}
-.dn-s{margin-top:3px;font-size:.875rem;color:var(--muted)}
-.dn.launcher{border-color:rgba(41,151,255,.6);background:rgba(41,151,255,.1)}
-.dn.data{border-color:rgba(34,211,238,.45)}
-.dn.data .dn-t{font:600 .8125rem var(--mono);color:#7fe3f4}
-.dn.orig{border-style:dashed}
-.dapp{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:28px 22px;text-align:center;border-radius:28px;background:linear-gradient(165deg,#14315c,#0a1830);border:1px solid rgba(41,151,255,.6);box-shadow:0 0 0 10px rgba(41,151,255,.06),0 50px 120px -30px rgba(41,151,255,.55)}
-.dapp .ai{display:grid;place-items:center;width:68px;height:68px;margin-bottom:8px;border-radius:18px;background:linear-gradient(160deg,#4a4a50,#2a2a2e);color:#e5e5ea;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
-.dapp .ai .i{width:34px;height:34px}
-.dapp b{font-size:1.625rem;letter-spacing:-.03em;font-weight:700}
+.dn{display:flex;flex-direction:column;justify-content:center;min-width:0;padding:14px 22px;border-radius:20px;background:#161617;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.dn-t{font-size:1.0625rem;font-weight:600;overflow-wrap:anywhere}
+.dn-s{margin-top:2px;font-size:.875rem;color:var(--muted)}
+.dn.launcher{display:grid;grid-template-columns:44px minmax(0,1fr);gap:0 14px;align-items:center}
+.dn.launcher .lic{grid-row:span 2;filter:none}
+.dn.data .dn-t{font:600 .875rem var(--mono);letter-spacing:0;color:#7fd4ff}
+.dn.orig{box-shadow:none;border:1px dashed rgba(255,255,255,.3)}
+.dapp{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:26px 22px;text-align:center;border-radius:28px;background:linear-gradient(165deg,#10294d,#081426);box-shadow:inset 0 0 0 1px rgba(41,151,255,.55),0 50px 120px -30px rgba(41,151,255,.5)}
+.dapp .lic{width:84px;margin-bottom:4px}
+.dapp b{font-size:1.625rem;letter-spacing:-.02em;font-weight:600}
 .dapp span{color:#c9d6ea;font-size:.9375rem;max-width:15em}
 .dconn{display:flex;justify-content:center}
-.ln{position:relative;display:block;width:2px;height:76px;margin:0 auto;background:linear-gradient(#2997ff,#22d3ee)}
-.ln::after{content:"";position:absolute;left:50%;bottom:-1px;width:9px;height:9px;border:solid #22d3ee;border-width:0 2px 2px 0;transform:translateX(-50%) rotate(45deg)}
-.ln em{position:absolute;left:16px;top:50%;transform:translateY(-50%);font:500 .75rem var(--mono);font-style:normal;color:var(--muted);white-space:nowrap}
-.ln.dash{background:repeating-linear-gradient(#22d3ee 0 6px,transparent 6px 11px)}
-@media (max-width:979px){.dconn .ln:nth-child(n+2){display:none}.dcol{max-width:440px;width:100%;margin-inline:auto}.dapp{max-width:440px;width:100%;margin-inline:auto}}
+.ln{position:relative;display:block;width:2px;height:64px;margin:0 auto;background:#2997ff}
+.ln::after{content:"";position:absolute;left:50%;bottom:-1px;width:9px;height:9px;border:solid #2997ff;border-width:0 2px 2px 0;transform:translateX(-50%) rotate(45deg)}
+.ln em{position:absolute;left:16px;top:50%;transform:translateY(-50%);font:500 .75rem var(--mono);font-style:normal;letter-spacing:0;color:var(--muted);white-space:nowrap}
+.ln.dash{background:repeating-linear-gradient(#2997ff 0 6px,transparent 6px 11px)}
+@media (max-width:979px){.dconn .ln:nth-child(n+2){display:none}.dcol,.dapp{max-width:440px;width:100%;margin-inline:auto}}
 @media (min-width:980px){
-  .dia{grid-template-columns:minmax(0,1fr) clamp(116px,11vw,160px) minmax(0,1.05fr) clamp(116px,11vw,160px) minmax(0,1fr);align-items:start}
+  .dia{grid-template-columns:minmax(0,1fr) clamp(104px,10vw,150px) minmax(0,1fr) clamp(104px,10vw,150px) minmax(0,1fr);align-items:start}
   .dcol,.dconn{grid-template-rows:repeat(3,var(--rh));gap:var(--g)}
   .dconn{display:grid;grid-template-columns:minmax(0,1fr);justify-content:stretch}
   .dcol .dn{height:var(--rh)}
   .dapp{height:calc(3*var(--rh) + 2*var(--g))}
-  .ln{width:100%;height:2px;margin:auto 0;background:linear-gradient(90deg,#2997ff,#22d3ee)}
-  .ln.dash{background:repeating-linear-gradient(90deg,#22d3ee 0 6px,transparent 6px 11px)}
+  .ln{width:100%;height:2px;margin:auto 0}
+  .ln.dash{background:repeating-linear-gradient(90deg,#2997ff 0 6px,transparent 6px 11px)}
   .ln::after{left:auto;right:-1px;bottom:auto;top:50%;transform:translateY(-50%) rotate(-45deg)}
   .ln em{left:50%;top:auto;bottom:10px;transform:translateX(-50%)}
 }
-.steps3{display:grid;gap:clamp(28px,4vw,48px);margin-top:clamp(56px,8vw,96px);grid-template-columns:minmax(0,1fr)}
+.steps3{display:grid;gap:clamp(28px,4vw,48px);margin-top:clamp(48px,7vw,84px);grid-template-columns:minmax(0,1fr)}
 @media (min-width:860px){.steps3{grid-template-columns:repeat(3,minmax(0,1fr))}}
-.steps3 li{padding-top:22px;border-top:1px solid var(--line)}
-.num{display:block;margin-bottom:14px;font:600 .9375rem var(--mono);color:var(--accent)}
-.steps3 h3{font-size:1.375rem}
+.steps3 li{padding-top:20px;border-top:1px solid var(--line)}
+.steps3 h3{font-size:1.3125rem}
 .steps3 p{margin:10px 0 0;color:var(--muted)}
-.steps3 code{white-space:normal}
-.map-note{margin:clamp(36px,5vw,56px) 0 0;text-align:center;font-size:1.25rem;letter-spacing:-.015em}
-
-/* ---------- Demos ---------- */
-.demo{max-width:1040px;margin:0 auto;border-radius:clamp(18px,2.6vw,30px)}
-.demo .term-bar{min-height:58px}
-.chapters{display:flex;flex-wrap:wrap;align-items:center;gap:8px 6px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.08);background:var(--t-bar)}
-.cl{margin:0 8px 0 4px;font:600 .75rem var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--t-muted)}
-.chapters ul{display:flex;flex-wrap:wrap;gap:6px}
-.chapters button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid transparent;background:transparent;color:var(--t-muted);font:500 .875rem var(--sans);cursor:pointer}
-.chapters button:hover{color:#fff;background:rgba(255,255,255,.1)}
-.chapters button[aria-current=true]{color:#fff;background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22)}
-.chapters small{font:500 .75rem var(--mono)}
-html:not(.js) .chapters{display:none}
-.cap{padding:16px 20px;border-top:1px solid rgba(255,255,255,.08);color:var(--t-muted);font-size:.9375rem;line-height:1.5}
-.tx{max-width:1040px;margin:18px auto 0;color:var(--muted)}
-.tx summary{display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--accent);font-weight:500;cursor:pointer;list-style:none}
-.tx summary::-webkit-details-marker{display:none}
-.tx ol{margin:8px 0 0;padding-left:1.4em}
-.tx li{margin:0 0 .6em}
-.tx li code{white-space:normal}
-.tx[open] summary .i{transform:rotate(180deg)}
-.menu-demo{display:grid;gap:clamp(24px,4vw,56px);grid-template-columns:minmax(0,1fr);align-items:center;max-width:1200px;margin:clamp(80px,11vw,144px) auto 0}
-.menu-demo h3{font-size:clamp(1.75rem,1.2rem + 2vw,2.75rem);line-height:1.1;letter-spacing:-.035em}
-.menu-demo h3 code{display:block;margin-top:.12em;font-size:.85em;white-space:nowrap}
-.menu-demo .mh p{margin:14px 0 0;max-width:30em;color:var(--muted);font-size:1.1875rem}
-.menu-demo .tx{margin:12px 0 0}
-@media (min-width:980px){.menu-demo{grid-template-columns:minmax(0,4fr) minmax(0,7fr)}.menu-demo .demo{max-width:none;width:100%}}
-
-/* ---------- Set up ---------- */
-.steps{display:grid;gap:clamp(32px,4vw,56px);grid-template-columns:minmax(0,1fr);counter-reset:s}
-@media (min-width:860px){.steps{grid-template-columns:repeat(3,minmax(0,1fr))}}
-.steps li{counter-increment:s}
-.steps li::before{content:counter(s);content:counter(s) / "";display:block;margin-bottom:10px;font-size:clamp(4rem,3rem + 4vw,6.5rem);line-height:1;font-weight:700;letter-spacing:-.05em;color:var(--accent)}
-.steps h3{font-size:1.5rem}
-.steps p{margin:12px 0 0;color:var(--muted)}
-.steps code{white-space:normal}
-.note{display:flex;gap:14px;margin-top:clamp(36px,5vw,56px);padding:20px 24px;background:var(--card);border-radius:22px;border:1px solid var(--line2)}
-.note .i{margin-top:.2em;color:var(--accent);width:1.3em;height:1.3em}
-.note p{margin:0;color:var(--muted)}
-.note strong{color:var(--text)}
-.note.warn .i{color:var(--warn)}
-.sub-h{margin:clamp(64px,9vw,112px) 0 clamp(20px,3vw,32px);text-align:center;font-size:clamp(1.75rem,1.2rem + 2vw,2.75rem);letter-spacing:-.035em}
-.cmdlist{padding:6px 0}
-.cmdlist li{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:6px 28px;align-items:baseline;padding:14px 22px}
-.cmdlist li+li{border-top:1px solid rgba(255,255,255,.08)}
-.cmdlist code{font:500 .9375rem/1.55 var(--mono);overflow-wrap:anywhere;background:none;padding:0;color:var(--t-text);white-space:normal}
-.cmdlist code::before{content:"$";content:"$" / "";margin-right:.6em;color:var(--t-ok)}
-.cmdlist .d{color:var(--t-muted);font-size:.9375rem}
-@media (max-width:699px){.cmdlist li{grid-template-columns:minmax(0,1fr)}}
-
-/* ---------- Apps ---------- */
-.apps{display:grid;gap:clamp(12px,1.5vw,20px);grid-template-columns:repeat(12,minmax(0,1fr))}
-.app{grid-column:span 12;padding:clamp(24px,3vw,40px);border-radius:clamp(24px,3vw,32px);background:var(--card);min-width:0}
-@media (min-width:900px){.a-v{grid-column:span 4}.a-t{grid-column:span 8}.a-b{grid-column:span 5}.a-n{grid-column:span 7}}
-.app h3{display:flex;align-items:center;gap:10px;font-size:1.75rem;letter-spacing:-.03em;color:var(--st)}
-.app h3 .i{width:1em;height:1em}
-.app p{margin:10px 0 0;color:var(--muted);font-size:1rem}
-.app p code{white-space:normal}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
-.chips li{padding:6px 14px;border-radius:999px;background:var(--sec);border:1px solid var(--line2);font-size:.9375rem}
-.app .ask{margin-top:20px;font-size:.9375rem}
-.blurb{margin:clamp(28px,4vw,40px) auto 0;max-width:50em;color:var(--muted)}
 
 /* ---------- Safety ---------- */
-.specs{border-bottom:1px solid var(--line)}
-.specs>li{display:grid;gap:10px 48px;padding:clamp(26px,3.4vw,40px) 0;border-top:1px solid var(--line);grid-template-columns:minmax(0,1fr)}
-@media (min-width:860px){.specs>li{grid-template-columns:minmax(0,4fr) minmax(0,8fr)}}
-.spec-k{display:flex;align-items:center;align-self:start;gap:10px;padding-top:.45em;font-size:.9375rem;font-weight:600;color:var(--accent)}
-.spec-k .i{width:1.4em;height:1.4em}
-.specs h3{font-size:clamp(1.375rem,1.1rem + 1vw,1.875rem);letter-spacing:-.028em;line-height:1.15}
-.specs p{margin:12px 0 0;color:var(--muted);max-width:42em}
-.specs p code{white-space:normal}
-.verify{display:grid;gap:28px 48px;margin-top:clamp(56px,8vw,96px);align-items:center;grid-template-columns:minmax(0,1fr)}
-@media (min-width:900px){.verify{grid-template-columns:minmax(0,6fr) minmax(0,6fr)}.verify .term{order:-1}}
+.facts{display:grid;gap:clamp(32px,4vw,52px) clamp(28px,4vw,56px);grid-template-columns:minmax(0,1fr)}
+@media (min-width:640px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:980px){.facts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.facts .i{display:block;width:34px;height:34px;margin-bottom:16px;stroke-width:1.5;color:var(--link)}
+.facts h3{font-size:1.3125rem}
+.facts p{margin:8px 0 0;color:var(--muted)}
+.verify{display:grid;gap:28px 56px;margin-top:clamp(56px,8vw,96px);align-items:center;grid-template-columns:minmax(0,1fr)}
+@media (min-width:900px){.verify{grid-template-columns:minmax(0,5fr) minmax(0,6fr)}}
+.verify h3{margin-bottom:12px;font-size:clamp(1.5rem,1.15rem + 1.2vw,2.125rem);letter-spacing:-.02em}
 .verify p{color:var(--muted)}
-.verify p code{white-space:normal}
-.verify h3{margin-bottom:14px;font-size:clamp(1.75rem,1.2rem + 2vw,2.75rem);letter-spacing:-.035em}
-.code{padding:20px 22px;font:500 .875rem/1.8 var(--mono)}
-.code p{margin:0;overflow-wrap:anywhere;color:var(--t-text)}
-.code p.o{color:var(--t-muted)}
+.code{padding:18px 22px 20px;font:500 .875rem/1.8 var(--mono);letter-spacing:0;color:var(--text)}
+.code p{margin:0;overflow-wrap:anywhere}
+.code .o{color:var(--muted)}
+.code .k{color:var(--ok)}
+.ps{margin-right:.7em;color:var(--muted);user-select:none;-webkit-user-select:none}
+.note{display:flex;gap:14px;margin-top:clamp(36px,5vw,56px);padding:20px 24px;border-radius:20px;background:var(--tile)}
+.note .i{margin-top:.2em;width:1.3em;height:1.3em;color:var(--warn)}
+.note p{margin:0;color:var(--muted)}
+.note strong{color:var(--text)}
 
-/* ---------- Catch ---------- */
-.split{display:grid;gap:clamp(32px,5vw,64px);grid-template-columns:minmax(0,1fr)}
-@media (min-width:960px){.split{grid-template-columns:minmax(0,5fr) minmax(0,6fr);align-items:center}}
-.split h2{font-size:clamp(2rem,1.1rem + 3.2vw,3.5rem)}
-.split .lede{margin:20px 0 0;color:var(--muted);font-size:1.1875rem;line-height:1.4}
-.tell{display:grid;gap:14px;margin-top:28px}
-.tell li{display:flex;gap:12px;align-items:flex-start;color:var(--muted)}
-.tell li::before{content:"\2713";content:"\2713" / "";flex:none;font-weight:700;color:var(--ok);margin-top:.05em}
+/* ---------- Apps: a list with a label column ---------- */
+.specs{max-width:980px;margin:0 auto;border-bottom:1px solid var(--line)}
+.specs>li{display:grid;gap:8px 40px;padding:clamp(22px,3vw,32px) 0;border-top:1px solid var(--line);grid-template-columns:minmax(0,1fr)}
+@media (min-width:760px){.specs>li{grid-template-columns:minmax(0,3fr) minmax(0,9fr)}}
+.spec-k{display:flex;align-items:center;align-self:start;gap:9px;font-size:1.0625rem;font-weight:600;color:var(--st)}
+.spec-k .i{width:1.15em;height:1.15em}
+.v-ok{--st:var(--ok)}.v-det{--st:var(--link)}.v-br{--st:var(--warn)}.v-no{--st:var(--bad)}
+.specs p{margin:0;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.chips li{padding:5px 14px;border-radius:999px;background:var(--tile);box-shadow:inset 0 0 0 1px var(--line2);font-size:.9375rem}
+.blurb{max-width:980px;margin:28px auto 0;color:var(--muted)}
+
+/* ---------- The catch ---------- */
+.eyebrow{margin:0 0 12px;font-size:1.0625rem;font-weight:600;color:var(--hot)}
+.split h2{font-size:clamp(2rem,1.2rem + 2.9vw,3.25rem)}
+.tell{display:grid;gap:12px;margin-top:26px}
+.tell li{display:flex;gap:12px;color:var(--muted)}
+.tell li::before{content:"\2713";content:"\2713" / "";flex:none;font-weight:700;color:var(--ok)}
 .tell strong{color:var(--text)}
-.dock-body{display:grid;gap:24px;padding:26px 22px;grid-template-columns:minmax(0,1fr)}
-@media (min-width:600px){.dock-body{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:start}.dock-arrow{padding-top:86px}}
-.dock-h{margin:0 0 16px;font:600 .75rem var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--t-muted)}
-.tiles{display:flex;gap:16px;flex-wrap:wrap}
-.tiles.dockbar{display:inline-flex;padding:14px 16px 12px;border:1px solid rgba(255,255,255,.18);border-radius:24px;background:rgba(255,255,255,.08)}
-.t{display:flex;flex-direction:column;align-items:center;gap:8px;font:.75rem/1.3 var(--sans);color:var(--t-muted);text-align:center}
-.tile-i{position:relative;display:grid;place-items:center;width:68px;height:68px;border-radius:17px;background:linear-gradient(160deg,#4a4a50,#2a2a2e);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);color:#e5e5ea}
-.tile-i .i{width:32px;height:32px}
-.tile-i .badge{border-color:var(--t-bg)}
-.tile-i.run{margin-bottom:4px}
-.run::after{content:"";position:absolute;left:50%;bottom:-11px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:#e5e5ea}
-.dock-arrow{color:#64b5ff;font:700 1.5rem var(--mono);text-align:center}
-@media (max-width:599px){.dock-arrow{transform:rotate(90deg)}}
-.nots{display:grid;gap:clamp(12px,1.5vw,20px);grid-template-columns:minmax(0,1fr)}
-@media (min-width:640px){.nots{grid-template-columns:repeat(6,minmax(0,1fr))}.nots li{grid-column:span 3}}
-@media (min-width:1000px){.nots li{grid-column:span 2}.nots li:nth-child(n+4){grid-column:span 3}}
-.nots li{display:flex;gap:12px;align-items:flex-start;padding:22px 24px;border-radius:24px;background:var(--card);color:var(--muted)}
-.nots li::before{content:"\2715";content:"\2715" / "";flex:none;font-weight:700;color:var(--bad);margin-top:.05em}
-.nots strong{color:var(--text)}
+.panel-v{padding:clamp(24px,3.4vw,48px);border-radius:clamp(22px,2.6vw,30px);background:var(--tile)}
+/* Three columns, filled downwards: the icons you click, an arrow, the Dock. */
+.dockpic{display:grid;grid-template-rows:repeat(3,auto);grid-auto-flow:column;justify-content:start;align-items:center;gap:14px clamp(14px,2.4vw,30px);color:var(--muted);font-size:.875rem;letter-spacing:0}
+.dockpic p{margin:0;font-weight:600}
+.dockpic .arr{grid-area:2/2;font-size:1.875rem;line-height:1}
+.dockpic .arr~*{grid-column:3}
+.dockpic .bar-d~p{font-weight:400}
+.dockpic li{width:clamp(64px,7vw,100px)}
+.dockpic .minirow{gap:14px;color:var(--text)}
+.bar-d{display:flex;justify-self:start;gap:6px;padding:10px 12px 22px;border-radius:30px;background:var(--chip);box-shadow:inset 0 0 0 1px var(--line2);list-style:none}
+.bar-d li{position:relative}
+.bar-d li::after{content:"";position:absolute;left:50%;bottom:-13px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--muted)}
+@media (max-width:719px){
+  .dockpic{grid-template-rows:none;grid-auto-flow:row}
+  .dockpic .arr,.dockpic .arr~*{grid-area:auto}
+  .dockpic .arr{justify-self:start;margin-left:38px;rotate:90deg}
+  .dockpic li{width:96px}
+}
+
+/* ---------- Install: dark in both themes ---------- */
+.term{border-radius:18px;overflow:hidden;background:var(--tile);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);text-align:left}
+.term-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.08)}
+.tabs{display:none;gap:4px}
+.js .tabs{display:flex}
+.tabs button{min-height:34px;padding:0 16px;border:0;border-radius:999px;background:transparent;color:var(--muted);font:500 .8125rem var(--sans);letter-spacing:0;cursor:pointer;transition:background-color .15s,color .15s}
+.tabs button:hover{color:var(--text)}
+.tabs button[aria-selected=true]{color:#fff;background:rgba(255,255,255,.14)}
+@media (pointer:coarse){.tabs button{min-height:44px}}
+.panel{padding:20px clamp(16px,3vw,26px) 18px}
+html:not(.js) .panel[hidden]{display:block!important}
+html:not(.js) .panel+.panel{border-top:1px solid rgba(255,255,255,.12)}
+.plabel{display:block;margin:0 0 8px;font:600 .75rem var(--sans);color:var(--muted)}
+.js .plabel{display:none}
+.cmdrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center}
+.cmdrow .ps{margin:0;font:500 1rem/1.6 var(--mono)}
+.cmd{display:block;font:500 clamp(.875rem,.8rem + .3vw,1rem)/1.6 var(--mono);letter-spacing:0;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
+.copy{display:none;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 20px;border:0;border-radius:999px;background:var(--btn);color:#fff;font:400 .9375rem var(--sans);cursor:pointer;transition:background-color .15s,transform .15s}
+.js .copy{display:inline-flex}
+.copy:hover{background:var(--btn-h)}
+.copy:active{transform:scale(.96)}
+.copy.done{background:#30d158;color:#04210d}
+.hint{margin:14px 0 0;color:var(--muted);font-size:.9375rem}
+.term :where(p) code{padding:0;background:none;color:var(--text)}
+@media (max-width:559px){.cmdrow{grid-template-columns:auto minmax(0,1fr);align-items:start}.copy{grid-column:1/-1;width:100%;min-height:44px}}
+.install-wrap{max-width:800px;margin:0 auto}
+.steps{display:grid;gap:clamp(28px,4vw,52px);margin-top:clamp(52px,7vw,88px);grid-template-columns:minmax(0,1fr);counter-reset:s}
+@media (min-width:860px){.steps{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.steps li{counter-increment:s}
+.steps li::before{content:counter(s);content:counter(s) / "";display:block;margin-bottom:8px;font-size:clamp(3.5rem,2.6rem + 3.4vw,5.5rem);line-height:1;font-weight:600;letter-spacing:-.04em;color:var(--link)}
+.steps h3{font-size:1.4375rem}
+.steps p{margin:10px 0 0;color:var(--muted)}
+.fine{max-width:800px;margin:clamp(36px,5vw,56px) auto 0;color:var(--muted);font-size:.9375rem;text-align:center}
+.fine strong{color:var(--text)}
+.fine summary{display:inline-flex;align-items:center;gap:6px;min-height:44px;cursor:pointer;color:var(--link);list-style:none}
+.fine summary::-webkit-details-marker{display:none}
+.fine details[open] summary .i{transform:rotate(180deg)}
+.fine details p{text-align:left}
 
 /* ---------- FAQ ---------- */
-.faq{max-width:820px;margin:0 auto;border-bottom:1px solid var(--line)}
+.faq{max-width:800px;margin:0 auto;border-bottom:1px solid var(--line)}
 .faq details{border-top:1px solid var(--line)}
-.faq summary{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:64px;padding:18px 4px;font-size:clamp(1.1875rem,1.05rem + .5vw,1.4375rem);font-weight:600;letter-spacing:-.018em;line-height:1.25;cursor:pointer;list-style:none;border-radius:8px}
+.faq summary{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:64px;padding:16px 4px;font-size:clamp(1.125rem,1.02rem + .45vw,1.3125rem);font-weight:600;letter-spacing:-.015em;line-height:1.25;cursor:pointer;list-style:none;border-radius:8px}
 .faq summary::-webkit-details-marker{display:none}
 .faq summary:focus-visible{outline-offset:-3px}
-.faq summary::after{content:"+";content:"+" / "";flex:none;font:300 2rem/1 var(--sans);color:var(--muted)}
-@media (prefers-reduced-motion:no-preference){.faq summary::after{transition:transform .25s}.fine summary .i,.tx summary .i{transition:transform .2s}}
+.faq summary::after{content:"+";content:"+" / "";flex:none;font:300 1.75rem/1 var(--sans);color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.faq summary::after{transition:transform .25s}.fine summary .i{transition:transform .2s}}
 .faq details[open] summary::after{transform:rotate(45deg)}
-.faq .a{padding:0 4px 28px;color:var(--muted);max-width:44em}
+.faq .a{padding:0 4px 26px;color:var(--muted);max-width:44em}
 .faq .a p{margin:0 0 .9em}
 .faq .a p:last-child{margin:0}
 
-/* ---------- Closer: a dark card in both themes ---------- */
-.closer{padding-block:clamp(56px,8vw,112px)}
-.cta-card{position:relative;isolation:isolate;overflow:hidden;text-align:center;padding:clamp(56px,9vw,120px) clamp(18px,5vw,64px);border-radius:clamp(28px,4vw,44px);background:#000;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
-.cta-card::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(60% 55% at 50% 0%,rgba(41,151,255,.32),transparent 72%),radial-gradient(50% 50% at 50% 110%,rgba(34,211,238,.16),transparent 72%)}
-.cta-card h2{font-size:clamp(2.5rem,1.2rem + 6vw,5rem);letter-spacing:-.045em}
-.cta-card .tagline{margin:16px auto 0;font-size:clamp(1.25rem,1.05rem + .9vw,1.75rem);line-height:1.25;letter-spacing:-.02em;font-weight:600}
-.cta-card .tagline span{color:var(--muted)}
-.cta-card .intro{max-width:28em;font-size:clamp(1.0625rem,1rem + .3vw,1.25rem)}
-.cta-card .install-wrap{margin-top:clamp(32px,5vw,56px);max-width:760px}
-.cta-card .small{margin:20px auto 0;max-width:36em;color:var(--muted);font-size:1rem}
-.cta-card .small a{white-space:nowrap}
-
-/* ---------- Footer ---------- */
-.foot{background:var(--sec-alt);color:var(--muted);padding:clamp(40px,6vw,64px) 0 36px;font-size:.875rem;border-top:1px solid var(--line2)}
-.foot-top{display:grid;gap:24px 48px;grid-template-columns:minmax(0,1fr)}
-@media (min-width:860px){.foot-top{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);align-items:start}}
-.foot .brand{font-size:1.25rem}
-.foot-top p{margin:12px 0 0;max-width:26em;font-size:.9375rem}
-.foot ul{display:flex;flex-wrap:wrap;gap:0 24px}
-@media (min-width:860px){.foot ul{justify-content:flex-end}}
-.foot li a{display:inline-flex;align-items:center;min-height:44px;font-size:.9375rem;color:var(--muted);text-decoration:none}
-.foot li a:hover{color:var(--text);text-decoration:underline}
-.legal{margin-top:28px;padding-top:20px;border-top:1px solid var(--line);font-size:.8125rem}
-.legal p{margin:0 0 6px}
-
-/* ---------- Scroll-in reveals. Off for reduced motion and without JS. ---------- */
-@media (prefers-reduced-motion:no-preference){
-  .js .rv{opacity:0;transform:translateY(32px);transition:opacity .9s cubic-bezier(.2,.7,.2,1) calc(var(--d,0)*90ms),transform .9s cubic-bezier(.2,.7,.2,1) calc(var(--d,0)*90ms)}
-  .js .rv.in{opacity:1;transform:none}
-  .rv-init .rv{transition:none!important}
-}
-@media print{.js .rv{opacity:1!important;transform:none!important}}
+/* ---------- Close and footer ---------- */
+.closer{padding-block:clamp(96px,13vw,180px);text-align:center;background:radial-gradient(60% 70% at 50% 110%,rgba(41,151,255,.22),transparent 70%),#000}
+.closer h2{font-size:clamp(2.75rem,1rem + 7vw,6rem);letter-spacing:-.025em}
+.closer .lede{margin-bottom:30px}
+.foot{padding:36px 0 40px;background:#000;border-top:1px solid var(--line);color:var(--muted);font-size:.8125rem;letter-spacing:0}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--text)}
+.notes{padding-bottom:22px;border-bottom:1px solid var(--line)}
+.notes li{margin:0 0 .5em 1.4em}
+.foot nav ul{display:flex;flex-wrap:wrap;gap:0 22px;padding:10px 0}
+.foot nav a{display:inline-flex;align-items:center;min-height:44px}
+.foot p{margin:0 0 6px}
 
 /* ---------- Forced colours ---------- */
 @media (forced-colors:active){
-  .term,.film,.tile,.app,.nots li,.note,.dn,.dapp,.eyebrow,.chip,.tag,.chips li,.btn-ghost,.mw,.icon,.cline,.empty,.ba article,.cta-card,.pills span,.mnav ul{border:1px solid CanvasText}
-  .btn-primary,.inst,.copy,.ctl,.bigplay,.watch{border:1px solid ButtonText}
-  .dots i,.badge{forced-color-adjust:none}
-  .tabs button[aria-selected=true],.chapters button[aria-current=true],.links a[aria-current=true]{border-color:Highlight;text-decoration:underline}
+  .term,.tile,.note,.dn,.dapp,.chips li,.mac,.win,.btn-2,.swatches button{border:1px solid CanvasText}
+  .btn,.inst,.copy,.ctl,.bigplay,.watch{border:1px solid ButtonText}
+  .mac-bar i,.lic,.swatches button{forced-color-adjust:none}
+  .tabs button[aria-selected=true],.links a[aria-current=true]{text-decoration:underline}
   .ln,.ln.dash{background:CanvasText}
+  .say .w.off{color:GrayText}
 }
 </style>
 </head>
 <body id="top">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+<!-- The badge aidentity draws on a launcher's icon: a ring, and a disc in the account's colour. -->
+<symbol id="badge" viewBox="0 0 100 100"><circle cx="75" cy="75" r="24.2" fill="#fff" fill-opacity=".96"/><circle cx="75" cy="75" r="22" style="fill:var(--b,#2E7DF6);transition:fill .25s"/></symbol>
 <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
 <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
 <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
@@ -560,12 +486,9 @@ html:not(.js) .chapters{display:none}
 <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.6A8 8 0 0 1 9.4 4a8 8 0 1 0 10.6 10.6z"/></symbol>
 <symbol id="i-undo" viewBox="0 0 24 24"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></symbol>
 <symbol id="i-user" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
-<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
-<symbol id="i-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+<symbol id="i-seal" viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="m8.5 14-1.5 8 5-3 5 3-1.5-8M9.5 9l1.8 1.8L14.5 7.5"/></symbol>
 <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
-<symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></symbol>
 <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
-<symbol id="i-win" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18"/></symbol>
 <symbol id="i-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
 <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></symbol>
 <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></symbol>
@@ -573,32 +496,33 @@ html:not(.js) .chapters{display:none}
 <symbol id="i-sound" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
 <symbol id="i-mute" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="m23 9-6 6M17 9l6 6"/></symbol>
 <symbol id="i-cc" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10.5 10.2a2.2 2.2 0 1 0 0 3.6M17.5 10.2a2.2 2.2 0 1 0 0 3.6"/></symbol>
-<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 </svg>
 
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="top">
+<header class="top dk">
 <div class="wrap bar">
-<a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="26" height="26"><span>aidentity</span></a>
+<a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="22" height="22"><span>aidentity</span></a>
 <nav class="links" aria-label="Main">
 <ul role="list">
+<li><a href="#film">Film</a></li>
 <li><a href="#uses">Uses</a></li>
 <li><a href="#how-it-works">How it works</a></li>
-<li><a href="#which-apps-work">Apps</a></li>
 <li><a href="#safety">Safety</a></li>
-<li><a href="#faq">FAQ</a></li>
+<li><a href="#which-apps-work">Apps</a></li>
+<li><a href="#faq">Questions</a></li>
 </ul>
 </nav>
 <nav class="mnav" aria-label="Main">
 <details>
 <summary>Menu</summary>
 <ul role="list">
+<li><a href="#film">Film</a></li>
 <li><a href="#uses">Uses</a></li>
 <li><a href="#how-it-works">How it works</a></li>
-<li><a href="#which-apps-work">Apps</a></li>
 <li><a href="#safety">Safety</a></li>
-<li><a href="#faq">FAQ</a></li>
+<li><a href="#which-apps-work">Apps</a></li>
+<li><a href="#faq">Questions</a></li>
 </ul>
 </details>
 </nav>
@@ -609,58 +533,354 @@ html:not(.js) .chapters{display:none}
 <main id="main" tabindex="-1">
 
 <!-- 1. Hero -->
-<section class="hero" aria-labelledby="h-hero">
+<section class="hero dk" aria-labelledby="h-hero">
 <div class="wrap">
-<a class="eyebrow" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-ui---window"><b>New</b><span><code>aidentity ui --window</code>, your profiles in a window</span><svg class="i" aria-hidden="true"><use href="#i-right"/></svg></a>
-<h1 id="h-hero">Stop signing out to <span class="grad">switch accounts.</span></h1>
-<p class="lead">One app, every account, all open at once. Each one stays signed in.</p>
-<p class="sub">A free, open-source command-line tool for Chromium and Electron apps on your Mac. It never changes your app. It opens it again, with one data folder per account.</p>
-<div class="cta">
-<a class="btn btn-primary" href="#install">Install</a>
-<a class="btn btn-ghost" href="#film"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Watch the film</a>
+<p class="kicker" data-e style="--e:0">aidentity</p>
+<h1 id="h-hero" data-e style="--e:1"><span>Every account.</span> <span>Open at once.</span></h1>
+<p class="lede" data-e style="--e:2"><b>Stop signing out to switch accounts.</b> aidentity opens the same Mac app once for each account, and each one stays signed in.</p>
+<div class="cta" data-e style="--e:3">
+<a class="btn" href="#install">Install aidentity</a>
+<a class="btn btn-2" href="#film" data-watch><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Watch the film</a>
+</div>
+<p class="fact" data-e style="--e:4">Free and open source. Verified with Claude Desktop, tested with ChatGPT, Slack, VS Code and 7 more.<sup><a href="#fn1" aria-label="Footnote 1">1</a></sup></p>
+</div>
+<div class="wrap shot fit" role="img" aria-label="The same chat app open in three windows at once: one for a Work account, one for a Personal account and one for a Client account. Each window shows that it is signed in.">
+<div class="art fan" aria-hidden="true">
+<div class="win c w-c" style="--n:0"><div class="mac-bar"><i></i><i></i><i></i><b>Chat</b></div><div class="wside"><div class="who"><span class="av">C</span><div>Client<small>Signed in</small></div></div><div class="rw" style="width:80%"></div><div class="rw" style="width:62%"></div><div class="rw" style="width:70%"></div></div><div class="wmain"><div class="bb" style="width:66%"></div><div class="bb me" style="width:44%"></div><div class="comp"></div></div></div>
+<div class="win w-w" style="--n:1"><div class="mac-bar"><i></i><i></i><i></i><b>Chat</b></div><div class="wside"><div class="who"><span class="av">W</span><div>Work<small>Signed in</small></div></div><div class="rw on"></div><div class="rw" style="width:70%"></div><div class="rw" style="width:76%"></div><div class="rw" style="width:58%"></div></div><div class="wmain"><div class="bb" style="width:62%"></div><div class="bb me" style="width:50%"></div><div class="bb" style="width:74%"></div><div class="bb me" style="width:38%"></div><div class="comp"></div></div></div>
+<div class="win p w-p" style="--n:2"><div class="mac-bar"><i></i><i></i><i></i><b>Chat</b></div><div class="wside"><div class="who"><span class="av">P</span><div>Personal<small>Signed in</small></div></div><div class="rw" style="width:58%"></div><div class="rw on"></div><div class="rw" style="width:66%"></div></div><div class="wmain"><div class="bb" style="width:54%"></div><div class="bb me" style="width:48%"></div><div class="bb" style="width:60%"></div><div class="comp"></div></div></div>
 </div>
 </div>
+</section>
 
-<div class="wrap film-w film-wrap">
-<figure class="film" id="film" data-player data-len="31.4" data-what="film">
-<div class="shot">
-<video id="film-vid" width="1280" height="720" controls muted loop playsinline preload="none" poster="assets/film-poster.jpg" aria-label="A 31-second film: to switch accounts in a chat app, you sign out and sign in again, and you lose your open chats. Then the same chat app is open three times at once, one window for each account, each one signed in. One command sets it up.">
+<!-- 2. The film -->
+<section class="sec dk cinema" aria-labelledby="h-film">
+<div class="wrap">
+<div class="head">
+<h2 id="h-film">See it in 32 seconds.</h2>
+</div>
+<figure class="film" id="film" data-player data-len="31.8" data-what="film">
+<div class="shot-v">
+<video id="film-vid" width="1920" height="1080" controls muted loop playsinline preload="none" poster="assets/film-poster.jpg" aria-label="A 32-second film: to switch accounts in a chat app, you sign out and sign in again, and your open chats are gone. Then the same chat app is open three times at once, one window for each account, each one signed in, with an icon for each. You add an account in a window, a menu, or with one command.">
 <source src="assets/film.webm" type='video/webm; codecs="vp9, opus"'>
 <source src="assets/film.mp4" type="video/mp4">
 <track kind="captions" src="assets/film.vtt" srclang="en" label="English">
-<a href="assets/film.mp4">Watch the film (MP4, 1.6 MB)</a>
+<a href="assets/film.mp4">Watch the film (MP4)</a>
 </video>
 <div class="ov" hidden>
 <button type="button" class="bigplay"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play with sound</button>
 <p class="why" hidden></p>
 </div>
-<button type="button" class="watch" hidden><svg class="i" aria-hidden="true"><use href="#i-sound"/></svg>Watch with sound</button>
 <div class="prog" aria-hidden="true"><i></i></div>
 </div>
-<div class="film-bar">
-<button type="button" class="ctl vbtn" aria-controls="film-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the film</span></button>
-<button type="button" class="ctl snd" aria-controls="film-vid" hidden><svg class="i" aria-hidden="true"><use class="sico" href="#i-mute"/></svg><span class="slbl">Sound off</span><span class="shint sr">, turn it on</span><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span></button>
-<button type="button" class="ctl cc" title="Captions" aria-controls="film-vid" aria-pressed="false" hidden><svg class="i" aria-hidden="true"><use href="#i-cc"/></svg><span class="ccl" aria-hidden="true">Captions</span><span class="sr">Captions for the film</span></button>
-<span class="vtime" aria-hidden="true">0:00 / 0:31</span>
-<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="fsl" aria-hidden="true">Full screen</span><span class="sr">Show the film in full screen</span></button>
+<div class="film-ui">
+<button type="button" class="watch" hidden><svg class="i" aria-hidden="true"><use href="#i-sound"/></svg>Watch with sound</button>
+<div class="ctls">
+<button type="button" class="ctl vbtn" aria-controls="film-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="sr"><span class="vlbl">Play</span> the film</span></button>
+<button type="button" class="ctl snd" aria-controls="film-vid" hidden><svg class="i" aria-hidden="true"><use class="sico" href="#i-mute"/></svg><span class="sr"><span class="slbl">Sound off</span><span class="shint">, turn it on</span></span></button>
+<button type="button" class="ctl cc" title="Captions" aria-controls="film-vid" aria-pressed="false" hidden><svg class="i" aria-hidden="true"><use href="#i-cc"/></svg><span class="sr">Captions for the film</span></button>
+<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="sr">Show the film in full screen</span></button>
 </div>
-<figcaption class="sr">The narration: You know this button… too well! To switch, you sign out. Then sign in again. Sign out. Sign in again. You lose your open chats. Meet aidentity. Every account you use. Open at once. Each in its own window. Each one signed in. Set it up with one command. No copies. No signing out. aidentity. Free, for your Mac.</figcaption>
+</div>
+<figcaption class="sr">The narration: You know this routine. Sign out. Sign in. Sign out. Sign in. And your open chats are gone. Meet aidentity. Every account you use. Open at once. Each in its own window. Each one signed in. An icon for every account. Add one in a window, a menu, or with one command. Your app stays untouched. No copies. No signing out. aidentity. Free, for your Mac.</figcaption>
 </figure>
 </div>
 </section>
 
-<!-- 2. Install -->
-<section class="sec install" id="install" aria-labelledby="h-install">
+<!-- 3. The problem and the answer -->
+<section class="sec say" aria-labelledby="h-say">
 <div class="wrap">
-<div class="head rv">
-<h2 id="h-install">Install it with one command.</h2>
-<p class="intro">Paste one line into Terminal. You sign in once per account.</p>
+<h2 id="h-say" class="sr">Why aidentity</h2>
+<p data-words>Your Mac opens each app once. So you get one account at a time, and every switch means signing out and signing in again. <strong>aidentity opens your app once for each account.</strong> Every window stays signed in, so your open chats stay where they are.</p>
 </div>
-<div class="install-wrap rv">
-<div class="term">
+</section>
+
+<!-- 4. An icon for every account -->
+<section class="sec alt" id="icons" aria-labelledby="h-icons">
+<div class="wrap split">
+<div>
+<h2 id="h-icons">An icon for every account.</h2>
+<p class="lede">Each account gets its own icon, with a letter and a colour you pick. <b>Click it and that account opens.</b></p>
+<div class="picker" hidden>
+<p class="pk-l" id="pk-l">Pick a colour for Work</p>
+<div class="swatches" role="radiogroup" aria-labelledby="pk-l">
+<button type="button" role="radio" aria-checked="true" data-c="blue" style="--c:#2E7DF6"><span class="sr">Blue</span></button>
+<button type="button" role="radio" aria-checked="false" tabindex="-1" data-c="green" style="--c:#2FB344"><span class="sr">Green</span></button>
+<button type="button" role="radio" aria-checked="false" tabindex="-1" data-c="orange" style="--c:#F76B15"><span class="sr">Orange</span></button>
+<button type="button" role="radio" aria-checked="false" tabindex="-1" data-c="purple" style="--c:#8E4EC6"><span class="sr">Purple</span></button>
+<button type="button" role="radio" aria-checked="false" tabindex="-1" data-c="teal" style="--c:#12A594"><span class="sr">Teal</span></button>
+<button type="button" role="radio" aria-checked="false" tabindex="-1" data-c="pink" style="--c:#D6409F"><span class="sr">Pink</span></button>
+<button type="button" role="radio" aria-checked="false" tabindex="-1" data-c="red" style="--c:#E5484D"><span class="sr">Red</span></button>
+<button type="button" role="radio" aria-checked="false" tabindex="-1" data-c="yellow" style="--c:#F5B400"><span class="sr">Yellow</span></button>
+<button type="button" role="radio" aria-checked="false" tabindex="-1" data-c="gray" style="--c:#6B7280"><span class="sr">Gray</span></button>
+<button type="button" role="radio" aria-checked="false" tabindex="-1" data-c="graphite" style="--c:#1F2430"><span class="sr">Graphite</span></button>
+</div>
+<p class="cmdline"><code>aidentity add Claude <span class="nw">--profile Work</span> <span class="nw">--color <span id="pk-name">blue</span></span></code></p>
+</div>
+</div>
+<ul class="iconrow" role="img" aria-label="Four icons made by aidentity. Each is the app's own icon with a round badge: Claude Work with a W, Claude Personal with a green P, Claude Client with an orange C, and Claude Main with a red M.">
+<li aria-hidden="true"><svg class="lic" id="pk-icon" viewBox="0 0 100 100"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">W</text></svg><span>Claude Work</span></li>
+<li aria-hidden="true"><svg class="lic" viewBox="0 0 100 100" style="--b:#2FB344"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">P</text></svg><span>Claude Personal</span></li>
+<li aria-hidden="true"><svg class="lic" viewBox="0 0 100 100" style="--b:#F76B15"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">C</text></svg><span>Claude Client</span></li>
+<li aria-hidden="true"><svg class="lic" viewBox="0 0 100 100" style="--b:#E5484D"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">M</text></svg><span>Claude Main</span></li>
+</ul>
+</div>
+</section>
+
+<!-- 5. One Mac, many uses -->
+<section class="sec" id="uses" aria-labelledby="h-uses">
+<div class="wrap">
+<div class="head">
+<h2 id="h-uses">One Mac, many uses.</h2>
+</div>
+<div class="bento">
+
+<article class="tile t7">
+<h3>Keep work and home apart.</h3>
+<p>Your work account stays open all day. Your personal one is in the next window. You never sign out, so your open chats stay where they are.</p>
+<div class="vis fit" aria-hidden="true"><div class="art pair">
+<div class="win"><div class="mac-bar"><i></i><i></i><i></i><b>Chat</b></div><div class="wside"><div class="who"><span class="av">W</span><div>Work<small>Signed in</small></div></div><div class="rw" style="width:80%"></div><div class="rw" style="width:60%"></div></div><div class="wmain"><div class="bb" style="width:70%"></div><div class="bb me" style="width:52%"></div></div></div>
+<div class="win p"><div class="mac-bar"><i></i><i></i><i></i><b>Chat</b></div><div class="wside"><div class="who"><span class="av">P</span><div>Personal<small>Signed in</small></div></div><div class="rw" style="width:66%"></div><div class="rw" style="width:82%"></div></div><div class="wmain"><div class="bb" style="width:58%"></div><div class="bb me" style="width:46%"></div></div></div>
+</div></div>
+</article>
+
+<article class="tile t5">
+<h3>Give each client a window.</h3>
+<p>One account for each client, each with an icon that carries the client's name. When the job ends, remove the icon. Add <code class="nw">--purge</code> to move its data to the Trash.</p>
+<ul class="vis minirow" role="list" aria-hidden="true">
+<li><svg class="lic" viewBox="0 0 100 100" style="--b:#12A594"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">A</text></svg><span>Claude Client A</span></li>
+<li><svg class="lic" viewBox="0 0 100 100" style="--b:#D6409F"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">B</text></svg><span>Claude Client B</span></li>
+</ul>
+</article>
+
+<article class="tile t4">
+<h3>Test with a clean account.</h3>
+<p>A new profile starts with an empty folder. aidentity does not copy, move or read your existing sign-in.</p>
+</article>
+
+<article class="tile t4">
+<h3>Connect different tools to each account.</h3>
+<p>A new Claude Desktop profile starts with its own, empty list of MCP servers. Add <code class="nw">--seed</code> to copy yours across as a start.</p>
+</article>
+
+<article class="tile t4">
+<h3>Run a second editor.</h3>
+<p>VS Code, Cursor or Kiro, each copy with its own settings. Add <code class="nw">--own-extensions</code> to give it its own extensions too.</p>
+</article>
+
+</div>
+</div>
+</section>
+
+<!-- 6. Three ways to manage accounts -->
+<section class="sec alt" id="demo" aria-labelledby="h-manage">
+<div class="wrap">
+<div class="head">
+<h2 id="h-manage">Three ways to manage your accounts.</h2>
+</div>
+<div class="bento">
+
+<article class="tile t-row">
+<div>
+<p class="tag">New in 1.7</p>
+<h3>A window with every profile.</h3>
+<p><code class="nw">aidentity ui --window</code> shows your profiles as cards, each with its own icon. Open, quit, edit or remove one with a click. It opens no port and runs no server.<sup><a href="#fn2" aria-label="Footnote 2">2</a></sup></p>
+</div>
+<div class="vis">
+<div class="mac"><div class="mac-bar" aria-hidden="true"><i></i><i></i><i></i><b>aidentity</b></div>
+<picture><source media="(prefers-color-scheme: dark)" srcset="assets/window-dark.png"><img src="assets/window-light.png" width="1560" height="1040" loading="lazy" alt="The aidentity window. Four profile cards: Claude Client, Claude Main, Claude Personal and Claude Work, each with its badged icon, its status and the buttons Open, Edit and Remove. The two that are running also have a Quit button. Below them, a removed profile, Claude Test, with a Restore button."></picture>
+</div>
+</div>
+</article>
+
+<article class="tile t-row">
+<div>
+<h3>A menu in your terminal.</h3>
+<p><code class="nw">aidentity ui</code> lists every profile on one screen. Pick one with the arrow keys. One key opens, quits, recolours, renames or removes it.</p>
+</div>
+<div class="vis">
+<figure class="mac t clip dk" data-player data-len="21" data-what="menu demo">
+<div class="mac-bar"><i></i><i></i><i></i><b aria-hidden="true">aidentity ui</b><div class="ctls"><button type="button" class="ctl vbtn" aria-controls="menu-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="sr"><span class="vlbl">Play</span> the menu demo</span></button><button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="sr">Show the menu demo in full screen</span></button></div></div>
+<div class="shot-v">
+<video id="menu-vid" width="1280" height="800" controls muted loop playsinline preload="none" poster="assets/demo-ui-poster.jpg" aria-label="Terminal recording: aidentity ui shows four profiles in a menu. One profile gets a new colour, then a new name.">
+<source src="assets/demo-ui.webm" type='video/webm; codecs="vp9"'>
+<source src="assets/demo-ui.mp4" type="video/mp4">
+<a href="assets/demo-ui.mp4">Watch the menu demo (MP4)</a>
+</video>
+<div class="ov" hidden><button type="button" class="bigplay"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play the menu demo</button><p class="why" hidden></p></div>
+<div class="prog" aria-hidden="true"><i></i></div>
+</div>
+</figure>
+</div>
+</article>
+
+<article class="tile t-row">
+<div>
+<h3>A command for each job.</h3>
+<p>Add an account, list them, rename one. Each job is one line, with tab completion for bash, zsh and fish. For scripts, <code class="nw">aidentity list --json</code> prints every profile as JSON.</p>
+</div>
+<div class="vis">
+<figure class="mac t clip dk" data-player data-len="26" data-what="demo">
+<div class="mac-bar"><i></i><i></i><i></i><b aria-hidden="true">Terminal</b><div class="ctls"><button type="button" class="ctl vbtn" aria-controls="demo-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="sr"><span class="vlbl">Play</span> the demo</span></button><button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="sr">Show the demo in full screen</span></button></div></div>
+<div class="shot-v">
+<video id="demo-vid" width="1280" height="800" controls muted loop playsinline preload="none" poster="assets/demo-poster.jpg" aria-label="Terminal recording: aidentity adds a Work and a Personal profile for Claude, lists them, then renames one. The renamed account stays signed in.">
+<source src="assets/demo.webm" type='video/webm; codecs="vp9"'>
+<source src="assets/demo.mp4" type="video/mp4">
+<a href="assets/demo.mp4">Watch the demo (MP4)</a>
+</video>
+<div class="ov" hidden><button type="button" class="bigplay"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play the demo</button><p class="why" hidden></p></div>
+<div class="prog" aria-hidden="true"><i></i></div>
+</div>
+</figure>
+</div>
+</article>
+
+</div>
+<p class="more"><a class="go" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#commands">See all commands</a></p>
+</div>
+</section>
+
+<!-- 7. How it works -->
+<section class="sec dk stage" id="how-it-works" aria-labelledby="h-how">
+<div class="wrap">
+<div class="head">
+<h2 id="h-how">The same app, with its own data folder for each account.</h2>
+<p class="lede">aidentity changes nothing inside the app. <b>It uses a start-up option the app already has.</b></p>
+</div>
+<div class="dia" role="img" aria-label="Three launchers, Claude Work, Claude Client and Claude Main, all open the same Claude.app. Each launcher points the app at its own data folder: profiles/claude-work, profiles/claude-client, or Claude's own folder for your original account.">
+<div class="dcol">
+<div class="dn launcher"><svg class="lic" viewBox="0 0 100 100"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">W</text></svg><span class="dn-t">Claude Work.app</span><span class="dn-s">launcher</span></div>
+<div class="dn launcher"><svg class="lic" viewBox="0 0 100 100" style="--b:#F76B15"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">C</text></svg><span class="dn-t">Claude Client.app</span><span class="dn-s">launcher</span></div>
+<div class="dn launcher"><svg class="lic" viewBox="0 0 100 100" style="--b:#E5484D"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">M</text></svg><span class="dn-t">Claude Main.app</span><span class="dn-s">launcher</span></div>
+</div>
+<div class="dconn"><span class="ln"><em>opens</em></span><span class="ln"><em>opens</em></span><span class="ln"><em>opens</em></span></div>
+<div class="dapp"><svg class="lic" viewBox="0 0 100 100"><image href="assets/app.svg" width="100" height="100"/></svg><b>Claude.app</b><span>One app. Never copied or changed.</span></div>
+<div class="dconn"><span class="ln"><em>--user-data-dir</em></span><span class="ln"><em>--user-data-dir</em></span><span class="ln dash"></span></div>
+<div class="dcol">
+<div class="dn data"><span class="dn-t">profiles/claude-work</span><span class="dn-s">work account</span></div>
+<div class="dn data"><span class="dn-t">profiles/claude-client</span><span class="dn-s">client account</span></div>
+<div class="dn data orig"><span class="dn-t">Claude's own folder</span><span class="dn-s">your original account</span></div>
+</div>
+</div>
+<ol class="steps3" role="list">
+<li><h3>Chromium and Electron apps lock their data folder.</h3><p>The lock stops the app from starting twice.</p></li>
+<li><h3>aidentity builds a launcher for each account.</h3><p>It opens your app again with <code class="nw">--user-data-dir</code>, an option that points the app at a different data folder.</p></li>
+<li><h3>A new folder gets a new lock and a new sign-in.</h3><p>Cookies live in that folder, so each launcher opens its own account.</p></li>
+</ol>
+<p class="more"><a class="go" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#how-it-works">Read how it works in the guide</a></p>
+</div>
+</section>
+
+<!-- 8. Safety -->
+<section class="sec" id="safety" aria-labelledby="h-safe">
+<div class="wrap">
+<div class="head">
+<h2 id="h-safe">Easy to try. Easy to undo.</h2>
+<p class="lede">Your app is not copied or changed, nothing runs in the background, and <b>you can remove everything aidentity made.</b></p>
+</div>
+<ul class="facts" role="list">
+<li><svg class="i" aria-hidden="true"><use href="#i-shield"/></svg><h3>Your app stays untouched.</h3><p>It is never copied, changed or signed again. So it keeps its signature, its keychain access and its own updates.</p></li>
+<li><svg class="i" aria-hidden="true"><use href="#i-undo"/></svg><h3>A deleted icon comes back.</h3><p><code>aidentity restore</code> rebuilds it, still signed in. <code>rm</code> keeps your data. Add <code class="nw">--purge</code> and the data moves to the Trash.</p></li>
+<li><svg class="i" aria-hidden="true"><use href="#i-moon"/></svg><h3>Nothing runs in the background.</h3><p>No login item and no service. It makes no network calls except when you run <code>aidentity update</code>, and it never uses <code>sudo</code>.</p></li>
+<li><svg class="i" aria-hidden="true"><use href="#i-file"/></svg><h3>One script you can read.</h3><p>Mostly bash, with nothing extra to install. <a href="https://github.com/PiniShv/aidentity/blob/main/bin/aidentity">Read the script on GitHub</a> before you run it.</p></li>
+<li><svg class="i" aria-hidden="true"><use href="#i-user"/></svg><h3>Your original account has its own icon.</h3><p><code>aidentity add Claude --main</code> builds a Main icon. It opens your original account, even while profiles run.</p></li>
+<li><svg class="i" aria-hidden="true"><use href="#i-seal"/></svg><h3>Releases are signed.</h3><p>Each release has a checksum, and its files are signed. <a href="https://github.com/PiniShv/aidentity/blob/main/SECURITY.md#verifying-a-release">Read what the signature proves</a>.</p></li>
+</ul>
+<div class="verify">
+<div>
+<h3>Check it yourself.</h3>
+<p>The first command looks for network tools and <code>sudo</code> in the script. Only one line runs <code>curl</code>: the download in <code>aidentity update</code>. The second checks the script against the checksum of its release.</p>
+<p><a class="go" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#check-it-yourself">Find more checks in the guide</a></p>
+</div>
+<div class="mac t dk">
+<div class="mac-bar" aria-hidden="true"><i></i><i></i><i></i><b>In a clone of the repository</b></div>
+<div class="code">
+<p><span class="ps" aria-hidden="true">$</span>grep -nwE 'curl|wget|nc|ncat|ssh|scp|sudo|telnet' bin/aidentity</p>
+<p><span class="ps" aria-hidden="true">$</span>shasum -a 256 -c SHA256SUMS</p>
+<p class="o">bin/aidentity: <span class="k">OK</span></p>
+</div>
+</div>
+</div>
+<div class="note">
+<svg class="i" aria-hidden="true"><use href="#i-info"/></svg>
+<p><strong>Worth knowing:</strong> aidentity does not encrypt profile data. Each data folder holds a live sign-in, just like the app's own folder. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#is-this-safe">Read the safety notes</a></p>
+</div>
+</div>
+</section>
+
+<!-- 9. Which apps work -->
+<section class="sec alt" id="which-apps-work" aria-labelledby="h-apps">
+<div class="wrap">
+<div class="head">
+<h2 id="h-apps">Made for Chromium and Electron apps.</h2>
+<p class="lede">Chromium is the engine inside Google Chrome. Electron is a toolkit for desktop apps built on it. <b>Run <code>aidentity apps</code> to see which of yours qualify.</b></p>
+</div>
+<ul class="specs" role="list">
+<li class="v-ok">
+<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Verified</div>
+<div><p>Two accounts signed in at once, checked by hand.</p>
+<ul class="chips" role="list"><li>Claude Desktop</li></ul></div>
+</li>
+<li class="v-det">
+<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-dot"/></svg>Tested</div>
+<div><p>Starts as its own copy, with its own data. Two sign-ins not checked by hand yet. <a href="https://github.com/PiniShv/aidentity/issues">Tell us how yours went</a>.</p>
+<ul class="chips" role="list"><li>ChatGPT</li><li>Slack</li><li>Visual Studio Code</li><li>Cursor</li><li>Kiro</li><li>Antigravity</li><li>Notion</li><li>Notion Calendar</li><li>Podman Desktop</li><li>Postman</li></ul></div>
+</li>
+<li class="v-br">
+<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-info"/></svg>Browsers</div>
+<div><p>Detected, but their built-in profiles usually do the job better.</p>
+<ul class="chips" role="list"><li>Chrome</li><li>Edge</li><li>Brave</li><li>Arc</li><li>Vivaldi</li><li>Comet</li></ul></div>
+</li>
+<li class="v-no">
+<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-x"/></svg>Does not work</div>
+<div><p>Native apps have no Chromium inside, so <code>aidentity add</code> refuses them. A few Electron apps ignore the separate folder, and <code>add</code> cannot tell.</p>
+<ul class="chips" role="list"><li>ChatGPT Classic</li><li>Any app written in Swift or AppKit</li></ul></div>
+</li>
+</ul>
+<p class="blurb">The newer ChatGPT app is Chromium inside. ChatGPT Classic is native, so it cannot work. For VS Code, Cursor and Kiro, keep profile names short: if a name is too long, aidentity refuses it and says how many characters to cut. <a class="go" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#which-apps-work">See the full list and notes</a></p>
+</div>
+</section>
+
+<!-- 10. The catch -->
+<section class="sec" id="trade-off" aria-labelledby="h-trade">
+<div class="wrap split">
+<div>
+<p class="eyebrow">Know before you install</p>
+<h2 id="h-trade">Running Dock tiles look the same.</h2>
+<p class="lede">While profiles run, the Dock shows the app's own tile for each one, with the same name and icon. macOS reads both from inside the app, and <b>aidentity never changes the app.</b></p>
+<ul class="tell" role="list">
+<li><span><strong>Click the right icon.</strong> The icons aidentity makes carry the profile name and a coloured badge.</span></li>
+<li><span><strong>Check the window.</strong> Look at the account shown in each running window.</span></li>
+<li><span><strong>Use Mission Control.</strong> It shows all your open windows at once.</span></li>
+</ul>
+</div>
+<div class="panel-v"><div class="dockpic" role="img" aria-label="Left: the icons you click, Claude Work and Claude Client, each with a coloured badge. Right: the Dock while both run, with two identical tiles, both named Claude.">
+<p aria-hidden="true">The icons you click</p>
+<ul class="minirow" role="list" aria-hidden="true">
+<li><svg class="lic" viewBox="0 0 100 100"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">W</text></svg><span>Claude Work</span></li>
+<li><svg class="lic" viewBox="0 0 100 100" style="--b:#F76B15"><image href="assets/app.svg" width="100" height="100"/><use href="#badge"/><text x="75" y="75.5">C</text></svg><span>Claude Client</span></li>
+</ul>
+<span class="arr" aria-hidden="true">→</span>
+<p aria-hidden="true">The Dock, while both run</p>
+<ul class="bar-d" aria-hidden="true">
+<li><svg class="lic" viewBox="0 0 100 100"><image href="assets/app.svg" width="100" height="100"/></svg></li>
+<li><svg class="lic" viewBox="0 0 100 100"><image href="assets/app.svg" width="100" height="100"/></svg></li>
+</ul>
+<p aria-hidden="true">Both tiles are named Claude.</p>
+</div></div>
+</div>
+</section>
+
+<!-- 11. Install -->
+<section class="sec dk" id="install" aria-labelledby="h-install">
+<div class="wrap">
+<div class="head">
+<h2 id="h-install">Install it with one command.</h2>
+<p class="lede">Paste one line into Terminal. <b>You sign in once for each account.</b></p>
+</div>
+<div class="install-wrap">
+<div class="term dk">
 <div class="term-bar">
-<span class="dots"><i></i><i></i><i></i></span>
-<span class="term-title">Terminal: install</span>
 <div class="tabs" role="tablist" aria-label="Install method">
 <button type="button" role="tab" id="tab-curl" aria-selected="true" aria-controls="panel-curl">curl</button>
 <button type="button" role="tab" id="tab-brew" aria-selected="false" aria-controls="panel-brew" tabindex="-1">Homebrew</button>
@@ -685,465 +905,34 @@ html:not(.js) .chapters{display:none}
 <p class="hint">Then run <code>aidentity setup</code> to start the walkthrough.</p>
 </div>
 </div>
-<p class="recipe-cta"><a href="recipes/">Not sure what to type? Build your recipe <svg class="i" aria-hidden="true"><use href="#i-right"/></svg></a></p>
-<details class="fine">
+</div>
+<ol class="steps" role="list" id="quick-start">
+<li><h3>Paste the install line.</h3><p>The installer checks the download, never uses <code>sudo</code> and leaves your shell files alone.</p></li>
+<li><h3>Pick your app.</h3><p>The walkthrough lists your apps. Choose one and name the account, for example <code>Work</code>.</p></li>
+<li><h3>Open the new icon.</h3><p>For example <code>Claude Work</code>. Sign in once with the other account, then drag the icon to your Dock.</p></li>
+</ol>
+<div class="fine">
+<p><strong>If the app is already open, quit it first.</strong> Sign in to the new icon, then open the app again. Some apps sign in through your browser, and macOS hands the result to the window that started first. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#signing-in-to-a-new-profile">Read why you quit the app first</a></p>
+<p><a class="go" href="recipes/">Build your recipe: pick apps and colours, copy the commands</a></p>
+<details>
 <summary>New to Terminal? <svg class="i" aria-hidden="true"><use href="#i-down"/></svg></summary>
-<p>Press <kbd>Cmd</kbd> + <kbd>Space</kbd>, type <code>Terminal</code>, press <kbd>Return</kbd>. Paste the line and press <kbd>Return</kbd> again. The installer checks the download, never uses <code>sudo</code> and leaves your shell files alone. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#install-and-upgrade">Read it first, or build from source</a>.</p>
-</details>
-<p class="works"><b>Verified</b> with Claude Desktop. <b>Tested</b> with ChatGPT, Slack, VS Code, Cursor, Notion and <a href="#which-apps-work">5 more</a>.</p>
-</div>
-</div>
-</section>
-
-<!-- 3. At a glance -->
-<section class="glance" aria-labelledby="h-glance">
-<div class="wrap">
-<h2 id="h-glance" class="sr">At a glance</h2>
-<ul role="list">
-<li class="rv" style="--d:0"><strong>Free.</strong><span>Open source, Apache-2.0 licence.</span></li>
-<li class="rv" style="--d:1"><strong>Untouched.</strong><span>Your app is never copied, changed or signed again.</span></li>
-<li class="rv" style="--d:2"><strong>No sudo.</strong><span>Nothing runs in the background.</span></li>
-<li class="rv" style="--d:3"><strong>One script.</strong><span>Mostly bash. Nothing extra to install.</span></li>
-<li class="rv" style="--d:4"><strong>Mac only.</strong><span>For Chromium and Electron apps.</span></li>
-</ul>
-</div>
-</section>
-
-<!-- 4. The problem, and the answer -->
-<section class="sec statement" aria-labelledby="h-problem">
-<div class="wrap">
-<h2 class="big rv" id="h-problem"><span class="l1">Your Mac opens each app only once.</span> <span class="l2">So you get one account at a time.</span></h2>
-<div class="ba">
-<article class="rv" style="--d:0">
-<div>
-<p class="label">Without aidentity</p>
-<h3>One account at a time.</h3>
-<p class="d">To switch, you sign out and sign in again. You lose your open chats and your window layout.</p>
-</div>
-<p class="pills" aria-hidden="true"><span class="off"><i></i>Sign out</span><span class="arr">→</span><span class="off"><i></i>Sign in</span></p>
-</article>
-<article class="with rv" style="--d:1">
-<div>
-<p class="label">With aidentity</p>
-<h3>Every account you use. Open at once.</h3>
-<p class="d">Each in its own window. Each one signed in.</p>
-</div>
-<p class="pills" aria-hidden="true"><span><i></i>Work</span><span><i></i>Personal</span><span><i></i>Client</span></p>
-</article>
-</div>
-</div>
-</section>
-
-<!-- 5. One Mac, many uses -->
-<section class="sec alt" id="uses" aria-labelledby="h-uses">
-<div class="wrap">
-<div class="head rv">
-<h2 id="h-uses">One Mac, many uses.</h2>
-<p class="intro">The same app, open as many times as you need. Each window keeps its own account.</p>
-</div>
-<div class="bento">
-
-<article class="tile tdk t-a rv" style="--d:0">
-<p class="lab">Work and home</p>
-<h3>Keep work and home apart.</h3>
-<p>Keep your work account open all day. Check your personal one in the next window. You never sign out, so your open chats stay where they are.</p>
-<p class="tags"><span class="tag v-ok"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Verified with Claude Desktop</span></p>
-<div class="vis mws" aria-hidden="true">
-<div class="mw"><div class="mw-bar"><i></i><i></i><i></i><span>Claude Work</span></div><div class="mw-body"><div class="mw-who"><b class="av">W</b>Work</div><span class="sig">Signed in</span><span class="sk w1"></span><span class="sk w2"></span><span class="bub"></span><span class="sk w3"></span></div></div>
-<div class="mw"><div class="mw-bar"><i></i><i></i><i></i><span>Claude Personal</span></div><div class="mw-body"><div class="mw-who"><b class="av g">P</b>Personal</div><span class="sig">Signed in</span><span class="sk w3"></span><span class="sk w1"></span><span class="bub"></span><span class="sk w2"></span></div></div>
-</div>
-</article>
-
-<article class="tile t-b rv" style="--d:1">
-<p class="lab">Clients</p>
-<h3>A window for each client.</h3>
-<p>Use one account per client, each with an icon that carries the client's name, like <code>Claude Acme</code>. Each one keeps its sign-in in its own folder. When the job ends, remove the icon. Add <code class="nw">--purge</code> to move its data to the Trash. Then empty the Trash.</p>
-<p class="tags"><span class="tag v-ok"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Verified with Claude Desktop</span><span class="tag v-det">Tested with ChatGPT</span></p>
-<div class="vis icons" aria-hidden="true">
-<span class="ic"><span class="icon"><svg class="i"><use href="#i-win"/></svg><span class="badge"></span></span>Claude Acme</span>
-<span class="ic"><span class="icon"><svg class="i"><use href="#i-win"/></svg><span class="badge b2"></span></span>Claude Client</span>
-<span class="ic"><span class="icon add"><svg class="i"><use href="#i-plus"/></svg></span>One per client</span>
-</div>
-</article>
-
-<article class="tile t-c rv" style="--d:0">
-<p class="lab">Testing</p>
-<h3>A clean account for testing.</h3>
-<p>A new profile starts with an empty folder. aidentity does not copy, move or read your existing sign-in. Sign in with a test account. When you are done, remove it with <code class="nw">--purge</code>, so the next test starts clean.</p>
-<div class="vis" aria-hidden="true"><div class="empty"><span>Starts empty</span><span class="sk"></span><span class="sk btn2"></span></div></div>
-</article>
-
-<article class="tile tblue t-d rv" style="--d:1">
-<p class="lab">Tools</p>
-<h3>Different tools for each account.</h3>
-<p>A new Claude Desktop profile starts with its own, empty list of MCP servers (the extra tools you connect to Claude). Add <code class="nw">--seed</code> to copy yours across as a start. After that, the two lists are separate.</p>
-<p class="tags"><span class="tag v-ok"><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Verified with Claude Desktop</span></p>
-<div class="vis" aria-hidden="true"><code class="bigcode">--seed</code></div>
-</article>
-
-<article class="tile t-e rv" style="--d:2">
-<p class="lab">Editors</p>
-<h3>Several editors, each with its own settings.</h3>
-<p>Run a second VS Code, Cursor or Kiro with its own settings. Add <code class="nw">--own-extensions</code> to give it its own extensions too.</p>
-<p class="tags"><span class="tag v-det">Tested: each copy runs on its own data</span></p>
-<div class="vis" aria-hidden="true"><code class="bigcode">--own-<wbr>extensions</code></div>
-</article>
-
-<article class="tile tdk t-f rv" style="--d:0">
-<div>
-<p class="lab">Scripts</p>
-<h3>Scripts can read your profiles.</h3>
-<p>For scripts, <code class="nw">aidentity list --json</code> prints every profile as JSON.</p>
-</div>
-<div class="vis" aria-hidden="true"><div class="cline"><span class="p">$</span><span>aidentity list --json</span></div></div>
-</article>
-
-</div>
-</div>
-</section>
-
-<!-- 6. How it works -->
-<section class="sec dk stage" id="how-it-works" aria-labelledby="h-how">
-<div class="wrap">
-<div class="head rv">
-<h2 id="h-how">One app. A small launcher for each account.</h2>
-<p class="intro">aidentity changes nothing inside the app. It uses a start-up option the app already has.</p>
-</div>
-<div class="dia rv" role="img" aria-label="Three launchers, Claude Work, Claude Client and Claude Main, all open the same Claude.app. Each launcher points the app at its own data folder: profiles/claude-work, profiles/claude-client, or Claude's own folder for your original account.">
-<div class="dcol">
-<div class="dn launcher"><span class="dn-t">Claude Work.app</span><span class="dn-s">launcher</span></div>
-<div class="dn launcher"><span class="dn-t">Claude Client.app</span><span class="dn-s">launcher</span></div>
-<div class="dn launcher"><span class="dn-t">Claude Main.app</span><span class="dn-s">launcher</span></div>
-</div>
-<div class="dconn"><span class="ln"><em>opens</em></span><span class="ln"><em>opens</em></span><span class="ln"><em>opens</em></span></div>
-<div class="dapp"><span class="ai"><svg class="i"><use href="#i-win"/></svg></span><b>Claude.app</b><span>One app. Never copied or changed.</span></div>
-<div class="dconn"><span class="ln"><em>--user-data-dir</em></span><span class="ln"><em>--user-data-dir</em></span><span class="ln dash"></span></div>
-<div class="dcol">
-<div class="dn data"><span class="dn-t">profiles/claude-work</span><span class="dn-s">work account</span></div>
-<div class="dn data"><span class="dn-t">profiles/claude-client</span><span class="dn-s">client account</span></div>
-<div class="dn data orig"><span class="dn-t">Claude's own folder</span><span class="dn-s">your original account</span></div>
-</div>
-</div>
-<ol class="steps3" role="list">
-<li class="rv" style="--d:0"><span class="num" aria-hidden="true">01</span><h3>Chromium and Electron apps lock their data folder.</h3><p>The lock stops the app from starting twice.</p></li>
-<li class="rv" style="--d:1"><span class="num" aria-hidden="true">02</span><h3>aidentity builds a launcher for each account.</h3><p>It opens your app again with <code class="nw">--user-data-dir</code>, a start-up option that points the app at a different data folder.</p></li>
-<li class="rv" style="--d:2"><span class="num" aria-hidden="true">03</span><h3>New folder, new lock, new sign-in.</h3><p>Cookies live in that folder, so each launcher opens its own account.</p></li>
-</ol>
-<p class="map-note rv">There is still one <code>Claude.app</code>. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#how-it-works">The full picture</a></p>
-</div>
-</section>
-
-<!-- 7. Demos -->
-<section class="sec" id="demo" aria-labelledby="h-demo">
-<div class="wrap">
-<div class="head rv">
-<h2 id="h-demo">Set up accounts in Terminal. Open them with a click.</h2>
-<p class="intro">An 85-second recording. It adds Claude and ChatGPT accounts, then renames, recolours, removes and restores one.</p>
-</div>
-<figure class="term demo rv" data-player data-len="85">
-<div class="term-bar">
-<span class="dots"><i></i><i></i><i></i></span>
-<span class="term-title" aria-hidden="true">aidentity: demo</span>
-<span class="vtime" aria-hidden="true">0:00 / 1:25</span>
-<button type="button" class="ctl vbtn" aria-controls="demo-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the demo</span></button>
-<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="fsl" aria-hidden="true">Full screen</span><span class="sr">Show the demo in full screen</span></button>
-</div>
-<div class="shot">
-<video id="demo-vid" width="920" height="592" controls muted loop playsinline preload="none" poster="assets/demo-poster.jpg" aria-label="Terminal demo: aidentity creates Claude and ChatGPT profiles, then renames, recolours, removes and restores one">
-<source src="assets/demo.webm" type='video/webm; codecs="vp9"'>
-<source src="assets/demo.mp4" type="video/mp4">
-<a href="assets/demo.mp4">Watch the demo (MP4, 1.2 MB)</a>
-</video>
-<div class="ov" hidden>
-<button type="button" class="bigplay"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play the demo</button>
-<p class="why" hidden></p>
-</div>
-<div class="prog" aria-hidden="true"><i></i></div>
-</div>
-<div class="chapters">
-<span class="cl" id="cl-demo">Jump to</span>
-<ul role="list" aria-labelledby="cl-demo">
-<li><button type="button" data-t="0">Add accounts <small>0:00</small></button></li>
-<li><button type="button" data-t="36">List <small>0:36</small></button></li>
-<li><button type="button" data-t="46">Rename <small>0:46</small></button></li>
-<li><button type="button" data-t="55">Recolour <small>0:55</small></button></li>
-<li><button type="button" data-t="64">Remove and restore <small>1:04</small></button></li>
-</ul>
-</div>
-<figcaption class="cap">You use Terminal to add and manage accounts. Day to day, you click the icons it makes. Recorded with stand-in apps in a temporary folder, so no real account is shown.</figcaption>
-</figure>
-<details class="tx">
-<summary>Read the demo as text <svg class="i" aria-hidden="true"><use href="#i-down"/></svg></summary>
-<ol>
-<li><code>aidentity apps</code> lists the apps that can get extra accounts. In the demo, that is ChatGPT, Claude and Slack.</li>
-<li><code>aidentity add Claude --profile Work --color blue</code> makes the icon <code>Claude Work</code>. <code>--profile Personal --color green</code> makes <code>Claude Personal</code>.</li>
-<li><code>aidentity add ChatGPT --profile Work --color teal</code> makes <code>ChatGPT Work</code>.</li>
-<li><code>aidentity add Claude --main</code> makes <code>Claude Main</code>, an icon that always opens your original Claude account.</li>
-<li><code>aidentity list</code> shows the four icons and where each keeps its data.</li>
-<li><code>aidentity rename 'Claude Personal' Client</code> gives it a new name. The account stays signed in.</li>
-<li><code>aidentity set 'Claude Client' --color purple</code> changes only the icon colour.</li>
-<li><code>aidentity rm 'Claude Client' -y</code> removes the icon. The profile data is kept.</li>
-<li><code>aidentity restore 'Claude Client'</code> brings the icon back. It opens the same profile folder as before.</li>
-</ol>
-</details>
-
-<div class="menu-demo">
-<div class="mh rv">
-<h3 id="h-menu-demo">Prefer a menu? <code>aidentity ui</code></h3>
-<p>Every profile on one screen. Pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it. Prefer buttons? <code>aidentity ui --window</code> shows the same profiles in a window.</p>
-<details class="tx">
-<summary>Read the menu demo as text <svg class="i" aria-hidden="true"><use href="#i-down"/></svg></summary>
-<ol>
-<li><code>aidentity ui</code> opens a menu with four profiles: <code>ChatGPT Work</code>, <code>Claude Main</code>, <code>Claude Personal</code> and <code>Claude Work</code>.</li>
-<li>The Down arrow, pressed twice, moves to <code>Claude Personal</code>.</li>
-<li><code>c</code> opens the colour picker. The Right arrow steps through the colours and Enter picks teal. Only the icon changes.</li>
-<li><code>r</code> renames it. Typing <code>Client</code> and pressing Enter gives it the new name. The account stays signed in.</li>
-<li><code>?</code> shows every key. Any key goes back to the menu.</li>
-<li><code>q</code> quits and returns to the shell.</li>
-</ol>
+<p>Press <kbd>Cmd</kbd> + <kbd>Space</kbd>, type <code>Terminal</code>, press <kbd>Return</kbd>. Paste the line and press <kbd>Return</kbd> again. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#install-and-upgrade">Read the installer first, or build from source</a>.</p>
 </details>
 </div>
-<figure class="term demo rv" style="--d:1" data-player data-len="31">
-<div class="term-bar">
-<span class="dots"><i></i><i></i><i></i></span>
-<span class="term-title" aria-hidden="true">aidentity ui</span>
-<span class="vtime" aria-hidden="true">0:00 / 0:31</span>
-<button type="button" class="ctl vbtn" aria-controls="menu-vid" hidden><svg class="i" aria-hidden="true"><use class="vico" href="#i-play"/></svg><span class="vlbl">Play</span><span class="sr"> the menu demo</span></button>
-<button type="button" class="ctl fs" title="Full screen" hidden><svg class="i" aria-hidden="true"><use href="#i-fs"/></svg><span class="fsl" aria-hidden="true">Full screen</span><span class="sr">Show the menu demo in full screen</span></button>
-</div>
-<div class="shot">
-<video id="menu-vid" width="920" height="592" controls muted loop playsinline preload="none" poster="assets/demo-ui-poster.jpg" aria-label="Terminal demo: aidentity ui shows the profiles in a menu, then recolours and renames one and lists every key">
-<source src="assets/demo-ui.webm" type='video/webm; codecs="vp9"'>
-<source src="assets/demo-ui.mp4" type="video/mp4">
-<a href="assets/demo-ui.mp4">Watch the menu demo (MP4, 0.3 MB)</a>
-</video>
-<div class="ov" hidden>
-<button type="button" class="bigplay"><svg class="i" aria-hidden="true"><use href="#i-play"/></svg>Play the menu demo</button>
-<p class="why" hidden></p>
-</div>
-<div class="prog" aria-hidden="true"><i></i></div>
-</div>
-<div class="chapters">
-<span class="cl" id="cl-menu">Jump to</span>
-<ul role="list" aria-labelledby="cl-menu">
-<li><button type="button" data-t="0">Open the menu <small>0:00</small></button></li>
-<li><button type="button" data-t="5">Pick and recolour <small>0:05</small></button></li>
-<li><button type="button" data-t="14">Rename <small>0:14</small></button></li>
-<li><button type="button" data-t="21">Show the keys <small>0:21</small></button></li>
-<li><button type="button" data-t="25">Quit <small>0:25</small></button></li>
-</ul>
-</div>
-<figcaption class="cap">The menu is optional. Recorded with stand-in apps in a temporary folder, so no real account is shown.</figcaption>
-</figure>
-</div>
 </div>
 </section>
 
-<!-- 8. Set up -->
-<section class="sec alt" id="quick-start" aria-labelledby="h-qs">
-<div class="wrap">
-<div class="head rv">
-<h2 id="h-qs">Three steps. You sign in once per account.</h2>
-</div>
-<ol class="steps" role="list">
-<li class="rv" style="--d:0">
-<h3>Paste the install line</h3>
-<p>Open Terminal and paste the <a href="#install">install line</a>. If you used Homebrew instead, run <code>aidentity setup</code>.</p>
-</li>
-<li class="rv" style="--d:1">
-<h3>Say yes, then pick your app</h3>
-<p>The installer ends with a walkthrough. Choose your app from the list and name the account, for example <code>Work</code>.</p>
-</li>
-<li class="rv" style="--d:2">
-<h3>Open the new icon and sign in</h3>
-<p>For example <code>Claude Work</code>. It opens signed out. Sign in once with the other account, then drag the icon to your Dock.</p>
-</li>
-</ol>
-<div class="note rv">
-<svg class="i" aria-hidden="true"><use href="#i-alert"/></svg>
-<p><strong>If the app is already open, quit it first.</strong> Sign in to the new icon, then open the app again. Some apps sign in through your browser, and macOS hands the result to the window that started first. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#signing-in-to-a-new-profile">Why <span class="sr">you quit the app first</span></a></p>
-</div>
-
-<h3 class="sub-h rv">Day to day</h3>
-<div class="term rv">
-<div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="term-title" aria-hidden="true">Terminal: everyday commands</span></div>
-<ul class="cmdlist" role="list">
-<li><code>aidentity apps</code><span class="d">Which of your apps can take extra accounts.</span></li>
-<li><code>aidentity ui</code><span class="d">A menu in your terminal. Pick a profile with the arrow keys, then open, quit, rename, recolour or remove it.</span></li>
-<li><code>aidentity ui --window</code><span class="d">The same profiles in a window, with buttons. Needs macOS 12.3 or later.</span></li>
-<li><code>aidentity add Claude <span class="nw">--profile Work</span> <span class="nw">--color blue</span></code><span class="d">One more account, no questions.</span></li>
-<li><code>aidentity list</code><span class="d">Every profile, and which are running.</span></li>
-<li><code>aidentity list <span class="nw">--json</span></code><span class="d">The same list as JSON, for scripts.</span></li>
-<li><code>aidentity rename <span class="nw">"Claude Work"</span> Client</code><span class="d">New name. It stays signed in.</span></li>
-<li><code>aidentity restore <span class="nw">"Claude Client"</span></code><span class="d">Bring back a deleted icon.</span></li>
-<li><code>aidentity doctor <span class="nw">--fix</span></code><span class="d">Check and repair.</span></li>
-</ul>
-</div>
-<p class="more"><a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#commands">All commands</a> · <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#per-profile-settings">Per-profile settings</a></p>
-</div>
-</section>
-
-<!-- 9. Which apps work -->
-<section class="sec" id="which-apps-work" aria-labelledby="h-apps">
-<div class="wrap">
-<div class="head rv">
-<h2 id="h-apps">Will it work with your app?</h2>
-<p class="intro">It works with apps built on Chromium or Electron. Chromium is the engine inside Google Chrome. Electron is a toolkit for desktop apps built on that engine. Run <code>aidentity apps</code> to see which of yours are built this way, then check them against the lists below.</p>
-</div>
-<div class="apps">
-<div class="app a-v v-ok rv" style="--d:0">
-<h3><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Verified</h3>
-<p>Two accounts signed in at once, checked by hand.</p>
-<ul class="chips" role="list"><li>Claude Desktop</li></ul>
-</div>
-<div class="app a-t v-det rv" style="--d:1">
-<h3><svg class="i" aria-hidden="true"><use href="#i-dot"/></svg>Tested</h3>
-<p>Starts as its own copy, with its own data. Two sign-ins not checked by hand yet.</p>
-<ul class="chips" role="list"><li>ChatGPT</li><li>Slack</li><li>Visual Studio Code</li><li>Cursor</li><li>Kiro</li><li>Antigravity</li><li>Notion</li><li>Notion Calendar</li><li>Podman Desktop</li><li>Postman</li></ul>
-<p class="ask">Used one of these with two accounts? <a href="https://github.com/PiniShv/aidentity/issues">Tell us how it went</a>. That is how an app moves to Verified.</p>
-</div>
-<div class="app a-b v-br rv" style="--d:0">
-<h3><svg class="i" aria-hidden="true"><use href="#i-info"/></svg>Browsers</h3>
-<p>Detected, but their built-in profiles usually do the job better.</p>
-<ul class="chips" role="list"><li>Chrome</li><li>Edge</li><li>Brave</li><li>Arc</li><li>Vivaldi</li><li>Comet</li></ul>
-</div>
-<div class="app a-n v-no rv" style="--d:1">
-<h3><svg class="i" aria-hidden="true"><use href="#i-x"/></svg>Does not work</h3>
-<p>Native apps have no Chromium inside, so they have no <code class="nw">--user-data-dir</code> option. <code>aidentity add</code> checks for this and refuses them. A few Electron apps ignore the option, so profiles would share one account. <code>add</code> cannot tell these apart, so check this list before you add one.</p>
-<ul class="chips" role="list"><li>ChatGPT Classic</li><li>Any app written in Swift or AppKit</li></ul>
-</div>
-</div>
-<p class="blurb rv">The newer ChatGPT app is Chromium inside. ChatGPT Classic is native, so it cannot work. VS Code, Cursor and Kiro keep a small connection file in the profile folder, and macOS limits how long its path can be. If a profile name would make that path too long, aidentity refuses it and says how many characters to cut. Support for native apps is not planned for version 1. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#which-apps-work">Full list and notes</a></p>
-</div>
-</section>
-
-<!-- 10. Safety -->
-<section class="sec alt" id="safety" aria-labelledby="h-why">
-<div class="wrap">
-<div class="head rv">
-<h2 id="h-why">Easy to try. Easy to undo.</h2>
-<p class="intro">Your app is not copied or changed, nothing runs in the background, and you can remove everything aidentity made.</p>
-</div>
-<ul class="specs" role="list">
-<li class="rv">
-<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-shield"/></svg>Your app</div>
-<div><h3>Your app stays exactly as it is</h3>
-<p>It is never copied, changed or signed again. So it keeps its signature, its keychain access and its own updates.</p></div>
-</li>
-<li class="rv">
-<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-undo"/></svg>Undo</div>
-<div><h3>Easy to reverse</h3>
-<p>Deleted an icon? <code>aidentity restore</code> brings it back, still signed in. <code>rm</code> keeps your data. The one exception is <code class="nw">--purge</code>, which moves the account's data to the Trash, where you can still get it back. Empty the Trash to remove it from your Mac. Something looks wrong? Run <code class="nw">aidentity doctor --fix</code>.</p></div>
-</li>
-<li class="rv">
-<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-moon"/></svg>Background</div>
-<div><h3>Nothing runs in the background</h3>
-<p>It makes no network calls except when you run <code>aidentity update</code>, and it never uses <code>sudo</code>. It adds no login item and no background service.</p></div>
-</li>
-<li class="rv">
-<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-file"/></svg>Source</div>
-<div><h3>Read it before you run it</h3>
-<p>One script, mostly bash, with nothing extra to install. <a href="https://github.com/PiniShv/aidentity/blob/main/bin/aidentity">Read the script</a> on GitHub before you run it.</p></div>
-</li>
-<li class="rv">
-<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-user"/></svg>Original account</div>
-<div><h3>Your original account stays one click away</h3>
-<p>While a profile runs, clicking <code>Claude.app</code> takes you to that profile. <code>aidentity add Claude --main</code> builds a Main icon that opens your original account instead. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#opening-your-original-account-while-a-profile-runs">Why <span class="sr">clicking the app opens a profile</span></a></p></div>
-</li>
-<li class="rv">
-<div class="spec-k"><svg class="i" aria-hidden="true"><use href="#i-refresh"/></svg>Updates</div>
-<div><h3>Your app still updates itself</h3>
-<p>An icon stores the path to the app, not a copy. So the next launch uses the new version. aidentity itself never checks for updates on its own. Run <code>aidentity update</code> when you want its newest version.</p></div>
-</li>
-</ul>
-
-<div class="verify">
-<div class="rv">
-<h3>Check it yourself</h3>
-<p>The first command looks for network tools and <code>sudo</code> in the script. Only one line runs <code>curl</code>: the download in <code>aidentity update</code>. The second checks the script against the checksum of its release.</p>
-<p>Release files are signed too. <code>gh attestation verify aidentity --repo PiniShv/aidentity</code> checks a download. <a href="https://github.com/PiniShv/aidentity/blob/main/SECURITY.md#verifying-a-release">What that proves, and what it does not</a></p>
-<p><a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#check-it-yourself">More checks in the guide</a></p>
-</div>
-<div class="term rv" style="--d:1">
-<div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="term-title" aria-hidden="true">Terminal: in a clone of the repository</span></div>
-<div class="code">
-<p><span class="p" aria-hidden="true">$</span>grep -nwE 'curl|wget|nc|ncat|ssh|scp|sudo|telnet' bin/aidentity</p>
-<p><span class="p" aria-hidden="true">$</span>shasum -a 256 -c SHA256SUMS</p>
-<p class="o">bin/aidentity: OK</p>
-</div>
-</div>
-</div>
-<div class="note warn rv">
-<svg class="i" aria-hidden="true"><use href="#i-info"/></svg>
-<p><strong>Worth knowing:</strong> aidentity does not encrypt profile data. Each data folder holds a live sign-in, just like the app's own folder. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#is-this-safe">Is this safe?</a></p>
-</div>
-</div>
-</section>
-
-<!-- 11. The honest catch -->
-<section class="sec" id="trade-off" aria-labelledby="h-trade">
-<div class="wrap">
-<div class="split">
-<div class="rv">
-<p class="eyebrow-s">Know before you install</p>
-<h2 id="h-trade">One catch: running Dock tiles look the same.</h2>
-<p class="lede">While profiles run, the Dock shows the app's own tile for each one, with the same name and icon. macOS reads both from inside the app, and aidentity never changes the app.</p>
-<ul class="tell" role="list">
-<li><span><strong>Click the right icon.</strong> Launcher icons carry the profile name and a coloured badge.</span></li>
-<li><span><strong>Check the window.</strong> Look at the account shown in each running window.</span></li>
-<li><span><strong>Use Mission Control.</strong> It shows all your open windows at once.</span></li>
-</ul>
-</div>
-<figure class="term rv" style="--d:1">
-<div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="term-title" aria-hidden="true">same name, same icon</span></div>
-<div class="dock-body" role="img" aria-label="Left: the icons you click, Claude Work and Claude Client, each with a coloured badge. Right: the Dock while both run, with two identical tiles, both named Claude.">
-<div>
-<p class="dock-h">The icons you click</p>
-<div class="tiles">
-<span class="t"><span class="tile-i"><svg class="i"><use href="#i-win"/></svg><span class="badge"></span></span>Claude Work</span>
-<span class="t"><span class="tile-i"><svg class="i"><use href="#i-win"/></svg><span class="badge b2"></span></span>Claude Client</span>
-</div>
-</div>
-<div class="dock-arrow">→</div>
-<div>
-<p class="dock-h">The Dock, while both run</p>
-<div class="tiles dockbar">
-<span class="t"><span class="tile-i run"><svg class="i"><use href="#i-win"/></svg></span>Claude</span>
-<span class="t"><span class="tile-i run"><svg class="i"><use href="#i-win"/></svg></span>Claude</span>
-</div>
-</div>
-</div>
-<figcaption class="cap">The launcher icons carry the profile name. The running tiles in the Dock look the same. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#the-rough-edge-dock-tiles-show-the-original-app">How to tell them apart</a></figcaption>
-</figure>
-</div>
-<h3 class="sub-h rv">What aidentity is not</h3>
-<ul class="nots" role="list">
-<li class="rv" style="--d:0"><span><strong>Not an app that keeps running.</strong> You set up in Terminal, or in a window with <code>aidentity ui --window</code>, then click icons.</span></li>
-<li class="rv" style="--d:1"><span><strong>Not for Windows or Linux.</strong> It is macOS only.</span></li>
-<li class="rv" style="--d:2"><span><strong>Not self-updating.</strong> You upgrade it when you choose.</span></li>
-<li class="rv" style="--d:0"><span><strong>Not encrypted.</strong> Profile folders hold live sign-ins, like the app's own folder.</span></li>
-<li class="rv" style="--d:1"><span><strong>Not for native apps,</strong> such as ChatGPT Classic.</span></li>
-</ul>
-</div>
-</section>
-
-<!-- 12. FAQ -->
+<!-- 12. Questions -->
 <section class="sec alt" id="faq" aria-labelledby="h-faq">
 <div class="wrap">
-<div class="head rv">
+<div class="head">
 <h2 id="h-faq">Questions before you install.</h2>
-<p class="intro">Short answers. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#frequently-asked">The guide has the rest.</a></p>
 </div>
-<div class="faq rv">
+<div class="faq">
 <details open>
 <summary>Will it break my app or my current account?</summary>
 <div class="a"><p>No. Your app is never copied, changed or signed again, so it keeps its own updates. aidentity only reads the app's files, to check that it is built on Chromium or Electron.</p>
-<p>Your original account is never moved or changed. aidentity reads one thing from it: Claude Desktop's tool list (MCP servers), and only when you add <code class="nw">--seed</code> to copy that list into a new profile.</p></div>
-</details>
-<details>
-<summary>Is it safe?</summary>
-<div class="a"><p>The installer checks the download, never uses <code>sudo</code> and leaves your shell files alone. After install, aidentity makes no network calls except when you run <code>aidentity update</code>, and it runs nothing in the background.</p>
-<p>One thing to know: it does not encrypt profile data. Each data folder holds a live sign-in, just like the app's own folder. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#is-this-safe">Read more about safety</a> or see the <a href="https://github.com/PiniShv/aidentity/blob/main/SECURITY.md">security policy</a>.</p></div>
+<p>Your original account is never moved or changed. aidentity reads only Claude Desktop's tool list (MCP servers) from it, and only when you add <code class="nw">--seed</code> to copy that list into a new profile.</p></div>
 </details>
 <details>
 <summary>Is this against the terms of service?</summary>
@@ -1167,14 +956,18 @@ html:not(.js) .chapters{display:none}
 <div class="a"><p>No. It works with desktop apps. Command-line tools keep their sign-in in other ways.</p></div>
 </details>
 <details>
+<summary>Does it work on Windows or Linux?</summary>
+<div class="a"><p>No. aidentity is for macOS only.</p></div>
+</details>
+<details>
 <summary>How do I upgrade it?</summary>
-<div class="a"><p>Run <code>aidentity update</code>. It downloads the latest release, checks it against its published checksum and replaces the old version in one step. It never uses <code>sudo</code>. Add <code class="nw">--check</code> to see first whether a newer release is out. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-update">What update checks</a></p>
-<p>If you used Homebrew, run <code>brew upgrade aidentity</code> instead. A copy older than 1.4 has no <code>update</code> command, so run the install line again. aidentity never checks for updates on its own.</p></div>
+<div class="a"><p>Run <code>aidentity update</code>. It downloads the latest release, checks it against its published checksum and replaces the old version in one step. Add <code class="nw">--check</code> to see first whether a newer release is out. If you used Homebrew, run <code>brew upgrade aidentity</code> instead.</p>
+<p>aidentity never checks for updates on its own. A copy older than 1.4 has no <code>update</code> command, so run the install line again. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#aidentity-update">Read what update checks</a></p></div>
 </details>
 <details>
 <summary>How do I remove it?</summary>
-<div class="a"><p>Use the uninstaller. It removes the command, then lists every launcher and data folder that aidentity made. It removes the launchers and moves the data folders to the Trash only after you type <code>delete</code>. Empty the Trash to remove the data from your Mac. Your apps stay as they were.</p>
-<p>If you installed with Homebrew, the uninstaller leaves the command alone. Run <code>brew uninstall aidentity</code> to remove it. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#uninstall">Uninstall steps</a></p></div>
+<div class="a"><p>Use the uninstaller. It removes the command, then lists every launcher and data folder that aidentity made. It removes the launchers and moves the data folders to the Trash only after you type <code>delete</code>. Your apps stay as they were.</p>
+<p>If you installed with Homebrew, run <code>brew uninstall aidentity</code> to remove the command. <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#uninstall">Read the uninstall steps</a></p></div>
 </details>
 <details>
 <summary>Something went wrong. Where do I start?</summary>
@@ -1182,49 +975,27 @@ html:not(.js) .chapters{display:none}
 <p>Still stuck? <a href="https://github.com/PiniShv/aidentity/issues">Open an issue</a> with the <code>doctor</code> output. It can show your Mac user name and profile names, so remove anything private first.</p></div>
 </details>
 </div>
-</div>
-</section>
-
-<!-- 13. Closer -->
-<section class="closer" aria-labelledby="h-cta">
-<div class="wrap">
-<div class="cta-card dk">
-<h2 id="h-cta" class="rv">Stop signing out.</h2>
-<p class="tagline rv">No copies. No signing out. <span>Free, for your Mac.</span></p>
-<p class="intro rv">Install aidentity, add your second account and keep both windows open. You sign in once per account.</p>
-<div class="install-wrap rv">
-<div class="term">
-<div class="term-bar"><span class="dots"><i></i><i></i><i></i></span><span class="term-title">Terminal: install</span></div>
-<div class="panel">
-<div class="cmdrow">
-<span class="ps" aria-hidden="true">$</span>
-<code class="cmd" id="cmd-curl2">curl -fsSL https://<wbr>github.com/<wbr>PiniShv/<wbr>aidentity/<wbr>releases/<wbr>latest/<wbr>download/<wbr><span class="nw">install.sh | bash</span></code>
-<button type="button" class="copy" data-target="cmd-curl2"><svg class="i" aria-hidden="true"><use href="#i-copy"/></svg><span class="lbl">Copy</span><span class="sr"> the install command</span></button>
-</div>
-<div class="cmdrow">
-<span class="ps" aria-hidden="true">$</span>
-<code class="cmd" id="cmd-brew2">brew install pinishv/tap/aidentity</code>
-<button type="button" class="copy" data-target="cmd-brew2"><svg class="i" aria-hidden="true"><use href="#i-copy"/></svg><span class="lbl">Copy</span><span class="sr"> the Homebrew command</span></button>
-</div>
-<p class="hint">Use one of the two. Homebrew users then run <code>aidentity setup</code>.</p>
-</div>
-</div>
-</div>
-<p class="small rv">Changed your mind later? The uninstaller removes what aidentity made, and asks before it moves any profile to the Trash.</p>
-<p class="small rv"><a href="https://github.com/PiniShv/aidentity/blob/main/bin/aidentity">Read the script on GitHub</a> · <a href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md">Full guide</a> · <a href="recipes/">Build your recipe</a></p>
-</div>
+<p class="more"><a class="go" href="https://github.com/PiniShv/aidentity/blob/main/docs/guide.md#frequently-asked">Read every answer in the guide</a></p>
 </div>
 </section>
 
 </main>
 
-<footer class="foot">
+<!-- 13. Close and footer -->
+<footer class="dk">
+<section class="closer" aria-labelledby="h-cta">
 <div class="wrap">
-<div class="foot-top">
-<div>
-<a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="26" height="26"><span>aidentity</span></a>
-<p>One app, every account, all open at once. Each one stays signed in.</p>
+<h2 id="h-cta">Stop signing out.</h2>
+<p class="lede">Free and open source, for your Mac.</p>
+<a class="btn" href="#install">Install aidentity</a>
 </div>
+</section>
+<div class="foot">
+<div class="wrap">
+<ol class="notes">
+<li id="fn1">Verified: two accounts signed in at once, checked by hand. Tested: the app starts as its own copy with its own data; two sign-ins are not checked by hand yet. <a href="#which-apps-work">See the lists</a>.</li>
+<li id="fn2">The window needs macOS 12.3 or later. The menu and the commands work without it.</li>
+</ol>
 <nav aria-label="Project links">
 <ul role="list">
 <li><a href="https://github.com/PiniShv/aidentity">GitHub</a></li>
@@ -1237,10 +1008,8 @@ html:not(.js) .chapters{display:none}
 <li><a href="https://github.com/PiniShv/aidentity/blob/main/LICENSE">Licence (Apache-2.0)</a></li>
 </ul>
 </nav>
-</div>
-<div class="legal">
 <p>Built by <a href="https://pinishv.com">Pini Shvartsman</a>. Apache-2.0 licence.</p>
-<p>Not affiliated with Anthropic, OpenAI or the makers of the other apps named here.</p>
+<p>Not affiliated with Anthropic, OpenAI or the makers of the other apps named here. The pictures and recordings use stand-in apps, so no real account is shown.</p>
 </div>
 </div>
 </footer>
@@ -1251,10 +1020,27 @@ html:not(.js) .chapters{display:none}
 (function(){
 var d=document,live=d.getElementById('live');
 function say(t){live.textContent='';setTimeout(function(){live.textContent=t},50)}
+var mq=window.matchMedia('(prefers-reduced-motion: reduce)');
+
+/* A row of tabs or radio buttons: a click picks one, and the arrow keys, Home and End move
+   to another and pick it. pick(item, focus) does the choosing. */
+function rove(list,pick){
+  list.forEach(function(b,i){
+    b.addEventListener('click',function(){pick(b)});
+    b.addEventListener('keydown',function(e){
+      var n,k=e.key;
+      if(k==='ArrowRight'||k==='ArrowDown')n=list[(i+1)%list.length];
+      else if(k==='ArrowLeft'||k==='ArrowUp')n=list[(i-1+list.length)%list.length];
+      else if(k==='Home')n=list[0];
+      else if(k==='End')n=list[list.length-1];
+      if(n){e.preventDefault();pick(n,true)}
+    });
+  });
+}
 
 /* Install tabs */
 var tabs=[].slice.call(d.querySelectorAll('[role=tab]'));
-function show(t,focus){
+rove(tabs,function(t,focus){
   tabs.forEach(function(x){
     var on=x===t;
     x.setAttribute('aria-selected',on?'true':'false');
@@ -1262,17 +1048,6 @@ function show(t,focus){
     d.getElementById(x.getAttribute('aria-controls')).hidden=!on;
   });
   if(focus)t.focus();
-}
-tabs.forEach(function(t,i){
-  t.addEventListener('click',function(){show(t)});
-  t.addEventListener('keydown',function(e){
-    var n,k=e.key;
-    if(k==='ArrowRight'||k==='ArrowDown')n=tabs[(i+1)%tabs.length];
-    else if(k==='ArrowLeft'||k==='ArrowUp')n=tabs[(i-1+tabs.length)%tabs.length];
-    else if(k==='Home')n=tabs[0];
-    else if(k==='End')n=tabs[tabs.length-1];
-    if(n){e.preventDefault();show(n,true)}
-  });
 });
 
 /* Copy buttons. If the clipboard is not available, select the text instead. */
@@ -1306,22 +1081,18 @@ tabs.forEach(function(t,i){
 });
 
 /* Videos. One function sets up a player from its own root element (a figure marked data-player),
-   so the film and the two demos share every behaviour. Pause keeps the place and Play carries on
+   so the film and the two clips share every behaviour. Pause keeps the place and Play carries on
    from there. A video plays (muted) only while it is on screen, and never by itself when the
-   device asks for less motion or Data Saver is on. Only one plays at a time: starting one pauses
-   the others. */
-var mq=window.matchMedia('(prefers-reduced-motion: reduce)');
+   device asks for less motion or Data Saver is on. */
 var saver=!!(navigator.connection&&navigator.connection.saveData);
-var players=[];
-function fmt(x){x=Math.max(0,Math.floor(x||0));return Math.floor(x/60)+':'+('0'+x%60).slice(-2)}
 function initPlayer(root){
   var v=root.querySelector('video');
   if(!v||!v.play)return;
-  var shot=root.querySelector('.shot'),btn=root.querySelector('.vbtn'),ico=root.querySelector('.vico'),lbl=root.querySelector('.vlbl');
+  var shot=root.querySelector('.shot-v'),btn=root.querySelector('.vbtn'),ico=root.querySelector('.vico'),lbl=root.querySelector('.vlbl');
   var ov=root.querySelector('.ov'),big=root.querySelector('.bigplay'),why=root.querySelector('.why');
-  var bar=root.querySelector('.prog i'),vt=root.querySelector('.vtime'),fsb=root.querySelector('.fs');
-  var chap=[].slice.call(root.querySelectorAll('.chapters button'));
+  var bar=root.querySelector('.prog i'),fsb=root.querySelector('.fs');
   var snd=root.querySelector('.snd'),watch=root.querySelector('.watch'),heard=false;
+  var cc=root.querySelector('.cc'),tr=v.textTracks&&v.textTracks[0];
   var len=+root.getAttribute('data-len')||1,what=root.getAttribute('data-what')||'demo';
   var last=v.querySelector('source:last-of-type');
   var userPaused=false,autoPaused=false,started=false,blocked=false,failed=false,seen=false,raf=0;
@@ -1329,7 +1100,8 @@ function initPlayer(root){
   function quiet(){return mq.matches||saver}
   function ui(){
     if(failed){
-      shot.classList.add('paused');ov.hidden=false;big.hidden=true;btn.hidden=true;fsb.hidden=true;why.hidden=false;
+      shot.classList.add('paused');ov.hidden=false;big.hidden=true;btn.hidden=true;why.hidden=false;
+      if(fsb)fsb.hidden=true;
       if(snd){snd.hidden=true;watch.hidden=true}
       if(cc)cc.hidden=true;
       var a=d.createElement('a');a.href=last?last.getAttribute('src'):'';a.textContent='Open the video file';
@@ -1344,13 +1116,13 @@ function initPlayer(root){
     lbl.textContent=p?'Play':'Pause';
     if(pre)w=blocked?'Your browser did not start the '+what+' by itself.':mq.matches?'Autoplay is off, because your device asks for less motion.':saver?'Autoplay is off, because Data Saver is on.':'';
     why.textContent=w;why.hidden=!w;
-    root.classList.toggle('playing',!p);sound();
+    sound();
   }
   /* Sound, on a player that has it (the film). The button says what is happening now: "Sound off"
-     with a crossed-out speaker, or "Sound on" with moving level bars. Muted and a volume of zero
-     (which the browser's own full-screen controls can set) both count as off. The first time sound
-     is turned on, from any control, the film starts again from the beginning, so the narration is
-     heard from its first line, and then it plays once. */
+     with a crossed-out speaker, or "Sound on". Muted and a volume of zero (which the browser's own
+     full-screen controls can set) both count as off. The first time sound is turned on, from any
+     control, the film starts again from the beginning, so the narration is heard from its first
+     line, and then it plays once. */
   function off(){return v.muted||!v.volume}
   function sound(){
     if(!snd)return;
@@ -1362,11 +1134,7 @@ function initPlayer(root){
   }
   function listen(){heard=true;v.loop=false;seekTo(0);if(!v.volume)v.volume=1;v.muted=false;userPaused=false;go()}
   function paint(){
-    var t=v.currentTime||0,n=v.duration||len,cur=0;
-    bar.style.setProperty('--p',Math.min(1,t/n).toFixed(4));
-    vt.textContent=fmt(t)+' / '+fmt(n);
-    chap.forEach(function(b,i){if(t>=+b.getAttribute('data-t')-.25)cur=i});
-    chap.forEach(function(b,i){if(i===cur)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')});
+    bar.style.setProperty('--p',Math.min(1,(v.currentTime||0)/(v.duration||len)).toFixed(4));
   }
   function loop(){paint();raf=v.paused?0:requestAnimationFrame(loop)}
   function go(){
@@ -1377,13 +1145,8 @@ function initPlayer(root){
     if(v.paused){userPaused=false;go()}else{userPaused=true;v.pause()}
   }
   function fail(){failed=true;ui()}
-  /* The other player starting is not the visitor's choice, so this counts as an automatic pause: the
-     demo carries on when it is on screen again, as after scrolling away. */
-  var me={yieldToOther:function(){if(!v.paused){autoPaused=true;v.pause()}}};
-  players.push(me);
   v.addEventListener('play',function(){
     started=true;autoPaused=false;ui();if(!raf)raf=requestAnimationFrame(loop);
-    players.forEach(function(o){if(o!==me)o.yieldToOther()});
   });
   v.addEventListener('pause',function(){ui();paint()});
   v.addEventListener('loadedmetadata',paint);
@@ -1394,32 +1157,32 @@ function initPlayer(root){
   v.addEventListener('click',function(){if(d.fullscreenElement!==v)toggle()});
   big.addEventListener('click',function(){if(snd&&!heard)listen();else{userPaused=false;go()}btn.focus()});
   /* A jump before the video has loaded waits for its metadata: until then the browser does not know
-     the video's length, and some browsers drop the seek. The video has a keyframe at every chapter
-     time, so a browser that seeks only to keyframes still lands exactly there. */
+     the video's length, and some browsers drop the seek. */
   function seekTo(t){
     if(v.readyState>=1){v.currentTime=t;return}
     v.addEventListener('loadedmetadata',function h(){v.removeEventListener('loadedmetadata',h);v.currentTime=t;paint()});
   }
-  chap.forEach(function(b){b.addEventListener('click',function(){seekTo(+b.getAttribute('data-t'));userPaused=false;go();paint()})});
   if(snd){
     snd.addEventListener('click',function(){
       if(!off())v.muted=true;
       else if(!heard)listen();
       else{if(!v.volume)v.volume=1;v.muted=false;userPaused=false;go()}
     });
-    watch.addEventListener('click',function(){listen();snd.focus()});
+    watch.addEventListener('click',function(){listen();snd.focus({preventScroll:true})});
     v.addEventListener('volumechange',function(){if(!off()&&!heard)listen();sound()});
     snd.hidden=false;
   }
   /* Captions on or off, on a player that has a captions track (the film). In full screen the
      browser's own controls come back, with their own captions menu; the button follows that too. */
-  var cc=root.querySelector('.cc'),tr=v.textTracks&&v.textTracks[0];
   if(cc&&tr){
     tr.mode='disabled';
     cc.hidden=false;
     cc.addEventListener('click',function(){tr.mode=tr.mode==='showing'?'disabled':'showing'});
-    v.textTracks.addEventListener('change',function(){root.classList.toggle('ccon',tr.mode==='showing')});
-    v.textTracks.addEventListener('change',function(){cc.setAttribute('aria-pressed',tr.mode==='showing'?'true':'false')});
+    v.textTracks.addEventListener('change',function(){
+      var on=tr.mode==='showing';
+      root.classList.toggle('ccon',on);
+      cc.setAttribute('aria-pressed',on?'true':'false');
+    });
   }
   if('IntersectionObserver' in window){
     new IntersectionObserver(function(es){
@@ -1435,13 +1198,13 @@ function initPlayer(root){
   }
   if(mq.addEventListener)mq.addEventListener('change',motion);else if(mq.addListener)mq.addListener(motion);
 
-  /* Full screen on any screen: the button, or a double click on the picture. The browser's own
-     controls show while it lasts. On a phone the picture can then turn sideways. */
+  /* Full screen, on a player that has the button: the button, or a double click on the picture.
+     The browser's own controls show while it lasts. On a phone the picture can then turn sideways. */
   function full(){
     userPaused=false;go();
     if(v.requestFullscreen)v.requestFullscreen();else v.webkitEnterFullscreen();
   }
-  if(v.requestFullscreen||v.webkitEnterFullscreen){
+  if(fsb&&(v.requestFullscreen||v.webkitEnterFullscreen)){
     fsb.hidden=false;
     fsb.addEventListener('click',full);
     v.addEventListener('dblclick',full);
@@ -1451,6 +1214,20 @@ function initPlayer(root){
 }
 [].slice.call(d.querySelectorAll('[data-player]')).forEach(initPlayer);
 
+/* "Watch the film" in the hero: go to the film and press its own "Watch with sound" button,
+   which starts it from the beginning with sound and moves focus to the sound button. A click is
+   the visitor's own action, so the browser lets the sound play. If the film's player did not
+   start up, the link stays a plain link to the film. */
+var film=d.getElementById('film'),watch=film.querySelector('.watch');
+[].forEach.call(d.querySelectorAll('[data-watch]'),function(a){
+  a.addEventListener('click',function(e){
+    if(film.querySelector('.snd').hidden)return;
+    e.preventDefault();
+    film.scrollIntoView();
+    watch.click();
+  });
+});
+
 /* Phone menu: close it after a choice, or with Escape. */
 var menu=d.querySelector('.mnav details');
 if(menu){
@@ -1458,38 +1235,62 @@ if(menu){
   d.addEventListener('keydown',function(e){if(e.key==='Escape'&&menu.open){menu.open=false;menu.querySelector('summary').focus()}});
 }
 
-/* Local nav: mark the section that crosses a line 40% down the screen, if a link names it. Checked
-   on scroll (once per frame) and on resize, from where each section is now, so it holds for any
-   window size. */
-var links=[].slice.call(d.querySelectorAll('.links a')),secs=[],tick=0;
-links.forEach(function(a){var s=d.getElementById(a.getAttribute('href').slice(1));if(s)secs.push([s,a])});
-function mark(){
-  tick=0;var y=window.innerHeight*.4,cur=null;
+/* Work that follows the scroll position. Each part below adds its own job; the jobs run once a
+   frame while the page scrolls, on a resize, and once at the start. */
+var jobs=[],tick=0;
+function frame(){tick=0;jobs.forEach(function(job){job()})}
+
+/* Local nav: mark the section that crosses a line 40% down the screen, if a link names it. The
+   film's link names the figure, so its section counts for it. */
+var links=[].slice.call(d.querySelectorAll('.links a')),secs=[];
+links.forEach(function(a){
+  var s=d.getElementById(a.getAttribute('href').slice(1));
+  if(s)secs.push([s.closest('section')||s,a]);
+});
+jobs.push(function(){
+  var y=window.innerHeight*.4,cur=null;
   secs.forEach(function(p){var r=p[0].getBoundingClientRect();if(r.top<=y&&r.bottom>y)cur=p[1]});
   links.forEach(function(a){if(a===cur)a.setAttribute('aria-current','true');else a.removeAttribute('aria-current')});
-}
-if(secs.length){
-  window.addEventListener('scroll',function(){if(!tick)tick=requestAnimationFrame(mark)},{passive:true});
-  window.addEventListener('resize',mark);
-  mark();
+});
+
+/* The statement lights up word by word as it crosses the screen. Without script, or when the
+   device asks for less motion, every word is lit from the start. */
+var para=d.querySelector('[data-words]');
+if(para&&!mq.matches){
+  var words=[];
+  (function split(n){
+    [].slice.call(n.childNodes).forEach(function(c){
+      if(c.nodeType===3){
+        var f=d.createDocumentFragment();
+        c.textContent.split(/(\s+)/).forEach(function(t){
+          if(!t.trim()){f.appendChild(d.createTextNode(t));return}
+          var s=d.createElement('span');s.className='w off';s.textContent=t;words.push(s);f.appendChild(s);
+        });
+        n.replaceChild(f,c);
+      }else split(c);
+    });
+  })(para);
+  jobs.push(function(){
+    var h=window.innerHeight,r=para.getBoundingClientRect(),n=Math.round((h*.82-r.top)/(r.height+h*.3)*words.length);
+    words.forEach(function(w,i){w.classList.toggle('off',i>=n)});
+  });
 }
 
-/* Scroll-in reveals. What is already on screen at load shows at once, with no fade. Everything
-   else fades in once, as it nears the screen. Nothing fades when the device asks for less motion. */
-var rv=[].slice.call(d.querySelectorAll('.rv')),root=d.documentElement;
-if(rv.length){
-  if(!('IntersectionObserver' in window)||mq.matches){rv.forEach(function(e){e.classList.add('in')})}
-  else{
-    root.classList.add('rv-init');
-    var h=window.innerHeight||800;
-    var io=new IntersectionObserver(function(es){
-      es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}});
-    },{rootMargin:'0px 0px -8% 0px'});
-    rv.forEach(function(e){
-      if(e.getBoundingClientRect().top<h)e.classList.add('in');else io.observe(e);
-    });
-    requestAnimationFrame(function(){requestAnimationFrame(function(){root.classList.remove('rv-init')})});
-  }
+window.addEventListener('scroll',function(){if(!tick)tick=requestAnimationFrame(frame)},{passive:true});
+window.addEventListener('resize',frame);
+frame();
+
+/* The colour picker: the Work icon's badge, and the command that would make it. */
+var pk=d.querySelector('.picker');
+if(pk){
+  var sw=[].slice.call(pk.querySelectorAll('[role=radio]')),icon=d.getElementById('pk-icon'),nm=d.getElementById('pk-name');
+  rove(sw,function(b,focus){
+    sw.forEach(function(x){var on=x===b;x.setAttribute('aria-checked',on?'true':'false');x.tabIndex=on?0:-1});
+    icon.style.setProperty('--b',b.style.getPropertyValue('--c'));
+    nm.textContent=b.getAttribute('data-c');
+    if(focus)b.focus();
+  });
+  pk.hidden=false;
 }
 })();
 </script>
