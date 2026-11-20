@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The site's front page is new again. It opens with "Every account. Open at
+  once." and a picture of one app open in three windows, each signed in. The
+  film has its own section under it. New sections show the icons `aidentity`
+  makes, with a colour picker, and the three ways to manage accounts: the
+  window, the menu and the commands. The page has about a third fewer words;
+  the README and the guide keep the full detail.
+- The film is cut again, at 1920x1080 and with larger type. It reaches the
+  product sooner. It shows the launcher icons with their badges, and the three
+  ways to add an account: the window, the menu and one command. The narration
+  is new, in a new voice, and the film is 32 seconds long. The card shown when
+  a link to the site is shared matches it.
+- Both terminal demos are recorded again on 1.7.0, shorter and with larger
+  type. The command-line demo adds two accounts, lists them and renames one.
+  The menu demo gives one a new colour and a new name.
+  `assets/record-demo.sh window` makes pictures of `aidentity ui --window`
+  from its real page, in the same sandbox, and the site, the README and the
+  film show them. The demos, the pictures, the film and the site use one stand-in app
+  icon, `site/assets/app.svg`. The two tapes share their settings in
+  `assets/demo-common.tape`.
+- The README follows the order of the site and shows the window.
+- The recipes page and the "page not found" page have the look of the new
+  front page.
+
 ## [1.7.0] - 2026-11-19
 
 ### Added

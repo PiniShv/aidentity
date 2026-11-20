@@ -1,35 +1,30 @@
 <div align="center">
 
-<img src="assets/logo.svg" alt="" width="96" height="96">
+<img src="assets/logo.svg" alt="" width="84" height="84">
 
 # aidentity
 
-### Stop signing out to switch accounts.
+### Every account. Open at once.
 
-**One app, every account, all open at once. Each one stays signed in.**
+**Stop signing out to switch accounts.**<br>
+aidentity opens the same Mac app once for each account, and each one stays signed in.
 
-Built for AI desktop apps like Claude and ChatGPT. Also tested with Slack, VS Code, Cursor, Notion and other apps built on Chromium, the engine inside Google Chrome. [See the list](#which-apps-work).
+[Install](#install) · [How it works](#how-it-works) · [Which apps work](#which-apps-work) · [Questions](#questions) · [Full guide](docs/guide.md) · [Website](https://aidentity.pinishv.com)
 
-![macOS only](https://img.shields.io/badge/macOS-only-111?logo=apple&logoColor=white)
-![Latest version](https://img.shields.io/github/v/tag/PiniShv/aidentity?label=version&sort=semver)
-![No dependencies](https://img.shields.io/badge/dependencies-none-2FB344)
-![Apache-2.0 licence](https://img.shields.io/badge/license-Apache--2.0-2E7DF6)
+<a href="https://aidentity.pinishv.com/assets/film.mp4"><img src="assets/film-poster.jpg" alt="Play the 32-second film, with sound: signing out and in again to switch accounts, then the same chat app open three times at once, one window for each account, each one signed in" width="840"></a>
 
-[Install](#30-seconds) · [How it works](#how-it-works) · [Which apps work](#which-apps-work) · [FAQ](#frequently-asked) · [Full guide](docs/guide.md)
+<sub>A 32-second film, with sound. Click to play.</sub>
 
-```bash
-curl -fsSL https://github.com/PiniShv/aidentity/releases/latest/download/install.sh | bash
-```
-
-<a href="https://aidentity.pinishv.com/assets/film.mp4"><img src="assets/film-poster.jpg" alt="Play the 31-second film, with sound: signing out and in again to switch accounts, then the same chat app open three times at once, one window for each account, each one signed in" width="800"></a>
-
-<sub>A 31-second film, with sound. Click to play.</sub>
+![macOS only](https://img.shields.io/badge/macOS-only-1d1d1f?style=flat-square&logo=apple&logoColor=white)
+![Latest version](https://img.shields.io/github/v/tag/PiniShv/aidentity?label=version&sort=semver&style=flat-square&color=1d1d1f)
+![No dependencies](https://img.shields.io/badge/dependencies-none-1d1d1f?style=flat-square)
+![Apache-2.0 licence](https://img.shields.io/badge/license-Apache--2.0-1d1d1f?style=flat-square)
 
 </div>
 
-<a id="30-seconds"></a>
+Built for AI desktop apps like Claude and ChatGPT. Also tested with Slack, VS Code, Cursor, Notion and other apps built on Chromium, the engine inside Google Chrome. [See the list](#which-apps-work).
 
-## Quick start
+## Install
 
 Open Terminal (press **Cmd + Space**, type `Terminal`, press **Return**) and paste:
 
@@ -54,7 +49,35 @@ The installer checks the download, never uses `sudo` and leaves your shell files
 
 Not sure what to type? [Build your recipe](https://aidentity.pinishv.com/recipes/): pick your apps and colours, and copy the commands.
 
-Day to day:
+## An icon for every account
+
+Each account gets its own icon: the app's icon, with a letter and a colour you pick. Click it and that account opens.
+
+```bash
+aidentity add Claude --profile Work --color blue       # the icon "Claude Work"
+aidentity add Claude --profile Personal --color green  # the icon "Claude Personal"
+aidentity add Claude --main                            # an icon for your original account
+```
+
+<div align="center">
+
+<img src="assets/demo.gif" alt="Terminal recording: aidentity adds a Work and a Personal profile for Claude, lists them, then renames one. The renamed account stays signed in." width="760">
+
+</div>
+
+## Three ways to manage your accounts
+
+**In a window.** `aidentity ui --window` shows your profiles as cards, each with its own icon. Open, quit, edit or remove one with a click. It opens no port and runs no server. Close it and it ends, after any action that is still running. It needs macOS 12.3 or later. [More](docs/guide.md#aidentity-ui---window)
+
+<div align="center">
+
+<img src="assets/window.png" alt="The aidentity window. Four profile cards: Claude Client, Claude Main, Claude Personal and Claude Work, each with its badged icon, its status and the buttons Open, Edit and Remove. The two that are running also have a Quit button. Below them, a removed profile, Claude Test, with a Restore button." width="760">
+
+</div>
+
+**In a menu.** `aidentity ui` shows every profile on one screen. Pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it. [More](docs/guide.md#aidentity-ui)
+
+**With commands.** Each job is one line:
 
 ```bash
 aidentity ui                                       # a menu in your terminal
@@ -69,23 +92,9 @@ aidentity doctor --fix                             # check and repair
 aidentity help rm                                  # options for one command (also: rm --help)
 ```
 
-<div align="center">
-
-<img src="assets/demo.gif" alt="Terminal demo: aidentity creates Claude and ChatGPT profiles, then renames, recolours, removes and restores one" width="800">
-
-</div>
+Tab completion for bash, zsh and fish is built in. Homebrew installs it for you; for other installs it takes [one line](docs/guide.md#aidentity-completion).
 
 Moving to another Mac? `aidentity export > profiles.json` saves how each launcher looks and starts, and `aidentity import profiles.json` builds them there. The file holds no account data, so each profile starts signed out. It does hold launch settings such as proxy values, so keep it private. `export` warns on standard error when it finds variable values, or a password in a switch. [More](docs/guide.md#aidentity-export)
-
-Prefer a menu? `aidentity ui` shows every profile on one screen; pick one with the arrow keys, then one key opens, quits, recolours, renames or removes it. `aidentity ui --window` shows the same profiles as cards in a window, with each launcher's icon. It opens no port and runs no server. Close it and it ends, after any action that is still running. [More](docs/guide.md#aidentity-ui---window)
-
-<div align="center">
-
-<img src="assets/demo-ui.gif" alt="Terminal demo: aidentity ui shows the profiles in a menu, then recolours and renames one and lists every key" width="800">
-
-</div>
-
-Tab completion for bash, zsh and fish is built in. Homebrew installs it for you; for other installs it takes [one line](docs/guide.md#aidentity-completion).
 
 [All commands](docs/guide.md#commands)
 
@@ -106,11 +115,11 @@ There is still one `Claude.app`. [The full picture](docs/guide.md#how-it-works)
 > [!NOTE]
 > **The main trade-off.** While profiles run, the Dock shows the app's own tile for each one, with the same name and icon. macOS reads both from inside the app, and aidentity never changes the app. [How to tell them apart](docs/guide.md#the-rough-edge-dock-tiles-show-the-original-app)
 
-## Why aidentity
+## Easy to try. Easy to undo.
 
 - **Your app stays untouched.** It is never copied, changed or signed again, so it keeps its signature, its keychain access and its own updates.
 - **One script you can read.** A few thousand lines, mostly bash; the window's page and the small program that draws it are in the same file. [Read it](bin/aidentity) before you run it. It needs nothing extra; the Xcode Command Line Tools are optional. It makes no network calls except when you run `aidentity update`, never uses `sudo` and runs nothing in the background.
-- **Easy to undo.** Deleted an icon? `aidentity restore` brings it back, still signed in. Something looks wrong? `aidentity doctor --fix`. `rm` keeps your data unless you add `--purge`, and even then it moves the data to the Trash, so you can move it back. The [uninstaller](docs/guide.md#uninstall) asks before it removes any profile, and it also moves the data to the Trash.
+- **A deleted icon comes back.** `aidentity restore` rebuilds it, still signed in. Something looks wrong? `aidentity doctor --fix`. `rm` keeps your data unless you add `--purge`, and even then it moves the data to the Trash, so you can move it back. The [uninstaller](docs/guide.md#uninstall) asks before it removes any profile, and it also moves the data to the Trash.
 - **Your original account stays one click away.** While a profile runs, clicking `Claude.app` takes you to that profile. `aidentity add Claude --main` builds a Main launcher that opens your original account instead. [Why](docs/guide.md#opening-your-original-account-while-a-profile-runs)
 
 Worth knowing: aidentity does not encrypt profile data. Each data folder holds a live sign-in, just like the app's own folder. [Is this safe?](docs/guide.md#is-this-safe)
@@ -130,7 +139,7 @@ Native apps have no Chromium inside, so they have no `--user-data-dir` option to
 
 Tried another app? [Tell us how it went](https://github.com/PiniShv/aidentity/issues). That is how an app moves to Verified.
 
-## Frequently asked
+## Questions
 
 **Something went wrong. Where do I start?**
 
@@ -166,6 +175,6 @@ No. It works with desktop apps. Command-line tools keep their sign-in in other w
 
 Built by [Pini Shvartsman](https://pinishv.com). Apache-2.0 licence.
 
-<sub>Not affiliated with Anthropic, OpenAI or the makers of the other apps named here.</sub>
+<sub>Not affiliated with Anthropic, OpenAI or the makers of the other apps named here. The pictures and recordings use stand-in apps, so no real account is shown.</sub>
 
 </div>
