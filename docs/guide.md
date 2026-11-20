@@ -50,7 +50,7 @@ Not sure what to type? [Build your recipe](https://aidentity.pinishv.com/recipes
 
 ### What it looks like
 
-![Terminal recording of aidentity: it lists apps, then creates, lists, renames, recolours, removes and restores profiles](../assets/demo.gif)
+![Terminal recording of aidentity: it creates a Work and a Personal profile for Claude, lists them, then renames one](../assets/demo.gif)
 
 <sub>The recording uses the direct commands from [Commands](#commands). `aidentity setup` does only the first part, creating profiles, and it asks you questions instead.</sub>
 
