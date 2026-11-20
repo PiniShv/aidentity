@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- A stand-in app icon for demos and pictures: no real product's mark. -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6a6a72"/><stop offset="1" stop-color="#2a2a2f"/></linearGradient>
+    <linearGradient id="h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".34"/><stop offset=".5" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#000" stop-opacity=".2"/></linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#g)"/>
+  <rect x="105" y="105" width="814" height="814" rx="180" fill="none" stroke="url(#h)" stroke-width="10"/>
+  <path transform="translate(100 100) scale(8.24)" d="M38 27h24a13 13 0 0 1 13 13v9a13 13 0 0 1-13 13H49.5L37 72.5V61.9A13 13 0 0 1 25 49v-9a13 13 0 0 1 13-13z" fill="#fff" fill-opacity=".96"/>
+</svg>
