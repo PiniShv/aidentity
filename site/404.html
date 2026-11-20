@@ -16,7 +16,7 @@
 /* Dark in both themes, like the first screen of the home page. */
 :root{
   color-scheme:dark;
-  --text:#f5f5f7;--muted:#98989d;--link:#2997ff;--btn:#0071e3;--btn-h:#0077ed;--focus:#64b5ff;
+  --text:#f5f5f7;--muted:#98989d;--link:#2997ff;--btn:#0071e3;--btn-h:#0066cc;--focus:#64b5ff;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
 }
@@ -25,6 +25,9 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:#000}
 body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:#000;color:var(--text);font:400 1.0625rem/1.47 var(--sans);letter-spacing:-.01em;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
 a{color:var(--link);text-decoration:none;text-underline-offset:.2em}
 a:hover{text-decoration:underline}
+/* A link inside running text keeps its underline: colour alone does not mark it. */
+p a:not([class]){text-decoration:underline;text-decoration-thickness:1px}
+p a:not([class]):hover{text-decoration-thickness:2px}
 :focus-visible{outline:3px solid var(--focus);outline-offset:3px;border-radius:8px}
 .wrap{width:min(100% - 2*clamp(20px,5vw,44px),1200px);margin-inline:auto}
 header{background:#161617;border-bottom:1px solid rgba(255,255,255,.1)}
