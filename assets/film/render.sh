@@ -5,9 +5,10 @@
 #   render.sh          narration, music, render, encode, posters
 #   render.sh audio    only the narration and the music: writes film-mix.wav
 #
-# Reads this folder and ../logo.svg (the repository is mounted read-only).
+# Reads this folder, ../logo.svg and the stand-in app icon, site/assets/app.svg
+# (the repository is mounted read-only).
 # Writes to /out (or $OUT):
-#   film.mp4  film.webm        the film, 1280x720, 31.4 s, with sound
+#   film.mp4  film.webm        the film, 1920x1080, 31.8 s, with sound
 #   film-poster.jpg            the poster the site shows before play
 #   readme-poster.jpg          the README poster, with a play button
 #   og.png                     the card shown when a link to the site is shared
@@ -32,7 +33,11 @@ done
 export PYTHONDONTWRITEBYTECODE=1
 PY=/opt/tts/bin/python
 HF=/opt/hf/node_modules/.bin/hyperframes
-LENGTH=31.4
+LENGTH=31.8
+# The second both posters show: both lines of "Each in its own window. Each one
+# signed in.", the three windows, each one marked "Signed in", and the three
+# launchers.
+POSTER=16.1
 step() { printf '\n== %s\n' "$*"; }
 ff() { ffmpeg -nostdin -hide_banner -y -loglevel error "$@"; }
 
@@ -86,13 +91,18 @@ if [ "$mode" = audio ]; then
   exit 0
 fi
 
-# 5. The composition and everything it loads, in one folder: the logo from the
-# repository, the Inter faces from the fonts-inter package, GSAP from npm.
+# 5. The composition and everything it loads, in one folder: the logo and the
+# stand-in app icon from the repository, the picture of the window from this
+# folder, the Inter faces from the fonts-inter package (Inter Display for the
+# lines, Inter for the small text), GSAP from npm. The page is laid out at
+# 1280x720 and drawn at 1920x1080.
 step "Render"
 cp "$HERE/index.html" "$P/index.html"
 cp "$HERE/../logo.svg" "$P/logo.svg"
-for w in Regular Medium SemiBold Bold; do
-  cp "/usr/share/fonts/opentype/inter/Inter-$w.otf" "$P/fonts/"
+cp "$HERE/../../site/assets/app.svg" "$P/app.svg"
+cp "$HERE/window.png" "$P/window.png"
+for f in InterDisplay-Medium InterDisplay-SemiBold Inter-Medium Inter-SemiBold Inter-Bold; do
+  cp "/usr/share/fonts/opentype/inter/$f.otf" "$P/fonts/"
 done
 cp /opt/hf/node_modules/gsap/dist/gsap.min.js "$P/vendor/gsap.min.js"
 ( cd "$P" && "$HF" render -o film-silent.mp4 --fps 30 --quality high )
@@ -117,20 +127,20 @@ ff -i "$P/film-silent.mp4" "${clean[@]}" -an -pix_fmt yuv420p -c:v libvpx-vp9 -b
 ff -i "$A/film-mix.wav" "${clean[@]}" -c:a libopus -b:a 128k -ar 48000 audio.opus
 ff -i video.webm -i audio.opus "${clean[@]}" -map 0:v -map 1:a -c copy -t "$LENGTH" film.webm
 
-# 7. The site poster: the frame at 20.8 s, with both lines and both windows on screen.
+# 7. The site poster: the frame at $POSTER.
 step "Posters"
-ff -ss 20.8 -i film.mp4 "${clean[@]}" -frames:v 1 -q:v 4 film-poster.jpg
+ff -ss "$POSTER" -i film.mp4 "${clean[@]}" -frames:v 1 -q:v 4 film-poster.jpg
 
-# 8. The README poster: the frame at 20.8 s with a play button over it.
+# 8. The README poster: the same frame with a play button over it.
 cat > play.svg <<'SVG'
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
-  <circle cx="640" cy="560" r="46" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.55)" stroke-width="2"/>
-  <path d="M628 538 L 660 560 L 628 582 Z" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <circle cx="960" cy="750" r="78" fill="rgba(0,0,0,0.5)" stroke="rgba(255,255,255,0.75)" stroke-width="3"/>
+  <path d="M938 711 L 998 750 L 938 789 Z" fill="#ffffff"/>
 </svg>
 SVG
-rsvg-convert -w 1280 -h 720 play.svg -o play.png
-ff -ss 20.8 -i film.mp4 -i play.png -filter_complex "overlay=0:0" "${clean[@]}" \
-  -frames:v 1 -q:v 3 readme-poster.jpg
+rsvg-convert -w 1920 -h 1080 play.svg -o play.png
+ff -ss "$POSTER" -i film.mp4 -i play.png -filter_complex "overlay=0:0" "${clean[@]}" \
+  -frames:v 1 -q:v 4 readme-poster.jpg
 
 # 9. The card shown when a link to the site is shared: og.html at 1200x630,
 # drawn by the same Chromium with the same fonts and logo as the film.

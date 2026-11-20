@@ -20,14 +20,17 @@ if not WORK:
     sys.exit("usage: music.py WORKDIR")
 
 SR = 48000
-# The hook comes first; the loop starts HOOK seconds in, and the turn 9 s after
-# that. The turn and the answer take 19.5 s, and their times count from TURN.
-HOOK = 2.9
-TURN = HOOK + 9.0
-LEN = TURN + 19.5
+# The hook comes first; the loop starts HOOK seconds in, and the turn 5.15 s
+# after that. The times of the answer count from TURN: its groove runs for eight
+# and a half bars, then the end chord rings under the end card.
+HOOK = 2.4
+TURN = HOOK + 5.15
+LEN = 31.8
 BPM = 104
 BEAT = 60 / BPM
 BAR = 4 * BEAT
+START = TURN + 0.55
+END_CHORD = START + 8.5 * BAR
 N = int(LEN * SR)
 
 def t_of(d): return np.arange(int(d * SR)) / SR
@@ -102,7 +105,7 @@ put(0.0, pad([62, 67, 71], TURN + 0.6) * np.linspace(0.8, 1.0, int((TURN + 0.6) 
 # The hook: the pad is already there, and one D sounds as the pointer comes to
 # rest on "Sign out". At the turn the D comes again, as the camera closes in.
 put(1.2, pluck(74, 1.6), -22, -0.15)
-for at, gap, db in [(1.62, 0.30, -21), (3.25, 0.34, -22.5), (4.66, 0.28, -21.5), (6.55, 0.36, -23)]:
+for at, gap, db in [(0.50, 0.30, -21), (1.45, 0.34, -22.5), (1.98, 0.28, -21.5), (2.80, 0.36, -23)]:
     put(HOOK + at, pluck(74), db, -0.15)
     put(HOOK + at + gap, pluck(79), db - 1, 0.15)
 put(TURN, pluck(74, 1.6), -22, -0.15)
@@ -112,8 +115,6 @@ CHORDS = [(48, [60, 64, 67], [60, 64, 67, 72, 76, 72, 67, 64]),
           (43, [55, 59, 62], [59, 62, 67, 71, 74, 71, 67, 62]),
           (45, [57, 60, 64], [60, 64, 69, 72, 76, 72, 69, 64]),
           (41, [53, 57, 60], [60, 65, 69, 72, 77, 72, 69, 65])]
-START = TURN + 0.55
-END_CHORD = TURN + 15.4
 def play(at, x, db, pan=0.0):
     """A note of the groove: nothing starts once the end chord is due."""
     if at < END_CHORD - 0.05: put(at, x, db, pan)
@@ -121,7 +122,8 @@ def play(at, x, db, pan=0.0):
 put(TURN, swell(), -24)
 bar = 0; at = START
 while at < END_CHORD - 0.05:
-    root, padn, arp = CHORDS[bar % 4]
+    # The last bar is half a bar, and it is on G: the end chord is then the way home.
+    root, padn, arp = CHORDS[1] if at + BAR > END_CHORD + 0.05 else CHORDS[bar % 4]
     span = min(BAR, END_CHORD - at)            # the end chord cuts the last bar short
     play(at, pad(padn, span + 0.25), -25)
     play(at, bass(root, BAR * 0.5), -18)
@@ -150,18 +152,26 @@ music = music + 0.22 * wet / (np.max(np.abs(wet)) or 1) * np.max(np.abs(music))
 music *= np.clip((LEN - t_of(LEN)) / 2.5, 0, 1)[:, None]
 music = np.stack([highpass(highpass(music[:, c], 110), 110) for c in range(2)], axis=1)
 
-# The narrator, with its few loudest glottal pulses held 3 dB down so the
+# The narrator, at a set loudness, with its loudest pulses held down so the
 # master limiter has almost nothing to do. The music stays 6 dB down under the
 # whole narration, pauses included, so it never breathes between lines, and
 # comes back up over one second after the last word.
-# When each line starts: the hook, the loop's three lines, then the turn and the
-# answer, counted from the turn.
-VO = [0.4] + [HOOK + t for t in (0.7, 4.3, 7.15)] + [TURN + t for t in (0.8, 3.1, 6.2, 10.2, 12.9, 15.6)]
+# When each line starts: the hook, the loop's two lines, the turn and the answer,
+# counted from the turn, and the last line on the end chord.
+VO = ([0.4] + [HOOK + t for t in (0.45, 3.30)]
+      + [TURN + t for t in (0.8, 3.0, 6.1, 9.3, 12.05, 16.2)] + [END_CHORD + 0.2])
 voice = np.zeros(N)
 for n, at in enumerate(VO, 1):
     v, sr = sf.read(os.path.join(WORK, f"vo{n}.wav")); assert sr == SR
     s = int(at * SR); v = v[: N - s]; voice[s:s + len(v)] += v
-voice = limit(norm(voice, 0.95)[:, None], SR, 0.95 * 10 ** (-3 / 20), release=0.05)[0][:, 0]
+# The level is set by how loud the voice is, not by its highest peak: one hard
+# consonant in one line would turn the whole narration down under the music.
+voice = norm(voice, 0.95)
+voice *= 10 ** (-20.4 / 20) / np.sqrt(np.mean(voice[np.abs(voice) > 0.003] ** 2))
+voice, held = limit(voice[:, None], SR, 0.95 * 10 ** (-3 / 20), release=0.05)
+voice = voice[:, 0]
+print(f"voice: peaks held down by up to {-20 * np.log10(held.min()):.1f} dB, "
+      f"by 2 dB or more for {np.sum(held < 10 ** (-2 / 20)) / SR * 1000:.0f} ms")
 last_word = np.nonzero(np.abs(voice) > 0.003)[0][-1] / SR
 rise = 0.5 - 0.5 * np.cos(np.pi * np.clip((t_of(LEN) - last_word - 0.05) / 1.0, 0, 1))
 duck = 10 ** (-6 * (1 - rise) / 20)
