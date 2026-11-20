@@ -34,7 +34,7 @@
   --line:#d2d2d7;--line2:#c7c7cc;--ctl:#86868b;
   --text:#1d1d1f;--muted:#6e6e73;--accent:#0066cc;--link:#0066cc;
   --ok:#1b7f37;--warn:#8a5a00;--bad:#c4281c;
-  --btn:#0071e3;--btn-h:#0077ed;--focus:#0071e3;
+  --btn:#0071e3;--btn-h:#0066cc;--focus:#0071e3;
   --shadow:0 0 0 1px rgba(0,0,0,.08),0 40px 80px -36px rgba(0,0,0,.35);
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
@@ -62,6 +62,9 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:76px
 body{margin:0;background:var(--bg);color:var(--text);font:400 1.0625rem/1.47 var(--sans);letter-spacing:-.01em;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
 a{color:var(--link);text-decoration:none;text-underline-offset:.2em}
 a:hover{text-decoration:underline}
+/* A link inside running text keeps its underline: colour alone does not mark it. */
+:where(p,.tips) a:not([class]){text-decoration:underline;text-decoration-thickness:1px}
+:where(p,.tips) a:not([class]):hover{text-decoration-thickness:2px}
 code,kbd{font-family:var(--mono);letter-spacing:0}
 kbd{padding:.1em .45em;border:1px solid var(--line2);border-bottom-width:2px;border-radius:6px;background:var(--surface);font-size:.85em;color:var(--text)}
 p{margin:0 0 1em}

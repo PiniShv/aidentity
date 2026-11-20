@@ -39,7 +39,7 @@
   --gut:clamp(20px,5vw,44px);--nav:52px;
   --bg:#fff;--bg2:#f5f5f7;--tile:#f5f5f7;--tile2:#fff;
   --text:#1d1d1f;--muted:#6e6e73;--dim:#8e8e93;--line:#d2d2d7;--line2:rgba(0,0,0,.08);
-  --link:#0066cc;--btn:#0071e3;--btn-h:#0077ed;--focus:#0071e3;
+  --link:#0066cc;--btn:#0071e3;--btn-h:#0066cc;--focus:#0071e3;
   --ok:#1b7f37;--warn:#8a5a00;--bad:#c4281c;--hot:#bf4800;--chip:rgba(0,0,0,.05);
   --shadow:0 0 0 1px rgba(0,0,0,.08),0 40px 80px -36px rgba(0,0,0,.35);
   --mac:#fff;--mac-bar:#ececee;--mac-t:#6e6e73;
@@ -69,6 +69,10 @@ img,video{max-width:100%}
 figure{margin:0}
 a{color:var(--link);text-decoration:none;text-underline-offset:.2em}
 a:hover{text-decoration:underline}
+/* A link inside running text keeps its underline: colour alone does not mark it. */
+:where(p,.notes) a:not([class]){text-decoration:underline;text-decoration-thickness:1px}
+:where(p,.notes) a:not([class]):hover{text-decoration-thickness:2px}
+sup a:not([class]){text-decoration:none}
 code,kbd{font-family:var(--mono);letter-spacing:0}
 p{margin:0 0 1em}
 h1,h2,h3{margin:0;font-weight:600;text-wrap:balance}
